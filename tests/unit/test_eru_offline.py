@@ -74,6 +74,28 @@ def test_threat_intel(tmp_path):
     assert "APT33: atomic indicators, T1071" in answer
 
 
+def test_rare_across_hosts(tmp_path):
+    path = Path(case(tmp_path))
+    assert "Nothing was stacked" in eru_offline.answer("rare", str(path))
+    header = "Rank,Score,Family,Value,Hosts With It,Hosts In Case,Hosts,Reasons,Artefact,Example\n"
+    (path / "stacking.csv").write_text(
+        header +
+        "1,3.0,process,c:\\users\\bob\\appdata\\x7kq.exe,1,4,WS02,\"rare, user path, generated name\",prefetch.csv,\n"
+        "2,1.0,\"service (systemd), debian\",kworkerds.service,1,3,web02,rare,services.csv,\n"
+        "3,1.0,parent and child,explorer.exe > cmd.exe,1,4,WS03,rare,4688.csv,\n")
+    answer = eru_offline.answer("rare", str(path))
+    ways_in, programs = answer.split("**Programs and process pairs**")
+    assert "kworkerds.service" in ways_in and "on 1 of 3 hosts (web02); rare" in ways_in and "x7kq" not in ways_in
+    assert "x7kq.exe" in programs and "rare, user path, generated name" in programs and "explorer.exe > cmd.exe" in programs
+    assert "lead, not a verdict" in answer
+
+
+def test_stacking_persistence_families_match():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
+    from rivendell.analysis import stacking
+    assert eru_offline.STACKING_PERSISTENCE == stacking.PERSISTENCE
+
+
 def test_general_and_missing_case():
     assert "ollama pull" in eru_offline.answer("enable_llm", None)
     assert "Select a processed case" in eru_offline.answer("persistence", None)

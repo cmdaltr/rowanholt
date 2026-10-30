@@ -8,7 +8,7 @@ Free-text answers, case summaries and investigation suggestions come from a loca
 
 ## Without Ollama
 
-If Ollama isn't running, or the model isn't pulled, Ask Eru says which and how to fix it, turns off free text, and offers fixed questions answered exactly from Elrond's output for the selected case: which hosts are in it, which ATT&CK techniques were tagged, what persistence was flagged, who logged in (and failed to), which IOCs were extracted, which shell commands look suspicious, what matched threat intelligence (when the case was run with it), and what analysts have confirmed in the case browser. With a model, confirmed findings go into its context first. A few general questions (persistence locations per OS, what Gandalf collects) need no case. These answers are read from the files and the findings, not generated, so they are the same every time.
+If Ollama isn't running, or the model isn't pulled, Ask Eru says which and how to fix it, turns off free text, and offers fixed questions answered exactly from Elrond's output for the selected case: which hosts are in it, which ATT&CK techniques were tagged, what persistence was flagged, who logged in (and failed to), which IOCs were extracted, which shell commands look suspicious, what matched threat intelligence (when the case was run with it), what's rare across the hosts (stacking's top rows, persistence first, each a lead rather than a verdict), and what analysts have confirmed in the case browser. With a model, confirmed findings go into its context first. A few general questions (persistence locations per OS, what Gandalf collects) need no case. These answers are read from the files and the findings, not generated, so they are the same every time.
 
 ## Eru Models
 

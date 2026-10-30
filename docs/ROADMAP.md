@@ -106,7 +106,7 @@ Container forensics goes first because half of it is written. ML goes last becau
 - **Evaluate in the lab per release.** The Linux and Windows runs above are the method. Signed or unsigned, and time of day against the host's logons, aren't features yet, because the cooked artefacts don't carry signatures and logon patterns need a per-host model of their own.
 - **No learned model (Ben, 29 October 2026).** An isolation forest was considered and dropped, with `scikit-learn`, because stacking found every plant in the lab. The note below is kept for the record.
 - **The isolation forest, as considered.** It would score how unusual each host's values are, not only how many hosts have them, catching what counting can't, such as a process every host runs but with an odd parent or command line on one. Against: `scikit-learn` (with numpy and scipy, about 30–40 MB) in the worker image, which the dependency rule needs agreed, and a score that's harder to explain than stacking's named reasons. Stacking found every plant with no noise on the lab case, so there was nothing for a forest to improve on.
-- **Eru's "What's rare in this case?"** was held back until the lab numbers held up. They now have (Linux and Windows above); see the plan below.
+- **Eru's "What's rare in this case?"** (built 30 October). An offline question over `stacking.csv`: persistence rows first, then programs and process pairs, each with its hosts and reasons, and the reminder that a row is a lead, not a verdict.
 
 ## Plan for what's left (29 October 2026)
 
@@ -140,7 +140,7 @@ Each feature's "Still to do" above, as work to schedule, then the Eru MCP server
 
 ### Stacking (anomaly detection)
 
-1. **Eru's "What's rare in this case?"** (half a day). An offline question over `stacking.csv`: the top rows, persistence first, each with its hosts and reasons, and the reminder that a row is a lead, not a verdict. A test in `test_eru_offline.py`.
+1. **Eru's "What's rare in this case?"** (done 30 October). An offline question over `stacking.csv`: the top rows, persistence first, each with its hosts and reasons, and the reminder that a row is a lead, not a verdict. Tests in `test_eru_offline.py`, one keeping its persistence families equal to `stacking.PERSISTENCE`.
 2. **One command for the lab evaluation** (half a day). `./lab.sh stacking-eval` builds the stacking targets, collects, runs Elrond and prints precision at 4, 8 and 20 against the plants, appending the result to a table in `lab/README.md`. Linux every release; Windows when its clean VMs are rebuilt (about two hours), at least once per major release.
 
 ### The Eru MCP server
@@ -162,7 +162,7 @@ The March 2026 prototype ("Building an MCP") kept its own case folders, ran its 
 | `list_cases` | `GET /api/jobs` |
 | `case_overview(job_id)` | the job, its hosts and their files (`GET /api/jobs/{id}`, `GET /api/jobs/{id}/case`) |
 | `read_rows(job_id, host, file, filter, offset, limit)` | `GET /api/jobs/{id}/case/rows`, with each row's reference for citing |
-| `ask_offline(job_id, question)` | `POST /api/ai/offline/answer`: the eleven fixed questions, plus "What's rare?" once it's built |
+| `ask_offline(job_id, question)` | `POST /api/ai/offline/answer`: the twelve fixed case questions, "What's rare?" among them |
 | `ask_eru(job_id, question)`, `case_summary`, `suggestions` | `/api/ai/cases/{case}/…`, when Ollama is up; otherwise they say so and point to `ask_offline` |
 | `check_indicator(value)` | `GET /api/threat-intel/enrich` (`enrich_artefact()`) |
 | `rare_across_hosts(job_id)` | `stacking.csv` through the case rows |

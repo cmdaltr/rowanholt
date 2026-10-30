@@ -30,6 +30,10 @@ SUSPICIOUS_COMMAND = re.compile(
 FLAGGED_CSVS = ("pam.csv", "sudoers.csv", "autostart.csv", "udev_rules.csv", "preload.csv", "shell_init.csv",
                 "kernel_modules.csv", "btm_items.csv", "emond_rules.csv", "periodic.csv")
 PERSISTENCE_LISTS = ("startup_items.csv", "generators.csv")
+# stacking.py's PERSISTENCE (the backend doesn't import the analysis package; a test keeps them equal)
+STACKING_PERSISTENCE = {"scheduled task", "wmi consumer", "service (Windows)", "autorun (Windows)", "service (systemd)",
+                        "autorun (Linux)", "kernel module", "autorun (macOS)"}
+RARE_ROWS = 8
 
 
 def _hosts(case_path: str) -> List[Path]:
@@ -267,6 +271,27 @@ def detections(case_path: str) -> str:
     return "**Detections:**\n\n" + "\n\n".join(sections)
 
 
+def rare(case_path: str) -> str:
+    """The top of Elrond's stacking across hosts (<case>/stacking.csv): persistence, then programs."""
+    rows = _rows(Path(case_path) / "stacking.csv")
+    if not rows:
+        return ("Nothing was stacked for this case. Stacking compares hosts, so it needs two or more, and runs with "
+                "Elrond's analysis (--Analysis); something is called rare only among three or more hosts of an OS.")
+    def line(r: Dict[str, str]) -> str:
+        return (f"#{r.get('Rank')} {r.get('Value')} ({r.get('Family')}): on {r.get('Hosts With It')} of "
+                f"{r.get('Hosts In Case')} hosts ({r.get('Hosts')}); {r.get('Reasons')}")
+    persistence = [r for r in rows if (r.get("Family") or "").split(",")[0] in STACKING_PERSISTENCE]
+    programs = [r for r in rows if r not in persistence]
+    parts = []
+    if persistence:
+        parts.append(f"**Ways back in** ({len(persistence)})\n" + _bullets(map(line, persistence), RARE_ROWS))
+    if programs:
+        parts.append(f"**Programs and process pairs** ({len(programs)})\n" + _bullets(map(line, programs), RARE_ROWS))
+    return ("**What's rare across the hosts** (stacking.csv, highest score first):\n\n" + "\n\n".join(parts) +
+            "\n\nEach row is a lead, not a verdict: rare can be an older build or a busier host. "
+            "Open stacking.csv in the case browser to flag one.")
+
+
 def analysis(case_path: str) -> str:
     sections = []
     for host in _hosts(case_path):
@@ -338,6 +363,7 @@ CASE_QUESTIONS: Dict[str, Dict[str, object]] = {
     "staging": {"question": "Were executables staged in temp directories?", "answer": staging},
     "detections": {"question": "Any malware detections or web shells?", "answer": detections},
     "analysis": {"question": "What did Elrond's analysis flag?", "answer": analysis},
+    "rare": {"question": "What's rare in this case?", "answer": rare},
     "threat_intel": {"question": "Does anything match known threat intelligence?", "answer": threat_intel},
     "findings": {"question": "What have analysts confirmed?", "answer": findings},
 }
