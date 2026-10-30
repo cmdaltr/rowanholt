@@ -381,6 +381,30 @@ cmd_gandalf_collect() {
   return $rc
 }
 
+# stacking-eval: the Linux stacking targets collected afresh, Elrond over all four as one case, and
+# stacking.csv scored against the plants (lib/stacking_eval.py), with a row added to README.md
+cmd_stacking_eval() {
+  pick_docker_context
+  require_password
+  docker ps --format '{{.Names}}' | grep -qx rivendell-celery-worker || die "Rivendell isn't running: ./rivendell start"
+  local root="${TEST_IMAGES_PATH:-$LAB_DATA_DIR}" case_id dest acq
+  docker exec rivendell-celery-worker test -d "$root" || die "Rivendell's worker can't see $root: run ./lab.sh rivendell-env"
+  case_id="STACKEVAL-$(date +%Y%m%d-%H%M)"
+  dest="$root/stacking-eval/$case_id"
+  # A collection of its own, so hosts left from earlier runs aren't stacked with these
+  ACQ_ROOT="$dest/gandalf"
+  acq="$ACQ_ROOT/python_collection/acquisitions/"
+  mkdir -p "$ACQ_ROOT" "$dest/elrond"
+  cmd_linux_targets stacking || return 1
+  GANDALF_WORKAROUNDS=0 cmd_gandalf_collect python "lab-ubuntu lab-rocky lab-ubuntu-clean1 lab-ubuntu-clean2" || return 1
+  step "Elrond over the four hosts as $case_id"
+  docker exec rivendell-celery-worker sh -c 'cd "${ELROND_HOME:-/opt/elrond}" && python3 elrond.py "$@"' elrond \
+    "$case_id" "$acq" "$dest/elrond" --Gandalf --Process --Analysis || return 1
+  step "Stacking against the plants"
+  python3 "$LAB_ROOT/lib/stacking_eval.py" "$dest/elrond" "$acq" --readme "$LAB_ROOT/README.md" \
+    --label "Linux containers (python collector)"
+}
+
 # ------------------------------------------------------------------------- mordor
 
 cmd_mordor_download() {
@@ -681,6 +705,7 @@ Usage: ./lab.sh [command]
   macos-vm [create|start|stop|delete|status|move <dir>]   (Apple silicon)
   windows-vm [create|start|stop|provision|gui|delete|status]
   gandalf-collect [bash|python|powershell|all] ["targets"]
+  stacking-eval       Collect the Linux stacking targets, run Elrond, score stacking.csv (adds a row to README.md)
   mordor-download [test paths...]   e.g. apt29/day1 atomic/persistence
   mordor-sensor       Sysmon + Atomic Red Team in the Windows VM
   mordor-capture      Run atomics and export a dataset
@@ -752,6 +777,7 @@ case "${1:-}" in
   macos-vm) shift; cmd_macos_vm "$@" ;;
   windows-vm) shift; cmd_windows_vm "$@" ;;
   gandalf-collect) shift; cmd_gandalf_collect "$@" ;;
+  stacking-eval) cmd_stacking_eval ;;
   mordor-download) shift; cmd_mordor_download "$@" ;;
   mordor-sensor) cmd_mordor_sensor ;;
   mordor-capture) shift; cmd_mordor_capture "$@" ;;

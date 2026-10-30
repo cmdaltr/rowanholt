@@ -76,6 +76,12 @@ For stacking, `linux-targets stacking` adds two clean Ubuntu hosts, `lab-ubuntu-
 
 Stacking compares Linux hosts within their distribution family, so `lab-rocky` (RHEL, one host) is only compared with itself and nothing on it is called rare; the three Ubuntu hosts are compared with each other. On 29 October 2026 that gave four rows, all planted on `lab-ubuntu` (`lab-sync.service`, `lab-agent.service` system and user, the `lab updater` autostart): precision@3 of 1.0, where before distro grouping the same case gave twenty rows of Rocky's own units. The clean hosts have no `expected.json`.
 
+`./lab.sh stacking-eval` does all of that in one go: it starts the four targets, collects them with `gandalf.py` into a folder of its own under `<data>/stacking-eval/STACKEVAL-<date>/`, runs Elrond in Rivendell's worker with `--Gandalf --Process --Analysis`, and scores `stacking.csv` against the `stacking` values in each target's `expected.json` (`lib/stacking_eval.py`). It prints precision at 4, 8 and 20 and each plant's rank, adds a row to the table below, and exits 1 if a plant isn't in `stacking.csv` at all. Run it every release; the Windows evaluation (clean siblings, below) at least once per major release.
+
+| Date | Hosts | Rows | P@4 | P@8 | P@20 | Plant ranks |
+|---|---|---|---|---|---|---|
+<!-- stacking-eval: rows above -->
+
 The **Linux VM** (`linux-vm create`) is Ubuntu with a real kernel (`bento/ubuntu-24.04` under Vagrant, Cirrus Labs `ubuntu:latest` under Tart), on SSH port 2230. The **macOS VM** (`macos-vm create`, Apple silicon only) is a Cirrus Labs Sequoia image on port 2231, provisioned without prompts: a `gandalf` user, a LaunchAgent, zsh history with a download, and a hidden staging folder in `/Users/Shared`. Both collectors work against it. `gandalf.sh` runs with sudo and also gets the root-only TCC and KnowledgeC databases; `gandalf.py` collects as the SSH user, so it skips what that user can't read. On the reference run (USB HDD), first boot took about an hour, then provisioning took 2.5 minutes, the bash and Python collections about 3 and 2 minutes, and Elrond 1.5–4 minutes.
 
 The **Windows VM** (`windows-vm create`) is Windows 11, provisioned with a Run key, a scheduled task, a service, failed logons and PSReadLine history.

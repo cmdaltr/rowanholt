@@ -134,6 +134,7 @@ cat > /etc/rivendell-lab/expected.json <<'EOF'
     {"path": "/var/log/pods/payments_api-7d9f_0b1c/api/0.log", "cooked": "container_logs.csv", "expect": ["payments"]},
     {"path": "/var/log/kubernetes/audit/audit.log", "attack": "T1552.007", "cooked": "k8s_audit.csv", "expect": ["T1609", "T1098.006"]}
   ],
-  "iocs": ["198.51.100.23", "198.51.100.77", "c2.rivendell-lab.test", "update.rivendell-lab.test"]
+  "iocs": ["198.51.100.23", "198.51.100.77", "c2.rivendell-lab.test", "update.rivendell-lab.test"],
+  "stacking": ["lab-sync.service", "lab-agent.service", "lab updater"]
 }
 EOF

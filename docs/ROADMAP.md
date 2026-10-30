@@ -141,7 +141,7 @@ Each feature's "Still to do" above, as work to schedule, then the Eru MCP server
 ### Stacking (anomaly detection)
 
 1. **Eru's "What's rare in this case?"** (done 30 October). An offline question over `stacking.csv`: the top rows, persistence first, each with its hosts and reasons, and the reminder that a row is a lead, not a verdict. Tests in `test_eru_offline.py`, one keeping its persistence families equal to `stacking.PERSISTENCE`.
-2. **One command for the lab evaluation** (half a day). `./lab.sh stacking-eval` builds the stacking targets, collects, runs Elrond and prints precision at 4, 8 and 20 against the plants, appending the result to a table in `lab/README.md`. Linux every release; Windows when its clean VMs are rebuilt (about two hours), at least once per major release.
+2. **One command for the lab evaluation** (built 30 October, not yet run end to end). `./lab.sh stacking-eval` builds the stacking targets, collects them into a folder of its own, runs Elrond in the worker and prints precision at 4, 8 and 20 against the plants (the `stacking` values in each target's `expected.json`), appending the result to a table in `lab/README.md`. The scorer, `lab/lib/stacking_eval.py`, is tested in `test_stacking_eval.py`. Linux every release; Windows when its clean VMs are rebuilt (about two hours), at least once per major release.
 
 ### The Eru MCP server
 
