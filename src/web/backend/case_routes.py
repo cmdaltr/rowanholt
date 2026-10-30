@@ -67,6 +67,11 @@ class CaseStore:
                 rows = rows.filter(CaseFindingModel.status == status)
             return [self._finding(r) for r in rows.order_by(CaseFindingModel.id)]
 
+    def count_findings(self, job_id: str) -> int:
+        """How many findings the job has: a restart rewrites the rows they point at."""
+        with self.Session() as session:
+            return session.query(CaseFindingModel).filter(CaseFindingModel.job_id == job_id).count()
+
     def existing(self, job_id: str, host: str, artefact: str, row_ref: str) -> Optional[Dict]:
         """The finding already on this row, if anyone flagged it."""
         with self.Session() as session:
@@ -192,6 +197,19 @@ def store() -> CaseStore:
     if _store is None:
         raise RuntimeError("case_routes.configure() hasn't been called")
     return _store
+
+
+def restart_refusal(job_id: str, confirm: bool) -> Optional[Dict]:
+    """Why a restart needs confirming (the job has findings and the caller didn't say confirm), or None."""
+    if confirm:
+        return None
+    count = store().count_findings(job_id)
+    if not count:
+        return None
+    return {"findings": count,
+            "message": f"This case has {count} finding{'' if count == 1 else 's'}. Restarting rewrites the case's "
+                       "output, so any row that changes will show \"row changed\" in the case browser. "
+                       "Restart with confirm=true to go ahead."}
 
 
 def _actor(request: Request) -> str:

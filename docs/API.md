@@ -762,12 +762,15 @@ Paths are passed to the worker unchanged, except `/host/tmp/rivendell/…`, whic
 
 **Endpoint:** `POST /api/jobs/{job_id}/restart`
 
-**Description:** Restart a failed or cancelled job. Creates new Celery task.
+**Description:** Restart a failed, cancelled or completed job. Creates new Celery task. A job with findings is refused unless the request confirms, since the re-run rewrites the rows they point at.
 
 **Authentication:** Not enforced in the current build (see [Authentication Status](#authentication-status))
 
 **Path Parameters:**
 - `job_id`: UUID of the job
+
+**Query Parameters:**
+- `confirm` (bool, default `false`): restart even though the job has findings
 
 **Response:** `200 OK`
 ```json
@@ -780,8 +783,9 @@ Paths are passed to the worker unchanged, except `/host/tmp/rivendell/…`, whic
 ```
 
 **Errors:**
-- `400 Bad Request`: Job not in failed/cancelled state
+- `400 Bad Request`: Job not in failed/cancelled/completed state
 - `404 Not Found`: Job not found
+- `409 Conflict`: The job has findings and `confirm` wasn't set; `detail` is `{"findings": 3, "message": "..."}`
 
 ---
 
@@ -843,7 +847,11 @@ Paths are passed to the worker unchanged, except `/host/tmp/rivendell/…`, whic
 
 **Endpoint:** `POST /api/jobs/bulk/restart`
 
-**Description:** Restart failed, cancelled or completed jobs. Takes a bare JSON array of job IDs and returns a result per job.
+**Description:** Restart failed, cancelled or completed jobs. Takes a bare JSON array of job IDs and returns a result per job. Without `confirm=true`, a job with findings is skipped: its result has `success: false`, the reason in `error` and the count in `findings`.
+
+**Query Parameters:**
+- `fresh` (bool, default `false`): remove each job's previous output before it runs again
+- `confirm` (bool, default `false`): restart jobs that have findings too
 
 ---
 

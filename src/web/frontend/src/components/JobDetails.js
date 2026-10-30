@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { getJob, cancelJob, pauseJob, resumeJob, deleteJob, restartJob, exportSiem, confirmSudo, cancelSudo, countFindings } from '../api';
+import { getJob, cancelJob, pauseJob, resumeJob, deleteJob, restartJob, exportSiem, confirmSudo, cancelSudo } from '../api';
 import { serviceUrl } from '../apiBase';
 import JobSharing from './JobSharing';
 
@@ -103,15 +103,21 @@ function JobDetails() {
   };
 
   const handleRestart = async () => {
-    const findings = await countFindings(jobId);
-    if (findings && !window.confirm(
-      `This case has ${findings} finding${findings === 1 ? '' : 's'}. Restarting rewrites the case's output, so any `
-      + 'row that changes will show "row changed" in the case browser. Restart anyway?')) {
-      return;
-    }
     setActionLoading(true);
     try {
-      await restartJob(jobId);
+      try {
+        await restartJob(jobId);
+      } catch (err) {
+        // The case has findings: the backend says how many, and the restart waits for a yes
+        if (err.response?.status !== 409) throw err;
+        const { findings } = err.response.data.detail;
+        if (!window.confirm(
+          `This case has ${findings} finding${findings === 1 ? '' : 's'}. Restarting rewrites the case's output, so any `
+          + 'row that changes will show "row changed" in the case browser. Restart anyway?')) {
+          return;
+        }
+        await restartJob(jobId, true);
+      }
       await loadJob();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to restart job');

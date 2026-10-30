@@ -83,8 +83,9 @@ export const resumeJob = async (jobId) => {
   return response.data;
 };
 
-export const restartJob = async (jobId) => {
-  const response = await api.post(`/api/jobs/${jobId}/restart`);
+// A job with findings answers 409 unless confirm is set: restarting rewrites the rows they point at
+export const restartJob = async (jobId, confirm = false) => {
+  const response = await api.post(`/api/jobs/${jobId}/restart`, null, { params: confirm ? { confirm: true } : {} });
   return response.data;
 };
 
@@ -123,8 +124,8 @@ export const bulkArchiveJobs = async (jobIds) => {
   return response.data;
 };
 
-export const bulkRestartJobs = async (jobIds) => {
-  const response = await api.post('/api/jobs/bulk/restart', jobIds);
+export const bulkRestartJobs = async (jobIds, confirm = false) => {
+  const response = await api.post('/api/jobs/bulk/restart', jobIds, { params: confirm ? { confirm: true } : {} });
   return response.data;
 };
 

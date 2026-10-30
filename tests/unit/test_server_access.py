@@ -146,6 +146,27 @@ class ServerAccessTest(unittest.TestCase):
         resp = self.client.post("/api/jobs/bulk/cancel", headers=self.bob, json=[job])
         self.assertEqual(resp.json()["results"][0]["error"], "Job not found")
 
+    def test_restart_with_findings_needs_confirm(self):
+        import case_routes
+        from models.job import JobStatus
+        job = self.create_job(self.alice, "CASE-RESTART-1")
+        stored = self.main.job_storage.get_job(job)
+        stored.status = JobStatus.COMPLETED
+        self.main.job_storage.save_job(stored)
+        case_routes.store().add_finding(job, "alice", host="WS01", artefact="artefacts/cooked/prefetch.csv",
+                                        row_ref="2", row_hash="0" * 64, title="Odd prefetch")
+
+        resp = self.client.post(f"/api/jobs/{job}/restart", headers=self.alice)
+        self.assertEqual(resp.status_code, 409, resp.text)
+        self.assertEqual(resp.json()["detail"]["findings"], 1)
+        resp = self.client.post("/api/jobs/bulk/restart", headers=self.alice, json=[job])
+        self.assertFalse(resp.json()["results"][0]["success"])
+        self.assertEqual(self.main.job_storage.get_job(job).status, JobStatus.COMPLETED)
+
+        resp = self.client.post(f"/api/jobs/{job}/restart?confirm=true", headers=self.alice)
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertEqual(resp.json()["status"], "pending")
+
     def test_case_clash_reported_without_listing_others_jobs(self):
         self.create_job(self.alice, "CASE-CLASH-1")
         body = self.client.get("/api/validate/case-id/CASE-CLASH-1", headers=self.bob).json()

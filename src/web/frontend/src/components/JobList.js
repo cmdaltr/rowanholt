@@ -283,7 +283,8 @@ function JobList() {
         try {
           // Only send restartable job IDs
           const restartableJobIds = restartableJobs.map(job => job.id);
-          const response = await bulkRestartJobs(restartableJobIds);
+          // The message above already warned about any findings
+          const response = await bulkRestartJobs(restartableJobIds, true);
 
           // Check results and show feedback
           const successful = response.results.filter(r => r.success).length;

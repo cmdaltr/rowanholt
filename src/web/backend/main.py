@@ -746,7 +746,7 @@ async def bulk_archive_jobs(job_ids: list[str], request: Request):
 
 
 @app.post("/api/jobs/bulk/restart")
-async def bulk_restart_jobs(job_ids: list[str], request: Request, fresh: bool = False):
+async def bulk_restart_jobs(job_ids: list[str], request: Request, fresh: bool = False, confirm: bool = False):
     """
     Restart multiple failed, cancelled, or completed jobs at once.
 
@@ -754,6 +754,7 @@ async def bulk_restart_jobs(job_ids: list[str], request: Request, fresh: bool = 
         job_ids: List of job IDs to restart
         fresh: Remove each job's previous output before it runs again, so a failed
             run's partial output doesn't mix with the new one
+        confirm: Restart jobs that have findings too (without it they're skipped)
 
     Returns:
         Results for each job
@@ -770,6 +771,12 @@ async def bulk_restart_jobs(job_ids: list[str], request: Request, fresh: bool = 
 
             if job.status not in [JobStatus.FAILED, JobStatus.CANCELLED, JobStatus.COMPLETED]:
                 results.append({"job_id": job_id, "success": False, "error": "Can only restart failed, cancelled, or completed jobs"})
+                continue
+
+            refusal = case_routes.restart_refusal(job_id, confirm)
+            if refusal:
+                results.append({"job_id": job_id, "success": False, "error": refusal["message"],
+                                "findings": refusal["findings"]})
                 continue
 
             # Reset job state
@@ -919,12 +926,13 @@ async def resume_job(job_id: str):
 
 
 @app.post("/api/jobs/{job_id}/restart")
-async def restart_job(job_id: str):
+async def restart_job(job_id: str, confirm: bool = False):
     """
     Restart a failed or cancelled job.
 
     Args:
         job_id: Job ID
+        confirm: Restart even though the job has findings (409 without it)
 
     Returns:
         Updated job
@@ -940,6 +948,10 @@ async def restart_job(job_id: str):
                 status_code=400,
                 detail="Can only restart failed, cancelled, or completed jobs",
             )
+
+        refusal = case_routes.restart_refusal(job_id, confirm)
+        if refusal:
+            raise HTTPException(status_code=409, detail=refusal)
 
         # Reset job state
         job.status = JobStatus.PENDING

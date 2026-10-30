@@ -63,7 +63,7 @@ Container forensics goes first because half of it is written. ML goes last becau
 - **Working at the same time.** Findings, notes and activity are separate rows, so simultaneous additions never collide.
   - A second flag on an already-flagged row is refused with the existing finding's number and author; the second analyst adds a note to it instead.
   - A status change carries the `updated_at` it was made against, and the server refuses it (409) if a colleague changed the finding first; the page then reloads it.
-  - The worker's image locks keep two jobs off the same evidence. Re-running a case that already has findings rewrites its cooked output, and the affected findings then show "row changed".
+  - The worker's image locks keep two jobs off the same evidence. Re-running a case that already has findings rewrites its cooked output, and the affected findings then show "row changed". So a restart of a job with findings is refused (409, with the count) unless the request says `confirm=true`; the bulk restart skips such jobs the same way. The Job page and the Jobs list say how many findings there are and send `confirm` once the analyst agrees.
 - **Output.** **Report** is Markdown: case notes first, then confirmed findings by host with their notes. **Navigator layer** holds confirmed findings' techniques only. Elrond's own layer is unchanged.
 - **Eru.** The offline question "What have analysts confirmed?" lists confirmed findings, then open leads. With a model, confirmed findings go into its context first.
 - **Storage.** Four tables, `case_findings`, `case_notes`, `case_hosts` and `case_activity`, added by Alembic revision `4d8b1f6e2c57`.
@@ -71,7 +71,6 @@ Container forensics goes first because half of it is written. ML goes last becau
 
 **Still to do.**
 - **Flagging from an Eru answer.** A finding needs a row, and Eru's answers are prose. This needs Eru to cite rows first.
-- **Restart with findings.** Restarting a job that has findings should warn first, since the re-run will change rows they point at.
 - **Assignees** are free text, offered from the user directory on a server, not checked against it.
 - **Live updates.** Polling is enough at this size. Websockets can wait until someone asks.
 
@@ -135,7 +134,7 @@ Each feature's "Still to do" above, as work to schedule, then the Eru MCP server
 
 ### Collaborative investigation
 
-1. **Restart with findings** (half a day). `POST /api/jobs/{id}/restart` answers 409 with the number of findings when there are any, unless the request says `confirm`; the Job page shows the count and asks before restarting. Test: a restart with findings is refused without `confirm`.
+1. **Restart with findings** (done 30 October). `POST /api/jobs/{id}/restart` answers 409 with the number of findings when there are any, unless the request says `confirm`; the bulk restart skips them likewise; the Job page shows the count and asks before restarting. Test: `test_restart_with_findings_needs_confirm` in `test_server_access.py`.
 2. **Assignees checked on a team server** (half a day). In server mode, `PUT /hosts/{host}` refuses an assignee who isn't in the user directory; on one machine it stays free text.
 3. **Flagging from an Eru answer** (two days, after the MCP server's row citations). Eru's offline answers are built from specific rows, so they return those rows with the text: file, row number and SHA-256, the same reference a finding stores. The Eru page shows ⚑ beside each cited line, which opens the usual finding form on that row. With a model, the context Eru sends is numbered by row and the model is asked to cite the numbers; only cited, existing rows can be flagged, so a model can't invent a finding.
 4. **Live updates** stay as polling until someone asks.
