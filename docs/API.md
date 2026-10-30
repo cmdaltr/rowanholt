@@ -1134,7 +1134,7 @@ A job's output, read-only, and the team's findings, notes, host assignments and 
 | `PATCH` | `/api/jobs/{job_id}/case/findings/{id}` | Change `title`, `technique` or `status`; pass the `updated_at` you loaded and a change someone else made first returns `409` instead of being overwritten |
 | `DELETE` | `/api/jobs/{job_id}/case/findings/{id}` | Remove a finding and its notes |
 | `GET` `POST` | `/api/jobs/{job_id}/case/notes` | Notes, Markdown: `{"body", "finding_id"}`, `finding_id` null for the case |
-| `PUT` | `/api/jobs/{job_id}/case/hosts/{host}` | `{"assignee", "status"}`; status is `to do`, `in progress` or `done` |
+| `PUT` | `/api/jobs/{job_id}/case/hosts/{host}` | `{"assignee", "status"}`; status is `to do`, `in progress` or `done`. In server mode the assignee must be an active user (username or email, stored as the username), otherwise `400`; `""` unassigns |
 | `GET` | `/api/jobs/{job_id}/case/activity?since=` | Who did what, newest first; `since` (the highest `id` seen) for polling |
 | `GET` | `/api/jobs/{job_id}/case/report` | Markdown: case notes, then confirmed findings by host with their notes |
 | `GET` | `/api/jobs/{job_id}/case/layer` | An ATT&CK Navigator layer of confirmed findings' techniques only |

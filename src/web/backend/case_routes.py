@@ -19,10 +19,12 @@ from pydantic import BaseModel, Field
 try:
     from . import case_files
     from .auth import access
+    from .auth.users import find_user, load_users
     from .storage import CaseActivityModel, CaseFindingModel, CaseHostModel, CaseNoteModel
 except ImportError:
     import case_files
     from auth import access
+    from auth.users import find_user, load_users
     from storage import CaseActivityModel, CaseFindingModel, CaseHostModel, CaseNoteModel
 
 router = APIRouter(prefix="/api/jobs/{job_id}/case", tags=["Case browser"])
@@ -391,7 +393,14 @@ async def assign_host(job_id: str, host: str, update: HostUpdate, request: Reque
         raise HTTPException(status_code=400, detail=f"status is one of {', '.join(HOST_STATUSES)}")
     if host not in {h.name for h in case_files.hosts(_root(job_id))}:
         raise HTTPException(status_code=404, detail=f"No host {host!r} in this case")
-    return store().assign(job_id, host, _actor(request), update.assignee, update.status)
+    assignee = update.assignee.strip() if update.assignee is not None else None
+    if assignee and access.server_mode():
+        # On a team server an assignee is someone who can sign in; on one machine it stays free text
+        user = find_user(load_users(), assignee)
+        if not user or not user.get("is_active", True):
+            raise HTTPException(status_code=400, detail=f"No active user {assignee!r}")
+        assignee = user["username"]
+    return store().assign(job_id, host, _actor(request), assignee, update.status)
 
 
 @router.get("/activity")

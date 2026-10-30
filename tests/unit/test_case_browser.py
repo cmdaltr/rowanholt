@@ -149,3 +149,20 @@ def test_findings_notes_and_output(client):
 
     assert api.delete(f"{base}/findings/{lead['id']}").status_code == 200
     assert len(api.get(f"{base}/findings").json()) == 1
+
+
+def test_assignees_checked_on_a_team_server(client, monkeypatch):
+    api, _ = client
+    url = f"/api/jobs/{JOB}/case/hosts/LAB-UBUNTU"
+    # One machine: free text
+    assert api.put(url, json={"assignee": "the night shift"}).json()["assignee"] == "the night shift"
+
+    monkeypatch.setattr(case_routes.access, "server_mode", lambda: True)
+    monkeypatch.setattr(case_routes, "load_users", lambda: {
+        "1": {"username": "sam", "email": "sam@example.org"},
+        "2": {"username": "pippin", "email": "pippin@example.org", "is_active": False}})
+    for name in ("the night shift", "pippin"):
+        refused = api.put(url, json={"assignee": name})
+        assert refused.status_code == 400 and name in refused.json()["detail"]
+    assert api.put(url, json={"assignee": "sam@example.org"}).json()["assignee"] == "sam"
+    assert api.put(url, json={"assignee": ""}).json()["assignee"] == ""

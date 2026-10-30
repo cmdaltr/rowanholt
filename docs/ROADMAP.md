@@ -59,7 +59,7 @@ Container forensics goes first because half of it is written. ML goes last becau
 
 - **Case browser.** **Browse Case** on a completed job opens `/jobs/{id}/case`. It lists each host's cooked artefacts and analysis files, plus the case's own CSVs (`threat_groups.csv`), in paged tables you can filter on any field. It is read-only by construction (`case_files.py`): requests are resolved against `artefacts/cooked/`, `analysis/` and the case root, `raw/` is never reachable, and nothing opens a file for writing.
 - **Findings.** ⚑ on any row flags it as a lead or confirms it outright, with a title and an optional technique. The server reads the row itself and stores its file, row reference, SHA-256 and an excerpt. If a re-run or an edited file changes the row, the finding shows "row changed" rather than silently pointing at something else.
-- **Notes, assignment and activity.** Notes are Markdown, on the case or on a finding. Each host has an assignee and a status: to do, in progress or done. An append-only feed records who flagged, marked, assigned, noted or exported what. The page polls every 15 seconds.
+- **Notes, assignment and activity.** Notes are Markdown, on the case or on a finding. Each host has an assignee and a status: to do, in progress or done. On a team server the assignee must be an active user (an email is stored as the username); on one machine it's free text. An append-only feed records who flagged, marked, assigned, noted or exported what. The page polls every 15 seconds.
 - **Working at the same time.** Findings, notes and activity are separate rows, so simultaneous additions never collide.
   - A second flag on an already-flagged row is refused with the existing finding's number and author; the second analyst adds a note to it instead.
   - A status change carries the `updated_at` it was made against, and the server refuses it (409) if a colleague changed the finding first; the page then reloads it.
@@ -67,11 +67,10 @@ Container forensics goes first because half of it is written. ML goes last becau
 - **Output.** **Report** is Markdown: case notes first, then confirmed findings by host with their notes. **Navigator layer** holds confirmed findings' techniques only. Elrond's own layer is unchanged.
 - **Eru.** The offline question "What have analysts confirmed?" lists confirmed findings, then open leads. With a model, confirmed findings go into its context first.
 - **Storage.** Four tables, `case_findings`, `case_notes`, `case_hosts` and `case_activity`, added by Alembic revision `4d8b1f6e2c57`.
-- **Tests.** `tests/unit/test_case_browser.py` covers the refusals around `raw/`, paging and filters, the finding lifecycle (including a changed row), notes, assignment, activity, the report, the layer and Eru's answer.
+- **Tests.** `tests/unit/test_case_browser.py` covers the refusals around `raw/`, paging and filters, the finding lifecycle (including a changed row), notes, assignment (checked against the users on a server), activity, the report, the layer and Eru's answer.
 
 **Still to do.**
 - **Flagging from an Eru answer.** A finding needs a row, and Eru's answers are prose. This needs Eru to cite rows first.
-- **Assignees** are free text, offered from the user directory on a server, not checked against it.
 - **Live updates.** Polling is enough at this size. Websockets can wait until someone asks.
 
 ## ML-based anomaly detection
@@ -135,7 +134,7 @@ Each feature's "Still to do" above, as work to schedule, then the Eru MCP server
 ### Collaborative investigation
 
 1. **Restart with findings** (done 30 October). `POST /api/jobs/{id}/restart` answers 409 with the number of findings when there are any, unless the request says `confirm`; the bulk restart skips them likewise; the Job page shows the count and asks before restarting. Test: `test_restart_with_findings_needs_confirm` in `test_server_access.py`.
-2. **Assignees checked on a team server** (half a day). In server mode, `PUT /hosts/{host}` refuses an assignee who isn't in the user directory; on one machine it stays free text.
+2. **Assignees checked on a team server** (done 30 October). In server mode, `PUT /hosts/{host}` refuses an assignee who isn't an active user; on one machine it stays free text. Test: `test_assignees_checked_on_a_team_server` in `test_case_browser.py`.
 3. **Flagging from an Eru answer** (two days, after the MCP server's row citations). Eru's offline answers are built from specific rows, so they return those rows with the text: file, row number and SHA-256, the same reference a finding stores. The Eru page shows ⚑ beside each cited line, which opens the usual finding form on that row. With a model, the context Eru sends is numbered by row and the model is asked to cite the numbers; only cited, existing rows can be flagged, so a model can't invent a finding.
 4. **Live updates** stay as polling until someone asks.
 
