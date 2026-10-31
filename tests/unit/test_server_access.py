@@ -53,8 +53,10 @@ def load_app():
     return main
 
 
-@unittest.skipIf(TestClient is None, "backend requirements (fastapi) not installed")
-class ServerAccessTest(unittest.TestCase):
+class BackendCase(unittest.TestCase):
+    """The real backend in server mode, with an admin, alice and bob signed in (no tests of its own:
+    test_eru_mcp.py drives its MCP server against the same setup)."""
+
     @classmethod
     def setUpClass(cls):
         cls.main = load_app()
@@ -71,7 +73,8 @@ class ServerAccessTest(unittest.TestCase):
         for name in ("alice", "bob"):
             resp = cls.client.post("/api/auth/users", headers=cls.admin, json={
                 "username": name, "email": f"{name}@example.org", "password": f"{name}-password-123"})
-            assert resp.status_code == 200, resp.text
+            # Another class over the same store may have made them already
+            assert resp.status_code == 200 or "already taken" in resp.text, resp.text
         cls.alice = cls.login("alice", "alice-password-123")
         cls.bob = cls.login("bob", "bob-password-123")
 
@@ -101,6 +104,9 @@ class ServerAccessTest(unittest.TestCase):
         self.assertEqual(resp.status_code, 200, resp.text)
         return {job["id"] for job in resp.json()["jobs"]}
 
+
+@unittest.skipIf(TestClient is None, "backend requirements (fastapi) not installed")
+class ServerAccessTest(BackendCase):
     def test_sign_in_required(self):
         for path in ("/api/jobs", "/api/fs/browse", "/api/ai/cases", "/api/auth/me"):
             self.assertEqual(self.client.get(path).status_code, 401, path)

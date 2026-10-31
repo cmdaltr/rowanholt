@@ -145,7 +145,9 @@ Each feature's "Still to do" above, as work to schedule, then the Eru MCP server
 
 ### The Eru MCP server
 
-**What it is.** One MCP server, built with FastMCP, through which an MCP host (Claude Desktop, Claude Code, OpenClaw) works a Rivendell case. It registers every Eru capability; nothing else registers tools.
+**Phase 1 built (31 October 2026):** `src/eru_mcp/server.py`, `rivendell mcp`, `requirements/mcp.txt`, documented in `docs/ERU.md`. mcp 2 renamed FastMCP to `MCPServer`, which it uses. Stdio only: the streamable HTTP option behind Caddy isn't built, because on a team server it would have to take each analyst's token from their request rather than the environment. The lab run on THREATINTEL-DEMO-01 is still to do; a smoke run over stdio against the local stack listed its cases and answered an offline question.
+
+**What it is.** One MCP server, built with FastMCP (mcp 2's `MCPServer`), through which an MCP host (Claude Desktop, Claude Code, OpenClaw) works a Rivendell case. It registers every Eru capability; nothing else registers tools.
 
 **How it's built.** A thin client of Rivendell's own API, not a second way into the case files.
 - On a team server, every call carries the analyst's token, so job sharing (`auth/access.py`) decides what the server can see, exactly as for the web app.
@@ -155,7 +157,7 @@ Each feature's "Still to do" above, as work to schedule, then the Eru MCP server
 
 The March 2026 prototype ("Building an MCP") kept its own case folders, ran its own acquisition and could call Anthropic's API. None of that carries over: cases are Rivendell jobs, acquisition is Gandalf's, and Eru's model is Ollama. Archer keeps its own server.
 
-**Phase 1: reading a case** (two days).
+**Phase 1: reading a case** (two days; built).
 
 | Tool | Calls |
 |---|---|

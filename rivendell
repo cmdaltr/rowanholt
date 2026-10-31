@@ -31,6 +31,8 @@ Forensics (run from the directory you're working in; relative paths stay relativ
   analyse <args>                    Elrond (rivendell analyse --help); 'analyze' works too
   mordor <command>                  Security datasets: list, download, info, local, verify, ...
   web                               The web UI and API without Docker
+  mcp                               Eru's MCP server over stdio, for Claude Desktop, Claude Code and the like
+                                    (RIVENDELL_API, RIVENDELL_TOKEN; needs requirements/mcp.txt; docs/ERU.md)
 
 The lab and the scripts:
   lab <command>                     The test lab (lab/lab.sh: linux-targets, windows-vm, gandalf-collect, ...)
@@ -430,6 +432,8 @@ case "$COMMAND" in
     analyse|analyze) exec "$PYTHON" "$ROOT/src/cli/rivendell.py" analyze "$@" ;;
     anduril|aragorn) exec "$PYTHON" "$ROOT/src/cli/rivendell.py" anduril "$@" ;;
     mordor) exec "$PYTHON" "$ROOT/src/cli/mordor.py" "$@" ;;
+    # stdout is the MCP protocol: nothing else may print to it
+    mcp) PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}" exec "${RIVENDELL_MCP_PYTHON:-$PYTHON}" -m eru_mcp.server "$@" ;;
     scripts) list_scripts ;;
     *)
         if [ -d "$ROOT/scripts/$COMMAND" ] && [ -z "${1:-}" ]; then

@@ -46,6 +46,7 @@ Gandalf (acquisition) → Elrond (analysis) → Eru (AI analyst)
 | `src/web/backend/auth/` | Sign-in: `users.py` (file store), `access.py` (the server-mode middleware: every route, job ownership and sharing via the `job_access` table), `oidc.py` (SSO), `manage_users.py` |
 | `src/common/startup_progress.py` | `rivendell start --progress`: phases, ETA from start history, the Shire-to-Rivendell places the apps draw |
 | `src/mordor/` | Security datasets and recorded attack telemetry |
+| `src/eru_mcp/` | Eru's MCP server (`rivendell mcp`), read-only over Rivendell's API |
 | `src/models/` | Ollama Modelfiles for the eru-* models |
 | `app/` | Desktop app: `macos/` (Swift WebKit app + first-run setup, `build.sh`/`package.sh` → DMG), `linux/` (launcher + zenity setup, `.deb`), `windows/` (launcher, Inno Setup installer); release builds in `.github/workflows/desktop-release.yml`; `rivendell app install` for a checkout; see `app/README.md` |
 | `lab/` | Test lab: Linux targets, Tart/UTM VMs, Gandalf against seeded hosts; bugs in `tests/docs/BUGS.md` |
@@ -85,9 +86,11 @@ Eru is the AI layer. It reads Elrond's case output and provides:
 - Case browser and collaboration: `src/web/backend/case_routes.py` + `case_files.py` (read-only over cooked/ and analysis/, never raw/), tables `case_findings`, `case_notes`, `case_hosts`, `case_activity`
 - Stacking across hosts: `src/analysis/rivendell/analysis/stacking.py` (stdlib; run by `--Analysis` on 2+ hosts, rarity needs 3+ of an OS, Linux grouped by distro family, persistence ranked above programs at equal score); no learned model (scikit-learn was dropped)
 
-## Planned, not in the repo yet
+## Eru's MCP server
 
-- Eru MCP tool server (FastMCP). When it's built, register every Eru capability through that one server — no parallel registration system
+- `src/eru_mcp/server.py` (`rivendell mcp`, stdio; mcp 2's `MCPServer`, formerly FastMCP; `requirements/mcp.txt`, Python 3.10+, never in the worker or backend images). Register every Eru capability through this one server — no parallel registration system
+- A thin client of Rivendell's API only (`RivendellAPI` refuses anything but `/api/` paths), read-only (phase 1); every tool `readOnlyHint`. Never expose starting/restarting/deleting jobs, Gandalf, threat intelligence import/delete, or `raw/`. Phase 2 (flag leads, add notes) is deferred and needs the threat model's review
+- Tests: `tests/unit/test_eru_mcp.py` over `test_server_access.BackendCase` (the real backend in server mode)
 
 ## What not to do
 
