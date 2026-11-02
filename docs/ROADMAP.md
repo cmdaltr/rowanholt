@@ -26,7 +26,7 @@ Container forensics goes first because half of it is written. ML goes last becau
 
 **Still to do.**
 - **The bash collector against the seed.** `gandalf.py`'s copy of the container lists ran against the rebuilt targets on 29 October (the containers video section shows its output). `gandalf.sh` collected the seed the same day, layer copy included, and Elrond over its result passed every container row of `verify-expected.py` on both targets (the one miss, `status.php`, needs YARA, which that run didn't use).
-- **containerd's own metadata** (`/var/lib/containerd`, a bbolt database) is collected by all three collectors since 29 October, with Podman/CRI-O's `containers.json`, but isn't parsed yet. On a containerd or CRI-O node, the pod logs, static pods and audit log are covered, but per-container settings come only from Docker.
+- **containerd's own metadata** (`/var/lib/containerd`, a bbolt database) is collected by all three collectors since 29 October, with Podman/CRI-O's `containers.json`, and parsed since 2 November: every container in every namespace but Docker's own (`moby`) becomes a `docker_containers.csv` row, `Runtime` `containerd`, flagged by the same rules. Podman/CRI-O's `containers.json` is still kept unparsed.
 - **Live container capture** (`docker export`, CRIU checkpoints) stays out of scope. It changes the running state, so if it's ever added it must be an explicit opt-in, recorded in the audit log.
 
 ## Threat intelligence integration
@@ -114,11 +114,11 @@ Each feature's "Still to do" above, as work to schedule, then the Eru MCP server
 ### Container forensics
 
 1. **The bash collector against the seed** (done 29 October). `./lab.sh linux-targets reset`, `./lab.sh gandalf-collect bash`, Elrond over the result, then `lab/verify-expected.py` against each target's `expected.json`. Done when `docker_containers.csv`, `container_changes.csv`, `static_pods.csv` and `k8s_audit.csv` match for `gandalf.sh` as they already do for `gandalf.py`.
-2. **containerd's metadata** (two to three days). On a containerd or CRI-O node, per-container settings (image, mounts, privileges, namespaces) live in `/var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db`, a bbolt database.
+2. **containerd's metadata** (done 2 November). On a containerd or CRI-O node, per-container settings (image, mounts, privileges, namespaces) live in `/var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db`, a bbolt database.
    - Collect `meta.db` in all three collectors, read-only, beside the Docker files. Done 29 October.
-   - Parse it into the existing `docker_containers.csv` columns, adding a `Runtime` column (`docker`, `containerd`) so one table covers both; the technique rules then apply unchanged.
-   - Seed a containerd-only node in the lab (`ctr` with a privileged container) with its rows in `expected.json`, and a unit test from that seed.
-   - Read bbolt with a stdlib reader in `process/extractions/` (decision 2). The container records inside are protobuf, decoded by hand either way, so the `bbolt` CLI would only save the page walking.
+   - Parse it into the existing `docker_containers.csv` columns, adding a `Runtime` column (`docker`, `containerd`) so one table covers both; the technique rules then apply unchanged. Done: `containers.containerd_rows` reads `v1/<namespace>/containers/<id>` (image, labels, `createdat`, and the OCI spec inside the protobuf `Any` in `spec`). Privileged is every device plus `CAP_SYS_ADMIN`; a host namespace is one the spec leaves out or one joined from PID 1 (`/proc/1/ns/…`); a pod's labels give its namespace, pod and container names. The resolver files a runtime mounts read-only into every container (`/etc/hosts`, `/etc/resolv.conf`, `/etc/hostname`) aren't flagged, for Docker either. Missing a seccomp profile isn't flagged: ctr and the CRI leave it out by default, so it would be on every row. Started, finished and running state aren't in `meta.db` (they're the task's, in memory).
+   - Seed a containerd-only node in the lab (`ctr` with a privileged container) with its rows in `expected.json`, and a unit test from that seed. Done, on the existing Linux targets rather than a node of its own: `seed/containerd/meta.db` was made by containerd 1.7 itself (`make-meta-db.sh` beside it: a privileged container with `/` mounted and the host's PID namespace, a harmless one, and a host-network pod), the seed copies it into place, and `expected.json` lists it. Tests: `test_containerd_metadata`, `test_bbolt_refuses_what_it_cannot_read` and the seed end to end in `test_containers.py`.
+   - Read bbolt with a stdlib reader in `process/extractions/` (decision 2). Done: `process/extractions/bbolt.py` (meta pages with their checksums, the later transaction's root; branch, leaf, inline and overflow pages; bounds checked).
 3. **Live capture** stays out of scope, as recorded above. No work planned.
 
 ### Threat intelligence

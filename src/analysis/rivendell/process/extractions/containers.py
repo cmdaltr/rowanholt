@@ -8,6 +8,9 @@ routes them here).
 - gandalf+container_changes.csv: Gandalf's listing of each container's writable layer, which is
   everything that changed since the container's image
 - /etc/kubernetes/manifests/*.yaml: static pods, which the kubelet runs with no API server involved
+- /var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db: containerd's own record of every
+  container (a Kubernetes node's, through the CRI, or ctr's), read with the stdlib bbolt reader
+  into the same docker_containers.csv rows, Runtime "containerd"
 
 Every function returns rows; techniques are decided from the rows by the *_techniques functions,
 only where a row justifies one.
@@ -17,14 +20,19 @@ import csv
 import json
 import os
 import re
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
+import struct
+from datetime import datetime, timedelta, timezone
+from typing import Dict, List, Optional, Tuple
+
+from rivendell.process.extractions.bbolt import Bolt, Bucket
 
 # Host paths a container has no business mounting
 SENSITIVE_MOUNTS = ("/", "/etc", "/root", "/proc", "/sys", "/dev", "/boot", "/var/lib/docker", "/var/lib/kubelet",
                     "/var/lib/containerd", "/home", "/usr", "/lib", "/var/log")
 DOCKER_SOCKETS = ("/var/run/docker.sock", "/run/docker.sock", "/run/containerd/containerd.sock",
                   "/var/run/containerd/containerd.sock", "/var/run/crio/crio.sock", "/run/crio/crio.sock")
+# What a runtime mounts read-only into every container for name resolution: not a lead
+RESOLVER_FILES = ("/etc/hosts", "/etc/resolv.conf", "/etc/hostname")
 ESCAPE_CAPABILITIES = {"ALL", "SYS_ADMIN", "SYS_PTRACE", "SYS_MODULE", "DAC_READ_SEARCH", "SYS_RAWIO", "BPF"}
 # Kubernetes' own static pods; anything else in the manifests directory was put there by someone
 CONTROL_PLANE_PODS = re.compile(r"^(?:kube-apiserver|kube-controller-manager|kube-scheduler|etcd|kube-vip|haproxy|"
@@ -43,7 +51,7 @@ PERSISTENCE_FILES = (
 HEADERS = {
     "docker_containers.csv": ["Container", "Name", "Image", "Command", "Created", "Started", "Finished", "Running",
                               "User", "Privileged", "PidMode", "NetworkMode", "IpcMode", "CapAdd", "SecurityOpt",
-                              "Mounts", "Flag"],
+                              "Mounts", "Runtime", "Flag"],
     "container_logs.csv": ["Runtime", "Container", "Pod", "Namespace", "Stream", "LastWriteTime", "Message"],
     "container_changes.csv": ["Container", "Path", "Size", "Mode", "Kind", "SHA256", "LastWriteTime", "Flag"],
     "static_pods.csv": ["Source", "Name", "Namespace", "Images", "Command", "Flag"],
@@ -71,6 +79,8 @@ def container_flags(privileged: bool, mounts: List[Dict[str, str]], pid_mode: st
         source = mount.get("Source", "")
         if source in DOCKER_SOCKETS:
             flags.append(f"container runtime socket mounted ({source})")
+        elif source in RESOLVER_FILES and not mount.get("RW"):
+            continue
         elif _sensitive(source):
             flags.append(f"host path mounted {'read-write' if mount.get('RW') else 'read-only'} ({source})")
     if pid_mode == "host":
@@ -117,8 +127,124 @@ def docker_container_row(path: str, hostconfig: Optional[str] = None) -> Optiona
         "PidMode": host.get("PidMode") or "", "NetworkMode": host.get("NetworkMode") or "",
         "IpcMode": host.get("IpcMode") or "", "CapAdd": ", ".join(cap_add), "SecurityOpt": ", ".join(security_opt),
         "Mounts": "; ".join(f"{m['Source']}:{m['Destination']}{'' if m['RW'] else ':ro'}" for m in mounts),
-        "Flag": "; ".join(flags),
+        "Runtime": "docker", "Flag": "; ".join(flags),
     }
+
+
+# containerd's namespaces: Docker's own containers are in moby, and come from config.v2.json instead
+CONTAINERD_SKIP = ("moby",)
+GO_EPOCH = datetime(1, 1, 1, tzinfo=timezone.utc)
+HEX_ID = re.compile(r"^[0-9a-f]{64}$")
+
+
+def _varint(data: bytes, at: int) -> Tuple[int, int]:
+    value = shift = 0
+    while at < len(data):
+        byte = data[at]
+        at += 1
+        value |= (byte & 0x7F) << shift
+        if not byte & 0x80:
+            return value, at
+        shift += 7
+    raise ValueError("truncated varint")
+
+
+def any_value(data: bytes) -> Tuple[str, bytes]:
+    """(type URL, value) of a protobuf google.protobuf.Any: fields 1 and 2, both length-delimited."""
+    type_url, value, at = "", b"", 0
+    while at < len(data):
+        key, at = _varint(data, at)
+        if key & 7 != 2:
+            raise ValueError("not an Any")
+        length, at = _varint(data, at)
+        chunk = data[at:at + length]
+        at += length
+        if key >> 3 == 1:
+            type_url = chunk.decode("utf-8", errors="replace")
+        elif key >> 3 == 2:
+            value = chunk
+    return type_url, value
+
+
+def go_time(data: Optional[bytes]) -> str:
+    """Go's time.MarshalBinary (version 1 or 2: seconds since year 1, nanoseconds, zone) as ISO UTC."""
+    if not data or len(data) < 15 or data[0] not in (1, 2):
+        return ""
+    seconds, nanos = struct.unpack(">qi", data[1:13])
+    try:
+        when = GO_EPOCH + timedelta(seconds=seconds, microseconds=nanos // 1000)
+    except OverflowError:
+        return ""
+    return when.isoformat().replace("+00:00", "Z")
+
+
+def _host_namespace(namespaces: List[Dict], kind: str) -> bool:
+    """No namespace of this kind in the spec, or joining PID 1's: the container shares the host's."""
+    for namespace in namespaces:
+        if namespace.get("type") == kind:
+            return (namespace.get("path") or "").startswith("/proc/1/ns/")
+    return True
+
+
+def containerd_container_row(namespace: str, container_id: str, container: Bucket) -> Dict[str, str]:
+    """One container from containerd's metadata (v1/<namespace>/containers/<id>): its OCI spec
+    says what it was allowed, as hostconfig.json does for Docker."""
+    values = container.values()
+    labels = {k.decode("utf-8", "replace"): v.decode("utf-8", "replace")
+              for k, v in (container.bucket(b"labels").items() if container.bucket(b"labels") else [])}
+    spec: Dict = {}
+    if values.get(b"spec"):
+        try:
+            spec = json.loads(any_value(values[b"spec"])[1] or b"{}")
+        except ValueError:
+            spec = {}
+    process = spec.get("process") or {}
+    linux = spec.get("linux") or {}
+    namespaces = linux.get("namespaces") or []
+    effective = [c.replace("CAP_", "") for c in (process.get("capabilities") or {}).get("effective") or []]
+    devices = (linux.get("resources") or {}).get("devices") or []
+    # What a privileged container gets: every device, and CAP_SYS_ADMIN with the rest
+    privileged = "SYS_ADMIN" in effective and any(d.get("allow") and not d.get("type") and not d.get("major")
+                                                  for d in devices)
+    mounts = [{"Source": m.get("source", ""), "Destination": m.get("destination", ""),
+               "RW": "ro" not in (m.get("options") or [])}
+              for m in spec.get("mounts") or [] if m.get("type") == "bind" or "bind" in (m.get("options") or []) or
+              "rbind" in (m.get("options") or [])]
+    pid_mode = "host" if spec and _host_namespace(namespaces, "pid") else ""
+    network_mode = "host" if spec and _host_namespace(namespaces, "network") else ""
+    ipc_mode = "host" if spec and _host_namespace(namespaces, "ipc") else ""
+    profile = process.get("apparmorProfile") or ""
+    security_opt = ["apparmor=unconfined"] if profile == "unconfined" else []
+    flags = container_flags(privileged, mounts, pid_mode, network_mode, ipc_mode, effective, security_opt)
+    user = process.get("user") or {}
+    name = labels.get("io.kubernetes.container.name")
+    pod = labels.get("io.kubernetes.pod.name")
+    shown = f"{labels.get('io.kubernetes.pod.namespace', '')}/{pod}/{name}" if pod and name else container_id
+    return {
+        "Container": container_id[:12] if HEX_ID.match(container_id) else container_id,
+        "Name": f"{namespace}: {shown}", "Image": values.get(b"image", b"").decode("utf-8", "replace"),
+        "Command": " ".join(str(a) for a in process.get("args") or []),
+        "Created": go_time(values.get(b"createdat")), "Started": "", "Finished": "", "Running": "",
+        "User": "root" if user.get("uid", 0) == 0 else str(user.get("uid")),
+        "Privileged": str(privileged), "PidMode": pid_mode, "NetworkMode": network_mode, "IpcMode": ipc_mode,
+        "CapAdd": ", ".join(effective), "SecurityOpt": ", ".join(security_opt),
+        "Mounts": "; ".join(f"{m['Source']}:{m['Destination']}{'' if m['RW'] else ':ro'}" for m in mounts),
+        "Runtime": "containerd", "Flag": "; ".join(flags),
+    }
+
+
+def containerd_rows(path: str) -> List[Dict[str, str]]:
+    """Every container in containerd's meta.db, in every namespace but Docker's."""
+    root = Bolt(path).root().bucket(b"v1")
+    rows = []
+    for namespace, bucket in (root.buckets() if root else []):
+        name = namespace.decode("utf-8", "replace")
+        listed = bucket.bucket(b"containers")
+        if name in CONTAINERD_SKIP or listed is None:
+            continue
+        for container_id, container in listed.buckets():
+            rows.append(containerd_container_row(name, container_id.decode("utf-8", "replace"), container))
+    return rows
 
 
 def container_techniques(rows: List[Dict[str, str]]) -> List[str]:

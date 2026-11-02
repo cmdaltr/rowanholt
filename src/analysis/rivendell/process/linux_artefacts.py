@@ -98,6 +98,7 @@ HEADERS = {
     "k8s_audit.csv": k8s_audit.HEADER,
 }
 DOCKER_CONTAINERS = "/var/lib/docker/containers/"
+CONTAINERD_META = "/var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db"
 
 
 def _cooked(output_directory: str, img: str, vss_path_insert: str) -> str:
@@ -576,6 +577,9 @@ def _route_linux(artefact: str) -> Tuple[str, List[Dict], str, List[str]]:
         return "tmp_executables.csv", tmp_executable_rows(artefact), "temporary-directory executables", []
     if path.startswith(DOCKER_CONTAINERS):
         return _route_docker(artefact, path)
+    if path == CONTAINERD_META:
+        rows = containers.containerd_rows(artefact)
+        return "docker_containers.csv", rows, "containerd containers", containers.container_techniques(rows)
     if path.startswith("/var/log/pods/") and re.search(r"\.log(?:\.\d+)?$", path):
         parts = path.split("/")  # /var/log/pods/<namespace>_<pod>_<uid>/<container>/<n>.log
         if len(parts) >= 7:

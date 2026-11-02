@@ -129,6 +129,7 @@ cat > /etc/rivendell-lab/expected.json <<'EOF'
     {"path": "/home/gandalf/.viminfo", "cooked": "viminfo.csv", "expect": ["/etc/shadow"]},
     {"path": "/var/lib/docker/containers/4f1c9e2ab3d7c0de5eedfacade1b0b0c4f1c9e2ab3d7c0de5eedfacade1b0b0c/config.v2.json", "attack": "T1611", "cooked": "docker_containers.csv", "expect": ["container runtime socket mounted"]},
     {"path": "/var/lib/docker/containers/4f1c9e2ab3d7c0de5eedfacade1b0b0c4f1c9e2ab3d7c0de5eedfacade1b0b0c/4f1c9e2ab3d7c0de5eedfacade1b0b0c4f1c9e2ab3d7c0de5eedfacade1b0b0c-json.log", "cooked": "container_logs.csv", "expect": ["c2.rivendell-lab.test"]},
+    {"path": "/var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db", "attack": "T1611", "cooked": "docker_containers.csv", "expect": ["containerd", "lab-escape", "host PID namespace"]},
     {"artefact": "container writable layer", "attack": "T1105", "cooked": "container_changes.csv", "expect": ["/tmp/.x/lab-miner", "cron changed"]},
     {"path": "/etc/kubernetes/manifests/lab-node-agent.yaml", "attack": "T1543.005", "cooked": "static_pods.csv"},
     {"path": "/var/log/pods/payments_api-7d9f_0b1c/api/0.log", "cooked": "container_logs.csv", "expect": ["payments"]},

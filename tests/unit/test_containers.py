@@ -11,9 +11,11 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
 from rivendell.collect import linux as collect  # noqa: E402
 from rivendell.process import linux_artefacts as la  # noqa: E402
-from rivendell.process.extractions import containers, k8s_audit  # noqa: E402
+from rivendell.process.extractions import bbolt, containers, k8s_audit  # noqa: E402
 
 CID = "4f1c9e2ab3d7" + "0" * 52
+# Made by containerd 1.7 itself (lab/linux-targets/seed/containerd/make-meta-db.sh)
+META_DB = Path(__file__).resolve().parents[2] / "lab" / "linux-targets" / "seed" / "containerd" / "meta.db"
 
 
 def host(tmp_path):
@@ -60,6 +62,7 @@ def test_escape_capable_container(tmp_path):
     assert run(out, linux / flat(f"/var/lib/docker/containers/{CID}/hostconfig.json"))  # read with the config
     (row,) = rows(out, "docker_containers.csv")
     assert row["Container"] == CID[:12] and row["Image"] == "alpine:3.20" and row["User"] == "root"
+    assert row["Runtime"] == "docker"
     for flag in ("privileged", "container runtime socket mounted (/var/run/docker.sock)",
                  "host path mounted read-only (/)", "host PID namespace", "capabilities SYS_ADMIN"):
         assert flag in row["Flag"]
@@ -195,6 +198,47 @@ def test_collection_lists_agree():
     assert os.path.basename(la.DOCKER_CONTAINERS.rstrip("/")) == "containers"
 
 
+def test_containerd_metadata(tmp_path):
+    out, linux = host(tmp_path)
+    copy = linux / flat("/var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db")
+    copy.write_bytes(META_DB.read_bytes())
+    assert run(out, copy)
+    found = {r["Container"]: r for r in rows(out, "docker_containers.csv")}
+    assert set(found) == {"lab-escape", "lab-web", "9b2e7c41d0a8"}
+    escape = found["lab-escape"]
+    assert (escape["Runtime"], escape["Name"], escape["Image"], escape["User"]) == \
+        ("containerd", "default: lab-escape", "docker.io/library/alpine:3.20", "root")
+    assert escape["Command"] == "sh -c nsenter -t 1 -m -u -i -n sh" and escape["Created"].startswith("2026-11-02T14:22:13")
+    assert escape["Privileged"] == "True" and escape["PidMode"] == "host"  # joined PID 1's namespace
+    for flag in ("privileged", "host path mounted read-write (/)", "host PID namespace", "capabilities SYS_ADMIN"):
+        assert flag in escape["Flag"]
+    assert found["lab-web"]["Flag"] == "" and found["lab-web"]["Privileged"] == "False"
+    pod = found["9b2e7c41d0a8"]
+    assert pod["Name"] == "k8s.io: kube-system/lab-node-agent/agent"
+    # Host network, and the resolver files every such container gets read-only aren't a finding
+    assert pod["Flag"] == "host network"
+    assert techniques(out) == ["T1610", "T1611"]
+
+
+def test_bbolt_refuses_what_it_cannot_read(tmp_path):
+    import pytest
+    junk = tmp_path / "junk.db"
+    junk.write_bytes(b"\0" * 8192)
+    with pytest.raises(bbolt.BoltError):
+        bbolt.Bolt(str(junk))
+    # A torn first meta page: the second one, written by the same transaction or the one before, is used
+    data = bytearray(META_DB.read_bytes())
+    data[16 + 60] ^= 0xFF  # the first meta page's checksum
+    torn = tmp_path / "torn.db"
+    torn.write_bytes(bytes(data))
+    assert bbolt.Bolt(str(torn)).root().bucket(b"v1") is not None
+    # A page pointing outside the file
+    cut = tmp_path / "cut.db"
+    cut.write_bytes(META_DB.read_bytes()[:3 * 4096])
+    with pytest.raises(bbolt.BoltError):
+        containers.containerd_rows(str(cut))
+
+
 def test_lab_seed_end_to_end(tmp_path):
     """The lab targets' container seed, collected the way Elrond collects an image, gives the
     findings lab/linux-targets/seed/seed-artefacts.sh's expected.json promises."""
@@ -209,8 +253,10 @@ def test_lab_seed_end_to_end(tmp_path):
     collect.collect_linux_extras(str(mnt), str(raw) + "/", "HOST::Linux", out, "collecting", 0)
     for artefact in sorted((raw / "linux").iterdir()):
         run(out, artefact)
-    (container,) = rows(out, "docker_containers.csv")
+    (container,) = [r for r in rows(out, "docker_containers.csv") if r["Runtime"] == "docker"]
     assert "container runtime socket mounted" in container["Flag"] and "host path mounted read-write (/)" in container["Flag"]
+    escape = next(r for r in rows(out, "docker_containers.csv") if r["Container"] == "lab-escape")
+    assert escape["Runtime"] == "containerd" and "host PID namespace" in escape["Flag"]
     assert any("c2.rivendell-lab.test" in r["Message"] for r in rows(out, "container_logs.csv"))
     changes = {r["Path"]: r["Flag"] for r in rows(out, "container_changes.csv")}
     assert changes["/tmp/.x/lab-miner"] == "executable in a temporary or hidden path"

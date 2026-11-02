@@ -85,6 +85,8 @@ docker-compose.override.yml
 
 # Database
 *.db
+# containerd's metadata for the lab seed, made by containerd itself (make-meta-db.sh beside it)
+!lab/linux-targets/seed/containerd/meta.db
 *.sqlite
 *.sqlite3
 

@@ -408,7 +408,7 @@ python3 -m src.analysis.rivendell.ai.web_interface
 Docker hosts and Kubernetes nodes, from a disk image or a Gandalf collection.
 
 **Features:**
-- Every Docker container's configuration, mounts, capabilities and log (`docker_containers.csv`, `container_logs.csv`)
+- Every Docker and containerd container's configuration, mounts, capabilities and log (`docker_containers.csv`, `container_logs.csv`)
 - The writable layer listed and hashed (`container_changes.csv`), with its executables and scripts copied and hashed: dropped executables, cron, SSH keys and `ld.so.preload` in a container
 - Static pod manifests, pod logs, and the API server's audit log (`static_pods.csv`, `k8s_audit.csv`)
 - Exported EKS, AKS or GKE audit logs: `python3 -m src.analysis.rivendell.cloud.cli k8s analyze-logs --log-file audit.json --output ./analysis`
