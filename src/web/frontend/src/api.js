@@ -376,6 +376,10 @@ export const deleteThreatIntelSource = async (source) => {
   return response.data;
 };
 
+// validUntil: an ISO date, or null for no expiry (admins, on a team server)
+export const setThreatIntelValidity = async (id, validUntil) =>
+  (await api.put(`/api/threat-intel/indicators/${id}/validity`, { valid_until: validUntil })).data;
+
 export const enrichValue = async (value) => {
   const response = await api.get('/api/threat-intel/enrich', { params: { value } });
   return response.data;

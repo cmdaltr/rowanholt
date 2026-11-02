@@ -80,6 +80,17 @@ class ThreatIntelIndicatorModel(Base):
     source_type = Column(String, nullable=True, index=True)
 
 
+class ThreatIntelValidityModel(Base):
+    """How long a threat intelligence indicator holds (rivendell/threat_intel/validity.py): beside the
+    fixed 10-column table rather than in it. No row, or valid_until empty: no expiry. Revision 9e3c5a7b1f42."""
+    __tablename__ = "threat_intel_validity"
+
+    indicator_id = Column(Integer, primary_key=True)  # threat_intel_indicators.id
+    valid_until = Column(DateTime, nullable=True, index=True)
+    confidence = Column(Integer, nullable=True)
+    first_seen = Column(DateTime, nullable=True)
+
+
 class CaseFindingModel(Base):
     """A row of a case's output an analyst flagged: a reference to the evidence, never a copy of it.
     row_hash pins the row, so a re-run that moves or changes it shows up instead of re-pointing."""
