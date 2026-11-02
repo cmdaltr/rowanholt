@@ -41,9 +41,11 @@ from collections import Counter, defaultdict
 from typing import Callable, Dict, Iterable, Iterator, List, Optional, Set, Tuple
 
 # Host and Row: the row on that host's Artefact the value was read from, as the case browser refers to it
-# (CSV line number with the header as 1, or #index in a JSON list), so a stacking row can be flagged there
+# (CSV line number with the header as 1, or #index in a JSON list), so a stacking row can be flagged there.
+# Sources: the same for every host with it (up to MAX_SOURCES), as a JSON list of [host, artefact, row]
 HEADER = ["Rank", "Score", "Family", "Value", "Hosts With It", "Hosts In Case", "Hosts", "Reasons", "Artefact",
-          "Example", "Host", "Row"]
+          "Example", "Host", "Row", "Sources"]
+MAX_SOURCES = 10
 BASELINE_HEADER = ["Family", "Value"]
 MAX_JSON_BYTES = 256 << 20
 MAX_ROWS = 2000
@@ -385,7 +387,9 @@ def stack(per_host: Dict[str, Dict[Tuple[str, str], Tuple[str, str, str]]],
         shown = f"{family}, {compared.split(':')[1]}" if ":" in compared else family
         rows.append({"Score": f"{score:.1f}", "Family": shown, "Value": value, "Hosts With It": str(len(with_it)),
                      "Hosts In Case": str(total), "Hosts": "; ".join(sorted(with_it)[:10]), "Reasons": ", ".join(why),
-                     "Artefact": artefact, "Example": example, "Host": with_it[0], "Row": ref})
+                     "Artefact": artefact, "Example": example, "Host": with_it[0], "Row": ref,
+                     "Sources": json.dumps([[h, *[per_host[h][(family, value)][i] for i in (0, 2)]]
+                                            for h in sorted(with_it)[:MAX_SOURCES]])})
     rows.sort(key=lambda r: (-float(r["Score"]), int(r["Hosts With It"]), r["Family"].split(",")[0] not in PERSISTENCE,
                              r["Family"], r["Value"]))
     for number, row in enumerate(rows, start=1):

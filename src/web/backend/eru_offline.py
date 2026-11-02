@@ -47,8 +47,9 @@ _citing: ContextVar[Optional[List[Dict[str, str]]]] = ContextVar("eru_offline_ci
 
 
 class Cited(str):
-    """A line of an answer, with the row it was built from."""
+    """A line of an answer, with the row it was built from (and, for a value on several hosts, theirs)."""
     cite: Optional[Dict[str, str]] = None
+    more: List[Dict[str, str]] = []
 
 
 def _cited(text: str, host: str, file: str, ref: str, normal: Dict[str, str]) -> Cited:
@@ -108,7 +109,10 @@ def _bullets(lines: Iterable[str], limit: int = MAX_ROWS) -> str:
     lines = list(lines)
     citing = _citing.get()
     if citing is not None:
-        citing.extend(line.cite for line in lines[:limit] if getattr(line, "cite", None))
+        for line in lines[:limit]:
+            if getattr(line, "cite", None):
+                citing.append(line.cite)
+                citing.extend(getattr(line, "more", []))
     shown = "\n".join(f"• {line}" for line in lines[:limit])
     if len(lines) > limit:
         shown += f"\n• …and {len(lines) - limit} more"
@@ -344,10 +348,12 @@ def rare(case_path: str) -> str:
             if index >= RARE_ROWS:
                 out.append(text(r))
                 continue
-            source = (r.get("Host") or "", r.get("Artefact") or "", r.get("Row") or "")
-            if source in host_rows:
-                # The row on the host the value was read from: that's what a finding should rest on
-                out.append(_cited(text(r), *source, host_rows[source]))
+            found = [s for s in _stacking_sources(r) if s in host_rows]
+            if found:
+                # The rows on the hosts the value was read from: that's what a finding should rest on
+                line = _cited(text(r), *found[0], host_rows[found[0]])
+                line.more = [_cited(text(r), *s, host_rows[s]).cite for s in found[1:]]
+                out.append(line)
             else:
                 out.append(_cited(text(r), case_files.CASE_HOST, stacking_csv.name, ref, normal))
         return out
@@ -361,14 +367,29 @@ def rare(case_path: str) -> str:
             "Flag one with ⚑: the flag goes on the host's own row the value was read from.")
 
 
+RARE_SOURCES = 5  # host rows cited per stacking line
+
+
+def _stacking_sources(row: Dict[str, str]) -> List[Tuple[str, str, str]]:
+    """(host, artefact, row) for each host a stacking row's value was read on: Sources, or from a
+    stacking.csv before it, Host and Row."""
+    try:
+        sources = [tuple(map(str, s)) for s in json.loads(row.get("Sources") or "[]") if len(s) == 3]
+    except (TypeError, ValueError):
+        sources = []
+    if not sources and row.get("Host") and row.get("Row"):
+        sources = [(row["Host"], row.get("Artefact") or "", row["Row"])]
+    return [s for s in sources if all(s)][:RARE_SOURCES]
+
+
 def _host_rows(root: Path, stacked: List[Dict[str, str]]) -> Dict[Tuple[str, str, str], Dict[str, str]]:
     """{(host, artefact, row reference): the row as case_files reads it} for the host rows these stacking rows
-    name (stacking.csv's Host, Artefact and Row); each file read once, and only through case_files, so only
-    what the case browser can open. Older stacking.csv files have no Host or Row: those stay unresolved."""
+    name (_stacking_sources); each file read once, and only through case_files, so only what the case
+    browser can open. A stacking.csv from before Host and Row names none: those stay unresolved."""
     wanted: Dict[Tuple[str, str], set] = {}
     for r in stacked:
-        if r.get("Host") and r.get("Artefact") and r.get("Row"):
-            wanted.setdefault((r["Host"], r["Artefact"]), set()).add(r["Row"])
+        for host, artefact, ref in _stacking_sources(r):
+            wanted.setdefault((host, artefact), set()).add(ref)
     found: Dict[Tuple[str, str, str], Dict[str, str]] = {}
     for (host, artefact), refs in wanted.items():
         try:
