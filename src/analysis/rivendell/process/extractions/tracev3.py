@@ -21,7 +21,6 @@ import mmap
 import os
 import re
 import struct
-import uuid as uuidlib
 from datetime import datetime, timezone
 from typing import Callable, Dict, Iterator, List, Optional, Tuple
 
@@ -67,7 +66,16 @@ class TraceError(ValueError):
     """Not a tracev3 file, or one whose chunks don't hold together."""
 
 
+# Not the uuid module: it imports platform, which Elrond's own platform package
+# shadows in the worker.
+def _dashed(raw: bytes) -> str:
+    """A UUID in its usual dashed, upper-case form."""
+    h = raw.hex().upper()
+    return f"{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:]}"
+
+
 # ---- LZ4 -----------------------------------------------------------------------
+
 
 def lz4_block(src: bytes, size: int) -> bytes:
     """One raw LZ4 block, decompressed to at most size bytes."""
@@ -409,7 +417,7 @@ class Store:
         while i + 4 <= len(data):
             if struct.unpack_from("<H", data, i)[0] == TIMESYNC_BOOT and i + BOOT.size <= len(data):
                 _, size, _, boot, numer, denom, boot_ns, _, _ = BOOT.unpack_from(data, i)
-                current = self._boots.setdefault(uuidlib.UUID(bytes=boot).hex.upper(), (numer, denom or 1, [], []))
+                current = self._boots.setdefault(bytes(boot).hex().upper(), (numer, denom or 1, [], []))
                 current[2].append(0)
                 current[3].append(boot_ns)
                 i += size or BOOT.size
@@ -457,7 +465,7 @@ def catalog(data: bytes) -> Dict[Tuple[int, int], Process]:
     """(first proc id, second proc id): Process for one catalog chunk."""
     strings_at, processes_at, count, _, _, _, _ = CATALOG_HEAD.unpack_from(data)
     base = CATALOG_HEAD.size
-    uuids = [uuidlib.UUID(bytes=data[base + i:base + i + 16]).hex.upper() for i in range(0, strings_at - strings_at % 16, 16)]
+    uuids = [bytes(data[base + i:base + i + 16]).hex().upper() for i in range(0, strings_at - strings_at % 16, 16)]
     strings = data[base + strings_at:base + processes_at]
     at = base + processes_at
     out: Dict[Tuple[int, int], Process] = {}
@@ -571,7 +579,7 @@ def render(fmt: str, args: List[Tuple[str, object]]) -> str:
             if conv == "P" or isinstance(value, str):
                 raw = value if isinstance(value, (bytes, bytearray)) else str(value).encode()
                 if "uuid_t" in notes and len(raw) >= 16:
-                    return str(uuidlib.UUID(bytes=bytes(raw[:16]))).upper()
+                    return _dashed(bytes(raw[:16]))
                 return raw.hex() if conv == "P" else raw.decode("utf-8", "replace")
             if conv in "eEfFgGaA":
                 number = struct.unpack("<d", value[:8].ljust(8, b"\0"))[0] if len(value) >= 8 else \
@@ -684,7 +692,7 @@ class Reader:
         while at + 8 <= len(body):
             tag, size = struct.unpack_from("<II", body, at)
             if tag == HEADER_BOOT and size >= 16:
-                return uuidlib.UUID(bytes=body[at + 8:at + 24]).hex.upper()
+                return bytes(body[at + 8:at + 24]).hex().upper()
             at += 8 + size
         return ""
 
@@ -763,7 +771,7 @@ class Reader:
                 (fields["alt_index"],) = struct.unpack_from("<H", body, at)
                 at += 2
             elif kind == UUID_RELATIVE:
-                fields["uuid"] = uuidlib.UUID(bytes=body[at:at + 16]).hex.upper()
+                fields["uuid"] = bytes(body[at:at + 16]).hex().upper()
                 at += 16
             elif kind == LARGE_SHARED_CACHE:
                 if flags & HAS_LARGE_OFFSET:
