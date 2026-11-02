@@ -70,7 +70,7 @@ Container forensics goes first because half of it is written. ML goes last becau
 - **Tests.** `tests/unit/test_case_browser.py` covers the refusals around `raw/`, paging and filters, the finding lifecycle (including a changed row), notes, assignment (checked against the users on a server), activity, the report, the layer and Eru's answer.
 
 **Still to do.**
-- **Flagging from an Eru answer.** A finding needs a row, and Eru's answers are prose. This needs Eru to cite rows first.
+- **Flagging from a model's answer.** Offline answers can be flagged from Ask Eru (2 November); the model's answers don't cite rows yet.
 - **Live updates.** Polling is enough at this size. Websockets can wait until someone asks.
 
 ## ML-based anomaly detection
@@ -135,7 +135,7 @@ Each feature's "Still to do" above, as work to schedule, then the Eru MCP server
 
 1. **Restart with findings** (done 30 October). `POST /api/jobs/{id}/restart` answers 409 with the number of findings when there are any, unless the request says `confirm`; the bulk restart skips them likewise; the Job page shows the count and asks before restarting. Test: `test_restart_with_findings_needs_confirm` in `test_server_access.py`.
 2. **Assignees checked on a team server** (done 30 October). In server mode, `PUT /hosts/{host}` refuses an assignee who isn't an active user; on one machine it stays free text. Test: `test_assignees_checked_on_a_team_server` in `test_case_browser.py`.
-3. **Flagging from an Eru answer** (two days, after the MCP server's row citations). Eru's offline answers are built from specific rows, so they return those rows with the text: file, row number and SHA-256, the same reference a finding stores. The Eru page shows ⚑ beside each cited line, which opens the usual finding form on that row. With a model, the context Eru sends is numbered by row and the model is asked to cite the numbers; only cited, existing rows can be flagged, so a model can't invent a finding.
+3. **Flagging from an Eru answer.** Offline answers done 2 November: each line built from a row carries it (`eru_offline.Cited`; only the lines shown are cited), `POST /api/ai/offline/answer` returns them with the job whose case it read, and Ask Eru lists them under the answer with ⚑, which opens the usual finding form on that row. Rows of the case's own summaries (`stacking.csv`, `threat_groups.csv`) are cited but not offered for flagging, as in the case browser: a finding rests on a host's row. MCP's `ask_offline` returns them as `cite`s. Tests: `test_answers_cite_their_rows` and `test_only_shown_lines_are_cited` in `test_eru_offline.py`, `test_flagging_a_cited_row` in `test_eru_mcp.py`. Still to do, the model's half: the context Eru sends is numbered by row and the model is asked to cite the numbers; only cited, existing rows can be flagged, so a model can't invent a finding. `_gather_case_context` reads `<case>/cooked/*.json`, not the per-host `artefacts/cooked/`, so it needs reworking first.
 4. **Live updates** stay as polling until someone asks.
 
 ### Stacking (anomaly detection)
@@ -164,7 +164,7 @@ The March 2026 prototype ("Building an MCP") kept its own case folders, ran its 
 | `list_cases` | `GET /api/jobs` |
 | `case_overview(job_id)` | the job, its hosts and their files (`GET /api/jobs/{id}`, `GET /api/jobs/{id}/case`) |
 | `read_rows(job_id, host, file, filter, offset, limit)` | `GET /api/jobs/{id}/case/rows`, with each row's reference for citing |
-| `ask_offline(job_id, question)` | `POST /api/ai/offline/answer`: the twelve fixed case questions, "What's rare?" among them |
+| `ask_offline(job_id, question)` | `POST /api/ai/offline/answer`: the twelve fixed case questions, "What's rare?" among them, with the rows each answer came from as `cite`s |
 | `ask_eru(job_id, question)`, `case_summary`, `suggestions` | `/api/ai/cases/{case}/…`, when Ollama is up; otherwise they say so and point to `ask_offline` |
 | `check_indicator(value)` | `GET /api/threat-intel/enrich` (`enrich_artefact()`) |
 | `rare_across_hosts(job_id)` | `stacking.csv` through the case rows |

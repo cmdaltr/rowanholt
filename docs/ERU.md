@@ -8,7 +8,7 @@ Free-text answers, case summaries and investigation suggestions come from a loca
 
 ## Without Ollama
 
-If Ollama isn't running, or the model isn't pulled, Ask Eru says which and how to fix it, turns off free text, and offers fixed questions answered exactly from Elrond's output for the selected case: which hosts are in it, which ATT&CK techniques were tagged, what persistence was flagged, who logged in (and failed to), which IOCs were extracted, which shell commands look suspicious, what matched threat intelligence (when the case was run with it), what's rare across the hosts (stacking's top rows, persistence first, each a lead rather than a verdict), and what analysts have confirmed in the case browser. With a model, confirmed findings go into its context first. A few general questions (persistence locations per OS, what Gandalf collects) need no case. These answers are read from the files and the findings, not generated, so they are the same every time.
+If Ollama isn't running, or the model isn't pulled, Ask Eru says which and how to fix it, turns off free text, and offers fixed questions answered exactly from Elrond's output for the selected case: which hosts are in it, which ATT&CK techniques were tagged, what persistence was flagged, who logged in (and failed to), which IOCs were extracted, which shell commands look suspicious, what matched threat intelligence (when the case was run with it), what's rare across the hosts (stacking's top rows, persistence first, each a lead rather than a verdict), and what analysts have confirmed in the case browser. With a model, confirmed findings go into its context first. A few general questions (persistence locations per OS, what Gandalf collects) need no case. These answers are read from the files and the findings, not generated, so they are the same every time. Under an answer, Ask Eru lists the host rows its lines came from (file and row; the SHA-256 on hover), each with ⚑ to flag it as a lead or a confirmed finding on that row, as the case browser would; a row someone has already flagged says who.
 
 ## From an MCP host
 
@@ -54,7 +54,7 @@ claude mcp add rivendell --env RIVENDELL_MCP_PYTHON=$HOME/.rivendell-mcp/bin/pyt
 | `list_cases` | The jobs you can see: id, case number, status, owner, dates |
 | `case_overview(job_id)` | The job, its hosts and their files, each host's assignee and status, findings by status |
 | `read_rows(job_id, host, file, filter, offset, limit)` | A page of one file's rows, each with `cite`: file, row and SHA-256, the reference a finding stores |
-| `ask_offline(job_id, question)` | One of the fixed questions above, by id or wording; an unknown one returns the list |
+| `ask_offline(job_id, question)` | One of the fixed questions above, by id or wording, with the rows the answer came from (each with its `cite`); an unknown one returns the list |
 | `ask_eru`, `case_summary`, `suggestions` | Eru's model (Ollama); when it isn't available they say why and point to `ask_offline` |
 | `check_indicator(value)` | What the imported threat intelligence says about one value |
 | `rare_across_hosts(job_id)` | The top of `stacking.csv` |

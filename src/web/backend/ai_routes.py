@@ -7,7 +7,7 @@ FastAPI routes for Eru AI assistant functionality.
 import os
 import json
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from pathlib import Path
 from datetime import datetime
 
@@ -182,12 +182,14 @@ async def answer_offline_question(request: OfflineRequest, http_request: Request
     """Answer one offline question, from the selected case's files where it needs a case."""
     if request.case_id and not access.case_allowed(access.current_user(http_request), request.case_id):
         raise HTTPException(status_code=404, detail="Case not found")
-    case_path = await _find_case_path(request.case_id) if request.case_id else None
+    user = access.current_user(http_request)
+    case_path, job_id = await _find_case(request.case_id, user) if request.case_id else (None, None)
     try:
-        answer = eru_offline.answer(request.question_id, case_path)
+        result = eru_offline.answer_with_rows(request.question_id, case_path)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"No offline question '{request.question_id}'")
-    return {"answer": answer, "offline": True}
+    # The rows it cited are flagged on job_id's case; a case directory with no job behind it can't be flagged
+    return {**result, "rows": result["rows"] if job_id else [], "job_id": job_id, "offline": True}
 
 
 @router.get("/cases")
@@ -513,27 +515,34 @@ Be thorough but concise."""
 # Helper functions
 async def _find_case_path(case_id: str) -> Optional[str]:
     """Find the path for a case ID."""
-    # Check data directory
+    return (await _find_case(case_id))[0]
+
+
+async def _find_case(case_id: str, user: Optional[dict] = None) -> Tuple[Optional[str], Optional[str]]:
+    """(case path, the job it's the output of): a case in the data directory has no job; with `user`,
+    only jobs they can see."""
     data_path = os.path.join(RIVENDELL_DATA_DIR, case_id)
     if os.path.exists(data_path):
-        return data_path
+        return data_path, None
 
-    # Check job storage
     try:
         job_storage = JobStorage()
 
         for job in job_storage.list_jobs():
-            if job.case_number == case_id and job.destination_path:
-                # The folder with the host folders, as the case browser finds it: the destination or <destination>/<case>
-                root = case_files.case_root(job.destination_path, job.case_number)
-                if root:
-                    return str(root)
-                if os.path.exists(job.destination_path):
-                    return job.destination_path
+            if job.case_number != case_id or not job.destination_path:
+                continue
+            if user is not None and not access.can_access_job(user, job.id):
+                continue
+            # The folder with the host folders, as the case browser finds it: the destination or <destination>/<case>
+            root = case_files.case_root(job.destination_path, job.case_number)
+            if root:
+                return str(root), job.id
+            if os.path.exists(job.destination_path):
+                return job.destination_path, job.id
     except Exception as e:
         logger.error(f"Error checking job storage: {e}")
 
-    return None
+    return None, None
 
 
 async def _gather_case_context(case_path: str, query_hint: str) -> str:

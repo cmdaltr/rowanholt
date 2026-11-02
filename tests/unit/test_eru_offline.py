@@ -90,6 +90,35 @@ def test_rare_across_hosts(tmp_path):
     assert "lead, not a verdict" in answer
 
 
+def test_answers_cite_their_rows(tmp_path):
+    import case_files
+    path = case(tmp_path)
+    result = eru_offline.answer_with_rows("persistence", path)
+    assert result["answer"] == eru_offline.answer("persistence", path)
+    [row] = result["rows"]  # the PAM module outside its directory; not pam_unix, not vboxdrv
+    assert (row["host"], row["file"], row["row_ref"]) == ("lab-ubuntu", "artefacts/cooked/pam.csv", "3")
+    assert "pam_lab.so" in row["line"]
+    # The reference and hash a finding on that row would store
+    page = case_files.page(case_files.resolve(Path(path), "lab-ubuntu", row["file"]))
+    assert row["hash"] == next(r["hash"] for r in page["rows"] if r["ref"] == "3")
+    [command] = eru_offline.answer_with_rows("commands", path)["rows"]
+    assert command["file"] == "artefacts/cooked/gandalf+bash_history.csv" and command["row_ref"] == "3"
+    # Counts aren't rows
+    assert eru_offline.answer_with_rows("iocs", path)["rows"] == []
+    assert eru_offline.answer_with_rows("hosts", path)["rows"] == []
+
+
+def test_only_shown_lines_are_cited(tmp_path):
+    path = Path(case(tmp_path))
+    header = "Rank,Score,Family,Value,Hosts With It,Hosts In Case,Hosts,Reasons,Artefact,Example\n"
+    (path / "stacking.csv").write_text(header + "".join(
+        f"{n},1.0,process,p{n}.exe,1,4,WS0{n % 4},rare,prefetch.csv,\n" for n in range(1, 13)))
+    result = eru_offline.answer_with_rows("rare", str(path))
+    assert "…and 4 more" in result["answer"]
+    assert [r["row_ref"] for r in result["rows"]] == [str(n + 1) for n in range(1, eru_offline.RARE_ROWS + 1)]
+    assert {(r["host"], r["file"]) for r in result["rows"]} == {("(case)", "stacking.csv")}
+
+
 def test_stacking_persistence_families_match():
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
     from rivendell.analysis import stacking

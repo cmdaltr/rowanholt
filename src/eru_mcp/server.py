@@ -176,14 +176,17 @@ def build_server(api: RivendellAPI) -> MCPServer:
         """One of Eru's fixed questions, answered exactly from the case files with no model (hosts, ATT&CK
         techniques, persistence, logins, IOCs, suspicious commands, staging, detections, analysis, threat
         intelligence, what's rare, what analysts confirmed). `question` is its id or its wording; an unknown
-        one returns the list."""
+        one returns the list. `rows` are the rows the answer's lines came from, each with its `cite`."""
         catalogue = api.get(api.path("ai", "offline", "questions")).get("questions", [])
         wanted = question.strip().lower().rstrip("?")
         match = next((q for q in catalogue if wanted in (q["id"].lower(), q["question"].lower().rstrip("?"))), None)
         if match is None:
             return {"unknown question": question, "questions": [{"id": q["id"], "question": q["question"]} for q in catalogue]}
         body = {"question_id": match["id"], "case_id": job(job_id)["case_number"] if match.get("needs_case") else None}
-        return {"question": match["question"], "answer": api.post(api.path("ai", "offline", "answer"), body)["answer"]}
+        result = api.post(api.path("ai", "offline", "answer"), body)
+        rows = [{"line": r["line"], "cite": f"{r['host']}: {r['file']} row {r['row_ref']} (sha256 {r['hash'][:16]})"}
+                for r in result.get("rows") or []]
+        return {"question": match["question"], "answer": result["answer"], "rows": rows}
 
     @server.tool(annotations=READ_ONLY)
     def ask_eru(job_id: str, question: str) -> Dict[str, Any]:

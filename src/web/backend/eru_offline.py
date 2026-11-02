@@ -4,7 +4,9 @@ Eru without an LLM: questions answered straight from Elrond's case output.
 Free-text questions need Ollama. When it isn't there, Ask Eru offers these
 instead: each reads the case directory (<case>/<host>/artefacts/cooked/*.csv,
 <case>/<host>/analysis/*.csv, <case>/mitre_techniques.txt, <case>/threat_groups.csv) and summarises what
-Elrond found, so the answers are exact rather than generated.
+Elrond found, so the answers are exact rather than generated. Each line built from a row
+carries that row (host, file, row reference, SHA-256: what a finding stores), so the answer can
+be flagged from (answer_with_rows).
 """
 
 import csv
@@ -13,8 +15,14 @@ import logging
 import os
 import re
 from collections import Counter
+from contextvars import ContextVar
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional
+from typing import Callable, Dict, Iterable, Iterator, List, Optional, Tuple
+
+try:
+    from . import case_files
+except ImportError:  # main.py imports the routes as top-level modules too
+    import case_files
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +42,19 @@ PERSISTENCE_LISTS = ("startup_items.csv", "generators.csv")
 STACKING_PERSISTENCE = {"scheduled task", "wmi consumer", "service (Windows)", "autorun (Windows)", "service (systemd)",
                         "autorun (Linux)", "kernel module", "autorun (macOS)"}
 RARE_ROWS = 8
+# The rows the lines shown so far came from, while answer_with_rows() runs
+_citing: ContextVar[Optional[List[Dict[str, str]]]] = ContextVar("eru_offline_citing", default=None)
+
+
+class Cited(str):
+    """A line of an answer, with the row it was built from."""
+    cite: Optional[Dict[str, str]] = None
+
+
+def _cited(text: str, host: str, file: str, ref: str, normal: Dict[str, str]) -> Cited:
+    line = Cited(text)
+    line.cite = {"host": host, "file": file, "row_ref": ref, "hash": case_files.row_hash(normal), "line": text}
+    return line
 
 
 def _hosts(case_path: str) -> List[Path]:
@@ -53,13 +74,30 @@ def _rows(path: Path) -> List[Dict[str, str]]:
         return []
 
 
-def _json_records(path: Path) -> List[Dict]:
+def _numbered(path: Path) -> Iterator[Tuple[str, Dict[str, str], Dict[str, str]]]:
+    """(row reference, row, row as hashed) for each CSV row: references and hashes as case_files gives them."""
+    for number, row in enumerate(_rows(path), start=2):
+        yield str(number), row, case_files.csv_row(row)
+
+
+def _where(host: Path, path: Path) -> Tuple[str, str]:
+    """The (host, file) a citation names: the host folder and the path in it, or the case's own file."""
+    try:
+        return host.name, str(path.relative_to(host))
+    except ValueError:
+        return case_files.CASE_HOST, path.name
+
+
+def _json_records(path: Path, keep_index: bool = False) -> List:
+    """A JSON file's records; with keep_index, everything in the list, so positions are the file's own."""
     try:
         records = json.loads(path.read_text(encoding="utf-8", errors="replace"))
     except (OSError, ValueError) as e:
         logger.debug(f"Couldn't read {path}: {e}")
         return []
-    return [r for r in records if isinstance(r, dict)] if isinstance(records, list) else []
+    if not isinstance(records, list):
+        return []
+    return records if keep_index else [r for r in records if isinstance(r, dict)]
 
 
 def _cooked(host: Path, pattern: str) -> Iterable[Path]:
@@ -68,6 +106,9 @@ def _cooked(host: Path, pattern: str) -> Iterable[Path]:
 
 def _bullets(lines: Iterable[str], limit: int = MAX_ROWS) -> str:
     lines = list(lines)
+    citing = _citing.get()
+    if citing is not None:
+        citing.extend(line.cite for line in lines[:limit] if getattr(line, "cite", None))
     shown = "\n".join(f"• {line}" for line in lines[:limit])
     if len(lines) > limit:
         shown += f"\n• …and {len(lines) - limit} more"
@@ -114,7 +155,7 @@ def persistence(case_path: str) -> str:
         lines = []
         for name in FLAGGED_CSVS:
             for path in _cooked(host, name):
-                for row in _rows(path):
+                for ref, row, normal in _numbered(path):
                     flag = row.get("Flag") or ""
                     # out-of-tree and unsigned alone are DKMS and VM drivers; only an odd file location is a lead
                     if name == "kernel_modules.csv" and not ("no module file" in flag or "outside" in flag):
@@ -122,18 +163,21 @@ def persistence(case_path: str) -> str:
                     if flag:
                         what = row.get("Command") or row.get("Line") or row.get("Module") or row.get("Library") or \
                             row.get("Identifier") or row.get("Name") or row.get("Actions") or ""
-                        lines.append(f"{path.stem}: {row.get('Source') or row.get('Path') or ''} {what} — {row['Flag']}".strip())
+                        text = f"{path.stem}: {row.get('Source') or row.get('Path') or ''} {what} — {row['Flag']}".strip()
+                        lines.append(_cited(text, *_where(host, path), ref, normal))
         for name in PERSISTENCE_LISTS:
             for path in _cooked(host, name):
-                for row in _rows(path):
-                    lines.append(f"{path.stem}: {row.get('Path') or row.get('Source') or row.get('Name') or ''}")
+                for ref, row, normal in _numbered(path):
+                    text = f"{path.stem}: {row.get('Path') or row.get('Source') or row.get('Name') or ''}"
+                    lines.append(_cited(text, *_where(host, path), ref, normal))
         # WMI event subscriptions carved from the repository; Elrond notes the ones Windows makes itself
         for path in _cooked(host, "wbem.json"):
-            for sub in _json_records(path):
-                if not sub.get("note"):
+            for index, sub in enumerate(_json_records(path, keep_index=True)):
+                if isinstance(sub, dict) and not sub.get("note"):
                     action = "; ".join(str(v) for v in sub.get("consumer_values") or [])
-                    lines.append(f"WMI subscription: {sub.get('filter_name')} -> {sub.get('consumer_class')} "
-                                 f"'{sub.get('consumer_name')}'" + (f": {action}" if action else ""))
+                    text = (f"WMI subscription: {sub.get('filter_name')} -> {sub.get('consumer_class')} "
+                            f"'{sub.get('consumer_name')}'" + (f": {action}" if action else ""))
+                    lines.append(_cited(text, *_where(host, path), f"#{index}", case_files.json_row(sub)))
         if lines:
             sections.append(f"**{host.name}**\n" + _bullets(lines))
     if not sections:
@@ -155,8 +199,9 @@ def logins(case_path: str) -> str:
         if failed:
             lines.append("failed logins by source: " + ", ".join(f"{s} ({n})" for s, n in failed.most_common(10)))
         for path in _cooked(host, "lastlog.csv"):
-            for row in _rows(path)[:10]:
-                lines.append(f"last login {row.get('User') or row.get('UID')}: {row.get('LastWriteTime')} from {row.get('Host') or 'local'}")
+            for ref, row, normal in list(_numbered(path))[:10]:
+                text = f"last login {row.get('User') or row.get('UID')}: {row.get('LastWriteTime')} from {row.get('Host') or 'local'}"
+                lines.append(_cited(text, *_where(host, path), ref, normal))
         if lines:
             sections.append(f"**{host.name}**\n" + _bullets(lines))
     if not sections:
@@ -204,21 +249,24 @@ def threat_intel(case_path: str) -> str:
     groups whose evidence turned up, with what each rank rests on."""
     sections = []
     for host in _hosts(case_path):
-        rows = _rows(host / "analysis" / "threat_intel_matches.csv")
-        if not rows:
+        path = host / "analysis" / "threat_intel_matches.csv"
+        seen: Dict[str, Tuple[str, Dict[str, str], Dict[str, str]]] = {}
+        for ref, row, normal in _numbered(path):
+            seen.setdefault(row.get("Element", ""), (ref, row, normal))
+        if not seen:
             continue
-        seen: Dict[str, Dict[str, str]] = {}
-        for row in rows:
-            seen.setdefault(row.get("Element", ""), row)
-        ordered = sorted(seen.values(), key=lambda r: (r.get("Common") == "yes", int(r.get("Groups Using") or 0)))
+        ordered = sorted(seen.values(), key=lambda m: (m[1].get("Common") == "yes", int(m[1].get("Groups Using") or 0)))
         sections.append(f"**{host.name}**\n" + _bullets(
-            f"{r['Element']} in {Path(r.get('Artefact', '')).name}: {r.get('Groups') or r.get('Sources')}"
-            + (" (common: many groups use it)" if r.get("Common") == "yes" else "") for r in ordered))
-    groups = _rows(Path(case_path) / "threat_groups.csv")
+            _cited(f"{r['Element']} in {Path(r.get('Artefact', '')).name}: {r.get('Groups') or r.get('Sources')}"
+                   + (" (common: many groups use it)" if r.get("Common") == "yes" else ""), *_where(host, path), ref, normal)
+            for ref, r, normal in ordered))
+    groups_csv = Path(case_path) / "threat_groups.csv"
+    groups = list(_numbered(groups_csv))
     if groups:
         sections.append("**Whose tradecraft it resembles** (a lead, not attribution)\n" + _bullets(
-            f"{g['Group']}: {g['Basis']}" + (f", {g['Techniques In Case']}" if g.get("Techniques In Case") else "")
-            for g in groups[:8]))
+            _cited(f"{g['Group']}: {g['Basis']}" + (f", {g['Techniques In Case']}" if g.get("Techniques In Case") else ""),
+                   case_files.CASE_HOST, groups_csv.name, ref, normal)
+            for ref, g, normal in groups[:8]))
     if not sections:
         return ("No threat intelligence matching was run on this case. Import indicators in Pippin (threat intelligence), "
                 "then tick Threat intelligence on Elrond's page (or run Elrond with --threatIntel).")
@@ -231,10 +279,10 @@ def commands(case_path: str) -> str:
         hits = []
         for pattern in ("*bash_history.csv", "*zsh_history.csv", "shell_histories.csv", "*ConsoleHost_history*.csv"):
             for path in _cooked(host, pattern):
-                for row in _rows(path):
+                for ref, row, normal in _numbered(path):
                     command = row.get("Command") or next(iter(row.values()), "") or ""
                     if SUSPICIOUS_COMMAND.search(command):
-                        hits.append(f"{path.stem}: {command.strip()[:200]}")
+                        hits.append(_cited(f"{path.stem}: {command.strip()[:200]}", *_where(host, path), ref, normal))
         if hits:
             sections.append(f"**{host.name}**\n" + _bullets(hits, 25))
     if not sections:
@@ -245,8 +293,9 @@ def commands(case_path: str) -> str:
 def staging(case_path: str) -> str:
     sections = []
     for host in _hosts(case_path):
-        lines = [f"{r.get('Path')} ({r.get('Kind')}, {r.get('Size')} bytes, sha256 {(r.get('SHA256') or '')[:16]}…)"
-                 for p in _cooked(host, "tmp_executables.csv") for r in _rows(p)]
+        lines = [_cited(f"{r.get('Path')} ({r.get('Kind')}, {r.get('Size')} bytes, sha256 {(r.get('SHA256') or '')[:16]}…)",
+                        *_where(host, p), ref, normal)
+                 for p in _cooked(host, "tmp_executables.csv") for ref, r, normal in _numbered(p)]
         if lines:
             sections.append(f"**{host.name}**\n" + _bullets(lines))
     if not sections:
@@ -259,11 +308,14 @@ def detections(case_path: str) -> str:
     for host in _hosts(case_path):
         lines = []
         for p in _cooked(host, "defender_detections.csv"):
-            lines += [f"Defender: {r.get('ThreatName') or r.get('Threat') or ''} {r.get('Path') or ''}".strip() for r in _rows(p)]
+            lines += [_cited(f"Defender: {r.get('ThreatName') or r.get('Threat') or ''} {r.get('Path') or ''}".strip(),
+                             *_where(host, p), ref, normal) for ref, r, normal in _numbered(p)]
         for p in _cooked(host, "webshells.csv"):
-            lines += [f"web shell: {r.get('Source')} ({r.get('Indicators')})" for r in _rows(p)]
+            lines += [_cited(f"web shell: {r.get('Source')} ({r.get('Indicators')})", *_where(host, p), ref, normal)
+                      for ref, r, normal in _numbered(p)]
         for p in _cooked(host, "xprotect_*.csv"):
-            lines += [f"XProtect ({p.stem}): {', '.join(f'{k}={v}' for k, v in list(r.items())[:4])}" for r in _rows(p)[:10]]
+            lines += [_cited(f"XProtect ({p.stem}): {', '.join(f'{k}={v}' for k, v in list(r.items())[:4])}",
+                             *_where(host, p), ref, normal) for ref, r, normal in list(_numbered(p))[:10]]
         if lines:
             sections.append(f"**{host.name}**\n" + _bullets(lines))
     if not sections:
@@ -273,15 +325,18 @@ def detections(case_path: str) -> str:
 
 def rare(case_path: str) -> str:
     """The top of Elrond's stacking across hosts (<case>/stacking.csv): persistence, then programs."""
-    rows = _rows(Path(case_path) / "stacking.csv")
+    stacking_csv = Path(case_path) / "stacking.csv"
+    rows = list(_numbered(stacking_csv))
     if not rows:
         return ("Nothing was stacked for this case. Stacking compares hosts, so it needs two or more, and runs with "
                 "Elrond's analysis (--Analysis); something is called rare only among three or more hosts of an OS.")
-    def line(r: Dict[str, str]) -> str:
-        return (f"#{r.get('Rank')} {r.get('Value')} ({r.get('Family')}): on {r.get('Hosts With It')} of "
-                f"{r.get('Hosts In Case')} hosts ({r.get('Hosts')}); {r.get('Reasons')}")
-    persistence = [r for r in rows if (r.get("Family") or "").split(",")[0] in STACKING_PERSISTENCE]
-    programs = [r for r in rows if r not in persistence]
+    def line(numbered: Tuple[str, Dict[str, str], Dict[str, str]]) -> Cited:
+        ref, r, normal = numbered
+        return _cited(f"#{r.get('Rank')} {r.get('Value')} ({r.get('Family')}): on {r.get('Hosts With It')} of "
+                      f"{r.get('Hosts In Case')} hosts ({r.get('Hosts')}); {r.get('Reasons')}",
+                      case_files.CASE_HOST, stacking_csv.name, ref, normal)
+    persistence = [n for n in rows if (n[1].get("Family") or "").split(",")[0] in STACKING_PERSISTENCE]
+    programs = [n for n in rows if n not in persistence]
     parts = []
     if persistence:
         parts.append(f"**Ways back in** ({len(persistence)})\n" + _bullets(map(line, persistence), RARE_ROWS))
@@ -289,16 +344,18 @@ def rare(case_path: str) -> str:
         parts.append(f"**Programs and process pairs** ({len(programs)})\n" + _bullets(map(line, programs), RARE_ROWS))
     return ("**What's rare across the hosts** (stacking.csv, highest score first):\n\n" + "\n\n".join(parts) +
             "\n\nEach row is a lead, not a verdict: rare can be an older build or a busier host. "
-            "Open stacking.csv in the case browser to flag one.")
+            "To flag one, open its artefact on that host in the case browser.")
 
 
 def analysis(case_path: str) -> str:
     sections = []
     for host in _hosts(case_path):
-        rows = _rows(host / "analysis" / "analysis.csv")
+        path = host / "analysis" / "analysis.csv"
+        rows = list(_numbered(path))
         if rows:
-            kinds = Counter(r.get("analysis_type", "?") for r in rows)
-            examples = [f"{r.get('analysis_type')}: {r.get('Filename')} {r.get('analysis_value', '')}".strip() for r in rows]
+            kinds = Counter(r.get("analysis_type", "?") for _, r, _ in rows)
+            examples = [_cited(f"{r.get('analysis_type')}: {r.get('Filename')} {r.get('analysis_value', '')}".strip(),
+                               *_where(host, path), ref, normal) for ref, r, normal in rows]
             sections.append(f"**{host.name}**: " + ", ".join(f"{k} ({n})" for k, n in kinds.most_common()) + "\n" + _bullets(examples, 10))
     if not sections:
         return "Elrond's analysis stage found nothing (or wasn't run: use --Analysis)."
@@ -393,6 +450,23 @@ def answer(question_id: str, case_path: Optional[str]) -> str:
         return "Select a processed case first: this question is answered from the case's own files."
     func: Callable[[str], str] = entry["answer"]  # type: ignore[assignment]
     return func(case_path)
+
+
+def answer_with_rows(question_id: str, case_path: Optional[str]) -> Dict[str, object]:
+    """The answer, and the rows its shown lines came from (each once), for flagging from the answer."""
+    rows: List[Dict[str, str]] = []
+    token = _citing.set(rows)
+    try:
+        text = answer(question_id, case_path)
+    finally:
+        _citing.reset(token)
+    seen, unique = set(), []
+    for row in rows:
+        key = (row["host"], row["file"], row["row_ref"])
+        if key not in seen:
+            seen.add(key)
+            unique.append(row)
+    return {"answer": text, "rows": unique}
 
 
 def unavailable_reason(status: Dict[str, object], host: str, model: str) -> str:

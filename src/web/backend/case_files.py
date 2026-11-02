@@ -88,7 +88,13 @@ def resolve(root: Path, host: str, relative: str) -> Path:
     raise CaseFileError(f"{relative}: outside the case's cooked and analysis folders")
 
 
-def _flatten(record) -> Dict[str, str]:
+def csv_row(row: Dict) -> Dict[str, str]:
+    """A csv.DictReader row as records() yields it (and row_hash() hashes it)."""
+    return {k or "": v if isinstance(v, str) else json.dumps(v) for k, v in row.items()}
+
+
+def json_row(record) -> Dict[str, str]:
+    """A JSON record as records() yields it (and row_hash() hashes it)."""
     if not isinstance(record, dict):
         return {"value": json.dumps(record) if not isinstance(record, str) else record}
     return {str(k): v if isinstance(v, str) else json.dumps(v, default=str) for k, v in record.items()}
@@ -99,7 +105,7 @@ def records(path: Path) -> Iterator[Tuple[str, Dict[str, str]]]:
     if path.suffix.lower() == ".csv":
         with open(path, newline="", encoding="utf-8", errors="replace") as fh:
             for number, row in enumerate(csv.DictReader(fh), start=2):
-                yield str(number), {k or "": v if isinstance(v, str) else json.dumps(v) for k, v in row.items()}
+                yield str(number), csv_row(row)
         return
     if path.stat().st_size > MAX_JSON_BYTES:
         raise CaseFileError(f"{path.name} is over {MAX_JSON_BYTES >> 20} MB: open it from the case folder")
@@ -113,7 +119,7 @@ def records(path: Path) -> Iterator[Tuple[str, Dict[str, str]]]:
     if isinstance(data, dict):
         data = data.get("items") or data.get("records") or [data]
     for number, record in enumerate(data):
-        yield f"#{number}", _flatten(record)
+        yield f"#{number}", json_row(record)
 
 
 def row_hash(row: Dict[str, str]) -> str:

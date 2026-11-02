@@ -1,10 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { API_BASE_URL } from '../apiBase';
+import { flagFinding } from '../api';
 
 const heroImage = `${process.env.PUBLIC_URL}/images/rivendell.png`;
 
 // API base URL - adjust based on environment
 const API_BASE = API_BASE_URL;
+const CASE_HOST = '(case)'; // the case's own summaries (stacking.csv): a finding rests on a host's row, as in the case browser
+const rowKey = (row) => `${row.host}|${row.file}|${row.row_ref}`;
 
 function AIAssistant() {
   const [messages, setMessages] = useState([]);
@@ -16,6 +20,8 @@ function AIAssistant() {
   const [offlineQuestions, setOfflineQuestions] = useState([]);
   const [loadingCases, setLoadingCases] = useState(true);
   const [showHelp, setShowHelp] = useState(true);
+  const [flagging, setFlagging] = useState(null); // {message, row, title, technique, status}
+  const [flagged, setFlagged] = useState({}); // `${message}|${rowKey}` -> {id} or {error}
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -109,12 +115,29 @@ function AIAssistant() {
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: response.ok ? data.answer : (data.detail || 'No answer.'),
-        offline: true
+        offline: true,
+        jobId: data.job_id || null,
+        rows: response.ok ? (data.rows || []).filter((r) => r.host !== CASE_HOST) : []
       }]);
     } catch (error) {
       setMessages(prev => [...prev, { role: 'assistant', content: `Couldn't reach the backend: ${error.message}` }]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const submitFlag = async (event) => {
+    event.preventDefault();
+    const { message, row, title, technique, status } = flagging;
+    const key = `${message}|${rowKey(row)}`;
+    try {
+      const finding = await flagFinding(messages[message].jobId, { host: row.host, artefact: row.file, row_ref: row.row_ref,
+        title, technique, status });
+      setFlagged((prev) => ({ ...prev, [key]: { id: finding.id } }));
+      setFlagging(null);
+    } catch (err) {
+      // 409: someone flagged that row already, and the message says who
+      setFlagged((prev) => ({ ...prev, [key]: { error: err.response?.data?.detail || err.message } }));
     }
   };
 
@@ -503,6 +526,42 @@ function AIAssistant() {
                 <div style={{ lineHeight: '1.6' }}>
                   {formatContent(message.content)}
                 </div>
+
+                {message.rows && message.rows.length > 0 && message.jobId && (
+                  <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(240, 219, 165, 0.2)', fontSize: '0.8rem' }}>
+                    <strong>Rows this answer came from</strong>{' '}
+                    <Link to={`/jobs/${message.jobId}/case`} style={{ color: '#66d9ef' }}>open the case</Link>
+                    {message.rows.map((row) => {
+                      const state = flagged[`${index}|${rowKey(row)}`];
+                      const open = flagging && flagging.message === index && rowKey(flagging.row) === rowKey(row);
+                      return (
+                        <div key={rowKey(row)} style={{ marginTop: '0.35rem' }}>
+                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'baseline' }}>
+                            {state?.id ? <span title={`Finding #${state.id}`}>⚑ #{state.id}</span> : (
+                              <button type="button" title="Flag as finding" style={{ padding: '0.1rem 0.4rem' }}
+                                onClick={() => setFlagging({ message: index, row, title: row.line.slice(0, 200), technique: '', status: 'lead' })}>⚑</button>
+                            )}
+                            <span style={{ opacity: 0.7 }} title={`sha256 ${row.hash}`}>{row.host}: {row.file} row {row.row_ref}</span>
+                          </div>
+                          {state?.error && <div style={{ color: '#ed5565' }}>{state.error}</div>}
+                          {open && (
+                            <form onSubmit={submitFlag} style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.35rem' }}>
+                              <input type="text" required autoFocus placeholder="What it is" value={flagging.title} style={{ flex: 2, minWidth: '12rem' }}
+                                onChange={(e) => setFlagging({ ...flagging, title: e.target.value })} />
+                              <input type="text" placeholder="T1053.003" value={flagging.technique} style={{ width: '8rem' }}
+                                onChange={(e) => setFlagging({ ...flagging, technique: e.target.value })} />
+                              <select value={flagging.status} onChange={(e) => setFlagging({ ...flagging, status: e.target.value })}>
+                                <option value="lead">lead</option><option value="confirmed">confirmed</option>
+                              </select>
+                              <button type="submit">Flag</button>
+                              <button type="button" className="secondary" onClick={() => setFlagging(null)}>Cancel</button>
+                            </form>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 {/* Show sources if available */}
                 {message.sources && message.sources.length > 0 && (

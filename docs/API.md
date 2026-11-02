@@ -1151,7 +1151,7 @@ Ask Eru's back end. Free-text answers come from Ollama at `OLLAMA_HOST` (default
 |---|---|---|
 | `GET` | `/api/ai/status` | `llm_available`, `ollama_running`, `model_name`, `models`, `ollama_host`, `data_dir`, and `reason`: why free text won't work (empty when it will) |
 | `GET` | `/api/ai/offline/questions` | The fixed questions: `id`, `question`, `needs_case` (including `threat_intel` and `findings`) |
-| `POST` | `/api/ai/offline/answer` | `{"question_id": "techniques", "case_id": "CASE-001"}` (`case_id` only where `needs_case`). Returns `{"answer", "offline": true}`; `404` for an unknown question |
+| `POST` | `/api/ai/offline/answer` | `{"question_id": "techniques", "case_id": "CASE-001"}` (`case_id` only where `needs_case`). Returns `{"answer", "rows", "job_id", "offline": true}`: `rows` are the rows the answer's shown lines came from (`host`, `file`, `row_ref`, `hash`, `line`), the reference a finding stores, so `POST /api/jobs/{job_id}/case/findings` can flag one; `job_id` is the job (one the caller can see) whose case was read, and `rows` is empty without one. Counts (hosts, IOCs, logins by user) cite nothing. `404` for an unknown question |
 | `GET` | `/api/ai/cases` | Cases Eru can see: indexed vector stores and completed jobs, with `indexed` and `has_artifacts` |
 | `POST` | `/api/ai/chat` | `{"message": "..."}` without case context. Returns `{"response", "model", "processing_time"}` |
 | `GET` | `/api/ai/cases/{case_id}/info` | What is indexed for a case |

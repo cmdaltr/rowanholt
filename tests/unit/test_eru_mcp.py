@@ -113,6 +113,7 @@ class EruMcpTest(BackendCase):
         self.assertIn("WS01", answer["answer"])
         error, answer = self.call(self.alice, "ask_offline", job_id=job, question="rare")
         self.assertIn("x7kq.exe", answer["answer"])
+        self.assertEqual([r["cite"][:23] for r in answer["rows"]], ["(case): stacking.csv ro"])
         error, unknown = self.call(self.alice, "ask_offline", job_id=job, question="who did it")
         self.assertIn("hosts", {q["id"] for q in unknown["questions"]})
 
@@ -132,6 +133,27 @@ class EruMcpTest(BackendCase):
         self.assertIn("WS01", answer["answer"])
         error, overview = self.call(self.alice, "case_overview", job_id=job)
         self.assertEqual([h["host"] for h in overview["case"]["hosts"]], ["WS01"])
+
+    def test_flagging_a_cited_row(self):
+        job = self.case_with_output("CASE-MCP-6")
+        analysis = self.evidence / "out" / "CASE-MCP-6" / "WS01" / "analysis"
+        analysis.mkdir()
+        (analysis / "analysis.csv").write_text("Filename,analysis_type,analysis_value\nX7KQ.EXE,masquerading,svchost\n")
+        resp = self.client.post("/api/ai/offline/answer", headers=self.alice,
+                                json={"question_id": "analysis", "case_id": "CASE-MCP-6"})
+        self.assertEqual(resp.status_code, 200, resp.text)
+        body = resp.json()
+        self.assertEqual(body["job_id"], job)
+        [row] = body["rows"]
+        self.assertEqual((row["host"], row["file"], row["row_ref"]), ("WS01", "analysis/analysis.csv", "2"))
+        flagged = self.client.post(f"/api/jobs/{job}/case/findings", headers=self.alice, json={
+            "host": row["host"], "artefact": row["file"], "row_ref": row["row_ref"], "title": "X7KQ.EXE posing as svchost"})
+        self.assertEqual(flagged.status_code, 200, flagged.text)
+        self.assertEqual(flagged.json()["row_hash"], row["hash"])
+        # Not bob's case: no answer from it, so nothing to flag
+        resp = self.client.post("/api/ai/offline/answer", headers=self.bob,
+                                json={"question_id": "analysis", "case_id": "CASE-MCP-6"})
+        self.assertEqual(resp.status_code, 404)
 
     def test_other_peoples_jobs_unreachable(self):
         job = self.case_with_output("CASE-MCP-2")
