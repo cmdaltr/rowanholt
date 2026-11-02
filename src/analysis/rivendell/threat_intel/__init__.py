@@ -7,6 +7,8 @@ Stdlib only, apart from openpyxl for the workbook, so the web backend can import
 
 from rivendell.threat_intel.index import ThreatIntelIndex, enrich_artefact
 from rivendell.threat_intel.schema import COLUMNS, Indicator
-from rivendell.threat_intel.sources import UnsupportedIntel, load, load_all
+from rivendell.threat_intel.sources import UnsupportedIntel, load, load_all, load_with_validity
+from rivendell.threat_intel.validity import Validity
 
-__all__ = ["COLUMNS", "Indicator", "ThreatIntelIndex", "UnsupportedIntel", "enrich_artefact", "load", "load_all"]
+__all__ = ["COLUMNS", "Indicator", "ThreatIntelIndex", "UnsupportedIntel", "Validity", "enrich_artefact", "load",
+           "load_all", "load_with_validity"]

@@ -1108,10 +1108,11 @@ The indicators in `threat_intel_indicators`, in the fixed ten-column schema (Evi
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/threat-intel` | `total`, `groups`, and `sources`: `[{source, count}]` |
-| `GET` | `/api/threat-intel/indicators?q=&source=&limit=&offset=` | Indicators whose element, group or technique ID contains `q`; `limit` up to 500 |
-| `POST` | `/api/threat-intel/import` | Multipart `file`: the Iran APT workbook (XLSX), a STIX 2.1 bundle (JSON), Rivendell's or MITRESaw's CSV, or a `.txt` watchlist. Up to 200 MB. Returns `read`, `added`, `duplicates` and `sources`; indicators already stored under the same element, group, technique and source are skipped |
+| `GET` | `/api/threat-intel` | `total`, `groups`, `expired` (past their `valid_until`, left out of matching) and `sources`: `[{source, count}]` |
+| `GET` | `/api/threat-intel/indicators?q=&source=&limit=&offset=` | Indicators whose element, group or technique ID contains `q`; `limit` up to 500. Each has `valid_until` (null: no expiry), `confidence`, `first_seen` and `expired` |
+| `POST` | `/api/threat-intel/import` | Multipart `file`: the Iran APT workbook (XLSX), a STIX 2.1 bundle (JSON), Rivendell's or MITRESaw's CSV, or a `.txt` watchlist. Up to 200 MB. Returns `read`, `added`, `duplicates` and `sources`; indicators already stored under the same element, group, technique and source are skipped, but their expiry is renewed. A STIX indicator keeps its own `valid_until` and `confidence`; IPs and domains from other sources hold for 90 days from import, everything else doesn't expire |
 | `POST` | `/api/threat-intel/taxii` | `{"url", "username", "password", "added_after"}`: every object in a TAXII 2.1 collection. `502` when the collection can't be read |
+| `PUT` | `/api/threat-intel/indicators/{id}/validity` | `{"valid_until": "2027-01-01"}` extends one indicator, `{"valid_until": null}` clears its expiry; admins only on a team server. `400` for a date that isn't ISO, `404` for no such indicator |
 | `DELETE` | `/api/threat-intel/sources/{source}` | Every indicator from one source |
 | `GET` | `/api/threat-intel/enrich?value=` | What the indicators say about one process name, command line, path, IP, domain or hash: per element, its `kind`, `breadth` (groups using it), `common` (more than 15), `groups`, `techniques` and `sources` |
 

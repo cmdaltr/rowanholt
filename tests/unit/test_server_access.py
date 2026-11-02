@@ -27,6 +27,8 @@ os.environ.update({
     # No Redis here: sign-in lockouts fall back to memory (port 1 refuses at once)
     "REDIS_HOST": "127.0.0.1",
     "REDIS_PORT": "1",
+    # Threat intelligence from this checkout, as the backend container mounts it
+    "RIVENDELL_ELROND_SRC": str(Path(__file__).resolve().parents[2] / "src" / "analysis"),
 })
 
 try:
@@ -254,6 +256,23 @@ class ServerAccessTest(BackendCase):
         bearer = {"Authorization": f"Bearer {issued.json()['access_token']}"}
         self.assertEqual(self.client.get("/api/auth/me", headers=bearer).json()["username"], "bob")
         self.assertEqual(self.client.get("/api/auth/users", headers=bearer).status_code, 403)  # still not an admin
+
+    def test_only_admins_change_threat_intel_expiry(self):
+        resp = self.client.post("/api/threat-intel/import", headers=self.admin,
+                                files={"file": ("lab.txt", b"203.0.113.9\nMimikatz\n", "text/plain")})
+        self.assertEqual(resp.status_code, 200, resp.text)
+        page = self.client.get("/api/threat-intel/indicators", headers=self.bob, params={"q": "203.0.113.9"}).json()
+        [ip] = page["indicators"]
+        self.assertIsNotNone(ip["valid_until"])  # an IP's default 90 days
+        path = f"/api/threat-intel/indicators/{ip['id']}/validity"
+        self.assertEqual(self.client.put(path, headers=self.bob, json={"valid_until": None}).status_code, 403)
+        self.assertEqual(self.client.put(path, headers=self.admin, json={"valid_until": "soon"}).status_code, 400)
+        resp = self.client.put(path, headers=self.admin, json={"valid_until": "2030-01-01"})
+        self.assertEqual(resp.json()["valid_until"], "2030-01-01T00:00:00")
+        resp = self.client.put(path, headers=self.admin, json={"valid_until": None})
+        self.assertIsNone(resp.json()["valid_until"])
+        self.assertEqual(self.client.put("/api/threat-intel/indicators/999999/validity", headers=self.admin,
+                                         json={"valid_until": None}).status_code, 404)
 
     def test_last_admin_stays_admin(self):
         users = self.client.get("/api/auth/users", headers=self.admin).json()

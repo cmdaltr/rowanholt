@@ -1,7 +1,7 @@
 """Threat intelligence: importing indicators, browsing them, and what they say about one value.
 
-Reading is open to every signed-in user; importing, TAXII pulls and deleting a source are
-admin-only on a team server (auth/access.py), as Mordor's are.
+Reading is open to every signed-in user; importing, TAXII pulls, deleting a source and changing
+an indicator's expiry are admin-only on a team server (auth/access.py), as Mordor's are.
 """
 
 import logging
@@ -47,6 +47,10 @@ def value_index():
         return _index["index"]
 
 
+class ValidityRequest(BaseModel):
+    valid_until: Optional[str] = None  # ISO date or time (UTC); null: no expiry
+
+
 class TaxiiRequest(BaseModel):
     url: str
     username: str = ""
@@ -83,10 +87,10 @@ async def import_file(file: UploadFile = File(...)):
                     raise HTTPException(status_code=413, detail="Threat intelligence files are limited to 200 MB")
                 out.write(chunk)
         try:
-            loaded = package.load(path)
+            loaded, validity = package.load_with_validity(path)
         except (ValueError, OSError) as exc:  # UnsupportedIntel, IntelFormatError, WorkbookError
             raise HTTPException(status_code=400, detail=str(exc))
-    added, duplicates = store().add(loaded)
+    added, duplicates = store().add(loaded, validity)
     sources = sorted({i.source_type for i in loaded})
     logger.info("Threat intelligence: %s indicators added from %s (%s already there)", added, name, duplicates)
     return {"file": name, "read": len(loaded), "added": added, "duplicates": duplicates, "sources": sources}
@@ -96,15 +100,31 @@ async def import_file(file: UploadFile = File(...)):
 async def import_taxii(request: TaxiiRequest):
     """Every object in a TAXII 2.1 collection (or those added after a date), as indicators."""
     _package()
-    from rivendell.threat_intel.stix import IntelFormatError, import_taxii as pull
+    from rivendell.threat_intel.stix import IntelFormatError, import_taxii_with_validity as pull
     try:
-        loaded = pull(request.url, request.username, request.password, request.added_after)
+        loaded, validity = pull(request.url, request.username, request.password, request.added_after)
     except IntelFormatError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except OSError as exc:  # URLError, HTTPError, timeouts
         raise HTTPException(status_code=502, detail=f"Couldn't read the TAXII collection: {exc}")
-    added, duplicates = store().add(loaded)
+    added, duplicates = store().add(loaded, validity)
     return {"collection": request.url, "read": len(loaded), "added": added, "duplicates": duplicates}
+
+
+@router.put("/indicators/{indicator_id}/validity")
+async def set_validity(indicator_id: int, request: ValidityRequest):
+    """Extend an indicator's expiry, or clear it (no expiry); an expired one matches again once extended."""
+    _package()
+    from rivendell.threat_intel.validity import parse_time
+    until = None
+    if request.valid_until:
+        until = parse_time(request.valid_until)
+        if until is None:
+            raise HTTPException(status_code=400, detail="valid_until is an ISO date or time, or null for no expiry")
+    try:
+        return store().set_validity(indicator_id, until)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="No such indicator")
 
 
 @router.delete("/sources/{source:path}")

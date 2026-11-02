@@ -8,6 +8,10 @@ Archer flattens a bundle into one list of IOCs and one group, which suits genera
 Matching evidence needs each indicator's own group and technique, so here an indicator takes them
 from its STIX 'indicates' relationships, falling back to the bundle's only intrusion set when it
 has exactly one, and never to every technique in the bundle.
+
+An indicator's valid_until and confidence (and valid_from or created, as first seen) come back
+beside the rows, keyed by Indicator.key(), for the backend's threat_intel_validity
+(parse_stix_bundle_with_validity); the ten columns don't carry them.
 """
 
 import base64
@@ -18,6 +22,7 @@ from typing import Dict, List, Tuple, Union
 from urllib.parse import urlencode
 
 from rivendell.threat_intel.schema import Indicator, unique
+from rivendell.threat_intel.validity import Validity, parse_time
 
 TECHNIQUE = re.compile(r"\bT\d{4}(?:\.\d{3})?\b")
 # objtype(:path)? = 'value': the comparisons inside a STIX pattern
@@ -102,6 +107,19 @@ def _tactics(obj: Dict) -> str:
 
 def parse_stix_bundle(data: Union[str, bytes, dict, list], source: str = "") -> List[Indicator]:
     """A STIX 2.1 bundle (or a bare list of objects) as indicators."""
+    return parse_stix_bundle_with_validity(data, source)[0]
+
+
+def _validity(obj: Dict) -> Validity:
+    confidence = obj.get("confidence")
+    return Validity(valid_until=parse_time(obj.get("valid_until")),
+                    confidence=confidence if isinstance(confidence, int) and 0 <= confidence <= 100 else None,
+                    first_seen=parse_time(obj.get("valid_from")) or parse_time(obj.get("created")))
+
+
+def parse_stix_bundle_with_validity(data: Union[str, bytes, dict, list],
+                                    source: str = "") -> Tuple[List[Indicator], Dict[tuple, Validity]]:
+    """The bundle's indicators, and the validity of those whose STIX object gives one (by key)."""
     data = _load(data)
     objects = data.get("objects") if isinstance(data, dict) else data
     if not isinstance(objects, list):
@@ -119,6 +137,7 @@ def parse_stix_bundle(data: Union[str, bytes, dict, list], source: str = "") -> 
                 targets.setdefault(rel.get("source_ref"), []).append(target)
 
     indicators = []
+    validity: Dict[tuple, Validity] = {}
     for obj in by_id.values():
         kind = obj.get("type")
         if kind == "indicator":
@@ -130,6 +149,8 @@ def parse_stix_bundle(data: Union[str, bytes, dict, list], source: str = "") -> 
         linked = targets.get(obj.get("id"), [])
         group = next((t.get("name", "") for t in linked if t.get("type") in GROUP_TYPES), only_group)
         patterns = [t for t in linked if t.get("type") == "attack-pattern"] or [None]
+        own = _validity(obj)
+        timed = own.valid_until is not None or own.confidence is not None
         for pattern in patterns:
             technique = _attack_id(pattern) if pattern else (TECHNIQUE.findall(obj.get("name", "")) or [""])[0]
             for value_kind, value in values:
@@ -141,7 +162,10 @@ def parse_stix_bundle(data: Union[str, bytes, dict, list], source: str = "") -> 
                     contextual_evidence=f"{value_kind}: {obj.get('name') or kind}"[:500],
                     reference_url=_reference(obj) or _reference(report), source_type=source,
                 ))
-    return unique(indicators)
+                if timed:
+                    key = indicators[-1].key()
+                    validity[key] = validity[key].merge(own) if key in validity else own
+    return unique(indicators), validity
 
 
 def fetch_taxii(collection_url: str, username: str = "", password: str = "", added_after: str = "",
@@ -172,5 +196,10 @@ def fetch_taxii(collection_url: str, username: str = "", password: str = "", add
 
 def import_taxii(collection_url: str, username: str = "", password: str = "", added_after: str = "",
                  limit: int = 5000) -> List[Indicator]:
+    return import_taxii_with_validity(collection_url, username, password, added_after, limit)[0]
+
+
+def import_taxii_with_validity(collection_url: str, username: str = "", password: str = "", added_after: str = "",
+                               limit: int = 5000) -> Tuple[List[Indicator], Dict[tuple, Validity]]:
     objects = fetch_taxii(collection_url, username, password, added_after, limit)
-    return parse_stix_bundle({"type": "bundle", "objects": objects}, source=f"TAXII: {collection_url}")
+    return parse_stix_bundle_with_validity({"type": "bundle", "objects": objects}, source=f"TAXII: {collection_url}")

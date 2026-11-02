@@ -6,6 +6,7 @@ import {
   importThreatIntel,
   importTaxii,
   deleteThreatIntelSource,
+  setThreatIntelValidity,
   enrichValue,
 } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -15,6 +16,9 @@ const PAGE = 50;
 const ACCEPT = '.xlsx,.xlsm,.csv,.json,.txt';
 
 const detail = (err, fallback) => err.response?.data?.detail || err.message || fallback;
+const EXTEND_DAYS = 90;
+const day = (iso) => (iso ? iso.slice(0, 10) : '');
+const inDays = (days) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
 
 // The indicators Elrond matches a case against (Threat intelligence on Elrond's page, or
 // --threatIntel) and Eru enriches single values with. On a team server only admins add or
@@ -101,6 +105,16 @@ function ThreatIntel() {
     });
   };
 
+  const extend = (indicator) => run(async () => {
+    await setThreatIntelValidity(indicator.id, inDays(EXTEND_DAYS));
+    setNotice(`${indicator.evidential_element} now holds until ${inDays(EXTEND_DAYS)}.`);
+  });
+
+  const clearExpiry = (indicator) => run(async () => {
+    await setThreatIntelValidity(indicator.id, null);
+    setNotice(`${indicator.evidential_element} no longer expires.`);
+  });
+
   const enrich = async (event) => {
     event.preventDefault();
     setError('');
@@ -127,7 +141,10 @@ function ThreatIntel() {
           <p>No indicators yet.{canEdit ? ' Import a file or pull a TAXII collection below.' : ' An administrator imports them.'}</p>
         ) : (
           <>
-            <p>{summary.total.toLocaleString()} indicators about {summary.groups} groups.</p>
+            <p>
+              {summary.total.toLocaleString()} indicators about {summary.groups} groups.
+              {summary.expired > 0 && ` ${summary.expired.toLocaleString()} have expired: they stay listed but cases aren't matched against them, and Eru doesn't check values with them, until a fresh import of their source or an administrator extends them.`}
+            </p>
             <div className="table-container">
               <table>
                 <thead><tr><th>Source</th><th>Indicators</th><th /></tr></thead>
@@ -214,7 +231,7 @@ function ThreatIntel() {
         </div>
         <div className="table-container">
           <table>
-            <thead><tr><th>Evidential Element</th><th>Threat Group</th><th>Technique</th><th>Tactic</th><th>Source</th></tr></thead>
+            <thead><tr><th>Evidential Element</th><th>Threat Group</th><th>Technique</th><th>Tactic</th><th>Source</th><th>Expires</th></tr></thead>
             <tbody>
               {results.indicators.map((i) => (
                 <tr key={i.id}>
@@ -223,6 +240,22 @@ function ThreatIntel() {
                   <td>{i.reference_url ? <a href={i.reference_url} target="_blank" rel="noopener noreferrer">{i.technique_id}</a> : i.technique_id} {i.technique_name}</td>
                   <td>{i.tactic}</td>
                   <td>{i.source_type}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    {i.valid_until
+                      ? <span style={i.expired ? { color: '#ed5565' } : undefined} title={i.first_seen ? `first seen ${day(i.first_seen)}` : undefined}>
+                          {i.expired ? 'expired ' : ''}{day(i.valid_until)}
+                        </span>
+                      : 'never'}
+                    {i.confidence !== null && i.confidence !== undefined && <div style={{ fontSize: '0.8rem', color: '#888' }}>confidence {i.confidence}</div>}
+                    {canEdit && (
+                      <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.25rem' }}>
+                        <button type="button" disabled={busy} style={{ padding: '0.1rem 0.4rem' }} title={`Hold until ${inDays(EXTEND_DAYS)}`}
+                          onClick={() => extend(i)}>+{EXTEND_DAYS} days</button>
+                        {i.valid_until && <button type="button" className="secondary" disabled={busy} style={{ padding: '0.1rem 0.4rem' }}
+                          onClick={() => clearExpiry(i)}>No expiry</button>}
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

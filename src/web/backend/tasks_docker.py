@@ -1209,14 +1209,18 @@ def export_threat_intel(job_id: str) -> str:
     path = os.path.join(tempfile.gettempdir(), f"rivendell-threat-intel-{job_id}.csv")
     try:
         threat_intel()
-        count = ThreatIntelStore(job_storage.Session).export_csv(path)
+        stored = ThreatIntelStore(job_storage.Session)
+        count = stored.export_csv(path)
+        expired = stored.expired_count()
     except (ThreatIntelUnavailable, OSError) as e:
         logger.warning(f"Threat intelligence not exported for job {job_id}: {e}")
         return ""
     if not count:
-        logger.info(f"Threat intelligence asked for on job {job_id}, but none is stored")
+        logger.info(f"Threat intelligence asked for on job {job_id}, but none is stored"
+                    + (f" that hasn't expired ({expired} expired)" if expired else ""))
         return ""
-    logger.info(f"Exported {count} threat intelligence indicators for job {job_id}")
+    logger.info(f"Exported {count} threat intelligence indicators for job {job_id}"
+                + (f"; {expired} expired ones left out" if expired else ""))
     return path
 
 

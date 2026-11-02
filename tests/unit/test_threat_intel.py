@@ -16,7 +16,8 @@ from rivendell.threat_intel import COLUMNS, Indicator, ThreatIntelIndex, enrich_
 from rivendell.threat_intel.index import classify  # noqa: E402
 from rivendell.threat_intel.match import match_case  # noqa: E402
 from rivendell.threat_intel.schema import read_csv, write_csv  # noqa: E402
-from rivendell.threat_intel.stix import parse_stix_bundle  # noqa: E402
+from rivendell.threat_intel.stix import parse_stix_bundle, parse_stix_bundle_with_validity  # noqa: E402
+from rivendell.threat_intel.validity import Validity, default_validity  # noqa: E402
 
 TEN = ["Evidential Element", "Threat Group", "Procedure Example", "Technique ID", "Technique Name", "Tactic",
        "Contextual Evidence", "Reference URL", "Navigation Layer URL", "Source Type"]
@@ -220,10 +221,89 @@ def test_backend_store(tmp_path):
     again = [Indicator(evidential_element="C2.RIVENDELL-LAB.TEST", threat_group="apt34", source_type="Iran APT workbook"),
              Indicator(evidential_element="Mimikatz", threat_group="APT29", source_type="MITRESaw")]
     assert store.add(again) == (1, 1)  # the same key whatever its case
-    assert store.counts() == {"total": 3, "groups": 2, "sources": [{"source": "Iran APT workbook", "count": 2},
+    assert store.counts() == {"total": 3, "groups": 2, "expired": 0, "sources": [{"source": "Iran APT workbook", "count": 2},
                                                                    {"source": "MITRESaw", "count": 1}]}
     assert store.search("rivendell")["total"] == 1
     assert sorted(i.evidential_element for i in store.indicators()) == ["198.51.100.23", "Mimikatz",
                                                                         "c2.rivendell-lab.test"]
     assert store.export_csv(str(tmp_path / "export.csv")) == 3
     assert store.delete_source("MITRESaw") == 1 and store.version()[0] == 2
+
+
+def test_stix_validity_beside_the_rows():
+    """valid_until and confidence come back beside the ten columns, never in them."""
+    bundle = {"type": "bundle", "objects": [
+        {"type": "indicator", "id": "indicator--1", "pattern": "[ipv4-addr:value = '198.51.100.23']",
+         "valid_from": "2026-01-01T00:00:00Z", "valid_until": "2026-04-01T00:00:00.000Z", "confidence": 80},
+        {"type": "indicator", "id": "indicator--2", "pattern": "[ipv4-addr:value = '198.51.100.23']",
+         "valid_until": "2026-06-01T00:00:00Z", "confidence": 40},
+        {"type": "indicator", "id": "indicator--3", "pattern": "[domain-name:value = 'c2.example.test']"},
+    ]}
+    indicators, validity = parse_stix_bundle_with_validity(bundle)
+    assert sorted(i.evidential_element for i in indicators) == ["198.51.100.23", "c2.example.test"]
+    [(key, held)] = validity.items()  # the domain's object gives none: it gets the default lifetime on import
+    assert key[0] == "198.51.100.23"
+    # The same indicator twice: the later expiry, the higher confidence, the earlier first sighting
+    assert (held.valid_until.isoformat(), held.confidence, held.first_seen.isoformat()) == \
+        ("2026-06-01T00:00:00", 80, "2026-01-01T00:00:00")
+
+
+def test_default_lifetimes():
+    from datetime import datetime, timedelta
+    now = datetime(2026, 11, 2)
+    assert default_validity(Indicator("198.51.100.23"), now).valid_until == now + timedelta(days=90)
+    assert default_validity(Indicator("c2.example.test"), now).valid_until == now + timedelta(days=90)
+    for value in ("a" * 64, "Mimikatz", "powershell -enc AAA", "C:\\Users\\Public\\x.exe"):
+        assert default_validity(Indicator(value), now).valid_until is None, value
+
+
+def test_expired_indicators_are_left_out_of_matching(tmp_path):
+    from datetime import datetime, timedelta
+    sqlalchemy = pytest.importorskip("sqlalchemy")
+    sys.path.insert(0, str(REPO / "src" / "web" / "backend"))
+    import storage
+    from threat_intel_store import ThreatIntelStore
+    engine = sqlalchemy.create_engine(f"sqlite:///{tmp_path / 'db.sqlite'}")
+    storage.Base.metadata.create_all(engine)
+    store = ThreatIntelStore(sqlalchemy.orm.sessionmaker(bind=engine))
+    bundle = {"type": "bundle", "objects": [
+        {"type": "indicator", "id": "indicator--1", "pattern": "[ipv4-addr:value = '198.51.100.23']",
+         "valid_until": "2026-03-01T00:00:00Z", "confidence": 70},
+        {"type": "indicator", "id": "indicator--2", "pattern": "[file:hashes.'SHA-256' = '" + "b" * 64 + "']"}]}
+    indicators, validity = parse_stix_bundle_with_validity(bundle, source="STIX: test")
+    watchlist = [Indicator("c2.example.test", source_type="Watchlist: x"), Indicator("Mimikatz", source_type="Watchlist: x")]
+    january = datetime(2026, 1, 1)
+    assert store.add(indicators, validity, now=january) == (2, 0)
+    assert store.add(watchlist, now=january) == (2, 0)
+    def elements(now):
+        return sorted(i.evidential_element for i in store.indicators(now=now))
+    assert elements(january) == ["198.51.100.23", "Mimikatz", "b" * 64, "c2.example.test"]
+    # March: the STIX IP is past its valid_until; June: the watchlist domain is past its 90 days
+    assert elements(datetime(2026, 3, 2)) == ["Mimikatz", "b" * 64, "c2.example.test"]
+    assert elements(datetime(2026, 6, 1)) == ["Mimikatz", "b" * 64]
+    assert store.expired_count(datetime(2026, 6, 1)) == 2
+    assert store.counts()["expired"] == 2  # today's date is past both
+    page = {i["evidential_element"]: i for i in store.search()["indicators"]}
+    assert page["198.51.100.23"]["expired"] and page["198.51.100.23"]["confidence"] == 70
+    assert page["b" * 64]["valid_until"] is None and not page["b" * 64]["expired"]
+    assert store.export_csv(str(tmp_path / "export.csv")) == 2
+    assert len(store.indicators(include_expired=True)) == 4
+
+    # A refreshed import brings the domain back for another 90 days from then, and keeps when it was first seen
+    later = datetime(2026, 11, 1)
+    assert store.add(watchlist, now=later) == (0, 2)
+    domain = store.search("c2.example")["indicators"][0]
+    assert domain["valid_until"] == (later + timedelta(days=90)).isoformat() and domain["first_seen"] == january.isoformat()
+    assert "c2.example.test" in elements(later)
+    # An admin clears the IP's expiry, or extends it
+    ip = page["198.51.100.23"]["id"]
+    store.set_validity(ip, None)
+    assert "198.51.100.23" in elements(later)
+    store.set_validity(ip, datetime(2026, 12, 1))
+    assert "198.51.100.23" not in elements(datetime(2026, 12, 2))
+    with pytest.raises(KeyError):
+        store.set_validity(999999, None)
+    # Removing a source removes its validity rows too
+    assert store.delete_source("STIX: test") == 2
+    with store.Session() as session:
+        assert session.query(storage.ThreatIntelValidityModel).count() == 1  # the watchlist domain's
