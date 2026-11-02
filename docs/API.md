@@ -1156,7 +1156,7 @@ Ask Eru's back end. Free-text answers come from Ollama at `OLLAMA_HOST` (default
 | `POST` | `/api/ai/chat` | `{"message": "..."}` without case context. Returns `{"response", "model", "processing_time"}` |
 | `GET` | `/api/ai/cases/{case_id}/info` | What is indexed for a case |
 | `POST` | `/api/ai/cases/{case_id}/query` | `{"question": "..."}` answered from the case's data; `rows` are the rows the answer cites by tag (`host`, `file`, `row_ref`, `hash`, `line`, `tag`), only ones it was given, on `job_id` (empty without a job) |
-| `POST` | `/api/ai/cases/{case_id}/suggestions` | Investigation paths to follow |
+| `POST` | `/api/ai/cases/{case_id}/suggestions` | Five investigation paths from the model, each with the `rows` its text cites; `rows` and `job_id` for all of them, as for `/query` |
 | `POST` | `/api/ai/cases/{case_id}/summary` | An executive summary of the case, with the `rows` it cites and `job_id`, as for `/query` |
 
 The LLM endpoints return `503` when Ollama or the model isn't available.

@@ -72,6 +72,8 @@ class EruQueryTest(BackendCase):
             # The prefetch row when the question brought it in; otherwise the first row given
             tag = (re.search(r"\[(R\d+)\] WS01 artefacts/cooked/prefetch.csv row 3", prompt) or
                    re.search(r"\[(R\d+)\]", prompt)).group(1)
+            if "investigation paths" in prompt:
+                return f"1. The autostart entry in /tmp [{tag}]\n   See where it came from.\n2. Logins\n   Nothing cited."
             return f"X7KQ.EXE ran on WS01 [{tag}]; it also beaconed [R404]."
 
         with mock.patch.object(sys.modules["ai_routes"].ollama, "generate", model):
@@ -90,6 +92,11 @@ class EruQueryTest(BackendCase):
             summary = self.client.post("/api/ai/cases/CASE-CTX-1/summary", headers=self.alice).json()
             # No question, so no question rows: the flagged autostart entry is what it has
             self.assertEqual([r["file"] for r in summary["rows"]], ["artefacts/cooked/autostart.csv"])
+            suggestions = self.client.post("/api/ai/cases/CASE-CTX-1/suggestions", headers=self.alice).json()
+            self.assertEqual(suggestions["job_id"], job)
+            self.assertEqual([r["file"] for r in suggestions["rows"]], ["artefacts/cooked/autostart.csv"])
+            # Each suggestion carries the rows its own text cites
+            self.assertEqual([len(s["rows"]) for s in suggestions["suggestions"]], [1, 0])
             # Bob can't see the case, so he can't ask about it
             self.assertEqual(self.client.post("/api/ai/cases/CASE-CTX-1/query", headers=self.bob,
                                               json={"question": "x7kq.exe"}).status_code, 404)

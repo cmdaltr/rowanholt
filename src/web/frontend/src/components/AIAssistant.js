@@ -233,7 +233,8 @@ function AIAssistant() {
 
         setMessages(prev => [...prev, {
           role: 'assistant',
-          content: `**Investigation Path Suggestions for ${selectedCase}:**\n\n${suggestionsText}`
+          content: `**Investigation Path Suggestions for ${selectedCase}:**\n\n${suggestionsText}`,
+          ...citedRows(data)
         }]);
       }
     } catch (error) {

@@ -420,7 +420,7 @@ Provide a detailed forensic analysis answer based on the case data provided."""
 
 
 @router.post("/cases/{case_id}/suggestions")
-async def get_investigation_suggestions(case_id: str):
+async def get_investigation_suggestions(case_id: str, http_request: Request):
     """
     Get AI-generated investigation path suggestions.
 
@@ -428,10 +428,10 @@ async def get_investigation_suggestions(case_id: str):
         case_id: Case identifier
 
     Returns:
-        List of investigation suggestions
+        List of investigation suggestions, each with the rows it cites, and all of them with the job
     """
     # Find case path
-    case_path = await _find_case_path(case_id)
+    case_path, job_id = await _find_case(case_id, access.current_user(http_request))
 
     if not case_path:
         raise HTTPException(status_code=404, detail=f"Case {case_id} not found")
@@ -451,14 +451,18 @@ Analyze the evidence and suggest 5 specific investigation paths. For each:
 
 Format as a numbered list."""
 
-    response = await ollama.generate(prompt=prompt, system=FORENSIC_SYSTEM_PROMPT)
+    response = await ollama.generate(prompt=prompt, system=f"{FORENSIC_SYSTEM_PROMPT}\n\n{eru_context.CITE_INSTRUCTIONS}")
 
     # Parse response into suggestions
     suggestions = _parse_suggestions(response)
+    for suggestion in suggestions:
+        suggestion["rows"] = _rows_for(eru_context.cited(f"{suggestion['title']} {suggestion['description']}", context), job_id)
 
     return {
         "case_id": case_id,
-        "suggestions": suggestions
+        "suggestions": suggestions,
+        "rows": _rows_for(eru_context.cited(response, context), job_id),
+        "job_id": job_id,
     }
 
 
