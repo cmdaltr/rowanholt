@@ -32,14 +32,42 @@ MACOS_EXTRA_DIRS = (
 )
 MACOS_BIOME = ("/private/var/db/biome/streams/restricted", "/Users/*/Library/Biome/streams/restricted")
 MACOS_BIOME_MAX_FILES = 2000
+# The unified-log store into raw/unified_log_store/ with its layout kept, uuidtext/ first (nothing
+# reads without it), then the newest files first, up to 2 GB, as gandalf.sh and gandalf.py take it
+MACOS_LOG_STORES = (("/private/var/db/uuidtext", "uuidtext"), ("/private/var/db/diagnostics", "diagnostics"))
+MACOS_LOG_STORE_MAX = 2 << 30
+
+
+def collect_macos_log_store(mnt, dest):
+    """Copy the unified-log store from a mounted image; returns the number of files taken."""
+    budget, count = MACOS_LOG_STORE_MAX, 0
+    for top, label in MACOS_LOG_STORES:
+        files = []
+        for source in _walk(mnt + top, 4) if os.path.isdir(mnt + top) else []:
+            try:
+                if not os.path.islink(source):
+                    files.append((os.path.getmtime(source), os.path.getsize(source), source))
+            except OSError:
+                pass
+        for _, size, source in sorted(files, reverse=True):
+            if size > budget:
+                continue
+            target = os.path.join(dest, "unified_log_store", label, os.path.relpath(source, mnt + top))
+            try:
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                shutil.copy2(source, target)
+            except OSError:
+                continue
+            budget -= size
+            count += 1
+    return count
 
 
 def collect_macos_extras(mnt, dest, img, output_directory, stage, verbosity):
     """
     BTM items, shared file lists, Notification Center, ExecPolicy, KextPolicy,
     XProtect, emond, periodic, InstallHistory, PowerLog and Biome from a mounted
-    macOS image, into raw/macos/. The unified log store isn't taken: Elrond has
-    no tracev3 parser, and Gandalf's live export covers it on a running host.
+    macOS image, into raw/macos/; the unified-log store into raw/unified_log_store/.
     """
     macos = dest + "macos/"
     os.makedirs(macos, exist_ok=True)
@@ -77,9 +105,10 @@ def collect_macos_extras(mnt, dest, img, output_directory, stage, verbosity):
                     break
                 take(source, 10 << 20)
                 biome += 1
+    count += collect_macos_log_store(mnt, dest)
     entry, prnt = "{},{},{},macos background items and policy databases\n".format(
         datetime.now().isoformat(), img.split("::")[0], stage
-    ), " -> {} -> {} {} macOS background-item, policy-database and Biome artefacts from '{}'".format(
+    ), " -> {} -> {} {} macOS background-item, policy-database, Biome and unified-log artefacts from '{}'".format(
         datetime.now().isoformat().replace("T", " "), stage, count, img.split("::")[0]
     )
     write_audit_log_entry(verbosity, output_directory, entry, prnt)

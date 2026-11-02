@@ -123,7 +123,7 @@ Each feature's "Still to do" above, as work to schedule, then the Eru MCP server
 
 ### Threat intelligence
 
-1. **Expiry and confidence** (built 2 November on `feat/ti-expiry`, Alembic `9e3c5a7b1f42`, not yet merged or migrated). The ten-column schema stays as it is. A side table, `threat_intel_validity` (indicator id, `valid_until`, `confidence`, `first_seen`), added by an Alembic migration:
+1. **Expiry and confidence** (done 2 November: built on `feat/ti-expiry`, merged into `feat/server-deployment`, Alembic `9e3c5a7b1f42`). The ten-column schema stays as it is. A side table, `threat_intel_validity` (indicator id, `valid_until`, `confidence`, `first_seen`), added by an Alembic migration:
    - STIX imports fill it from `valid_until` and `confidence`; other sources get a default lifetime per kind (90 days for IPs and domains, as Archer does; none for hashes and tool names).
    - Matching skips expired indicators and says how many it skipped; Pippin shows the expiry and lets an admin extend or clear it.
    - Tests: an expired STIX indicator doesn't match; a refreshed import revives it.
