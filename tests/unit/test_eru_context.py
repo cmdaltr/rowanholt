@@ -61,6 +61,20 @@ def test_only_shown_tags_are_cited(tmp_path):
 
 
 @unittest.skipIf(TestClient is None, "backend requirements (fastapi) not installed")
+class SuggestionParsingTest(unittest.TestCase):
+    def test_numbered_points_under_a_suggestion_stay_in_it(self):
+        import ai_routes
+        parse = ai_routes._parse_suggestions
+        text = ("1. **Check the autostart entry** [R1]\n   1. It runs from /tmp\n   2. Look for T1547.013\n"
+                "2. **Review logins**\n   1. Failed SSH from 198.51.100.77\n")
+        found = parse(text)
+        self.assertEqual([s["title"] for s in found], ["Check the autostart entry [R1]", "Review logins"])
+        self.assertIn("Look for T1547.013", found[0]["description"])
+        # All indented alike: still one per item
+        self.assertEqual(len(parse("  1. One\n  2. Two\n")), 2)
+
+
+@unittest.skipIf(TestClient is None, "backend requirements (fastapi) not installed")
 class EruQueryTest(BackendCase):
     def test_query_cites_rows_it_was_given(self):
         job = self.create_job(self.alice, "CASE-CTX-1")

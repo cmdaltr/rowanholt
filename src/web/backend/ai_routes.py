@@ -557,18 +557,26 @@ def _rows_for(rows: List[Dict[str, str]], job_id: Optional[str]) -> List[Dict[st
 def _parse_suggestions(response: str) -> List[Dict[str, Any]]:
     """Parse LLM response into suggestion objects."""
     suggestions = []
-    lines = response.strip().split('\n')
+    lines = response.strip('\n').split('\n')
+
+    def numbered(text: str) -> bool:
+        return bool(text) and text[0].isdigit() and '.' in text[:4]
+
+    # A suggestion starts at a numbered line of the outermost list; the numbered points the prompt
+    # asks for under each one are indented further, and belong to its description
+    depths = [len(l) - len(l.lstrip()) for l in lines if numbered(l.strip())]
+    top = min(depths) if depths else 0
 
     current_suggestion = None
     current_description = []
 
-    for line in lines:
-        line = line.strip()
+    for raw in lines:
+        line = raw.strip()
         if not line:
             continue
 
-        # Check if it's a numbered item
-        if line[0].isdigit() and '.' in line[:4]:
+        # Check if it's a numbered item of the outermost list
+        if numbered(line) and len(raw) - len(raw.lstrip()) == top:
             # Save previous suggestion
             if current_suggestion:
                 current_suggestion["description"] = ' '.join(current_description)
