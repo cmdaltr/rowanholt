@@ -106,6 +106,8 @@ def test_container_and_store_paths_agree():
     bash = (ROOT / "src" / "acquisition" / "bash" / "gandalf.sh").read_text()
     python = (ROOT / "src" / "acquisition" / "python" / "collect_artefacts-py").read_text()
     for path in ("/var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db",
-                 "/var/lib/containers/storage/overlay-containers/containers.json"):
+                 "/var/lib/containers/storage/overlay-containers/containers.json",
+                 "/var/lib/containers/storage/db.sql", "/var/lib/containers/storage/db.sql-wal",
+                 "/var/lib/containers/storage/libpod/bolt_state.db"):
         assert path in collect.LINUX_EXTRA_FILES and f'"{path}"' in python and path in bash
     assert "collect_container_layers \"$acq_dir\"" in bash and "collect_macos_stores \"$acq_dir\"" in bash

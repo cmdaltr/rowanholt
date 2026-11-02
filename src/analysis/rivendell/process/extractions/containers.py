@@ -11,6 +11,8 @@ routes them here).
 - /var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db: containerd's own record of every
   container (a Kubernetes node's, through the CRI, or ctr's), read with the stdlib bbolt reader
   into the same docker_containers.csv rows, Runtime "containerd"
+- /var/lib/containers/storage/db.sql (Podman 4.8 on, SQLite) or libpod/bolt_state.db (bbolt, before):
+  Podman's record of its containers, with the same OCI spec inside, Runtime "podman"
 
 Every function returns rows; techniques are decided from the rows by the *_techniques functions,
 only where a row justifies one.
@@ -20,7 +22,10 @@ import csv
 import json
 import os
 import re
+import shutil
+import sqlite3
 import struct
+import tempfile
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
@@ -30,7 +35,8 @@ from rivendell.process.extractions.bbolt import Bolt, Bucket
 SENSITIVE_MOUNTS = ("/", "/etc", "/root", "/proc", "/sys", "/dev", "/boot", "/var/lib/docker", "/var/lib/kubelet",
                     "/var/lib/containerd", "/home", "/usr", "/lib", "/var/log")
 DOCKER_SOCKETS = ("/var/run/docker.sock", "/run/docker.sock", "/run/containerd/containerd.sock",
-                  "/var/run/containerd/containerd.sock", "/var/run/crio/crio.sock", "/run/crio/crio.sock")
+                  "/var/run/containerd/containerd.sock", "/var/run/crio/crio.sock", "/run/crio/crio.sock",
+                  "/run/podman/podman.sock", "/var/run/podman/podman.sock")
 # What a runtime mounts read-only into every container for name resolution: not a lead
 RESOLVER_FILES = ("/etc/hosts", "/etc/resolv.conf", "/etc/hostname")
 ESCAPE_CAPABILITIES = {"ALL", "SYS_ADMIN", "SYS_PTRACE", "SYS_MODULE", "DAC_READ_SEARCH", "SYS_RAWIO", "BPF"}
@@ -186,6 +192,43 @@ def _host_namespace(namespaces: List[Dict], kind: str) -> bool:
     return True
 
 
+def oci_spec_fields(spec: Dict, privileged: Optional[bool] = None) -> Dict[str, str]:
+    """The docker_containers.csv columns an OCI runtime spec decides, flagged as Docker's are.
+    `privileged` when the runtime records it (Podman); otherwise read from the spec."""
+    process = spec.get("process") or {}
+    linux = spec.get("linux") or {}
+    namespaces = linux.get("namespaces") or []
+    effective = [c.replace("CAP_", "") for c in (process.get("capabilities") or {}).get("effective") or []]
+    devices = (linux.get("resources") or {}).get("devices") or []
+    # What a privileged container gets: every device, and CAP_SYS_ADMIN with the rest
+    if privileged is None:
+        privileged = "SYS_ADMIN" in effective and any(d.get("allow") and not d.get("type") and not d.get("major")
+                                                      for d in devices)
+    mounts = [{"Source": m.get("source", ""), "Destination": m.get("destination", ""),
+               "RW": "ro" not in (m.get("options") or [])}
+              for m in spec.get("mounts") or [] if m.get("type") == "bind" or "bind" in (m.get("options") or []) or
+              "rbind" in (m.get("options") or [])]
+    pid_mode = "host" if spec and _host_namespace(namespaces, "pid") else ""
+    network_mode = "host" if spec and _host_namespace(namespaces, "network") else ""
+    ipc_mode = "host" if spec and _host_namespace(namespaces, "ipc") else ""
+    profile = process.get("apparmorProfile") or ""
+    security_opt = ["apparmor=unconfined"] if profile == "unconfined" else []
+    flags = container_flags(privileged, mounts, pid_mode, network_mode, ipc_mode, effective, security_opt)
+    user = process.get("user") or {}
+    return {
+        "Command": " ".join(str(a) for a in process.get("args") or []),
+        "User": "root" if user.get("uid", 0) == 0 else str(user.get("uid")),
+        "Privileged": str(privileged), "PidMode": pid_mode, "NetworkMode": network_mode, "IpcMode": ipc_mode,
+        "CapAdd": ", ".join(effective), "SecurityOpt": ", ".join(security_opt),
+        "Mounts": "; ".join(f"{m['Source']}:{m['Destination']}{'' if m['RW'] else ':ro'}" for m in mounts),
+        "Flag": "; ".join(flags),
+    }
+
+
+def _short(container_id: str) -> str:
+    return container_id[:12] if HEX_ID.match(container_id) else container_id
+
+
 def containerd_container_row(namespace: str, container_id: str, container: Bucket) -> Dict[str, str]:
     """One container from containerd's metadata (v1/<namespace>/containers/<id>): its OCI spec
     says what it was allowed, as hostconfig.json does for Docker."""
@@ -198,39 +241,68 @@ def containerd_container_row(namespace: str, container_id: str, container: Bucke
             spec = json.loads(any_value(values[b"spec"])[1] or b"{}")
         except ValueError:
             spec = {}
-    process = spec.get("process") or {}
-    linux = spec.get("linux") or {}
-    namespaces = linux.get("namespaces") or []
-    effective = [c.replace("CAP_", "") for c in (process.get("capabilities") or {}).get("effective") or []]
-    devices = (linux.get("resources") or {}).get("devices") or []
-    # What a privileged container gets: every device, and CAP_SYS_ADMIN with the rest
-    privileged = "SYS_ADMIN" in effective and any(d.get("allow") and not d.get("type") and not d.get("major")
-                                                  for d in devices)
-    mounts = [{"Source": m.get("source", ""), "Destination": m.get("destination", ""),
-               "RW": "ro" not in (m.get("options") or [])}
-              for m in spec.get("mounts") or [] if m.get("type") == "bind" or "bind" in (m.get("options") or []) or
-              "rbind" in (m.get("options") or [])]
-    pid_mode = "host" if spec and _host_namespace(namespaces, "pid") else ""
-    network_mode = "host" if spec and _host_namespace(namespaces, "network") else ""
-    ipc_mode = "host" if spec and _host_namespace(namespaces, "ipc") else ""
-    profile = process.get("apparmorProfile") or ""
-    security_opt = ["apparmor=unconfined"] if profile == "unconfined" else []
-    flags = container_flags(privileged, mounts, pid_mode, network_mode, ipc_mode, effective, security_opt)
-    user = process.get("user") or {}
     name = labels.get("io.kubernetes.container.name")
     pod = labels.get("io.kubernetes.pod.name")
     shown = f"{labels.get('io.kubernetes.pod.namespace', '')}/{pod}/{name}" if pod and name else container_id
-    return {
-        "Container": container_id[:12] if HEX_ID.match(container_id) else container_id,
-        "Name": f"{namespace}: {shown}", "Image": values.get(b"image", b"").decode("utf-8", "replace"),
-        "Command": " ".join(str(a) for a in process.get("args") or []),
-        "Created": go_time(values.get(b"createdat")), "Started": "", "Finished": "", "Running": "",
-        "User": "root" if user.get("uid", 0) == 0 else str(user.get("uid")),
-        "Privileged": str(privileged), "PidMode": pid_mode, "NetworkMode": network_mode, "IpcMode": ipc_mode,
-        "CapAdd": ", ".join(effective), "SecurityOpt": ", ".join(security_opt),
-        "Mounts": "; ".join(f"{m['Source']}:{m['Destination']}{'' if m['RW'] else ':ro'}" for m in mounts),
-        "Runtime": "containerd", "Flag": "; ".join(flags),
-    }
+    return {"Container": _short(container_id), "Name": f"{namespace}: {shown}",
+            "Image": values.get(b"image", b"").decode("utf-8", "replace"),
+            "Created": go_time(values.get(b"createdat")), "Started": "", "Finished": "", "Running": "",
+            **oci_spec_fields(spec), "Runtime": "containerd"}
+
+
+# libpod's ContainerStatus: 3 is running
+PODMAN_RUNNING = 3
+PODMAN_UNSET_TIME = "0001-01-01T00:00:00Z"
+
+
+def podman_container_row(config: Dict, state: Optional[Dict] = None) -> Dict[str, str]:
+    """One container from Podman's state database: its config (with the OCI spec Podman generated
+    at create) and its state."""
+    state = state or {}
+    def when(value) -> str:
+        return "" if not value or value == PODMAN_UNSET_TIME else str(value)
+    return {"Container": _short(config.get("id") or ""), "Name": config.get("name") or "",
+            "Image": config.get("rootfsImageName") or config.get("RawImageName") or "",
+            "Created": when(config.get("createdTime")), "Started": when(state.get("startedTime")),
+            "Finished": when(state.get("finishedTime")),
+            "Running": str(state.get("state") == PODMAN_RUNNING) if state else "",
+            **oci_spec_fields(config.get("spec") or {}, bool(config.get("privileged"))), "Runtime": "podman"}
+
+
+def _json(raw) -> Dict:
+    try:
+        value = json.loads(raw or "{}")
+    except (TypeError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def podman_bolt_rows(path: str) -> List[Dict[str, str]]:
+    """Podman's libpod/bolt_state.db: ctr/<id>/config and state."""
+    listed = Bolt(path).root().bucket(b"ctr")
+    rows = []
+    for _, container in (listed.buckets() if listed else []):
+        config = _json(container.get(b"config"))
+        if config.get("id"):
+            rows.append(podman_container_row(config, _json(container.get(b"state"))))
+    return rows
+
+
+def podman_sqlite_rows(path: str) -> List[Dict[str, str]]:
+    """Podman's db.sql (ContainerConfig and ContainerState), from a copy with its -wal beside it:
+    SQLite in WAL mode keeps the latest writes there, and opening the case's own copy could write to it."""
+    with tempfile.TemporaryDirectory(prefix="rivendell-podman-") as folder:
+        copy = os.path.join(folder, "db.sql")
+        shutil.copyfile(path, copy)
+        if os.path.isfile(path + "-wal"):
+            shutil.copyfile(path + "-wal", copy + "-wal")
+        connection = sqlite3.connect(copy)
+        try:
+            states = {i: _json(j) for i, j in connection.execute("SELECT ID, JSON FROM ContainerState")}
+            configs = [_json(j) for (j,) in connection.execute("SELECT JSON FROM ContainerConfig")]
+        finally:
+            connection.close()
+    return [podman_container_row(c, states.get(c.get("id"))) for c in configs if c.get("id")]
 
 
 def containerd_rows(path: str) -> List[Dict[str, str]]:

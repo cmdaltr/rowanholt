@@ -18,6 +18,8 @@ LINUX_EXTRA_FILES = (
     "/var/lib/wtmpdb/wtmp.db", "/var/lib/lastlog/lastlog2.db",
     "/var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db",
     "/var/lib/containers/storage/overlay-containers/containers.json",
+    "/var/lib/containers/storage/db.sql", "/var/lib/containers/storage/db.sql-wal",
+    "/var/lib/containers/storage/libpod/bolt_state.db",
 )
 # directory, depth, largest file, file name suffixes (empty: any)
 LINUX_EXTRA_DIRS = (

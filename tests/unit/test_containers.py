@@ -220,6 +220,60 @@ def test_containerd_metadata(tmp_path):
     assert techniques(out) == ["T1610", "T1611"]
 
 
+PODMAN = Path(__file__).resolve().parents[2] / "lab" / "linux-targets" / "seed" / "podman"
+
+
+def test_podman_state(tmp_path):
+    """Podman 5's SQLite state and Podman 4's bbolt one (both made by Podman: make-podman-state.sh)
+    give the same containers."""
+    out, linux = host(tmp_path)
+    for name, path in (("db.sql", "/var/lib/containers/storage/db.sql"),
+                       ("bolt_state.db", "/var/lib/containers/storage/libpod/bolt_state.db")):
+        (linux / flat(path)).write_bytes((PODMAN / name).read_bytes())
+        assert run(out, linux / flat(path))
+    found = rows(out, "docker_containers.csv")
+    assert len(found) == 6 and {r["Runtime"] for r in found} == {"podman"}
+    for name in ("lab-escape", "lab-web", "lab-sock"):
+        flags = {r["Flag"] for r in found if r["Name"] == name}
+        assert len(flags) == 1, (name, flags)  # the same from both stores
+    escape = next(r for r in found if r["Name"] == "lab-escape")
+    assert escape["Privileged"] == "True" and escape["Image"] == "docker.io/library/alpine:3.20"
+    assert escape["Running"] == "False" and escape["Created"].startswith("2026-11-02T15:00:")
+    for flag in ("privileged", "host path mounted read-write (/)", "host PID namespace", "capabilities SYS_ADMIN, SYS_PTRACE"):
+        assert flag in escape["Flag"]
+    sock = next(r for r in found if r["Name"] == "lab-sock")
+    assert sock["Flag"] == "container runtime socket mounted (/run/podman/podman.sock); host network; capabilities SYS_PTRACE"
+    assert next(r for r in found if r["Name"] == "lab-web")["Flag"] == ""
+    assert techniques(out) == ["T1610", "T1611"]
+
+
+def test_podman_sqlite_reads_its_wal_and_leaves_the_case_copy_alone(tmp_path):
+    import hashlib
+    import shutil
+    import sqlite3
+    # A live host's database with a write still in its WAL: a container renamed after the last checkpoint
+    db = tmp_path / "live" / "db.sql"
+    db.parent.mkdir()
+    db.write_bytes((PODMAN / "db.sql").read_bytes())
+    live = sqlite3.connect(str(db))
+    live.execute("PRAGMA journal_mode=WAL")
+    live.execute("PRAGMA wal_autocheckpoint=0")
+    live.execute("UPDATE ContainerConfig SET JSON = json_set(JSON, '$.name', 'lab-renamed') WHERE Name = 'lab-web'")
+    live.commit()
+    wal = Path(str(db) + "-wal")
+    assert wal.stat().st_size > 0
+    # Collected while it's open, as they'd sit in raw/
+    copy = tmp_path / "raw"
+    copy.mkdir()
+    shutil.copyfile(db, copy / db.name)
+    shutil.copyfile(wal, copy / wal.name)
+    live.close()
+    before = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in copy.iterdir()}
+    names = {r["Name"] for r in containers.podman_sqlite_rows(str(copy / db.name))}
+    assert "lab-renamed" in names and "lab-web" not in names
+    assert {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in copy.iterdir()} == before
+
+
 def test_bbolt_refuses_what_it_cannot_read(tmp_path):
     import pytest
     junk = tmp_path / "junk.db"
@@ -257,6 +311,8 @@ def test_lab_seed_end_to_end(tmp_path):
     assert "container runtime socket mounted" in container["Flag"] and "host path mounted read-write (/)" in container["Flag"]
     escape = next(r for r in rows(out, "docker_containers.csv") if r["Container"] == "lab-escape")
     assert escape["Runtime"] == "containerd" and "host PID namespace" in escape["Flag"]
+    sock = next(r for r in rows(out, "docker_containers.csv") if r["Name"] == "lab-sock")
+    assert sock["Runtime"] == "podman" and "/run/podman/podman.sock" in sock["Flag"]
     assert any("c2.rivendell-lab.test" in r["Message"] for r in rows(out, "container_logs.csv"))
     changes = {r["Path"]: r["Flag"] for r in rows(out, "container_changes.csv")}
     assert changes["/tmp/.x/lab-miner"] == "executable in a temporary or hidden path"

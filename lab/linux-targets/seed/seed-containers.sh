@@ -4,7 +4,8 @@
 # the host's PID namespace) whose writable layer holds a dropped binary and a cron entry, a
 # static pod nobody should have put there, a pod log and an API server audit log with secrets
 # read, an exec and a cluster-admin binding. containerd's metadata (containerd/meta.db, made by
-# containerd itself: see make-meta-db.sh there) adds a privileged ctr container with / mounted. Nothing here runs; the "binary" is text behind an
+# containerd itself: see make-meta-db.sh there) adds a privileged ctr container with / mounted,
+# and Podman's (podman/db.sql, likewise) a privileged one and one with Podman's API socket. Nothing here runs; the "binary" is text behind an
 # ELF header. Called by seed-artefacts.sh, whose expected.json lists what Elrond should find.
 set -eu
 
@@ -35,6 +36,10 @@ printf '%s\n' \
 # T1611 / T1610: containerd's own record of its containers (no Docker involved)
 mkdir -p "$ROOT/var/lib/containerd/io.containerd.metadata.v1.bolt"
 cp "$(dirname "$0")/containerd/meta.db" "$ROOT/var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db"
+
+# T1611 / T1610: Podman's state database (SQLite, as Podman 4.8 on keeps it)
+mkdir -p "$ROOT/var/lib/containers/storage"
+cp "$(dirname "$0")/podman/db.sql" "$ROOT/var/lib/containers/storage/db.sql"
 
 # T1105 / T1053.003: what changed in the container since its image
 echo labmount > "$DOCKER/image/overlay2/layerdb/mounts/$CID/mount-id"

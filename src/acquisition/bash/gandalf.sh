@@ -389,7 +389,9 @@ collect_linux_extras() {
         /etc/bashrc /etc/rc.local /etc/sudoers /run/utmp /var/run/utmp /var/log/wtmp /var/log/btmp \
         /var/log/lastlog /var/log/faillog /var/lib/wtmpdb/wtmp.db /var/lib/lastlog/lastlog2.db \
         /var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db \
-        /var/lib/containers/storage/overlay-containers/containers.json; do
+        /var/lib/containers/storage/overlay-containers/containers.json \
+        /var/lib/containers/storage/db.sql /var/lib/containers/storage/db.sql-wal \
+        /var/lib/containers/storage/libpod/bolt_state.db; do
         take "$source" "$(flat "$source")" 67108864
     done
     # directory|depth|largest file|file name suffix (empty: any)

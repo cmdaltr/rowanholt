@@ -99,6 +99,9 @@ HEADERS = {
 }
 DOCKER_CONTAINERS = "/var/lib/docker/containers/"
 CONTAINERD_META = "/var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db"
+# Podman's state: SQLite from 4.8 (its -wal beside it is read with it), bbolt before
+PODMAN_SQLITE = "/var/lib/containers/storage/db.sql"
+PODMAN_BOLT = "/var/lib/containers/storage/libpod/bolt_state.db"
 
 
 def _cooked(output_directory: str, img: str, vss_path_insert: str) -> str:
@@ -580,6 +583,9 @@ def _route_linux(artefact: str) -> Tuple[str, List[Dict], str, List[str]]:
     if path == CONTAINERD_META:
         rows = containers.containerd_rows(artefact)
         return "docker_containers.csv", rows, "containerd containers", containers.container_techniques(rows)
+    if path in (PODMAN_SQLITE, PODMAN_BOLT):
+        rows = containers.podman_sqlite_rows(artefact) if path == PODMAN_SQLITE else containers.podman_bolt_rows(artefact)
+        return "docker_containers.csv", rows, "Podman containers", containers.container_techniques(rows)
     if path.startswith("/var/log/pods/") and re.search(r"\.log(?:\.\d+)?$", path):
         parts = path.split("/")  # /var/log/pods/<namespace>_<pod>_<uid>/<container>/<n>.log
         if len(parts) >= 7:
