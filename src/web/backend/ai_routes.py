@@ -15,10 +15,11 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 try:
-    from . import eru_offline
+    from . import case_files, eru_offline
     from .auth import access
     from .storage import JobStorage
 except ImportError:  # main.py imports the routes as top-level modules too
+    import case_files
     import eru_offline
     from auth import access
     from storage import JobStorage
@@ -523,6 +524,10 @@ async def _find_case_path(case_id: str) -> Optional[str]:
 
         for job in job_storage.list_jobs():
             if job.case_number == case_id and job.destination_path:
+                # The folder with the host folders, as the case browser finds it: the destination or <destination>/<case>
+                root = case_files.case_root(job.destination_path, job.case_number)
+                if root:
+                    return str(root)
                 if os.path.exists(job.destination_path):
                     return job.destination_path
     except Exception as e:

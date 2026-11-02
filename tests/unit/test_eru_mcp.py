@@ -67,9 +67,10 @@ class EruMcpTest(BackendCase):
             return False, structured.get("result", structured)
         return False, json.loads(text) if text[:1] in "[{" else text
 
-    def case_with_output(self, case):
+    def case_with_output(self, case, nested=False):
         job = self.create_job(self.alice, case)
-        root = self.evidence / "out" / case  # host folders in the destination itself
+        # Host folders in the destination itself, or in <destination>/<case>
+        root = self.evidence / "out" / case / (case if nested else "")
         cooked = root / "WS01" / "artefacts" / "cooked"
         cooked.mkdir(parents=True)
         (root / "WS01" / "artefacts" / "raw").mkdir()
@@ -123,6 +124,14 @@ class EruMcpTest(BackendCase):
         self.assertEqual(layer["techniques"], [])
         error, text = self.call(self.alice, "report", job_id=job)
         self.assertIn("CASE-MCP-1", text)
+
+    def test_offline_answers_in_a_nested_case(self):
+        job = self.case_with_output("CASE-MCP-5", nested=True)
+        error, answer = self.call(self.alice, "ask_offline", job_id=job, question="hosts")
+        self.assertFalse(error, answer)
+        self.assertIn("WS01", answer["answer"])
+        error, overview = self.call(self.alice, "case_overview", job_id=job)
+        self.assertEqual([h["host"] for h in overview["case"]["hosts"]], ["WS01"])
 
     def test_other_peoples_jobs_unreachable(self):
         job = self.case_with_output("CASE-MCP-2")
