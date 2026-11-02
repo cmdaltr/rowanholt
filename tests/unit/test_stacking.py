@@ -79,6 +79,23 @@ def test_stacking_finds_the_seeded_values(tmp_path):
     assert precision_at_k(str(case / "stacking.csv"), ["a7f3k9qz2m", "updater", "diamorphine"], k=3) == 1.0
 
 
+def test_rows_point_at_the_host_row(tmp_path):
+    """Host and Row are the case browser's reference to the row the value was read from, so it can be flagged."""
+    sys.path.append(str(REPO / "src" / "web" / "backend"))
+    import case_files
+    case = make_case(tmp_path)
+    stack_case(str(case))
+    rows = {r["Value"]: r for r in read(case / "stacking.csv")}
+    for value, host, artefact, ref, field in (
+            ("a7f3k9qz2m.exe", "WS03", "artefacts/cooked/prefetch/prefetch.json", "#5", "filename"),
+            ("commandlineeventconsumer: updater", "WS03", "artefacts/cooked/wbem.json", "#0", "consumer_name"),
+            ("diamorphine", "WEB02", "artefacts/cooked/kernel_modules.csv", "4", "Name")):
+        row = rows[value]
+        assert (row["Host"], row["Artefact"], row["Row"]) == (host, artefact, ref)
+        found = case_files.find_row(case_files.resolve(case, row["Host"], row["Artefact"]), row["Row"])
+        assert value.endswith(found[field].lower())
+
+
 def test_baseline_and_single_host(tmp_path):
     clean = tmp_path / "CLEAN"
     windows_host(clean, "GOLD", extra=["a7f3k9qz2m.exe"])

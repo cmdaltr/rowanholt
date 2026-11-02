@@ -119,6 +119,26 @@ def test_only_shown_lines_are_cited(tmp_path):
     assert {(r["host"], r["file"]) for r in result["rows"]} == {("(case)", "stacking.csv")}
 
 
+def test_rare_cites_the_host_row(tmp_path):
+    import case_files
+    path = Path(case(tmp_path))
+    header = "Rank,Score,Family,Value,Hosts With It,Hosts In Case,Hosts,Reasons,Artefact,Example,Host,Row\n"
+    (path / "stacking.csv").write_text(
+        header +
+        "1,1.0,\"autorun (Linux), debian\",curl,1,3,lab-ubuntu,rare,artefacts/cooked/gandalf+bash_history.csv,,"
+        "lab-ubuntu,3\n"
+        # Older stacking.csv rows, or one whose host row has gone: cited to stacking.csv itself
+        "2,1.0,process,x7kq.exe,1,4,WS02,rare,artefacts/cooked/prefetch.json,,,\n"
+        "3,1.0,process,y8.exe,1,4,lab-ubuntu,rare,artefacts/cooked/gone.csv,,lab-ubuntu,2\n")
+    rows = eru_offline.answer_with_rows("rare", str(path))["rows"]
+    assert [(r["host"], r["file"], r["row_ref"]) for r in rows] == [
+        ("lab-ubuntu", "artefacts/cooked/gandalf+bash_history.csv", "3"),
+        ("(case)", "stacking.csv", "3"), ("(case)", "stacking.csv", "4")]
+    assert rows[0]["line"].startswith("#1 curl")
+    page = case_files.page(case_files.resolve(path, "lab-ubuntu", "artefacts/cooked/gandalf+bash_history.csv"))
+    assert rows[0]["hash"] == next(r["hash"] for r in page["rows"] if r["ref"] == "3")
+
+
 def test_stacking_persistence_families_match():
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
     from rivendell.analysis import stacking

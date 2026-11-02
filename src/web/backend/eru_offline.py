@@ -330,21 +330,57 @@ def rare(case_path: str) -> str:
     if not rows:
         return ("Nothing was stacked for this case. Stacking compares hosts, so it needs two or more, and runs with "
                 "Elrond's analysis (--Analysis); something is called rare only among three or more hosts of an OS.")
-    def line(numbered: Tuple[str, Dict[str, str], Dict[str, str]]) -> Cited:
-        ref, r, normal = numbered
-        return _cited(f"#{r.get('Rank')} {r.get('Value')} ({r.get('Family')}): on {r.get('Hosts With It')} of "
-                      f"{r.get('Hosts In Case')} hosts ({r.get('Hosts')}); {r.get('Reasons')}",
-                      case_files.CASE_HOST, stacking_csv.name, ref, normal)
+    def text(r: Dict[str, str]) -> str:
+        return (f"#{r.get('Rank')} {r.get('Value')} ({r.get('Family')}): on {r.get('Hosts With It')} of "
+                f"{r.get('Hosts In Case')} hosts ({r.get('Hosts')}); {r.get('Reasons')}")
     persistence = [n for n in rows if (n[1].get("Family") or "").split(",")[0] in STACKING_PERSISTENCE]
     programs = [n for n in rows if n not in persistence]
+    shown = persistence[:RARE_ROWS] + programs[:RARE_ROWS]
+    host_rows = _host_rows(Path(case_path), [r for _, r, _ in shown])
+
+    def lines(section: List[Tuple[str, Dict[str, str], Dict[str, str]]]) -> List[str]:
+        out: List[str] = []
+        for index, (ref, r, normal) in enumerate(section):
+            if index >= RARE_ROWS:
+                out.append(text(r))
+                continue
+            source = (r.get("Host") or "", r.get("Artefact") or "", r.get("Row") or "")
+            if source in host_rows:
+                # The row on the host the value was read from: that's what a finding should rest on
+                out.append(_cited(text(r), *source, host_rows[source]))
+            else:
+                out.append(_cited(text(r), case_files.CASE_HOST, stacking_csv.name, ref, normal))
+        return out
     parts = []
     if persistence:
-        parts.append(f"**Ways back in** ({len(persistence)})\n" + _bullets(map(line, persistence), RARE_ROWS))
+        parts.append(f"**Ways back in** ({len(persistence)})\n" + _bullets(lines(persistence), RARE_ROWS))
     if programs:
-        parts.append(f"**Programs and process pairs** ({len(programs)})\n" + _bullets(map(line, programs), RARE_ROWS))
+        parts.append(f"**Programs and process pairs** ({len(programs)})\n" + _bullets(lines(programs), RARE_ROWS))
     return ("**What's rare across the hosts** (stacking.csv, highest score first):\n\n" + "\n\n".join(parts) +
             "\n\nEach row is a lead, not a verdict: rare can be an older build or a busier host. "
-            "To flag one, open its artefact on that host in the case browser.")
+            "Flag one with ⚑: the flag goes on the host's own row the value was read from.")
+
+
+def _host_rows(root: Path, stacked: List[Dict[str, str]]) -> Dict[Tuple[str, str, str], Dict[str, str]]:
+    """{(host, artefact, row reference): the row as case_files reads it} for the host rows these stacking rows
+    name (stacking.csv's Host, Artefact and Row); each file read once, and only through case_files, so only
+    what the case browser can open. Older stacking.csv files have no Host or Row: those stay unresolved."""
+    wanted: Dict[Tuple[str, str], set] = {}
+    for r in stacked:
+        if r.get("Host") and r.get("Artefact") and r.get("Row"):
+            wanted.setdefault((r["Host"], r["Artefact"]), set()).add(r["Row"])
+    found: Dict[Tuple[str, str, str], Dict[str, str]] = {}
+    for (host, artefact), refs in wanted.items():
+        try:
+            for ref, row in case_files.records(case_files.resolve(root, host, artefact)):
+                if ref in refs:
+                    found[(host, artefact, ref)] = row
+                    refs.discard(ref)
+                    if not refs:
+                        break
+        except (case_files.CaseFileError, OSError, ValueError, csv.Error) as e:
+            logger.debug(f"Couldn't read {host}: {artefact} for stacking's rows: {e}")
+    return found
 
 
 def analysis(case_path: str) -> str:

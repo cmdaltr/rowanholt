@@ -150,6 +150,18 @@ class EruMcpTest(BackendCase):
             "host": row["host"], "artefact": row["file"], "row_ref": row["row_ref"], "title": "X7KQ.EXE posing as svchost"})
         self.assertEqual(flagged.status_code, 200, flagged.text)
         self.assertEqual(flagged.json()["row_hash"], row["hash"])
+        # A stacking row is flagged on the host row it was read from
+        (self.evidence / "out" / "CASE-MCP-6" / "stacking.csv").write_text(
+            "Rank,Score,Family,Value,Hosts With It,Hosts In Case,Hosts,Reasons,Artefact,Example,Host,Row\n"
+            "1,2.0,process,x7kq.exe,1,4,WS01,rare,artefacts/cooked/prefetch.csv,X7KQ.EXE,WS01,3\n")
+        body = self.client.post("/api/ai/offline/answer", headers=self.alice,
+                                json={"question_id": "rare", "case_id": "CASE-MCP-6"}).json()
+        [row] = body["rows"]
+        self.assertEqual((row["host"], row["file"], row["row_ref"]), ("WS01", "artefacts/cooked/prefetch.csv", "3"))
+        flagged = self.client.post(f"/api/jobs/{job}/case/findings", headers=self.alice, json={
+            "host": row["host"], "artefact": row["file"], "row_ref": row["row_ref"], "title": row["line"]})
+        self.assertEqual(flagged.status_code, 200, flagged.text)
+        self.assertIn("X7KQ.EXE", flagged.json()["excerpt"])
         # Not bob's case: no answer from it, so nothing to flag
         resp = self.client.post("/api/ai/offline/answer", headers=self.bob,
                                 json={"question_id": "analysis", "case_id": "CASE-MCP-6"})

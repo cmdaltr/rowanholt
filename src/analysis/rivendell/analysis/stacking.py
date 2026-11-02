@@ -40,8 +40,10 @@ import re
 from collections import Counter, defaultdict
 from typing import Callable, Dict, Iterable, Iterator, List, Optional, Set, Tuple
 
+# Host and Row: the row on that host's Artefact the value was read from, as the case browser refers to it
+# (CSV line number with the header as 1, or #index in a JSON list), so a stacking row can be flagged there
 HEADER = ["Rank", "Score", "Family", "Value", "Hosts With It", "Hosts In Case", "Hosts", "Reasons", "Artefact",
-          "Example"]
+          "Example", "Host", "Row"]
 BASELINE_HEADER = ["Family", "Value"]
 MAX_JSON_BYTES = 256 << 20
 MAX_ROWS = 2000
@@ -60,7 +62,7 @@ FAMILY_OS = {"process": "windows", "parent > child": "windows", "scheduled task"
 PERSISTENCE = {"scheduled task", "wmi consumer", "service (Windows)", "autorun (Windows)", "service (systemd)",
                "autorun (Linux)", "kernel module", "autorun (macOS)"}
 
-Value = Tuple[str, str, str]  # (family, value, example)
+Value = Tuple[str, str, str, str]  # (family, value, example, row reference)
 
 # Fingerprints of a distribution family, looked for in a host's raw file names and its values
 DISTRO_MARKERS = {
@@ -75,7 +77,9 @@ OS_RELEASE_FAMILY = {"debian": "debian", "ubuntu": "debian", "rhel": "rhel", "fe
                      "opensuse": "suse", "sles": "suse", "arch": "arch", "alpine": "alpine"}
 
 
-def _json_records(path: str) -> Iterator[dict]:
+def _json_records(path: str) -> Iterator[Tuple[str, dict]]:
+    """(row reference, record): #index in the file's list. An object is one record, #0, unless it holds
+    items or records, which the case browser lists instead; those get no reference rather than a wrong one."""
     if os.path.getsize(path) > MAX_JSON_BYTES:
         return
     with open(path, encoding="utf-8", errors="replace") as fh:
@@ -83,14 +87,20 @@ def _json_records(path: str) -> Iterator[dict]:
             data = json.load(fh)
         except ValueError:
             return
-    for record in data if isinstance(data, list) else [data]:
+    if not isinstance(data, list):
+        if isinstance(data, dict):
+            yield ("" if data.get("items") or data.get("records") else "#0"), data
+        return
+    for number, record in enumerate(data):
         if isinstance(record, dict):
-            yield record
+            yield f"#{number}", record
 
 
-def _csv_rows(path: str) -> Iterator[Dict[str, str]]:
+def _csv_rows(path: str) -> Iterator[Tuple[str, Dict[str, str]]]:
+    """(row reference, row): the line number with the header as 1."""
     with open(path, newline="", encoding="utf-8", errors="replace") as fh:
-        yield from csv.DictReader(fh)
+        for number, row in enumerate(csv.DictReader(fh), start=2):
+            yield str(number), row
 
 
 def _event(record: dict) -> Tuple[Optional[int], Dict[str, str]]:
@@ -120,61 +130,63 @@ def _norm_path(path: str) -> str:
 
 
 def _prefetch(path: str) -> Iterable[Value]:
-    for r in _json_records(path):
+    for ref, r in _json_records(path):
         name = (r.get("filename") or "").lower()
         if name:
             # The program's own path is among the files it loaded; the example carries it. The list arrives
             # as its Python text, backslashes doubled
             loaded = re.findall(r"[^'\",\[\]]+", str(r.get("accessed_files") or "").replace("\\\\", "\\"))
             full = next((f.strip() for f in loaded if f.strip().lower().endswith("\\" + name)), name)
-            yield "process", name, full
+            yield "process", name, full, ref
 
 
 def _amcache(path: str) -> Iterable[Value]:
-    for r in _json_records(path):
+    for ref, r in _json_records(path):
         full = r.get("path") or ""
         if full:
-            yield "process", _norm_path(full), full
+            yield "process", _norm_path(full), full, ref
 
 
 def _security(path: str) -> Iterable[Value]:
-    for r in _json_records(path):
+    for ref, r in _json_records(path):
         event_id, data = _event(r)
         if event_id == 4688 and data.get("NewProcessName"):
             child = _norm_path(data["NewProcessName"])
-            yield "process", child, data["NewProcessName"]
+            yield "process", child, data["NewProcessName"], ref
             if data.get("ParentProcessName"):
-                yield "parent > child", f"{_base(data['ParentProcessName'])} > {_base(child)}", data.get("CommandLine", "")
+                yield ("parent > child", f"{_base(data['ParentProcessName'])} > {_base(child)}",
+                       data.get("CommandLine", ""), ref)
         elif event_id == 4698 and data.get("TaskName"):
-            yield "scheduled task", _norm_name(data["TaskName"].strip("\\")), data["TaskName"]
+            yield "scheduled task", _norm_name(data["TaskName"].strip("\\")), data["TaskName"], ref
 
 
 def _sysmon(path: str) -> Iterable[Value]:
-    for r in _json_records(path):
+    for ref, r in _json_records(path):
         event_id, data = _event(r)
         if event_id == 1 and data.get("Image"):
-            yield "process", _norm_path(data["Image"]), data["Image"]
+            yield "process", _norm_path(data["Image"]), data["Image"], ref
             if data.get("ParentImage"):
-                yield "parent > child", f"{_base(data['ParentImage'])} > {_base(data['Image'])}", data.get("CommandLine", "")
+                yield ("parent > child", f"{_base(data['ParentImage'])} > {_base(data['Image'])}",
+                       data.get("CommandLine", ""), ref)
 
 
 def _system(path: str) -> Iterable[Value]:
-    for r in _json_records(path):
+    for ref, r in _json_records(path):
         event_id, data = _event(r)
         if event_id == 7045 and data.get("ServiceName"):
-            yield "service (Windows)", data["ServiceName"].lower(), data.get("ImagePath", "")
+            yield "service (Windows)", data["ServiceName"].lower(), data.get("ImagePath", ""), ref
 
 
 def _systemd(path: str) -> Iterable[Value]:
     name = os.path.basename(path)[:-len(".json")]
-    yield "service (systemd)", name.lower(), name
+    yield "service (systemd)", name.lower(), name, "#0"
 
 
 def _startup_items(path: str) -> Iterable[Value]:
-    for r in _csv_rows(path):
+    for ref, r in _csv_rows(path):
         target = r.get("Target") or r.get("Item") or ""
         if target:
-            yield "autorun (Windows)", _norm_path(target), f"{r.get('Item', '')}: {target}"
+            yield "autorun (Windows)", _norm_path(target), f"{r.get('Item', '')}: {target}", ref
 
 
 def _norm_name(name: str) -> str:
@@ -186,44 +198,46 @@ def _norm_name(name: str) -> str:
 
 def _task_file(path: str) -> Iterable[Value]:
     # A collection carries every task, where 4698 only shows the ones created while Security was auditing
-    for r in _json_records(path):
+    for ref, r in _json_records(path):
         for task in r.get("tasks") or []:
             name = ((task.get("registration_info") or {}).get("uri") or "").strip("\\")
             if name:
                 run = ((task.get("actions") or {}).get("exec") or [{}])[0]
-                yield "scheduled task", _norm_name(name), f"{run.get('command') or ''} {run.get('arguments') or ''}".strip()
+                yield ("scheduled task", _norm_name(name),
+                       f"{run.get('command') or ''} {run.get('arguments') or ''}".strip(), ref)
 
 
 def _run_keys(path: str) -> Iterable[Value]:
-    for r in _json_records(path):
+    for ref, r in _json_records(path):
         if r.get("Plugin") == "run" and r.get("AppName"):
-            yield "autorun (Windows)", r["AppName"].lower(), f"{r.get('RegistryKey', '')}: {r.get('AppLocation', '')}"
+            yield ("autorun (Windows)", r["AppName"].lower(), f"{r.get('RegistryKey', '')}: {r.get('AppLocation', '')}",
+                   ref)
 
 
 def _autostart(path: str) -> Iterable[Value]:
-    for r in _csv_rows(path):
+    for ref, r in _csv_rows(path):
         if r.get("Name") or r.get("Command"):
-            yield "autorun (Linux)", (r.get("Name") or r.get("Command") or "").lower(), r.get("Command", "")
+            yield "autorun (Linux)", (r.get("Name") or r.get("Command") or "").lower(), r.get("Command", ""), ref
 
 
 def _btm(path: str) -> Iterable[Value]:
-    for r in _csv_rows(path):
+    for ref, r in _csv_rows(path):
         value = r.get("ExecutablePath") or r.get("Identifier") or r.get("Name") or ""
         if value:
-            yield "autorun (macOS)", _norm_path(value), f"{r.get('Name', '')}: {r.get('ExecutablePath', '')}"
+            yield "autorun (macOS)", _norm_path(value), f"{r.get('Name', '')}: {r.get('ExecutablePath', '')}", ref
 
 
 def _wmi(path: str) -> Iterable[Value]:
-    for r in _json_records(path):
+    for ref, r in _json_records(path):
         if r.get("consumer_name") and not r.get("note"):
             values = " ".join(str(v) for v in r.get("consumer_values") or [])
-            yield "wmi consumer", f"{r.get('consumer_class', '')}: {r['consumer_name']}".lower(), values
+            yield "wmi consumer", f"{r.get('consumer_class', '')}: {r['consumer_name']}".lower(), values, ref
 
 
 def _kernel_modules(path: str) -> Iterable[Value]:
-    for r in _csv_rows(path):
+    for ref, r in _csv_rows(path):
         if r.get("Name"):
-            yield "kernel module", r["Name"].lower(), r.get("Path", "")
+            yield "kernel module", r["Name"].lower(), r.get("Path", ""), ref
 
 
 # (test on the cooked path relative to the host's cooked folder, extractor)
@@ -244,8 +258,9 @@ SOURCES: List[Tuple[Callable[[str], bool], Callable[[str], Iterable[Value]]]] = 
 ]
 
 
-def host_values(host_dir: str) -> Dict[Tuple[str, str], Tuple[str, str]]:
-    """{(family, value): (artefact, example)} for one host: each value once, wherever it was first seen."""
+def host_values(host_dir: str) -> Dict[Tuple[str, str], Tuple[str, str, str]]:
+    """{(family, value): (artefact, example, row reference)} for one host: each value once, wherever it was
+    first seen."""
     cooked = os.path.join(host_dir, "artefacts", "cooked")
     found: Dict[Tuple[str, str], Tuple[str, str]] = {}
     for root, _, files in os.walk(cooked):
@@ -256,8 +271,8 @@ def host_values(host_dir: str) -> Dict[Tuple[str, str], Tuple[str, str]]:
                 if not test(relative):
                     continue
                 try:
-                    for family, value, example in extract(full):
-                        found.setdefault((family, value), (f"artefacts/cooked/{relative}", example[:300]))
+                    for family, value, example, ref in extract(full):
+                        found.setdefault((family, value), (f"artefacts/cooked/{relative}", example[:300], ref))
                 except (OSError, csv.Error):
                     continue  # an unreadable artefact leaves its values out; the rest still stack
     return found
@@ -340,7 +355,7 @@ def hosts(output_directory: str) -> List[str]:
                   if os.path.isdir(os.path.join(output_directory, d, "artefacts", "cooked")))
 
 
-def stack(per_host: Dict[str, Dict[Tuple[str, str], Tuple[str, str]]],
+def stack(per_host: Dict[str, Dict[Tuple[str, str], Tuple[str, str, str]]],
           baseline: Optional[Set[Tuple[str, str]]] = None,
           distros: Optional[Dict[str, str]] = None) -> List[Dict[str, str]]:
     """Ranked rows for every value that's rare across the hosts (or new against the baseline).
@@ -360,7 +375,7 @@ def stack(per_host: Dict[str, Dict[Tuple[str, str], Tuple[str, str]]],
         total = len(of_os[compared])
         if total < MIN_HOSTS and baseline is None:
             continue
-        artefact, example = per_host[with_it[0]][(family, value)]
+        artefact, example, ref = per_host[with_it[0]][(family, value)]
         why = reasons(family, value, len(with_it), total, baseline, example)
         if total < MIN_HOSTS:
             why = [r for r in why if r != "rare"]
@@ -370,7 +385,7 @@ def stack(per_host: Dict[str, Dict[Tuple[str, str], Tuple[str, str]]],
         shown = f"{family}, {compared.split(':')[1]}" if ":" in compared else family
         rows.append({"Score": f"{score:.1f}", "Family": shown, "Value": value, "Hosts With It": str(len(with_it)),
                      "Hosts In Case": str(total), "Hosts": "; ".join(sorted(with_it)[:10]), "Reasons": ", ".join(why),
-                     "Artefact": artefact, "Example": example})
+                     "Artefact": artefact, "Example": example, "Host": with_it[0], "Row": ref})
     rows.sort(key=lambda r: (-float(r["Score"]), int(r["Hosts With It"]), r["Family"].split(",")[0] not in PERSISTENCE,
                              r["Family"], r["Value"]))
     for number, row in enumerate(rows, start=1):
