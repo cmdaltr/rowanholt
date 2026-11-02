@@ -9,6 +9,8 @@ const heroImage = `${process.env.PUBLIC_URL}/images/rivendell.png`;
 const API_BASE = API_BASE_URL;
 const CASE_HOST = '(case)'; // the case's own summaries (stacking.csv): a finding rests on a host's row, as in the case browser
 const rowKey = (row) => `${row.host}|${row.file}|${row.row_ref}`;
+// The rows an answer cited, which can be flagged on its job's case
+const citedRows = (data) => (data.job_id ? { jobId: data.job_id, rows: (data.rows || []).filter((r) => r.host !== CASE_HOST) } : {});
 
 function AIAssistant() {
   const [messages, setMessages] = useState([]);
@@ -116,8 +118,7 @@ function AIAssistant() {
         role: 'assistant',
         content: response.ok ? data.answer : (data.detail || 'No answer.'),
         offline: true,
-        jobId: data.job_id || null,
-        rows: response.ok ? (data.rows || []).filter((r) => r.host !== CASE_HOST) : []
+        ...(response.ok ? citedRows(data) : {})
       }]);
     } catch (error) {
       setMessages(prev => [...prev, { role: 'assistant', content: `Couldn't reach the backend: ${error.message}` }]);
@@ -171,7 +172,8 @@ function AIAssistant() {
             content: data.answer,
             sources: data.sources || [],
             confidence: data.confidence,
-            processing_time: data.processing_time
+            processing_time: data.processing_time,
+            ...citedRows(data)
           };
           setMessages(prev => [...prev, assistantMessage]);
         } else {
@@ -254,7 +256,8 @@ function AIAssistant() {
         const data = await response.json();
         setMessages(prev => [...prev, {
           role: 'assistant',
-          content: `**Case Summary for ${selectedCase}:**\n\n${data.executive_summary || 'No summary available.'}`
+          content: `**Case Summary for ${selectedCase}:**\n\n${data.executive_summary || 'No summary available.'}`,
+          ...citedRows(data)
         }]);
       }
     } catch (error) {
@@ -541,7 +544,7 @@ function AIAssistant() {
                               <button type="button" title="Flag as finding" style={{ padding: '0.1rem 0.4rem' }}
                                 onClick={() => setFlagging({ message: index, row, title: row.line.slice(0, 200), technique: '', status: 'lead' })}>⚑</button>
                             )}
-                            <span style={{ opacity: 0.7 }} title={`sha256 ${row.hash}`}>{row.host}: {row.file} row {row.row_ref}</span>
+                            <span style={{ opacity: 0.7 }} title={`sha256 ${row.hash}`}>{row.tag ? `[${row.tag}] ` : ''}{row.host}: {row.file} row {row.row_ref}</span>
                           </div>
                           {state?.error && <div style={{ color: '#ed5565' }}>{state.error}</div>}
                           {open && (

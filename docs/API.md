@@ -1145,7 +1145,7 @@ A job's output, read-only, and the team's findings, notes, host assignments and 
 
 **Authentication:** none
 
-Ask Eru's back end. Free-text answers come from Ollama at `OLLAMA_HOST` (default `http://host.docker.internal:11434`) with the model `RIVENDELL_MODEL_NAME` (default `llama3.2:3b`). Without them, `/status` says why and the offline endpoints answer fixed questions from Elrond's output.
+Ask Eru's back end. Free-text answers come from Ollama at `OLLAMA_HOST` (default `http://host.docker.internal:11434`) with the model `RIVENDELL_MODEL_NAME` (default `llama3.2:3b`) and a `RIVENDELL_NUM_CTX`-token window (default 8192). Without them, `/status` says why and the offline endpoints answer fixed questions from Elrond's output.
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -1155,9 +1155,9 @@ Ask Eru's back end. Free-text answers come from Ollama at `OLLAMA_HOST` (default
 | `GET` | `/api/ai/cases` | Cases Eru can see: indexed vector stores and completed jobs, with `indexed` and `has_artifacts` |
 | `POST` | `/api/ai/chat` | `{"message": "..."}` without case context. Returns `{"response", "model", "processing_time"}` |
 | `GET` | `/api/ai/cases/{case_id}/info` | What is indexed for a case |
-| `POST` | `/api/ai/cases/{case_id}/query` | `{"question": "..."}` answered from the case's data |
+| `POST` | `/api/ai/cases/{case_id}/query` | `{"question": "..."}` answered from the case's data; `rows` are the rows the answer cites by tag (`host`, `file`, `row_ref`, `hash`, `line`, `tag`), only ones it was given, on `job_id` (empty without a job) |
 | `POST` | `/api/ai/cases/{case_id}/suggestions` | Investigation paths to follow |
-| `POST` | `/api/ai/cases/{case_id}/summary` | An executive summary of the case |
+| `POST` | `/api/ai/cases/{case_id}/summary` | An executive summary of the case, with the `rows` it cites and `job_id`, as for `/query` |
 
 The LLM endpoints return `503` when Ollama or the model isn't available.
 

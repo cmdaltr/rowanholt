@@ -40,7 +40,7 @@ Gandalf (acquisition) → Elrond (analysis) → Eru (AI analyst)
 | `src/acquisition/` | Gandalf: `bash/gandalf.sh`, `python/gandalf.py` + `collect_artefacts-py`, `windows/Invoke-Gandalf.ps1` + `Set-ArtefactCollection` |
 | `src/analysis/elrond.py`, `src/analysis/rivendell/` | Elrond: `core/` (incl. Gandalf ingest and manifest check), `collect/`, `process/`, `analysis/`, `memory/`, `post/` (Splunk, Elastic, ATT&CK), `cloud/`, `ai/` (Eru's CLI) |
 | `src/analysis/tools/definitions.py` | Forensic tool definitions (executables, paths, platforms) |
-| `src/web/backend/` | FastAPI (:5688): jobs, auth, `ai_routes.py` + `eru_offline.py` (Eru), Mordor, lab, Andúril proxy |
+| `src/web/backend/` | FastAPI (:5688): jobs, auth, `ai_routes.py` + `eru_offline.py` (fixed answers) + `eru_context.py` (the model's numbered context) (Eru), Mordor, lab, Andúril proxy |
 | `src/web/frontend/` | React (:5687); About is `components/HelpPage.js` |
 | `deploy/server/`, `scripts/server/` | Team server profile: Compose override (Caddy in front, nothing else published, production frontend), Caddyfile, `server init/users/ca`; guide in `docs/SERVER.md` |
 | `src/web/backend/auth/` | Sign-in: `users.py` (file store), `access.py` (the server-mode middleware: every route, job ownership and sharing via the `job_access` table), `oidc.py` (SSO), `manage_users.py` |
@@ -76,7 +76,7 @@ Gandalf (acquisition) → Elrond (analysis) → Eru (AI analyst)
 ## What Eru touches
 
 Eru is the AI layer. It reads Elrond's case output and provides:
-- Natural-language answers, case summaries and investigation suggestions (with Ollama)
+- Natural-language answers, case summaries and investigation suggestions (with Ollama), from per-host rows tagged `[R1]`…; answers return only the cited rows they were given, which Ask Eru offers to flag
 - Fixed questions answered straight from the case files when Ollama or the model isn't available (`eru_offline.py`): hosts, ATT&CK techniques, persistence, logins, IOCs, suspicious commands
 - ATT&CK mapping itself is Elrond's (`post/mitre/`), not Eru's
 

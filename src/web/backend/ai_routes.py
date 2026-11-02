@@ -15,11 +15,12 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 try:
-    from . import case_files, eru_offline
+    from . import case_files, eru_context, eru_offline
     from .auth import access
     from .storage import JobStorage
 except ImportError:  # main.py imports the routes as top-level modules too
     import case_files
+    import eru_context
     import eru_offline
     from auth import access
     from storage import JobStorage
@@ -34,6 +35,8 @@ RIVENDELL_DATA_DIR = os.getenv("RIVENDELL_DATA_DIR", "/opt/rivendell/data")
 # For Docker on macOS, use host.docker.internal to reach host machine's Ollama
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://host.docker.internal:11434")
 DEFAULT_MODEL = os.getenv("RIVENDELL_MODEL_NAME", "llama3.2:3b")
+# Ollama's own default window (2048 tokens) is shorter than the case context Eru sends
+NUM_CTX = int(os.getenv("RIVENDELL_NUM_CTX", "8192"))
 
 
 # Request/Response Models
@@ -75,6 +78,7 @@ class OllamaClient:
             "model": self.model,
             "prompt": prompt,
             "stream": False,
+            "options": {"num_ctx": NUM_CTX},
         }
 
         if system:
@@ -337,7 +341,7 @@ async def get_case_info(case_id: str):
 
 
 @router.post("/cases/{case_id}/query")
-async def query_case(case_id: str, request: QueryRequest):
+async def query_case(case_id: str, request: QueryRequest, http_request: Request):
     """
     Query a case using natural language.
 
@@ -346,29 +350,13 @@ async def query_case(case_id: str, request: QueryRequest):
         request: Query request with question
 
     Returns:
-        AI response with sources
+        AI response with sources, and the rows it cited (as the offline answers give them) with the job
+        they're on
     """
     import time
     start_time = time.time()
 
-    # Find case path
-    case_path = None
-
-    # Check data directory
-    data_path = os.path.join(RIVENDELL_DATA_DIR, case_id)
-    if os.path.exists(data_path):
-        case_path = data_path
-
-    # Check job storage
-    if not case_path:
-        job_storage = JobStorage()
-
-        for job in job_storage.list_jobs():
-            if job.case_number == case_id and job.destination_path:
-                if os.path.exists(job.destination_path):
-                    case_path = job.destination_path
-                    break
-
+    case_path, job_id = await _find_case(case_id, access.current_user(http_request))
     if not case_path:
         raise HTTPException(status_code=404, detail=f"Case {case_id} not found")
 
@@ -397,6 +385,8 @@ async def query_case(case_id: str, request: QueryRequest):
                 ],
                 "confidence": result.confidence,
                 "processing_time": result.processing_time,
+                "rows": [],
+                "job_id": job_id,
             }
         except ImportError:
             logger.warning("ForensicQueryEngine not available, using direct LLM query")
@@ -404,17 +394,17 @@ async def query_case(case_id: str, request: QueryRequest):
             logger.warning(f"RAG query failed: {e}, falling back to direct query")
 
     # Fall back to direct LLM query with artifact context
-    context = await _gather_case_context(case_path, request.question)
+    context = _case_context(case_path, request.question)
 
     prompt = f"""Based on the following forensic case data:
 
-{context}
+{context.text()}
 
 Question: {request.question}
 
 Provide a detailed forensic analysis answer based on the case data provided."""
 
-    response = await ollama.generate(prompt=prompt, system=FORENSIC_SYSTEM_PROMPT)
+    response = await ollama.generate(prompt=prompt, system=f"{FORENSIC_SYSTEM_PROMPT}\n\n{eru_context.CITE_INSTRUCTIONS}")
 
     processing_time = time.time() - start_time
 
@@ -424,6 +414,8 @@ Provide a detailed forensic analysis answer based on the case data provided."""
         "sources": [],
         "confidence": 0.7,
         "processing_time": processing_time,
+        "rows": _rows_for(eru_context.cited(response, context), job_id),
+        "job_id": job_id,
     }
 
 
@@ -445,11 +437,11 @@ async def get_investigation_suggestions(case_id: str):
         raise HTTPException(status_code=404, detail=f"Case {case_id} not found")
 
     # Gather context
-    context = await _gather_case_context(case_path, "suspicious activities")
+    context = _case_context(case_path, "suspicious activities")
 
     prompt = f"""Based on the following forensic case data:
 
-{context}
+{context.text()}
 
 Analyze the evidence and suggest 5 specific investigation paths. For each:
 1. Provide a clear title
@@ -471,7 +463,7 @@ Format as a numbered list."""
 
 
 @router.post("/cases/{case_id}/summary")
-async def generate_case_summary(case_id: str):
+async def generate_case_summary(case_id: str, http_request: Request):
     """
     Generate an executive summary for a case.
 
@@ -482,17 +474,17 @@ async def generate_case_summary(case_id: str):
         Case summary
     """
     # Find case path
-    case_path = await _find_case_path(case_id)
+    case_path, job_id = await _find_case(case_id, access.current_user(http_request))
 
     if not case_path:
         raise HTTPException(status_code=404, detail=f"Case {case_id} not found")
 
     # Gather comprehensive context
-    context = await _gather_case_context(case_path, "key findings timeline IOCs")
+    context = _case_context(case_path, "")
 
     prompt = f"""Based on the following forensic case data:
 
-{context}
+{context.text()}
 
 Generate a comprehensive executive summary including:
 1. Executive Summary (2-3 paragraphs)
@@ -503,12 +495,14 @@ Generate a comprehensive executive summary including:
 
 Be thorough but concise."""
 
-    response = await ollama.generate(prompt=prompt, system=FORENSIC_SYSTEM_PROMPT)
+    response = await ollama.generate(prompt=prompt, system=f"{FORENSIC_SYSTEM_PROMPT}\n\n{eru_context.CITE_INSTRUCTIONS}")
 
     return {
         "case_id": case_id,
         "executive_summary": response,
-        "generated_at": datetime.now().isoformat()
+        "generated_at": datetime.now().isoformat(),
+        "rows": _rows_for(eru_context.cited(response, context), job_id),
+        "job_id": job_id,
     }
 
 
@@ -545,68 +539,15 @@ async def _find_case(case_id: str, user: Optional[dict] = None) -> Tuple[Optiona
     return None, None
 
 
-async def _gather_case_context(case_path: str, query_hint: str) -> str:
-    """Gather relevant context from case artifacts."""
-    context_parts = []
+def _case_context(case_path: str, question: str) -> eru_context.Context:
+    """The numbered case context for the model, the analysts' findings first."""
+    findings = eru_offline.FINDINGS(case_path) if eru_offline.FINDINGS else []
+    return eru_context.build(case_path, question, findings)
 
-    # The analysts' confirmed findings go first: they're what the case is known to hold
-    confirmed = [f for f in (eru_offline.FINDINGS(case_path) if eru_offline.FINDINGS else [])
-                 if f["status"] == "confirmed"]
-    if confirmed:
-        context_parts.append("## Confirmed findings (analysts)\n" + "\n".join(
-            f"- {f['title']} ({f['technique'] or 'no technique'}): {f['host']} {f['artefact']} row {f['row_ref']}: "
-            f"{f['excerpt'][:300]}" for f in confirmed[:30]))
 
-    # Look for cooked artifacts
-    cooked_path = os.path.join(case_path, "cooked")
-    if os.path.exists(cooked_path):
-        # Get relevant JSON files (limit to prevent token overflow)
-        json_files = list(Path(cooked_path).rglob("*.json"))[:20]
-
-        for json_file in json_files:
-            try:
-                with open(json_file, 'r') as f:
-                    data = json.load(f)
-
-                # Format based on content
-                if isinstance(data, list):
-                    # Take first few records
-                    sample = data[:10]
-                    context_parts.append(f"## {json_file.stem}\n{json.dumps(sample, indent=2, default=str)[:2000]}")
-                elif isinstance(data, dict):
-                    context_parts.append(f"## {json_file.stem}\n{json.dumps(data, indent=2, default=str)[:2000]}")
-            except Exception as e:
-                logger.debug(f"Error reading {json_file}: {e}")
-                continue
-
-    # Look for timeline
-    timeline_path = os.path.join(case_path, "timeline")
-    if os.path.exists(timeline_path):
-        csv_files = list(Path(timeline_path).glob("*.csv"))
-        for csv_file in csv_files[:2]:
-            try:
-                with open(csv_file, 'r') as f:
-                    lines = f.readlines()[:50]  # First 50 lines
-                context_parts.append(f"## Timeline - {csv_file.stem}\n{''.join(lines)}")
-            except Exception:
-                pass
-
-    # Look for IOC files
-    analysis_path = os.path.join(case_path, "analysis")
-    if os.path.exists(analysis_path):
-        for pattern in ["*ioc*", "*indicator*", "*suspicious*"]:
-            for match_file in Path(analysis_path).glob(pattern):
-                try:
-                    with open(match_file, 'r') as f:
-                        content = f.read()[:3000]
-                    context_parts.append(f"## {match_file.stem}\n{content}")
-                except Exception:
-                    pass
-
-    if not context_parts:
-        return "No artifact data available for this case."
-
-    return "\n\n".join(context_parts)[:15000]  # Limit total context
+def _rows_for(rows: List[Dict[str, str]], job_id: Optional[str]) -> List[Dict[str, str]]:
+    """Cited rows can be flagged only on a job's case; a case directory with no job behind it has none."""
+    return rows if job_id else []
 
 
 def _parse_suggestions(response: str) -> List[Dict[str, Any]]:
