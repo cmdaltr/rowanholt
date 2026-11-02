@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { issueSessionToken } from '../api';
 
 const heroImage = `${process.env.PUBLIC_URL}/images/rivendell.png`;
 
@@ -24,9 +25,7 @@ const AccountPage = () => {
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [showMfaSetup, setShowMfaSetup] = useState(false);
 
-  // API tokens state
-  const [apiTokens, setApiTokens] = useState([]);
-  const [newTokenName, setNewTokenName] = useState('');
+  // A token for scripts and Eru's MCP server (the sign-in's own kind; there are no long-lived ones)
   const [generatedToken, setGeneratedToken] = useState('');
 
   // Messages
@@ -151,57 +150,21 @@ const AccountPage = () => {
     }
   };
 
-  const handleGenerateToken = async (e) => {
-    e.preventDefault();
+  const handleGenerateToken = async () => {
     setTokenMessage({ type: '', text: '' });
-    setGeneratedToken('');
-
-    if (!newTokenName.trim()) {
-      setTokenMessage({ type: 'error', text: 'Please enter a token name.' });
-      return;
-    }
-
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch('/api/auth/tokens', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ name: newTokenName })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setGeneratedToken(data.token);
-        setApiTokens([...apiTokens, { name: newTokenName, created: new Date().toISOString() }]);
-        setNewTokenName('');
-        setTokenMessage({ type: 'success', text: 'Token generated. Copy it now - it won\'t be shown again.' });
-      } else {
-        setTokenMessage({ type: 'error', text: 'Failed to generate token.' });
-      }
+      setGeneratedToken((await issueSessionToken()).access_token);
     } catch (error) {
-      setTokenMessage({ type: 'error', text: 'API tokens require backend support. Coming soon.' });
+      setTokenMessage({ type: 'error', text: error.response?.data?.detail || 'Could not issue a token.' });
     }
   };
 
-  const handleRevokeToken = async (tokenName) => {
+  const copyToken = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`/api/auth/tokens/${tokenName}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        setApiTokens(apiTokens.filter(t => t.name !== tokenName));
-        setTokenMessage({ type: 'success', text: 'Token revoked.' });
-      }
-    } catch (error) {
-      setTokenMessage({ type: 'error', text: 'Failed to revoke token.' });
+      await navigator.clipboard.writeText(generatedToken);
+      setTokenMessage({ type: 'success', text: 'Copied.' });
+    } catch {
+      setTokenMessage({ type: 'error', text: 'Copy it from the box: the browser refused the clipboard.' });
     }
   };
 
@@ -351,72 +314,29 @@ const AccountPage = () => {
                 </form>
               </div>
 
-              {/* Rivendell API Tokens */}
+              {/* A token for scripts and Eru's MCP server */}
               <div style={{ paddingTop: '2rem', borderTop: '1px solid #3f4b2a' }}>
-                <h3 style={{ marginBottom: '1.5rem' }}>Rivendell API Tokens</h3>
+                <h3 style={{ marginBottom: '1.5rem' }}>Token for scripts and Eru's MCP server</h3>
 
                 <p style={{ marginBottom: '1rem', color: '#a09580' }}>
-                  Generate API tokens for programmatic access to Rivendell services.
+                  A bearer token for your account, whichever way you signed in. It lasts as long as a sign-in does
+                  (24 hours unless the server is set otherwise) and does what you can do, so keep it like a password.
+                  For <code>rivendell mcp</code>, set it as <code>RIVENDELL_TOKEN</code> (docs/ERU.md).
                 </p>
 
+                {tokenMessage.text && (
+                  <div className={tokenMessage.type === 'error' ? 'alert-error' : 'alert-success'}>{tokenMessage.text}</div>
+                )}
+
                 {generatedToken && (
-                  <div className="alert-success" style={{ wordBreak: 'break-all' }}>
-                    <strong>New Token:</strong> {generatedToken}
-                    <br />
-                    <small>Copy this token now. It won't be shown again.</small>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                    <input type="text" readOnly value={generatedToken} style={{ flex: 1, fontFamily: 'monospace' }}
+                      onFocus={(e) => e.target.select()} />
+                    <button type="button" className="secondary" onClick={copyToken}>Copy</button>
                   </div>
                 )}
 
-                <form onSubmit={handleGenerateToken} style={{ marginBottom: '1.5rem' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'end' }}>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label>Token Name</label>
-                      <input
-                        type="text"
-                        value={newTokenName}
-                        onChange={(e) => setNewTokenName(e.target.value)}
-                        placeholder="e.g., CI/CD Pipeline, Script Access"
-                      />
-                    </div>
-                    <button type="submit" style={{ height: '42px' }}>Generate Token</button>
-                  </div>
-                </form>
-
-                {apiTokens.length > 0 && (
-                  <div>
-                    <h4 style={{ marginBottom: '0.5rem', color: '#f0dba5' }}>Active Tokens</h4>
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Name</th>
-                          <th>Created</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {apiTokens.map((token, index) => (
-                          <tr key={index}>
-                            <td>{token.name}</td>
-                            <td>{new Date(token.created).toLocaleDateString()}</td>
-                            <td>
-                              <button
-                                className="secondary"
-                                style={{ padding: '0.25rem 0.75rem', fontSize: '0.875rem' }}
-                                onClick={() => handleRevokeToken(token.name)}
-                              >
-                                Revoke
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {apiTokens.length === 0 && (
-                  <p style={{ color: '#666', fontStyle: 'italic' }}>No API tokens generated yet.</p>
-                )}
+                <button type="button" onClick={handleGenerateToken}>{generatedToken ? 'Get another' : 'Get a token'}</button>
               </div>
 
             </>

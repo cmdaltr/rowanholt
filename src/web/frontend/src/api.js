@@ -197,6 +197,10 @@ export const completeSsoSignIn = async () => {
   return response.data;
 };
 
+// A fresh bearer token for whoever is signed in (a password or single sign-on), lasting as long as
+// a sign-in does: for scripts and RIVENDELL_TOKEN (rivendell mcp). The app's own token is left as it is
+export const issueSessionToken = async () => (await api.post('/api/auth/session')).data;
+
 export const getJobSharing = async (jobId) => {
   const response = await api.get(`/api/jobs/${jobId}/sharing`);
   return response.data;

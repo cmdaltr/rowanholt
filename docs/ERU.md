@@ -23,13 +23,13 @@ python3 -m venv ~/.rivendell-mcp
 ~/.rivendell-mcp/bin/pip install -r requirements/mcp.txt
 ```
 
-`RIVENDELL_API` is the Rivendell to read (default `http://127.0.0.1:5688`). On a team server, `RIVENDELL_TOKEN` is your session token, from a sign-in:
+`RIVENDELL_API` is the Rivendell to read (default `http://127.0.0.1:5688`). On a team server, `RIVENDELL_TOKEN` is your session token. The simplest way to get one, with a password or single sign-on, is **Account → Token for scripts and Eru's MCP server → Get a token** in the web app; or from a password sign-in:
 
 ```bash
 curl -s https://rivendell.example.org/api/auth/login -d username=alice -d password=… | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])'
 ```
 
-Tokens last 24 hours (`access_token_expire_minutes`). A user who only signs in with SSO has no password to sign in with here yet. On one machine, no token is needed. The token is read from the environment only, since an argument would show in the process list.
+Tokens last 24 hours (`access_token_expire_minutes`), so this is a day's token rather than a standing one; there are no long-lived, revocable tokens. On one machine, no token is needed. The token is read from the environment only, since an argument would show in the process list.
 
 For Claude Desktop, in `claude_desktop_config.json`:
 

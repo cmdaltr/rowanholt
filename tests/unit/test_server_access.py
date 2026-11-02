@@ -238,6 +238,23 @@ class ServerAccessTest(BackendCase):
             throttle.failed("alice", f"10.1.{n}.1")
         self.assertGreater(throttle.locked_for("alice", "10.0.0.5"), 0)
 
+    def test_a_session_gets_a_token_for_scripts(self):
+        """Account's token for scripts and rivendell mcp: the session cookie (a password or single
+        sign-on) traded for a bearer token, with nothing more than the session had."""
+        self.client.cookies.clear()
+        self.assertEqual(self.client.post("/api/auth/session").status_code, 401)
+        resp = self.client.post("/api/auth/login", data={"username": "bob", "password": "bob-password-123"})
+        self.assertEqual(resp.status_code, 200, resp.text)
+        cookie = resp.cookies.get("session_token")
+        self.client.cookies.clear()
+        # The cookie alone (Secure on a server, so the plain-HTTP test client won't send it by itself)
+        issued = self.client.post("/api/auth/session", headers={"Cookie": f"session_token={cookie}"})
+        self.assertEqual(issued.status_code, 200, issued.text)
+        self.assertEqual(issued.json()["user"]["username"], "bob")
+        bearer = {"Authorization": f"Bearer {issued.json()['access_token']}"}
+        self.assertEqual(self.client.get("/api/auth/me", headers=bearer).json()["username"], "bob")
+        self.assertEqual(self.client.get("/api/auth/users", headers=bearer).status_code, 403)  # still not an admin
+
     def test_last_admin_stays_admin(self):
         users = self.client.get("/api/auth/users", headers=self.admin).json()
         admin_id = next(u["id"] for u in users if u["username"] == "admin")
