@@ -164,6 +164,28 @@ class EruMcpTest(BackendCase):
         self.assertIn("2 writes", text)
         self.assertEqual(len(self.client.get(f"/api/jobs/{job}/case/notes", headers=self.alice).json()), 2)
 
+    def test_writes_need_an_eru_token_on_a_server(self):
+        def api(headers):
+            def send(method, path, params, body):
+                resp = self.client.request(method, path, params=params, json=body, headers=headers)
+                return resp.status_code, resp.json()
+            return eru_mcp.RivendellAPI("http://testserver", transport=send)
+
+        def token(scope):
+            made = self.client.post("/api/auth/tokens", headers=self.alice, json={"name": "mcp", "scope": scope})
+            return {"Authorization": f"Bearer {made.json()['token']}"}
+
+        self.assertIsNone(eru_mcp.write_refusal(api(token("eru-mcp"))))
+        self.assertIn("not a full token", eru_mcp.write_refusal(api(token("full"))))
+        self.assertIn("not a sign-in token", eru_mcp.write_refusal(api(self.alice)))
+        self.assertIn("can't check the token", eru_mcp.write_refusal(api({})))
+        # On an analyst's own machine there's no token to check
+        self.settings.rivendell_server_mode = False
+        try:
+            self.assertIsNone(eru_mcp.write_refusal(api({})))
+        finally:
+            self.settings.rivendell_server_mode = True
+
     def test_the_agent_header_is_sent(self):
         sent = []
 

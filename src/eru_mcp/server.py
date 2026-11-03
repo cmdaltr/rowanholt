@@ -45,6 +45,7 @@ READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotent
 WRITES = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
 AGENT_HEADER = ("X-Rivendell-Agent", "eru-mcp")  # case_routes.AGENT_HEADER, ERU_MCP
 MAX_WRITES = 25
+ERU_TOKEN_SCOPE = "eru-mcp"  # auth/tokens.py in the backend
 INSTRUCTIONS = """Eru works one Rivendell case at a time, read-only.
 Start from a job id: list_cases, then case_overview to see the hosts and their files.
 Cite file and row for every claim (read_rows gives each row's reference); don't state what no row shows.
@@ -296,6 +297,22 @@ def build_server(api: RivendellAPI, writes: bool = False, max_writes: int = MAX_
     return server
 
 
+def write_refusal(api: RivendellAPI) -> Optional[str]:
+    """Why --allow-writes won't start with this token, or None. On a team server the token must be an
+    eru-mcp one (auth/tokens.py), so the backend itself holds Eru to reads, leads and notes rather than
+    this server's code alone; on an analyst's own machine there is no token to check."""
+    try:
+        if not api.get("/api/auth/config").get("server_mode"):
+            return None
+        scope = (api.get("/api/auth/me").get("token") or {}).get("scope")
+    except ApiError as exc:
+        return f"can't check the token, so writes stay off: {exc}"
+    if scope != ERU_TOKEN_SCOPE:
+        return (f"--allow-writes needs an {ERU_TOKEN_SCOPE} token on a team server, not "
+                f"{'a ' + scope + ' token' if scope else 'a sign-in token'}: make one under Account in the web app")
+    return None
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     cli = argparse.ArgumentParser(prog="rivendell mcp", description="Eru's MCP server (stdio) over a Rivendell.")
     cli.add_argument("--api", default=os.environ.get("RIVENDELL_API", DEFAULT_API),
@@ -310,8 +327,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="eru-mcp: %(message)s")
     mode = f"leads and notes allowed, up to {options.max_writes}" if options.allow_writes else "read-only"
     logger.info(f"Serving Rivendell at {options.api} over stdio ({'with' if token else 'without'} a token; {mode})")
-    build_server(RivendellAPI(options.api, token), writes=options.allow_writes,
-                 max_writes=max(options.max_writes, 0)).run("stdio")
+    api = RivendellAPI(options.api, token)
+    if options.allow_writes:
+        refusal = write_refusal(api)
+        if refusal:
+            logger.error(refusal)
+            return 2
+    build_server(api, writes=options.allow_writes, max_writes=max(options.max_writes, 0)).run("stdio")
     return 0
 
 
