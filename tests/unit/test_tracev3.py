@@ -215,6 +215,10 @@ def test_render():
     assert t.render("%.*s|%s|%s", [("precision", 3), ("string", "abcdef"), ("string", t.NULL), ("number", t.PRIVATE)]) == \
         "abc|(null)|<private>"
     assert t.render("%s and %s", [("string", "one")]) == f"one and {t.MISSING}"
+    # %m is the strerror of the errno logged with the message, by macOS's numbers (35 is EAGAIN there,
+    # EDEADLK on Linux), and it takes its argument, so the next one isn't shifted
+    assert t.render("send failed: %m (%d)", [number(22), number(7)]) == "send failed: Invalid argument (7)"
+    assert t.render("%{errno}d", [number(35)]) == "[35: Resource temporarily unavailable]"
 
 
 def test_refuses_what_is_not_a_tracev3_file(tmp_path):
