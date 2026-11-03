@@ -54,6 +54,16 @@ def test_only_shown_tags_are_cited(tmp_path):
     context.text()
     real = next(iter(context.rows))
     assert eru_context.cited(f"It ran [{real}], twice [{real}], and [R999].", context) == [{**context.rows[real], "tag": real}]
+    # Several tags in one bracket, as models often write them
+    first, second = list(context.rows)[:2]
+    assert [r["tag"] for r in eru_context.cited(f"Both ran [{first}, {second}]; again [{second};{first}].", context)] \
+        == [first, second]
+    tags = list(context.rows)
+    numbers = sorted(int(tag[1:]) for tag in tags)
+    low, high = numbers[0], numbers[-1]
+    spelt = [r["tag"] for r in eru_context.cited(f"All of them [R{low}–R{high}], one [R{low}-{low}].", context)]
+    assert sorted(spelt, key=lambda tag: int(tag[1:])) == [f"R{n}" for n in numbers]
+    assert eru_context.cited(f"[R{low}–R{low + 500}]", context) == []  # too wide to be a citation
     # A row cut off the end of the context wasn't shown, so it can't be cited
     with mock.patch.object(eru_context, "MAX_CHARS", 10):
         context.text()

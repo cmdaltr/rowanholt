@@ -13,7 +13,7 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Iterator, List, Optional, Tuple
 
 try:
     from . import case_files, eru_offline
@@ -35,11 +35,16 @@ MAX_TERMS = 5
 MAX_FILE_BYTES = 32 << 20  # tables searched for the question's words; bigger ones are left to the case browser
 MAX_MATCHES = 25
 MAX_MATCHES_PER_FILE = 3
-TAG = re.compile(r"\[R(\d+)\]")
+# A cited tag, [R3], or several in one bracket, as models write them: [R2, R3], [R2–R5], [R2-R5, R8]
+TAG_ITEM = r"R\d+(?:\s*[-–—]\s*R?\d+)?"
+TAG = re.compile(rf"\[\s*({TAG_ITEM}(?:\s*[,;]\s*{TAG_ITEM})*)\s*\]")
+TAG_RANGE = re.compile(r"R(\d+)(?:\s*[-–—]\s*R?(\d+))?")
+MAX_RANGE = 25  # a wider range is a gesture at the whole context, not a citation
 
 CITE_INSTRUCTIONS = (
     "Rows in the case data are tagged [R1], [R2] and so on. When a statement rests on a row, cite its tag "
-    "in square brackets right after the statement, for example [R3]. Cite only tags that appear in the "
+    "in square brackets right after the statement, for example [R3], or [R3][R4] for two; never a range. "
+    "Cite only tags that appear in the "
     "case data; never invent one. If the case data doesn't answer the question, say so.")
 
 
@@ -130,10 +135,19 @@ def build(case_path: str, question: str = "", findings: Optional[List[Dict]] = N
     return context
 
 
+def _tag_numbers(answer: str) -> Iterator[str]:
+    """Each tag number the answer cites, ranges spelt out (R2–R5 is R2, R3, R4, R5)."""
+    for group in TAG.findall(answer):
+        for first, last in TAG_RANGE.findall(group):
+            start, end = int(first), int(last or first)
+            if start <= end <= start + MAX_RANGE:
+                yield from (str(n) for n in range(start, end + 1))
+
+
 def cited(answer: str, context: Context) -> List[Dict[str, str]]:
     """The rows the answer cites by tag, in the order it first cites them; tags it wasn't shown are dropped."""
     out: List[Dict[str, str]] = []
-    for number in dict.fromkeys(TAG.findall(answer)):
+    for number in dict.fromkeys(_tag_numbers(answer)):
         row = context.rows.get(f"R{number}")
         if row and f"[R{number}]" in context.shown:
             out.append({**row, "tag": f"R{number}"})
