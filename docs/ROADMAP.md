@@ -50,7 +50,7 @@ Container forensics goes first because half of it is written. ML goes last becau
 - **Tests.** `tests/unit/test_threat_intel.py`, and the Eru question in `test_eru_offline.py`.
 
 **Still to do.**
-- **Expiry.** Archer expires IPs and domains after 90 days. Here, STIX `valid_until` and confidence aren't kept, because the schema has no column for them. Re-import and delete by source for now.
+- **Expiry** (done 2 November). STIX `valid_until` and confidence are kept beside the ten columns in `threat_intel_validity` (`threat_intel/validity.py`, Alembic `9e3c5a7b1f42`); other sources default to 90 days for IPs and domains, as Archer does. Expired indicators stay listed but are left out of Elrond's matching and Eru's value index.
 - **Online lookups** (VirusTotal and the like) stay out. They would be opt-in per case, after the threat model's review of Eru's outbound access.
 
 ## Collaborative investigation
@@ -140,13 +140,13 @@ Each feature's "Still to do" above, as work to schedule, then the Eru MCP server
 ### Stacking (anomaly detection)
 
 1. **Eru's "What's rare in this case?"** (done 30 October). An offline question over `stacking.csv`: the top rows, persistence first, each with its hosts and reasons, and the reminder that a row is a lead, not a verdict. Tests in `test_eru_offline.py`, one keeping its persistence families equal to `stacking.PERSISTENCE`.
-2. **One command for the lab evaluation** (built 30 October, not yet run end to end). `./lab.sh stacking-eval` builds the stacking targets, collects them into a folder of its own, runs Elrond in the worker and prints precision at 4, 8 and 20 against the plants (the `stacking` values in each target's `expected.json`), appending the result to a table in `lab/README.md`. The scorer, `lab/lib/stacking_eval.py`, is tested in `test_stacking_eval.py`. Linux every release; Windows when its clean VMs are rebuilt (about two hours), at least once per major release.
+2. **One command for the lab evaluation** (built 30 October; first run end to end 3 November: precision at 4, 8 and 20 all 1.00, the plants at ranks 1, 2 and 4, recorded in `lab/README.md`). `./lab.sh stacking-eval` builds the stacking targets, collects them into a folder of its own, runs Elrond in the worker and prints precision at 4, 8 and 20 against the plants (the `stacking` values in each target's `expected.json`), appending the result to a table in `lab/README.md`. The scorer, `lab/lib/stacking_eval.py`, is tested in `test_stacking_eval.py`. Linux every release; Windows when its clean VMs are rebuilt (about two hours), at least once per major release.
 
 ### The Eru MCP server
 
-**Phase 1 built (31 October 2026):** `src/eru_mcp/server.py`, `rivendell mcp`, `requirements/mcp.txt`, documented in `docs/ERU.md`. mcp 2 renamed FastMCP to `MCPServer`, which it uses. Stdio only: the streamable HTTP option behind Caddy isn't built, because on a team server it would have to take each analyst's token from their request rather than the environment. The lab run on THREATINTEL-DEMO-01 is still to do; a smoke run over stdio against the local stack listed its cases and answered an offline question.
+**Phase 1 built (31 October 2026):** `src/eru_mcp/server.py`, `rivendell mcp`, `requirements/mcp.txt`, documented in `docs/ERU.md`. mcp 2 renamed FastMCP to `MCPServer`, which it uses. Stdio only: the streamable HTTP option behind Caddy isn't built, because on a team server it would have to take each analyst's token from their request rather than the environment. Lab run on THREATINTEL-DEMO-01 done 3 November, in Claude Code: the tools listed the case, its hosts and techniques and its persistence with row citations, a lead was written as "Eru (for local)", and `raw/` was refused. It found a broken registry file (E47) and Run keys missing from Eru's persistence answer (E48), both fixed, and led to review condition 2 covering shell access (below).
 
-**Phase 2 built (3 November 2026):** `flag_lead` and `add_note`, only with `rivendell mcp --allow-writes`. Leads only; every call sends `X-Rivendell-Agent: eru-mcp`, so the backend records the write as "Eru (for <user>)" and refuses Eru other statuses, edits, deletes and host assignment; `--max-writes` (25) caps a session. Tests in `test_eru_mcp.py`. Long-lived API tokens (3 November, branch `feat/api-tokens`, Alembic a3f8c6e1d295): an `eru-mcp` token holds the caller to reads, leads and notes in the backend itself, header or not, and `--allow-writes` needs one on a team server. Reviewed 3 November with conditions (`.claude/threat-model.md`): live cases only in an MCP host without other network-capable tools.
+**Phase 2 built (3 November 2026):** `flag_lead` and `add_note`, only with `rivendell mcp --allow-writes`. Leads only; every call sends `X-Rivendell-Agent: eru-mcp`, so the backend records the write as "Eru (for <user>)" and refuses Eru other statuses, edits, deletes and host assignment; `--max-writes` (25) caps a session. Tests in `test_eru_mcp.py`. Long-lived API tokens (3 November, Alembic a3f8c6e1d295): an `eru-mcp` token holds the caller to reads, Eru's questions, leads and notes in the backend itself, header or not, and `--allow-writes` needs one on a team server. Reviewed 3 November with conditions (`.claude/threat-model.md`): live cases only in an MCP host without other network-capable tools and without shell or file access to the case store.
 
 **What it is.** One MCP server, built with FastMCP (mcp 2's `MCPServer`), through which an MCP host (Claude Desktop, Claude Code, OpenClaw) works a Rivendell case. It registers every Eru capability; nothing else registers tools.
 
@@ -188,6 +188,19 @@ The server's instructions: start from a job id; cite file and row for every clai
 ### Suggested order
 
 The small items first: restart warning, assignees, "What's rare?", bash collector, lab evaluation command (about three days together). Then the MCP server's phase 1, then flagging from Eru answers (it uses the server's row citations), then threat intelligence expiry, then containerd, then the MCP server's phase 2 after its review.
+
+## Done 3 November 2026
+
+The day v2.3 was merged (PR #2, merge commit `a9c118b`). Bug numbers are in `tests/docs/BUGS.md`.
+
+| What | Bugs |
+|---|---|
+| Registry JSON stays valid when a value has quotes in it (Edge's Run key broke whole hives); Eru's fixed persistence answer lists Run keys | E47, E48 |
+| A completed job's restart re-processes it (Elrond skipped everything already written); the case browser answers a broken file with 400, not 500 | P16, P15 |
+| Eru's model settings reach the backend (`RIVENDELL_MODEL_NAME` in `.env`); rows cited as lists or ranges come back to flag | P17, P18 |
+| Ask Eru with Ollama tested: `llama3.2:3b` works but misreads the case; `qwen3:8b` (about 5 GB) is the smallest worth relying on, at about a minute an answer | |
+| The PR #2 review's ten findings: an `eru-mcp` token may ask Eru; tokens can't set passwords or make accounts; one sign-in lockout per account; the Navigator layer check can't be skipped with `//` or `../`; Eru reads every job, not the newest 50, and the job asked for (`job_id`), not the first with its case number; only a job's owner or an admin can delete, archive or wipe it; one finding per row (Alembic `c71d4e9a2b58`); a fresh restart's wipe isn't kept for the next one | P19 |
+| Lab: a VM cloned from the same image as another project's shared its MAC, so `tart ip` sent provisioning and collection to that VM; start refuses a clash and clones get their own MAC. A stopped VM is started by its state, not its IP | L30 |
 
 ## Decisions (Ben, 29 October 2026)
 
