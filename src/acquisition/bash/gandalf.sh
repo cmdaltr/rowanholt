@@ -441,7 +441,8 @@ DIRS
         [ -d "$user_home" ] || continue
         username=$(basename "$user_home")
         for source in .zsh_history .viminfo .lesshst .python_history .mysql_history .psql_history .wget-hsts \
-            .local/share/recently-used.xbel; do
+            .local/share/recently-used.xbel .local/share/containers/storage/db.sql \
+            .local/share/containers/storage/db.sql-wal .local/share/containers/storage/libpod/bolt_state.db; do
             take "${user_home}/${source}" "${acq_dir}/artefacts/user/${username}/$(basename "$source")"
         done
         while IFS= read -r -d '' source; do

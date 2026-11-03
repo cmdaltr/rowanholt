@@ -26,7 +26,8 @@ from dernvale.process.extractions import artemis, containers, k8s_audit
 logger = logging.getLogger(__name__)
 
 LINUX_RAW = re.compile(r"/artefacts/raw/linux/")
-USER_FILES = ("viminfo", "lesshst", "python_history", "mysql_history", "psql_history", "wget-hsts", "recently-used.xbel")
+USER_FILES = ("viminfo", "lesshst", "python_history", "mysql_history", "psql_history", "wget-hsts", "recently-used.xbel",
+              "db.sql", "bolt_state.db")  # the last two: rootless Podman
 
 # Commands an attacker leaves in a startup or init script and an administrator rarely does
 SUSPICIOUS_COMMAND = re.compile(
@@ -631,6 +632,11 @@ def _route_user(artefact: str) -> Tuple[str, List[Dict], str, List[str]]:
         return "wget_hsts.csv", wget_hsts_rows(artefact, user), kind, []
     if kind == "recently-used.xbel":
         return "recently_used.csv", recently_used_rows(artefact, user), kind, []
+    if kind in ("db.sql", "bolt_state.db"):
+        rows = containers.podman_sqlite_rows(artefact) if kind == "db.sql" else containers.podman_bolt_rows(artefact)
+        for row in rows:
+            row["Runtime"] = f"podman (rootless, {user})"
+        return "docker_containers.csv", rows, "rootless Podman containers", containers.container_techniques(rows)
     return "", [], "", []
 
 

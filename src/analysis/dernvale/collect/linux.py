@@ -53,7 +53,10 @@ WEB_SCRIPTS = (".php", ".phtml", ".php3", ".php4", ".php5", ".php7", ".phar", ".
 WEB_MAX_FILES = 5000
 # under each home: user_profiles/<user>+<name without the dot>
 LINUX_USER_FILES = (".zsh_history", ".viminfo", ".lesshst", ".python_history", ".mysql_history",
-                    ".psql_history", ".wget-hsts", ".local/share/recently-used.xbel")
+                    ".psql_history", ".wget-hsts", ".local/share/recently-used.xbel",
+                    # rootless Podman's state (5's SQLite and its WAL, or 4's bbolt)
+                    ".local/share/containers/storage/db.sql", ".local/share/containers/storage/db.sql-wal",
+                    ".local/share/containers/storage/libpod/bolt_state.db")
 LINUX_USER_DIRS = ((".config/autostart", (".desktop",)), (".config/systemd/user", (".service", ".timer")))
 TMP_DIRS = ("/tmp", "/var/tmp", "/dev/shm")
 LISTING_MAX_HASH = 100 << 20
