@@ -6,7 +6,7 @@ from pathlib import Path
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from rivendell.process import timeline  # noqa: E402
+from dernvale.process import timeline  # noqa: E402
 
 
 class FakePsteal:

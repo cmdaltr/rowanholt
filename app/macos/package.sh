@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Release package for macOS: Rivendell-<version>.dmg holding a universal Rivendell.app
+# Release package for macOS: Dernvale-<version>.dmg holding a universal Dernvale.app
 # that carries the source tree. Signs and notarises when the environment has the means:
 #   MACOS_SIGN_IDENTITY                          "Developer ID Application: ..." in the keychain
 #   APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD  notarytool credentials (an app-specific password)
 # Without them the app is ad-hoc signed: it runs, but Gatekeeper makes users approve it in
 # System Settings › Privacy & Security the first time.
-# Usage: package.sh --version V --source rivendell-src.tar.gz <out-dir>
+# Usage: package.sh --version V --source dernvale-src.tar.gz <out-dir>
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -21,14 +21,14 @@ while [ $# -gt 0 ]; do
     shift
 done
 [ -n "$VERSION" ] && [ -f "$SOURCE" ] && [ -n "$OUT" ] || {
-    echo "usage: package.sh --version V --source rivendell-src.tar.gz <out-dir>" >&2; exit 1; }
+    echo "usage: package.sh --version V --source dernvale-src.tar.gz <out-dir>" >&2; exit 1; }
 mkdir -p "$OUT"
 OUT="$(cd "$OUT" && pwd)"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 
 "$HERE/build.sh" --release --version "$VERSION" --source "$SOURCE" "$STAGE"
-APP="$STAGE/Rivendell.app"
+APP="$STAGE/Dernvale.app"
 
 if [ -n "${MACOS_SIGN_IDENTITY:-}" ]; then
     echo "Signing with $MACOS_SIGN_IDENTITY..."
@@ -37,9 +37,9 @@ if [ -n "${MACOS_SIGN_IDENTITY:-}" ]; then
 fi
 
 ln -s /Applications "$STAGE/Applications"
-DMG="$OUT/Rivendell-$VERSION.dmg"
+DMG="$OUT/Dernvale-$VERSION.dmg"
 rm -f "$DMG"
-hdiutil create -volname "Rivendell $VERSION" -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov "$DMG" >/dev/null
+hdiutil create -volname "Dernvale $VERSION" -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov "$DMG" >/dev/null
 
 if [ -n "${MACOS_SIGN_IDENTITY:-}" ]; then
     codesign --force --timestamp --sign "$MACOS_SIGN_IDENTITY" "$DMG"

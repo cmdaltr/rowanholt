@@ -1,4 +1,4 @@
-# Rivendell Architecture Diagrams
+# Dernvale Architecture Diagrams
 
 This directory contains Graphviz DOT files for generating professional architecture diagrams.
 
@@ -77,7 +77,7 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}Generating Rivendell Architecture Diagrams...${NC}\n"
+echo -e "${BLUE}Generating Dernvale Architecture Diagrams...${NC}\n"
 
 # Create output directory
 mkdir -p output
@@ -128,7 +128,7 @@ chmod +x generate_diagrams.sh
 
 ### Color Scheme
 
-The diagrams use the Rivendell theme colors:
+The diagrams use the Dernvale theme colors:
 - Background: `#0f0f23` (dark blue)
 - Nodes: `#2d2d44` (slate)
 - Text: `#f0dba5` (gold)

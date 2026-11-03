@@ -1,11 +1,11 @@
 #!/bin/bash
-# Start Rivendell in Testing Mode (optimized for 16GB Macs)
+# Start Dernvale in Testing Mode (optimized for 16GB Macs)
 # This disables Splunk and Elastic to save 6GB+ RAM
 
 set -e
 
 echo "╔════════════════════════════════════════════════════════════╗"
-echo "║   Rivendell - Testing Mode (16GB RAM Optimized)           ║"
+echo "║   Dernvale - Testing Mode (16GB RAM Optimized)             ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
 echo "This mode disables:"

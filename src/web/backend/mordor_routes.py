@@ -724,7 +724,7 @@ async def verify_dataset_endpoint(dataset_id: str):
 # (./lab.sh mordor-record), plus Microsoft GUIDE's Defender XDR alerting.
 # Reading is open; Update (a rebuild from the sources) is admin-only.
 
-TELEMETRY_ROOT = os.environ.get("RIVENDELL_SRC_ROOT", "/opt/rivendell")
+TELEMETRY_ROOT = os.environ.get("DERNVALE_SRC_ROOT", "/opt/dernvale")
 
 
 def _telemetry():

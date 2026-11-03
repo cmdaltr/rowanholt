@@ -10,7 +10,7 @@ Pages and their sections come from src/web/frontend/src/guide/content.js; a sect
 found by its data-guide attribute. Each photograph is cropped to the part of the page its
 sections cover. Writes src/web/frontend/public/guide/<page>.jpg and boxes.json.
 
-Sign in as an admin (--username, with RIVENDELL_PASSWORD in the environment) so Account
+Sign in as an admin (--username, with DERNVALE_PASSWORD in the environment) so Account
 and Aragorn are photographed too. The Job page uses the most recent job, so have one.
 
 A page that now shows fewer of its sections than its last photograph did (no jobs on this
@@ -114,9 +114,9 @@ def as_team_server(page, job_id: str, on: bool) -> None:
 def capture(args: argparse.Namespace) -> None:
     from playwright.sync_api import sync_playwright
 
-    token, user = args.token or os.environ.get("RIVENDELL_TOKEN", ""), None
+    token, user = args.token or os.environ.get("DERNVALE_TOKEN", ""), None
     if args.username:
-        token, user = sign_in(args.api, args.username, os.environ.get("RIVENDELL_PASSWORD", ""))
+        token, user = sign_in(args.api, args.username, os.environ.get("DERNVALE_PASSWORD", ""))
     job_id = ""
     try:
         job_id = latest_job(args.api, token)
@@ -136,7 +136,7 @@ def capture(args: argparse.Namespace) -> None:
         context = browser.new_context(viewport={"width": WIDTH, "height": HEIGHT})
         # No start-up offer over the pages, and the token where the app keeps it
         context.add_init_script(
-            "localStorage.setItem('rivendell.offeredAt', String(Date.now()));"
+            "localStorage.setItem('dernvale.offeredAt', String(Date.now()));"
             + (f"localStorage.setItem('access_token', {json.dumps(token)});" if token else "")
             + (f"localStorage.setItem('user', {json.dumps(json.dumps(user))});" if user else ""))
         page = context.new_page()
@@ -191,8 +191,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--url", default="http://localhost:5687", help="the web UI")
     parser.add_argument("--api", default="http://localhost:5688", help="the API, for the latest job")
-    parser.add_argument("--token", help="an API token (or RIVENDELL_TOKEN)")
-    parser.add_argument("--username", help="sign in as this user (password in RIVENDELL_PASSWORD)")
+    parser.add_argument("--token", help="an API token (or DERNVALE_TOKEN)")
+    parser.add_argument("--username", help="sign in as this user (password in DERNVALE_PASSWORD)")
     parser.add_argument("--fresh", action="store_true", help="replace every photograph, even with fewer sections")
     parser.add_argument("--only", nargs="+", metavar="PAGE",
                         help="retake just these pages (ids from guide/content.js: case, intel, home, ...); the rest are kept")

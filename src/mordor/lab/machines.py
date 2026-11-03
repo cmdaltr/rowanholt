@@ -3,9 +3,9 @@ The lifecycle of a lab machine, the same verbs for a container or a VM: create (
 template), start, stop, snapshot, revert (to a snapshot), delete, status and logs. Each verb
 dispatches to the engine that runs the machine (engines).
 
-A machine Rivendell made is tagged in the registry with its template, so the page shows its OS
+A machine Dernvale made is tagged in the registry with its template, so the page shows its OS
 and what it records, and provisioning knows which script to run. The lab's own machines and any
-UTM VM are listed too. Ported from Archer; the lab is admin-only in Rivendell, so there's no
+UTM VM are listed too. Ported from Archer; the lab is admin-only in Dernvale, so there's no
 per-user ownership.
 """
 
@@ -19,7 +19,7 @@ from .templates import BY_ID
 
 # The lab's own Windows VM (lab.conf WINDOWS_UTM_VM); set by the lab agent. Its set-up and
 # recording go through ./lab.sh over SSH, which it's built for, rather than utmctl exec.
-LAB_WINDOWS_VM = "rivendell-lab-win11"
+LAB_WINDOWS_VM = "dernvale-lab-win11"
 # Machines on this host the page never shows (lab.conf LAB_HIDDEN_MACHINES), such as another
 # project's UTM VM; set by the lab agent.
 HIDDEN: Set[str] = set()
@@ -29,7 +29,7 @@ def lab_machine(engine: str, name: str) -> bool:
     """One of the lab's own machines (./lab.sh builds and deletes those, not this page)."""
     if engine == "docker":
         return name.startswith("lab-")
-    return name.startswith("rivendell-lab-") or (engine == "utm" and name == LAB_WINDOWS_VM)
+    return name.startswith("dernvale-lab-") or (engine == "utm" and name == LAB_WINDOWS_VM)
 
 
 def is_lab_windows(engine: str, name: str) -> bool:
@@ -45,10 +45,10 @@ def _lab_os(engine: str, name: str) -> str:
 
 
 def _decorate(m: Dict) -> Dict:
-    """Add what Rivendell remembers about the machine to the engine's own view.
+    """Add what Dernvale remembers about the machine to the engine's own view.
 
-    A UTM VM counts the moment it exists — Rivendell didn't make it, but it drives any UTM VM —
-    so it shows even before its OS is set. Only a machine Rivendell created here may be deleted
+    A UTM VM counts the moment it exists — Dernvale didn't make it, but it drives any UTM VM —
+    so it shows even before its OS is set. Only a machine Dernvale created here may be deleted
     here: the lab's own are ./lab.sh's, and another VM in UTM (Archer's, say) is yours."""
     known = registry.get(m["engine"], m["name"])
     template = BY_ID.get((known or {}).get("template", ""))
@@ -64,8 +64,8 @@ def _decorate(m: Dict) -> Dict:
 
 
 def listing(engines: Optional[List[str]] = None) -> List[Dict]:
-    """The machines Rivendell made, the lab's own and every UTM VM, across the engines given
-    (default: all that are ready). Anything else built outside Rivendell is left out."""
+    """The machines Dernvale made, the lab's own and every UTM VM, across the engines given
+    (default: all that are ready). Anything else built outside Dernvale is left out."""
     out = []
     for key, engine in ENGINES.items():
         if engines is not None and key not in engines:
@@ -79,7 +79,7 @@ def listing(engines: Optional[List[str]] = None) -> List[Dict]:
 
 
 def adopt(engine_key: str, name: str, os_name: str) -> Dict:
-    """Tell Rivendell what OS a VM it didn't create runs, so it can provision and record it."""
+    """Tell Dernvale what OS a VM it didn't create runs, so it can provision and record it."""
     name = safe_name(name)
     if os_name not in ("windows", "linux", "macos"):
         raise LabError("Unknown OS", "Pick windows, linux or macos")
@@ -91,7 +91,7 @@ def adopt(engine_key: str, name: str, os_name: str) -> Dict:
 def clone(engine_key: str, name: str, new_name: str) -> Dict:
     """Clone an existing VM into a new machine — the fast Windows path: copy a prepared VM rather
     than install one from an ISO. UTM only (its engine has clone). The clone inherits the source's
-    OS when Rivendell knows it, so Set up and Record work on it straight away."""
+    OS when Dernvale knows it, so Set up and Record work on it straight away."""
     engine, name = _op(engine_key, name)
     engine_clone = getattr(engine, "clone", None)
     if engine_clone is None:
@@ -104,8 +104,8 @@ def clone(engine_key: str, name: str, new_name: str) -> Dict:
 
 
 def all_host_names(engines: Optional[List[str]] = None) -> List[str]:
-    """Every machine name the engines report, Rivendell's and not (Tart lists all its VMs; Docker
-    lists Rivendell's containers) — so the create dialog can suggest a name that won't collide."""
+    """Every machine name the engines report, Dernvale's and not (Tart lists all its VMs; Docker
+    lists Dernvale's containers) — so the create dialog can suggest a name that won't collide."""
     names = []
     for key, engine in ENGINES.items():
         if engines is not None and key not in engines:
@@ -118,7 +118,7 @@ def all_host_names(engines: Optional[List[str]] = None) -> List[str]:
         from .engines import parse_tart_list_raw
 
         try:
-            names += parse_tart_list_raw()  # includes VMs and snapshots outside Rivendell
+            names += parse_tart_list_raw()  # includes VMs and snapshots outside Dernvale
         except LabError:
             pass
     return names
@@ -173,8 +173,8 @@ def delete(engine_key: str, name: str):
     if lab_machine(engine_key, name):
         raise LabError("The lab's own machines are deleted with ./lab.sh", f"{name}: see ./lab.sh help")
     if not (registry.get(engine_key, name) or {}).get("created"):
-        raise LabError("Rivendell didn't create this machine, so it won't delete it",
-                       f"{name} was made outside Rivendell; delete it in {engine_key} yourself if you want it gone")
+        raise LabError("Dernvale didn't create this machine, so it won't delete it",
+                       f"{name} was made outside Dernvale; delete it in {engine_key} yourself if you want it gone")
     e.delete(name)
     registry.forget(engine_key, name)
 

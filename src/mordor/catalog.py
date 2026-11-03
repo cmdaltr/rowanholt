@@ -23,7 +23,7 @@ from .models import (
 GITHUB_API = "https://api.github.com/repos/OTRF/Security-Datasets"
 RAW_GITHUB = "https://raw.githubusercontent.com/OTRF/Security-Datasets/master"
 CACHE_TTL_HOURS = 24
-DEFAULT_CACHE_DIR = "/tmp/rivendell/mordor/cache"
+DEFAULT_CACHE_DIR = "/tmp/dernvale/mordor/cache"
 
 
 class MordorCatalog:

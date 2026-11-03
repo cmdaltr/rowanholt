@@ -1,4 +1,4 @@
-# Rivendell Configuration Guide
+# Dernvale Configuration Guide
 
 **Version:** 2.1.0
 **Last Updated:** 2025-01-15
@@ -21,13 +21,13 @@
 
 ### Default Configuration
 
-Rivendell works out-of-the-box with sensible defaults:
+Dernvale works out-of-the-box with sensible defaults:
 
 - **Backend**: http://localhost:5688
 - **Frontend**: http://localhost:5687
 - **Database**: PostgreSQL (localhost:5432)
 - **Redis**: localhost:6379
-- **Default Admin**: admin@rivendell.app / IWasThere3000YearsAgo!
+- **Default Admin**: admin@dernvale.app / IWasThere3000YearsAgo!
 
 ### Environment Variables
 
@@ -35,11 +35,11 @@ Create `.env` file in `/src/web/backend/`:
 
 ```bash
 # Application
-APP_NAME="Rivendell Web Interface"
+APP_NAME="Dernvale Web Interface"
 DEBUG=false
 
 # Database
-DATABASE_URL=postgresql://rivendell:rivendell@postgres:5432/rivendell
+DATABASE_URL=postgresql://dernvale:dernvale@postgres:5432/dernvale
 
 # Redis
 REDIS_HOST=redis
@@ -102,7 +102,7 @@ allowed_paths = [
     "/Volumes",
     "/mnt",
     "/media",
-    "/tmp/rivendell",
+    "/tmp/dernvale",
     "/host/tmp",  # Host /tmp mounted in Docker
 ]
 ```
@@ -111,15 +111,15 @@ allowed_paths = [
 ```python
 allowed_paths = [
     "/Volumes",
-    "/tmp/rivendell",
+    "/tmp/dernvale",
 ]
 ```
 
 **Windows:**
 ```python
 allowed_paths = [
-    "C:\\Temp\\rivendell",
-    "D:\\Temp\\rivendell",
+    "C:\\Temp\\dernvale",
+    "D:\\Temp\\dernvale",
 ]
 ```
 
@@ -171,18 +171,18 @@ ls -la build/
 postgres:
   image: postgres:15-alpine
   environment:
-    POSTGRES_USER: rivendell
-    POSTGRES_PASSWORD: rivendell
-    POSTGRES_DB: rivendell
+    POSTGRES_USER: dernvale
+    POSTGRES_PASSWORD: dernvale
+    POSTGRES_DB: dernvale
   ports:
     - "5432:5432"
   volumes:
-    - rivendell-postgres:/var/lib/postgresql/data
+    - dernvale-postgres:/var/lib/postgresql/data
 ```
 
 **Connection String:**
 ```
-postgresql://rivendell:rivendell@localhost:5432/rivendell
+postgresql://dernvale:dernvale@localhost:5432/dernvale
 ```
 
 ### Database Migrations
@@ -208,7 +208,7 @@ redis:
   ports:
     - "6379:6379"
   volumes:
-    - rivendell-redis:/data
+    - dernvale-redis:/data
 ```
 
 ---
@@ -368,13 +368,13 @@ yara --version
 **Solutions:**
 ```bash
 # Check database connection
-psql -h localhost -U rivendell -d rivendell
+psql -h localhost -U dernvale -d dernvale
 
 # Check Redis connection
 redis-cli ping
 
 # Check logs
-docker logs rivendell-backend
+docker logs dernvale-backend
 
 # Verify dependencies
 pip install -r requirements/web.txt
@@ -422,13 +422,13 @@ python -m alembic history
 ```bash
 # Check allowed_paths in config.py
 # Verify directory exists
-ls -la /tmp/rivendell
+ls -la /tmp/dernvale
 
 # Check permissions
-chmod 755 /tmp/rivendell
+chmod 755 /tmp/dernvale
 
 # Check Docker volume mounts
-docker inspect rivendell-backend | grep Mounts
+docker inspect dernvale-backend | grep Mounts
 ```
 
 #### Celery Tasks Not Running
@@ -438,13 +438,13 @@ docker inspect rivendell-backend | grep Mounts
 **Solutions:**
 ```bash
 # Check Celery worker
-docker logs rivendell-celery-worker
+docker logs dernvale-celery-worker
 
 # Check Redis
 redis-cli ping
 
 # Restart Celery
-docker restart rivendell-celery-worker
+docker restart dernvale-celery-worker
 ```
 
 ### Debug Mode
@@ -457,15 +457,15 @@ DEBUG=true
 LOG_LEVEL=DEBUG
 
 # Or environment variable
-export RIVENDELL_DEBUG=1
+export DERNVALE_DEBUG=1
 ```
 
 ### Getting Help
 
-1. Check logs: `docker logs rivendell-backend`
+1. Check logs: `docker logs dernvale-backend`
 2. Review [API.md](API.md) for endpoint docs
 3. See [SECURITY.md](SECURITY.md) for security setup
-4. Check GitHub issues: https://github.com/cmdaltr/rivendell/issues
+4. Check GitHub issues: https://github.com/cmdaltr/dernvale/issues
 
 ---
 
@@ -503,8 +503,8 @@ Control how user profiles are collected during forensic analysis:
 
 | Environment Variable | Values | Default | Description |
 |---------------------|--------|---------|-------------|
-| `RIVENDELL_EXCLUDE_PROFILE_CACHE` | `true`/`false` | `true` | Skip cache directories when copying full user profiles |
-| `RIVENDELL_DEBUG_PROFILE_COPY` | `true`/`false` | `false` | Show progress updates during profile copies (every 60s) |
+| `DERNVALE_EXCLUDE_PROFILE_CACHE` | `true`/`false` | `true` | Skip cache directories when copying full user profiles |
+| `DERNVALE_DEBUG_PROFILE_COPY` | `true`/`false` | `false` | Show progress updates during profile copies (every 60s) |
 
 When enabled, the following directories are excluded from user profile collection:
 - `AppData/Local/Temp` - Temporary files
@@ -521,7 +521,7 @@ When enabled, the following directories are excluded from user profile collectio
 **To disable exclusions** (copy everything including caches):
 ```yaml
 # In docker-compose.yml under celery-worker environment:
-- RIVENDELL_EXCLUDE_PROFILE_CACHE=false
+- DERNVALE_EXCLUDE_PROFILE_CACHE=false
 ```
 
 Then restart: `docker compose up -d --force-recreate celery-worker`
@@ -547,17 +547,17 @@ Then restart: `docker compose up -d --force-recreate celery-worker`
 
 ```bash
 # Backup
-docker exec rivendell-postgres pg_dump -U rivendell rivendell > backup_$(date +%Y%m%d).sql
+docker exec dernvale-postgres pg_dump -U dernvale dernvale > backup_$(date +%Y%m%d).sql
 
 # Restore
-docker exec -i rivendell-postgres psql -U rivendell rivendell < backup_20250115.sql
+docker exec -i dernvale-postgres psql -U dernvale dernvale < backup_20250115.sql
 ```
 
 ### Configuration Backup
 
 ```bash
 # Backup all configs
-tar czf rivendell-config_$(date +%Y%m%d).tar.gz \
+tar czf dernvale-config_$(date +%Y%m%d).tar.gz \
   /src/web/backend/.env \
   /src/web/backend/config.py \
   /src/web/frontend/.env
@@ -567,7 +567,7 @@ tar czf rivendell-config_$(date +%Y%m%d).tar.gz \
 
 ```bash
 # Add to crontab
-0 2 * * * /opt/rivendell/scripts/backup.sh
+0 2 * * * /opt/dernvale/scripts/backup.sh
 ```
 
 ---

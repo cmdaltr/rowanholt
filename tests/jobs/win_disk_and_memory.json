@@ -1,10 +1,10 @@
 {
   "case_number": "TEST_win_disk_and_memory",
   "source_paths": [
-    "/Volumes/Media5TB/rivendell_imgs/win7-64-nfury-c-drive.E01",
-    "/Volumes/Media5TB/rivendell_imgs/win7-64-nfury-memory-raw.001"
+    "/Volumes/Media5TB/dernvale_imgs/win7-64-nfury-c-drive.E01",
+    "/Volumes/Media5TB/dernvale_imgs/win7-64-nfury-memory-raw.001"
   ],
-  "destination_path": "/Volumes/Media5TB/rivendell_imgs/tests/win_disk_and_memory",
+  "destination_path": "/Volumes/Media5TB/dernvale_imgs/tests/win_disk_and_memory",
   "options": {
     "local": true,
     "gandalf": false,

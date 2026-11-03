@@ -1,5 +1,5 @@
 #!/bin/bash
-# Rivendell - Stop/Cancel Running Jobs
+# Dernvale - Stop/Cancel Running Jobs
 # Usage:
 #   ./stop-jobs.sh              # Cancel all running/pending jobs (with confirmation)
 #   ./stop-jobs.sh -y           # Cancel all jobs (no confirmation)
@@ -16,8 +16,8 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-API_HOST="${RIVENDELL_API_HOST:-localhost}"
-API_PORT="${RIVENDELL_API_PORT:-5688}"
+API_HOST="${DERNVALE_API_HOST:-localhost}"
+API_PORT="${DERNVALE_API_PORT:-5688}"
 API_BASE="http://${API_HOST}:${API_PORT}/api"
 
 # Parse arguments
@@ -40,9 +40,9 @@ done
 
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
 if [ -n "$SPECIFIC_JOB_ID" ]; then
-    echo -e "${BLUE}║         Rivendell - Stop Specific Job                     ║${NC}"
+    echo -e "${BLUE}║         Dernvale - Stop Specific Job                       ║${NC}"
 else
-    echo -e "${BLUE}║         Rivendell - Stop Running Jobs                     ║${NC}"
+    echo -e "${BLUE}║         Dernvale - Stop Running Jobs                       ║${NC}"
 fi
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
@@ -63,8 +63,8 @@ fi
 # Test API connectivity
 echo -e "${BLUE}Checking API connectivity...${NC}"
 if ! curl -s -f "${API_BASE}/health" > /dev/null 2>&1; then
-    echo -e "${RED}Error: Cannot connect to Rivendell API at ${API_BASE}${NC}"
-    echo -e "${YELLOW}Make sure Rivendell backend is running on ${API_HOST}:${API_PORT}${NC}"
+    echo -e "${RED}Error: Cannot connect to Dernvale API at ${API_BASE}${NC}"
+    echo -e "${YELLOW}Make sure Dernvale backend is running on ${API_HOST}:${API_PORT}${NC}"
     exit 1
 fi
 echo -e "${GREEN}✓ API is reachable${NC}"

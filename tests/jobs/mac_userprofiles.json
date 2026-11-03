@@ -1,9 +1,9 @@
 {
   "case_number": "TEST_mac_userprofiles",
   "source_paths": [
-    "/Volumes/Media5TB/rivendell_imgs/MacintoshHD_disk5.E01"
+    "/Volumes/Media5TB/dernvale_imgs/MacintoshHD_disk5.E01"
   ],
-  "destination_path": "/Volumes/Media5TB/rivendell_imgs/tests/mac_userprofiles",
+  "destination_path": "/Volumes/Media5TB/dernvale_imgs/tests/mac_userprofiles",
   "options": {
     "local": true,
     "gandalf": false,

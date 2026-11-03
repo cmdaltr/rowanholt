@@ -14,8 +14,8 @@ from pathlib import Path
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from rivendell.core import event_dataset, gandalf  # noqa: E402
-from rivendell.process.extractions.artemis import eventlog_techniques  # noqa: E402
+from dernvale.core import event_dataset, gandalf  # noqa: E402
+from dernvale.process.extractions.artemis import eventlog_techniques  # noqa: E402
 
 # As OTRF publishes them: flat, with Winlogbeat/NXLog fields alongside the event's own
 SYSMON_PROCESS = {

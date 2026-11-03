@@ -14,7 +14,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-TMP = tempfile.mkdtemp(prefix="rivendell-access-")
+TMP = tempfile.mkdtemp(prefix="dernvale-access-")
 # The backend's settings read .env from the working directory; never the repository's
 os.chdir(TMP)
 os.environ.update({
@@ -22,13 +22,13 @@ os.environ.update({
     "USERS_FILE": f"{TMP}/users.json",
     "OUTPUT_DIR": f"{TMP}/output",
     "SECRET_KEY": "test-secret-key-for-unit-tests-only-0123456789",
-    "RIVENDELL_ADMIN_PASSWORD": "correct horse battery staple",
-    "RIVENDELL_PUBLIC_URL": "https://rivendell.test",
+    "DERNVALE_ADMIN_PASSWORD": "correct horse battery staple",
+    "DERNVALE_PUBLIC_URL": "https://dernvale.test",
     # No Redis here: sign-in lockouts fall back to memory (port 1 refuses at once)
     "REDIS_HOST": "127.0.0.1",
     "REDIS_PORT": "1",
     # Threat intelligence from this checkout, as the backend container mounts it
-    "RIVENDELL_ELROND_SRC": str(Path(__file__).resolve().parents[2] / "src" / "analysis"),
+    "DERNVALE_ELROND_SRC": str(Path(__file__).resolve().parents[2] / "src" / "analysis"),
 })
 
 try:
@@ -69,7 +69,7 @@ class BackendCase(unittest.TestCase):
         cls.allowed = mock.patch.object(type(settings), "allowed_paths",
                                         new_callable=mock.PropertyMock, return_value=[str(cls.evidence)])
         cls.allowed.start()
-        settings.rivendell_server_mode = True
+        settings.dernvale_server_mode = True
         cls.client = TestClient(cls.main.app)
         cls.admin = cls.login("admin", "correct horse battery staple")
         for name in ("alice", "bob"):
@@ -83,7 +83,7 @@ class BackendCase(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.allowed.stop()
-        cls.settings.rivendell_server_mode = False
+        cls.settings.dernvale_server_mode = False
 
     @classmethod
     def login(cls, username, password):
@@ -247,9 +247,9 @@ class ServerAccessTest(BackendCase):
     def test_verify_for_the_proxy(self):
         self.assertEqual(self.client.get("/api/auth/verify").status_code, 401)
         resp = self.client.get("/api/auth/verify?login_redirect=1", follow_redirects=False)
-        self.assertEqual(resp.headers["location"], "https://rivendell.test/login")
+        self.assertEqual(resp.headers["location"], "https://dernvale.test/login")
         resp = self.client.get("/api/auth/verify", headers=self.bob)
-        self.assertEqual(resp.headers["X-Rivendell-User"], "bob")
+        self.assertEqual(resp.headers["X-Dernvale-User"], "bob")
 
     def test_navigator_layers_follow_the_case(self):
         self.create_job(self.alice, "CASE-LAYER-1")
@@ -305,7 +305,7 @@ class ServerAccessTest(BackendCase):
         self.assertGreater(throttle.locked_for("alice", "10.0.0.5"), 0)
 
     def test_a_session_gets_a_token_for_scripts(self):
-        """Account's token for scripts and rivendell mcp: the session cookie (a password or single
+        """Account's token for scripts and dernvale mcp: the session cookie (a password or single
         sign-on) traded for a bearer token, with nothing more than the session had."""
         self.client.cookies.clear()
         self.assertEqual(self.client.post("/api/auth/session").status_code, 401)
@@ -345,12 +345,12 @@ class ServerAccessTest(BackendCase):
         self.assertEqual(resp.status_code, 400)
 
     def test_local_mode_stays_open(self):
-        self.settings.rivendell_server_mode = False
+        self.settings.dernvale_server_mode = False
         try:
             self.assertEqual(self.client.get("/api/jobs").status_code, 200)
             self.assertEqual(self.client.get("/api/auth/me").json()["username"], "local")
         finally:
-            self.settings.rivendell_server_mode = True
+            self.settings.dernvale_server_mode = True
 
 
 if __name__ == "__main__":

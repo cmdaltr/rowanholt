@@ -4,7 +4,7 @@ MITRE ATT&CK Module Examples
 
 Demonstrates usage of the MITRE ATT&CK integration module.
 
-Author: Rivendell DF Acceleration Suite
+Author: Dernvale DF Acceleration Suite
 Version: 2.1.0
 """
 
@@ -204,7 +204,7 @@ def example_6_generate_dashboards():
         print(f"  {artifact_type}: {len(techniques)} technique(s)")
 
     # Generate dashboards
-    output_dir = "/tmp/rivendell_mitre_examples"
+    output_dir = "/tmp/dernvale_mitre_examples"
 
     print(f"\n[*] Generating dashboards in {output_dir}...\n")
 

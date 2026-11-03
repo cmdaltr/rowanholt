@@ -197,7 +197,7 @@ export const completeSsoSignIn = async () => {
   return response.data;
 };
 
-// Long-lived, revocable tokens for scripts and RIVENDELL_TOKEN (rivendell mcp), made from a sign-in.
+// Long-lived, revocable tokens for scripts and DERNVALE_TOKEN (dernvale mcp), made from a sign-in.
 // The token itself comes back once, from createApiToken; the list has only its first characters
 export const listApiTokens = async () => (await api.get('/api/auth/tokens')).data.tokens;
 export const createApiToken = async (name, scope, days) =>

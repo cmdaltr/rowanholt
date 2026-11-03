@@ -3,7 +3,7 @@ requires = ["setuptools>=65.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "rivendell-dfir"
+name = "dernvale-dfir"
 version = "2.0.0"
 description = "Unified Digital Forensics Suite - Remote Acquisition (Gandalf) and Automated Analysis (Elrond)"
 readme = "README.md"
@@ -72,20 +72,20 @@ all = [
 ]
 
 [project.scripts]
-rivendell = "src.cli.rivendell:main"
-rivendell-acquire = "src.acquisition.python.gandalf:main"
-rivendell-analyze = "src.analysis.cli:main"
-rivendell-mordor = "src.cli.mordor:main"
-rivendell-web = "src.web.backend.main:start_server"
+dernvale = "src.cli.dernvale:main"
+dernvale-acquire = "src.acquisition.python.gandalf:main"
+dernvale-analyze = "src.analysis.cli:main"
+dernvale-mordor = "src.cli.mordor:main"
+dernvale-web = "src.web.backend.main:start_server"
 # Legacy compatibility
 elrond = "src.analysis.cli:main"
 gandalf = "src.acquisition.python.gandalf:main"
 
 [project.urls]
-Homepage = "https://github.com/cmdaltr/rivendell"
-Documentation = "https://github.com/cmdaltr/rivendell"
-Repository = "https://github.com/cmdaltr/rivendell.git"
-Issues = "https://github.com/cmdaltr/rivendell/issues"
+Homepage = "https://github.com/cmdaltr/dernvale"
+Documentation = "https://github.com/cmdaltr/dernvale"
+Repository = "https://github.com/cmdaltr/dernvale.git"
+Issues = "https://github.com/cmdaltr/dernvale/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

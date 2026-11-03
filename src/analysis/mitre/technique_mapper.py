@@ -4,7 +4,7 @@ MITRE ATT&CK Technique Mapper
 Maps forensic artifacts to ATT&CK techniques dynamically.
 Provides confidence scoring and context-aware mapping.
 
-Author: Rivendell DF Acceleration Suite
+Author: Dernvale DF Acceleration Suite
 Version: 2.1.0
 """
 

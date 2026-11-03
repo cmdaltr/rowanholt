@@ -1,4 +1,4 @@
-# Rivendell lab VMs for x86-64 hosts (Intel Macs, Linux) on VirtualBox. Driven by ./lab.sh, which sets
+# Dernvale lab VMs for x86-64 hosts (Intel Macs, Linux) on VirtualBox. Driven by ./lab.sh, which sets
 # the environment below; don't run `vagrant up` by hand without it.
 #
 #   win    Windows 11 x64 (Gandalf PowerShell target + Mordor sensor). x64 so
@@ -36,7 +36,7 @@ Vagrant.configure("2") do |config|
     w.vm.synced_folder ACQ_ROOT, "C:/lab/acquisitions"
     w.vm.synced_folder MORDOR_ROOT, "C:/lab/mordor"
     w.vm.provider "virtualbox" do |vb|
-      vb.name = "rivendell-lab-win11"
+      vb.name = "dernvale-lab-win11"
       vb.memory = WIN_MEM
       vb.cpus = WIN_CPUS
       vb.gui = false
@@ -54,7 +54,7 @@ Vagrant.configure("2") do |config|
     l.vm.synced_folder ".", "/vagrant", disabled: true
     l.vm.synced_folder File.join(REPO_ROOT, "lab", "linux-targets"), "/lab", type: "rsync"
     l.vm.provider "virtualbox" do |vb|
-      vb.name = "rivendell-lab-linux"
+      vb.name = "dernvale-lab-linux"
       vb.memory = LINUX_MEM
       vb.cpus = 2
     end

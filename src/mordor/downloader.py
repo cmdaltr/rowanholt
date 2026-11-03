@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from .models import MordorDataset, DatasetDownloadResult, DatasetVerifyResult
 from .catalog import MordorCatalog
 
-DEFAULT_OUTPUT_DIR = "/tmp/rivendell/mordor"
+DEFAULT_OUTPUT_DIR = "/tmp/dernvale/mordor"
 
 
 class MordorDownloader:

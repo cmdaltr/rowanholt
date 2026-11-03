@@ -1,7 +1,7 @@
 """Eru's MCP server (src/eru_mcp/server.py), driven through the MCP SDK's in-memory client against
 the real backend in server mode (test_server_access.BackendCase). These are the threat model's
 checks before it goes near a live case: the tool list against what's never exposed, no reaching a
-job that isn't yours or shared with you, no reaching raw/, and no calls but Rivendell's API.
+job that isn't yours or shared with you, no reaching raw/, and no calls but Dernvale's API.
 
 Needs the backend's requirements and requirements/mcp.txt; skipped without them.
 """
@@ -49,12 +49,12 @@ class EruMcpTest(BackendCase):
     def server(self, headers, **options):
         def send(method, path, params, body):
             self.calls.append(path)
-            # RivendellAPI._urllib sends the agent header (test_the_agent_header_is_sent)
+            # DernvaleAPI._urllib sends the agent header (test_the_agent_header_is_sent)
             resp = self.client.request(method, path, params=params, json=body,
                                        headers={**headers, eru_mcp.AGENT_HEADER[0]: eru_mcp.AGENT_HEADER[1]})
             is_json = "json" in resp.headers.get("content-type", "")
             return resp.status_code, resp.json() if is_json else resp.text
-        return eru_mcp.build_server(eru_mcp.RivendellAPI("http://testserver", transport=send), **options)
+        return eru_mcp.build_server(eru_mcp.DernvaleAPI("http://testserver", transport=send), **options)
 
     def call(self, headers, name, server=None, **arguments):
         """(is_error, result): the tool's structured result, or its error text."""
@@ -154,6 +154,14 @@ class EruMcpTest(BackendCase):
         confirmed = self.client.patch(f"{base}/findings/{lead['id']}", headers=self.alice, json={"status": "confirmed"})
         self.assertEqual(confirmed.json()["status"], "confirmed")
 
+    def test_an_mcp_server_from_before_the_rename_is_still_eru(self):
+        job = self.case_with_output("CASE-MCP-24")
+        eru = {**self.alice, "X-Rivendell-Agent": "eru-mcp"}
+        base = f"/api/jobs/{job}/case"
+        row = {"host": "WS01", "artefact": "artefacts/cooked/prefetch.csv", "row_ref": "3", "title": "x"}
+        self.assertEqual(self.client.post(f"{base}/findings", headers=eru, json={**row, "status": "confirmed"}).status_code, 403)
+        self.assertEqual(self.client.post(f"{base}/findings", headers=eru, json=row).json()["author"], "Eru (for alice)")
+
     def test_a_session_stops_at_its_write_limit(self):
         job = self.case_with_output("CASE-MCP-9")
         server = self.server(self.alice, writes=True, max_writes=2)
@@ -169,7 +177,7 @@ class EruMcpTest(BackendCase):
             def send(method, path, params, body):
                 resp = self.client.request(method, path, params=params, json=body, headers=headers)
                 return resp.status_code, resp.json()
-            return eru_mcp.RivendellAPI("http://testserver", transport=send)
+            return eru_mcp.DernvaleAPI("http://testserver", transport=send)
 
         def token(scope):
             made = self.client.post("/api/auth/tokens", headers=self.alice, json={"name": "mcp", "scope": scope})
@@ -180,11 +188,11 @@ class EruMcpTest(BackendCase):
         self.assertIn("not a sign-in token", eru_mcp.write_refusal(api(self.alice)))
         self.assertIn("can't check the token", eru_mcp.write_refusal(api({})))
         # On an analyst's own machine there's no token to check
-        self.settings.rivendell_server_mode = False
+        self.settings.dernvale_server_mode = False
         try:
             self.assertIsNone(eru_mcp.write_refusal(api({})))
         finally:
-            self.settings.rivendell_server_mode = True
+            self.settings.dernvale_server_mode = True
 
     def test_the_agent_header_is_sent(self):
         sent = []
@@ -207,8 +215,8 @@ class EruMcpTest(BackendCase):
             return Response()
 
         with mock.patch.object(eru_mcp.urllib.request, "urlopen", urlopen):
-            eru_mcp.RivendellAPI("http://testserver", "t0ken").get("/api/jobs")
-        self.assertEqual(sent[0].get("X-rivendell-agent"), "eru-mcp")
+            eru_mcp.DernvaleAPI("http://testserver", "t0ken").get("/api/jobs")
+        self.assertEqual(sent[0].get("X-dernvale-agent"), "eru-mcp")
         self.assertEqual(sent[0].get("Authorization"), "Bearer t0ken")
 
     def test_reading_a_case(self):
@@ -325,7 +333,7 @@ class EruMcpTest(BackendCase):
         (data / "CASE-MCP-23" / "WS09" / "artefacts" / "cooked").mkdir(parents=True)
         bobs = self.create_job(self.bob, "CASE-MCP-23")
         (self.evidence / "out" / "CASE-MCP-23" / "WS01" / "artefacts" / "cooked").mkdir(parents=True)
-        with mock.patch.object(ai_routes, "RIVENDELL_DATA_DIR", str(data)):
+        with mock.patch.object(ai_routes, "DERNVALE_DATA_DIR", str(data)):
             def hosts(headers):
                 resp = self.client.post("/api/ai/offline/answer", headers=headers,
                                         json={"question_id": "hosts", "case_id": "CASE-MCP-23"})
@@ -360,8 +368,8 @@ class EruMcpTest(BackendCase):
         error, text = self.call(self.alice, "case_overview", job_id="..")
         self.assertTrue(error, text)
 
-    def test_only_rivendells_api(self):
-        api = eru_mcp.RivendellAPI("http://testserver", transport=lambda *a: (200, {}))
+    def test_only_dernvales_api(self):
+        api = eru_mcp.DernvaleAPI("http://testserver", transport=lambda *a: (200, {}))
         for path in ("http://198.51.100.23/api/jobs", "/api/jobs/../../etc", "/healthz", "//198.51.100.23/api/"):
             with self.assertRaises(ValueError, msg=path):
                 api.get(path)

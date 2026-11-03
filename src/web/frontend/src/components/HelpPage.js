@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rivendell.png`;
-const architectureMap = `${process.env.PUBLIC_URL}/architecture/rivendell-architecture.html`;
+const heroImage = `${process.env.PUBLIC_URL}/images/dernvale.png`;
+const architectureMap = `${process.env.PUBLIC_URL}/architecture/dernvale-architecture.html`;
 const architecturePages = [
   { href: `${architectureMap}#realm`, preview: 'realm.jpg', title: 'The realm: Gandalf to Elrond to Eru' },
   { href: `${architectureMap}#elrond`, preview: 'elrond.jpg', title: "Elrond's roads: branching by evidence and OS" },
@@ -11,7 +11,7 @@ const architecturePages = [
     title: "Gandalf's acquisition flow",
   },
   {
-    href: `${process.env.PUBLIC_URL}/architecture/rivendell-journey.html`,
+    href: `${process.env.PUBLIC_URL}/architecture/dernvale-journey.html`,
     preview: 'journey.jpg',
     title: "The evidence's journey (interactive 3D)",
   },
@@ -25,9 +25,9 @@ const HelpPage = () => {
       title: 'Overview',
       content: (
         <>
-          <h3>Rivendell DF Acceleration Suite v2.1.0</h3>
+          <h3>Dernvale DF Acceleration Suite v2.1.0</h3>
           <p>
-            Rivendell is a comprehensive Digital Forensics and Incident Response (DFIR) suite designed to accelerate
+            Dernvale is a comprehensive Digital Forensics and Incident Response (DFIR) suite designed to accelerate
             forensic investigations through automation, AI-powered analysis, and integrated threat intelligence.
           </p><br />
 
@@ -83,16 +83,16 @@ const HelpPage = () => {
         <>
           <h3>Quick Installation</h3>
           <pre className="code-block">
-{`git clone https://github.com/cmdaltr/rivendell.git
-cd rivendell
-./rivendell install              # optional: run 'rivendell' from anywhere
+{`git clone https://github.com/cmdaltr/dernvale.git
+cd dernvale
+./dernvale install              # optional: run 'dernvale' from anywhere
 
 # Docker: OrbStack on macOS (faster, lighter), Docker Desktop or Docker Engine elsewhere
 brew install --cask orbstack     # macOS
-python3 scripts/install-rivendell.py   # other platforms: checks and installs prerequisites
+python3 scripts/install-dernvale.py   # other platforms: checks and installs prerequisites
 
 python3 scripts/image-paths.py   # where your forensic images live
-rivendell start --testing        # the stack without Splunk and Elastic
+dernvale start --testing        # the stack without Splunk and Elastic
 # Web interface: http://localhost:5687 · API: http://localhost:5688`}
           </pre>
 
@@ -102,7 +102,7 @@ rivendell start --testing        # the stack without Splunk and Elastic
           <p><strong>Core Requirements:</strong></p>
           <ul>
             <li>Docker (OrbStack, Docker Desktop or Docker Engine) with 8 GB or more for its VM</li>
-            <li>Python 3.8+ on the host, for the <code>rivendell</code> command and scripts</li>
+            <li>Python 3.8+ on the host, for the <code>dernvale</code> command and scripts</li>
             <li>The forensic tools (Volatility 3, Plaso, Artemis, RegRipper, YARA, The Sleuth Kit) are in the worker image</li>
           </ul>
 
@@ -110,13 +110,13 @@ rivendell start --testing        # the stack without Splunk and Elastic
           <p><strong>Optional:</strong></p>
           <ul>
             <li>Ollama, for Eru's free-text answers (Eru answers fixed questions without it)</li>
-            <li>Splunk or Elasticsearch, for SIEM export (<code>rivendell start</code> without <code>--testing</code>)</li>
+            <li>Splunk or Elasticsearch, for SIEM export (<code>dernvale start</code> without <code>--testing</code>)</li>
           </ul>
 
           <br />
           <h4>Verification</h4>
           <pre className="code-block">
-{`rivendell status`}
+{`dernvale status`}
           </pre>
         </>
       )
@@ -125,34 +125,34 @@ rivendell start --testing        # the stack without Splunk and Elastic
       title: 'Command Line',
       content: (
         <>
-          <h3>The rivendell Command</h3>
+          <h3>The dernvale Command</h3>
           <p>
             One command runs everything: the Docker stack, Gandalf, Elrond, Mordor, Anduril, the lab and every
             script under <code>scripts/</code>. Link it into a directory on your PATH once and it runs from anywhere.
           </p>
           <pre className="code-block">
-{`cd rivendell
-./rivendell install        # links ~/.local/bin/rivendell (or: ./rivendell install /usr/local/bin)
-rivendell help`}
+{`cd dernvale
+./dernvale install        # links ~/.local/bin/dernvale (or: ./dernvale install /usr/local/bin)
+dernvale help`}
           </pre>
 
           <br />
           <h4>Commands</h4>
           <pre className="code-block">
-{`rivendell start | stop | restart | status [--testing] [--logs]
-rivendell gandalf [bash|python] <args>     # collect from a Linux or macOS host
-rivendell acquire <args>                   # Gandalf through the Python CLI
-rivendell analyse <args>                   # Elrond
-rivendell mordor <command>                 # list, download, info, local, verify, ...
-rivendell anduril <command>                # container administration
-rivendell lab <command>                    # the test lab
-rivendell scripts                          # every script under scripts/
-rivendell jobs status                      # or any <group> <name>: siem splunk-restart, docker clean, ...
-rivendell map [realm|elrond|gandalf|journey] # open an architecture page`}
+{`dernvale start | stop | restart | status [--testing] [--logs]
+dernvale gandalf [bash|python] <args>     # collect from a Linux or macOS host
+dernvale acquire <args>                   # Gandalf through the Python CLI
+dernvale analyse <args>                   # Elrond
+dernvale mordor <command>                 # list, download, info, local, verify, ...
+dernvale anduril <command>                # container administration
+dernvale lab <command>                    # the test lab
+dernvale scripts                          # every script under scripts/
+dernvale jobs status                      # or any <group> <name>: siem splunk-restart, docker clean, ...
+dernvale map [realm|elrond|gandalf|journey] # open an architecture page`}
           </pre>
           <p>
             Forensic commands keep the directory you run them from, so relative evidence and output paths work as
-            typed; scripts and the stack run from the repository root. Set <code>RIVENDELL_PYTHON</code> to use a
+            typed; scripts and the stack run from the repository root. Set <code>DERNVALE_PYTHON</code> to use a
             virtualenv. On Windows, run <code>Invoke-Gandalf.ps1</code> from <code>src/acquisition/windows</code>.
           </p>
         </>
@@ -190,7 +190,7 @@ rivendell map [realm|elrond|gandalf|journey] # open an architecture page`}
           <pre className="code-block">
 {`sudo ./src/acquisition/bash/gandalf.sh Password Local -m -o /evidence
 sudo ./src/acquisition/bash/gandalf.sh Key Remote -h 192.168.1.100 -u analyst
-# or, from anywhere: rivendell gandalf Key Local -m`}
+# or, from anywhere: dernvale gandalf Key Local -m`}
           </pre>
 
           <h5>Linux and macOS (Python)</h5>
@@ -347,7 +347,7 @@ sudo python3 python/gandalf.py Password Remote -O /evidence/CASE-001`}
           <ul>
             <li><strong>Iran APT workbook</strong> (XLSX)</li>
             <li><strong>STIX 2.1</strong> bundles (JSON) and <strong>TAXII 2.1</strong> collections</li>
-            <li><strong>MITRESaw</strong>'s procedures CSV, or Rivendell's own CSV</li>
+            <li><strong>MITRESaw</strong>'s procedures CSV, or Dernvale's own CSV</li>
             <li>A <strong>.txt watchlist</strong>, one value per line</li>
           </ul>
 
@@ -402,11 +402,11 @@ sudo python3 python/gandalf.py Password Remote -O /evidence/CASE-001`}
             <li><strong>Cloud:</strong> Cloud platform logs (AWS, Azure, GCP)</li>
           </ul>
 
-          <h4>Integration with Rivendell</h4>
+          <h4>Integration with Dernvale</h4>
           <p>Mordor datasets are automatically cloned during Docker deployment:</p>
           <pre className="code-block">
 {`# Location: /data/mordor
-# Access via: python3 -m rivendell.mordor.loader`}
+# Access via: python3 -m dernvale.mordor.loader`}
           </pre>
 
           <h4>External Access</h4>
@@ -460,29 +460,29 @@ ollama list`}
 
           <h5>Index Case Data</h5>
           <pre className="code-block">
-{`rivendell-ai index CASE-001 /output/CASE-001`}
+{`dernvale-ai index CASE-001 /output/CASE-001`}
           </pre>
 
           <h5>Query Cases</h5>
           <pre className="code-block">
 {`# Ask questions
-rivendell-ai query CASE-001 "What PowerShell commands were executed?"
+dernvale-ai query CASE-001 "What PowerShell commands were executed?"
 
 # Timeline queries
-rivendell-ai query CASE-001 "Show events between 14:00 and 15:00"
+dernvale-ai query CASE-001 "Show events between 14:00 and 15:00"
 
 # IOC queries
-rivendell-ai query CASE-001 "List all suspicious IP addresses"`}
+dernvale-ai query CASE-001 "List all suspicious IP addresses"`}
           </pre>
 
           <h5>Generate Summaries</h5>
           <pre className="code-block">
-{`rivendell-ai summary CASE-001 --format markdown --output report.md`}
+{`dernvale-ai summary CASE-001 --format markdown --output report.md`}
           </pre>
 
           <h5>Web Interface</h5>
           <pre className="code-block">
-{`python3 -m rivendell.ai.web_interface
+{`python3 -m dernvale.ai.web_interface
 # Visit http://localhost:5687/ai/chat/CASE-001`}
           </pre>
 
@@ -503,7 +503,7 @@ rivendell-ai query CASE-001 "List all suspicious IP addresses"`}
         <>
           <h3>Advanced Features</h3>
           <p>
-            Rivendell includes powerful features for threat intelligence mapping, cloud forensics, and SIEM integration.
+            Dernvale includes powerful features for threat intelligence mapping, cloud forensics, and SIEM integration.
           </p>
 
           <h4>MITRE ATT&CK Integration</h4>
@@ -522,13 +522,13 @@ rivendell-ai query CASE-001 "List all suspicious IP addresses"`}
           <h5>MITRE Usage</h5>
           <pre className="code-block">
 {`# Update MITRE Data
-python3 -m rivendell.mitre.updater
+python3 -m dernvale.mitre.updater
 
 # Map Artifacts to Techniques
-python3 -m rivendell.mitre.mapper /path/to/artifacts
+python3 -m dernvale.mitre.mapper /path/to/artifacts
 
 # Generate Dashboard
-python3 -m rivendell.mitre.dashboard -o /output`}
+python3 -m dernvale.mitre.dashboard -o /output`}
           </pre>
 
           <h4>Working a Case Together</h4>
@@ -548,7 +548,7 @@ python3 -m rivendell.mitre.dashboard -o /output`}
           </p>
           <pre className="code-block">
 {`# Audit logs exported from EKS, AKS or GKE
-python3 -m src.analysis.rivendell.cloud.cli k8s analyze-logs --log-file audit.json --output ./analysis`}
+python3 -m src.analysis.dernvale.cloud.cli k8s analyze-logs --log-file audit.json --output ./analysis`}
           </pre>
 
           <h4>Cloud Forensics</h4>
@@ -566,13 +566,13 @@ python3 -m src.analysis.rivendell.cloud.cli k8s analyze-logs --log-file audit.js
           <h5>Cloud Usage Examples</h5>
           <pre className="code-block">
 {`# AWS - Acquire logs
-python3 -m rivendell.cloud.cli aws acquire-logs --days 7 --output ./logs
+python3 -m dernvale.cloud.cli aws acquire-logs --days 7 --output ./logs
 
 # Azure - Acquire disk snapshot
-python3 -m rivendell.cloud.cli azure acquire-disk --instance-id vm-name
+python3 -m dernvale.cloud.cli azure acquire-disk --instance-id vm-name
 
 # GCP - Create snapshot
-python3 -m rivendell.cloud.cli gcp snapshot --instance server-name`}
+python3 -m dernvale.cloud.cli gcp snapshot --instance server-name`}
           </pre>
 
           <h4>SIEM Integration</h4>
@@ -635,33 +635,33 @@ elrond -C \\
           <h4>Step 3: MITRE Mapping</h4>
           <pre className="code-block">
 {`# Map findings to ATT&CK
-python3 -m rivendell.mitre.mapper /cases/CASE-001`}
+python3 -m dernvale.mitre.mapper /cases/CASE-001`}
           </pre>
 
           <h4>Step 4: Index for AI</h4>
           <pre className="code-block">
 {`# Index artifacts for queries
-rivendell-ai index CASE-001 /cases/CASE-001`}
+dernvale-ai index CASE-001 /cases/CASE-001`}
           </pre>
 
           <h4>Step 5: Investigate</h4>
           <pre className="code-block">
 {`# Query with AI
-rivendell-ai query CASE-001 "What were the initial access vectors?"
-rivendell-ai query CASE-001 "Show persistence mechanisms"
-rivendell-ai query CASE-001 "List lateral movement activity"`}
+dernvale-ai query CASE-001 "What were the initial access vectors?"
+dernvale-ai query CASE-001 "Show persistence mechanisms"
+dernvale-ai query CASE-001 "List lateral movement activity"`}
           </pre>
 
           <h4>Step 6: Generate Report</h4>
           <pre className="code-block">
 {`# Create summary report
-rivendell-ai summary CASE-001 --format markdown --output report.md`}
+dernvale-ai summary CASE-001 --format markdown --output report.md`}
           </pre>
 
           <h4>Step 7: Export to SIEM</h4>
           <pre className="code-block">
 {`# Export to Splunk
-python3 -m rivendell.siem.splunk_exporter \\
+python3 -m dernvale.siem.splunk_exporter \\
   --case-id CASE-001 \\
   --data-dir /cases/CASE-001 \\
   --hec-url https://splunk:8088 \\
@@ -720,10 +720,10 @@ curl http://localhost:11434/api/tags
 ollama serve
 
 # Check vector database
-rivendell-ai info CASE-001
+dernvale-ai info CASE-001
 
 # Re-index if needed
-rivendell-ai reindex CASE-001`}
+dernvale-ai reindex CASE-001`}
           </pre>
 
           <h4>SIEM Export Failures</h4>
@@ -732,7 +732,7 @@ rivendell-ai reindex CASE-001`}
 curl -k https://splunk:8088/services/collector/health
 
 # Verify HEC token
-python3 -m rivendell.siem.splunk_test --hec-token YOUR_TOKEN
+python3 -m dernvale.siem.splunk_test --hec-token YOUR_TOKEN
 
 # Check firewall rules
 telnet splunk 8088`}
@@ -744,7 +744,7 @@ telnet splunk 8088`}
 docker-compose ps
 
 # View logs
-docker-compose logs rivendell
+docker-compose logs dernvale
 
 # Rebuild containers
 docker-compose build --no-cache
@@ -757,8 +757,8 @@ docker-compose up -d`}
 elrond -C -c CASE-001 -s /evidence --veryverbose
 
 # Enable debug logs
-export RIVENDELL_DEBUG=1
-python3 -m rivendell.analysis.engine`}
+export DERNVALE_DEBUG=1
+python3 -m dernvale.analysis.engine`}
           </pre>
 
           <h4>Getting Help</h4>
@@ -766,7 +766,7 @@ python3 -m rivendell.analysis.engine`}
             <li>
               <strong>GitHub Issues:</strong>{' '}
               <a
-                href="https://github.com/cmdaltr/rivendell/issues"
+                href="https://github.com/cmdaltr/dernvale/issues"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ color: '#a7db6c' }}
@@ -797,7 +797,7 @@ python3 -m rivendell.analysis.engine`}
       <section className="hero-section">
         <img
           src={heroImage}
-          alt="Rivendell - The Last Homely House"
+          alt="Dernvale"
           className="hero-image"
           style={{
             transform: 'scale(0.2)',
@@ -809,7 +809,7 @@ python3 -m rivendell.analysis.engine`}
       <header>
         <h2>Help & Documentation</h2>
         <p>
-          Comprehensive guide to using the Rivendell DF Acceleration Suite.
+          Comprehensive guide to using the Dernvale DF Acceleration Suite.
         </p>
       </header>
 
@@ -870,12 +870,12 @@ python3 -m rivendell.analysis.engine`}
             <li>
               <strong>Project Repository:</strong>{' '}
               <a
-                href="https://github.com/cmdaltr/rivendell"
+                href="https://github.com/cmdaltr/dernvale"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ color: '#a7db6c' }}
               >
-                https://github.com/cmdaltr/rivendell
+                https://github.com/cmdaltr/dernvale
               </a>
             </li>
             <li>

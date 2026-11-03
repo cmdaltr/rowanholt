@@ -1,8 +1,8 @@
-# Rivendell Test Runner - Summary
+# Dernvale Test Runner - Summary
 
 ## Overview
 
-Comprehensive test automation system for Rivendell forensic analysis with automatic Docker management and resource optimization.
+Comprehensive test automation system for Dernvale forensic analysis with automatic Docker management and resource optimization.
 
 ## Key Features
 
@@ -151,9 +151,9 @@ cd tests/scripts/batch
 ## Test Output Locations
 
 ### Platform-Specific
-- **macOS:** `/Volumes/[Drive]/rivendell_imgs/tests/`
-- **Linux:** `/mnt/[mount]/rivendell_imgs/tests/` or `/media/[user]/[drive]/rivendell_imgs/tests/`
-- **Windows:** `[Drive]:/rivendell_imgs/tests/`
+- **macOS:** `/Volumes/[Drive]/dernvale_imgs/tests/`
+- **Linux:** `/mnt/[mount]/dernvale_imgs/tests/` or `/media/[user]/[drive]/dernvale_imgs/tests/`
+- **Windows:** `[Drive]:/dernvale_imgs/tests/`
 
 ### Structure
 ```
@@ -186,7 +186,7 @@ tests/
 | Test one | `./run_single_test.sh win_brisk` | ~10 min |
 | Quick batch | `./batch1a-archive-lnk.sh` | ~65 min |
 | All tests | `./RUN_ALL_TESTS.sh` | ~9-10 hrs |
-| Check results | `ls -lh /Volumes/*/rivendell_imgs/tests/` | - |
+| Check results | `ls -lh /Volumes/*/dernvale_imgs/tests/` | - |
 | View logs | `ls -lt tests/logs/*.log \| head -5` | - |
 
 ## Documentation Files

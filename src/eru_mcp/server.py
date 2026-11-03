@@ -2,13 +2,13 @@
 Eru's MCP server: reading a case and, when it's started with --allow-writes, flagging leads and adding notes.
 
 Every Eru capability an MCP host can use is registered here, and nowhere else. The server is a
-thin client of Rivendell's API, not a second way into the case files:
+thin client of Dernvale's API, not a second way into the case files:
 
-- every call carries the analyst's token (RIVENDELL_TOKEN), so on a team server job sharing
+- every call carries the analyst's token (DERNVALE_TOKEN), so on a team server job sharing
   (auth/access.py) decides what it can see, exactly as for the web app;
 - what it reads comes through the case browser's routes, which are read-only over cooked/,
   analysis/ and the case root and never reach raw/;
-- it calls nothing but the Rivendell API at RIVENDELL_API (RivendellAPI refuses any other URL),
+- it calls nothing but the Dernvale API at DERNVALE_API (DernvaleAPI refuses any other URL),
   so it adds no outbound access.
 
 Never exposed: starting, restarting or deleting jobs, Gandalf acquisition, importing or deleting
@@ -19,7 +19,7 @@ exist, and nothing else that writes: a lead is never a confirmed finding (the ba
 other status), every write is recorded as "Eru (for <user>)" (AGENT_HEADER), and a session stops after
 --max-writes writes, so a host misled by text inside the case can't flood it.
 
-Runs over stdio: `rivendell mcp`, or `python3 -m eru_mcp.server` with src/ on the path. Needs
+Runs over stdio: `dernvale mcp`, or `python3 -m eru_mcp.server` with src/ on the path. Needs
 Python 3.10+ and requirements/mcp.txt. Nothing but the protocol may go to stdout.
 """
 
@@ -43,10 +43,10 @@ DEFAULT_API = "http://127.0.0.1:5688"
 CASE_HOST = "(case)"  # case_files.CASE_HOST: the case's own files, such as stacking.csv
 READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 WRITES = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
-AGENT_HEADER = ("X-Rivendell-Agent", "eru-mcp")  # case_routes.AGENT_HEADER, ERU_MCP
+AGENT_HEADER = ("X-Dernvale-Agent", "eru-mcp")  # case_routes.AGENT_HEADER, ERU_MCP
 MAX_WRITES = 25
 ERU_TOKEN_SCOPE = "eru-mcp"  # auth/tokens.py in the backend
-INSTRUCTIONS = """Eru works one Rivendell case at a time, read-only.
+INSTRUCTIONS = """Eru works one Dernvale case at a time, read-only.
 Start from a job id: list_cases, then case_overview to see the hosts and their files.
 Cite file and row for every claim (read_rows gives each row's reference); don't state what no row shows.
 A stacking row (rare_across_hosts) or a threat intelligence match (check_indicator) is a lead, not a verdict.
@@ -63,20 +63,20 @@ Transport = Callable[[str, str, Dict[str, Any], Optional[dict]], Tuple[int, Any]
 
 
 class ApiError(ToolError):
-    """Rivendell answered with an error (or couldn't be reached). A ToolError, so the host sees why."""
+    """Dernvale answered with an error (or couldn't be reached). A ToolError, so the host sees why."""
 
     def __init__(self, status: int, detail: str):
-        super().__init__(f"Rivendell answered {status}: {detail}" if status else detail)
+        super().__init__(f"Dernvale answered {status}: {detail}" if status else detail)
         self.status = status
         self.detail = detail
 
 
-class NotRivendell(ToolError, ValueError):
-    """A request for anything but an /api path on the configured Rivendell."""
+class NotDernvale(ToolError, ValueError):
+    """A request for anything but an /api path on the configured Dernvale."""
 
 
-class RivendellAPI:
-    """Rivendell's API, and nothing else: paths must be under /api/ on the configured base URL."""
+class DernvaleAPI:
+    """Dernvale's API, and nothing else: paths must be under /api/ on the configured base URL."""
 
     def __init__(self, base_url: str = DEFAULT_API, token: str = "", transport: Optional[Transport] = None):
         self.base_url = base_url.rstrip("/")
@@ -104,11 +104,11 @@ class RivendellAPI:
         except urllib.error.HTTPError as exc:
             return exc.code, _decode(exc.read(), exc.headers.get("Content-Type", ""))
         except urllib.error.URLError as exc:
-            raise ApiError(0, f"Rivendell isn't reachable at {self.base_url} ({exc.reason}). Is it running?")
+            raise ApiError(0, f"Dernvale isn't reachable at {self.base_url} ({exc.reason}). Is it running?")
 
     def call(self, method: str, path: str, params: Optional[Dict[str, Any]] = None, body: Optional[dict] = None) -> Any:
         if not path.startswith("/api/") or "://" in path or ".." in path.split("?")[0].split("/"):
-            raise NotRivendell(f"Not a Rivendell API path: {path!r}")
+            raise NotDernvale(f"Not a Dernvale API path: {path!r}")
         status, payload = self.transport(method, path, {k: v for k, v in (params or {}).items() if v not in (None, "")}, body)
         if status >= 400:
             detail = payload.get("detail", payload) if isinstance(payload, dict) else payload
@@ -136,9 +136,9 @@ def _decode(raw: bytes, content_type: str) -> Any:
 JOB_FIELDS = ("id", "case_number", "status", "progress", "owner", "created_at", "completed_at", "error")
 
 
-def build_server(api: RivendellAPI, writes: bool = False, max_writes: int = MAX_WRITES) -> MCPServer:
-    """The MCP server, its tools bound to one Rivendell API client; flag_lead and add_note only with writes."""
-    server = MCPServer("rivendell-eru", title="Eru (Rivendell)",
+def build_server(api: DernvaleAPI, writes: bool = False, max_writes: int = MAX_WRITES) -> MCPServer:
+    """The MCP server, its tools bound to one Dernvale API client; flag_lead and add_note only with writes."""
+    server = MCPServer("dernvale-eru", title="Eru (Dernvale)",
                        instructions=INSTRUCTIONS + (WRITE_INSTRUCTIONS if writes else ""))
 
     def job(job_id: str) -> Dict[str, Any]:
@@ -157,7 +157,7 @@ def build_server(api: RivendellAPI, writes: bool = False, max_writes: int = MAX_
 
     @server.tool(annotations=READ_ONLY)
     def list_cases() -> List[Dict[str, Any]]:
-        """The Rivendell jobs (cases) you can see, newest first: id, case number, status, owner and dates.
+        """The Dernvale jobs (cases) you can see, newest first: id, case number, status, owner and dates.
         Every other tool takes one of these ids."""
         listing = api.get(api.path("jobs"))
         return [{k: j.get(k) for k in JOB_FIELDS} for j in listing.get("jobs", [])]
@@ -234,7 +234,7 @@ def build_server(api: RivendellAPI, writes: bool = False, max_writes: int = MAX_
 
     @server.tool(annotations=READ_ONLY)
     def check_indicator(value: str) -> Dict[str, Any]:
-        """What Rivendell's imported threat intelligence says about one value: a process name, command line,
+        """What Dernvale's imported threat intelligence says about one value: a process name, command line,
         path, IP, domain or hash. A match is a lead, not attribution."""
         return api.get(api.path("threat-intel", "enrich"), value=value)
 
@@ -300,7 +300,7 @@ def build_server(api: RivendellAPI, writes: bool = False, max_writes: int = MAX_
     return server
 
 
-def write_refusal(api: RivendellAPI) -> Optional[str]:
+def write_refusal(api: DernvaleAPI) -> Optional[str]:
     """Why --allow-writes won't start with this token, or None. On a team server the token must be an
     eru-mcp one (auth/tokens.py), so the backend itself holds Eru to reads, leads and notes rather than
     this server's code alone; on an analyst's own machine there is no token to check."""
@@ -317,20 +317,20 @@ def write_refusal(api: RivendellAPI) -> Optional[str]:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    cli = argparse.ArgumentParser(prog="rivendell mcp", description="Eru's MCP server (stdio) over a Rivendell.")
-    cli.add_argument("--api", default=os.environ.get("RIVENDELL_API", DEFAULT_API),
-                     help=f"Rivendell's API (RIVENDELL_API, default {DEFAULT_API})")
+    cli = argparse.ArgumentParser(prog="dernvale mcp", description="Eru's MCP server (stdio) over a Dernvale.")
+    cli.add_argument("--api", default=os.environ.get("DERNVALE_API", DEFAULT_API),
+                     help=f"Dernvale's API (DERNVALE_API, default {DEFAULT_API})")
     cli.add_argument("--allow-writes", action="store_true",
                      help="add flag_lead and add_note (leads and notes, recorded as Eru's); read-only without it")
     cli.add_argument("--max-writes", type=int, default=MAX_WRITES,
                      help=f"writes allowed in one session with --allow-writes (default {MAX_WRITES})")
     options = cli.parse_args(argv)
     # The token comes from the environment only: an argument would show in the process list
-    token = os.environ.get("RIVENDELL_TOKEN", "")
+    token = os.environ.get("DERNVALE_TOKEN", "")
     logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="eru-mcp: %(message)s")
     mode = f"leads and notes allowed, up to {options.max_writes}" if options.allow_writes else "read-only"
-    logger.info(f"Serving Rivendell at {options.api} over stdio ({'with' if token else 'without'} a token; {mode})")
-    api = RivendellAPI(options.api, token)
+    logger.info(f"Serving Dernvale at {options.api} over stdio ({'with' if token else 'without'} a token; {mode})")
+    api = DernvaleAPI(options.api, token)
     if options.allow_writes:
         refusal = write_refusal(api)
         if refusal:

@@ -2,7 +2,7 @@
 
 How long each Elrond option takes, measured from the E2E test matrix. Use it to size a job before you start it: the right option set on a 12 GB E01 takes 15 minutes, the wrong one takes 10 hours.
 
-Numbers come from `rivendell_audit.log` in each test's output directory. Each audit entry is written when a piece of work finishes, so a stage is charged the time since the previous entry and stage times add up to the job's total. Regenerate the tables with:
+Numbers come from `dernvale_audit.log` in each test's output directory. Each audit entry is written when a piece of work finishes, so a stage is charged the time since the previous entry and stage times add up to the job's total. Regenerate the tables with:
 
 ```bash
 python tests/scripts/test_timings.py --output-root <test output dir> \
@@ -107,7 +107,7 @@ The Linux image is nearly twice the size of the Windows E01 yet processes in abo
 
 ## Carving (`collect_files_all`, `collect_files_unalloc`)
 
-Carving is by far the most expensive option. It runs foremost over the whole image and then logs each carved file. That loop slept 0.5 s per file at the time of these runs (`src/analysis/rivendell/collect/files/carve.py`), so the total is roughly:
+Carving is by far the most expensive option. It runs foremost over the whole image and then logs each carved file. That loop slept 0.5 s per file at the time of these runs (`src/analysis/dernvale/collect/files/carve.py`), so the total is roughly:
 
 ```
 carving time ≈ foremost time + carved files × sleep

@@ -19,12 +19,12 @@
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-postgres"],
       "env": {
-        "DATABASE_URL": "${RIVENDELL_DB_RO_URL}"
+        "DATABASE_URL": "${DERNVALE_DB_RO_URL}"
       }
     }
   }
 }
 
-// RIVENDELL_DB_RO_URL — read-only Postgres user only.
+// DERNVALE_DB_RO_URL — read-only Postgres user only.
 // SQLite (default) does not need MCP; enable Postgres MCP only on production deployments.
 // evidence/ directory is write-denied in settings.json — do not add filesystem MCP write access to it.

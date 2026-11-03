@@ -59,7 +59,7 @@ def test_a_missing_engine_is_reported_with_its_install_command(monkeypatch):
 def test_parse_docker_ps_skips_snapshot_images():
     out = "\n".join([
         json.dumps({"Names": "win11", "Image": "ubuntu:24.04", "State": "running", "Status": "Up 2m"}),
-        json.dumps({"Names": "old", "Image": "rivendell-snap/win11:clean", "State": "exited", "Status": "x"}),
+        json.dumps({"Names": "old", "Image": "dernvale-snap/win11:clean", "State": "exited", "Status": "x"}),
         json.dumps({"Names": "box", "Image": "ubuntu:24.04", "State": "exited", "Status": "Exited (0)"}),
     ])
     rows = engines.parse_docker_ps(out)
@@ -104,10 +104,10 @@ def test_docker_snapshot_and_revert_use_the_committed_image(monkeypatch):
     monkeypatch.setattr("src.mordor.lab.engines.run_ok", lambda argv, **k: True)
     d = engines.Docker()
     d.snapshot("box", "clean")
-    assert ["docker", "commit", "box", "rivendell-snap/box:clean"] in calls
+    assert ["docker", "commit", "box", "dernvale-snap/box:clean"] in calls
     d.revert("box", "clean")
     assert ["docker", "rm", "-f", "box"] in calls
-    assert any(c[:3] == ["docker", "run", "-d"] and "rivendell-snap/box:clean" in c for c in calls)
+    assert any(c[:3] == ["docker", "run", "-d"] and "dernvale-snap/box:clean" in c for c in calls)
 
 
 def test_tart_start_spawns_and_snapshot_clones(monkeypatch):
@@ -191,7 +191,7 @@ def test_record_dry_run_runs_nothing(monkeypatch):
     assert any("Dry run" in l for l in lines)
 
 
-def test_listing_shows_only_machines_rivendell_knows(monkeypatch, tmp_path):
+def test_listing_shows_only_machines_dernvale_knows(monkeypatch, tmp_path):
     # Two VMs on the host; only one is in the registry — the other is left out
     monkeypatch.setattr("src.mordor.lab.registry._PATH", str(tmp_path / "machines.json"))
     monkeypatch.setattr(engines.Docker, "list", lambda self: [])
@@ -208,16 +208,16 @@ def test_listing_shows_only_machines_rivendell_knows(monkeypatch, tmp_path):
 
 
 def test_listing_leaves_out_hidden_machines(monkeypatch, tmp_path):
-    # Every UTM VM is listed (Rivendell drives any of them) unless lab.conf hides it
+    # Every UTM VM is listed (Dernvale drives any of them) unless lab.conf hides it
     monkeypatch.setattr("src.mordor.lab.registry._PATH", str(tmp_path / "machines.json"))
     monkeypatch.setattr(engines.UTM, "list", lambda self: [
         {"engine": "utm", "name": "archer-win11", "kind": "vm", "image": "", "os": "", "state": "stopped", "detail": ""},
-        {"engine": "utm", "name": "rivendell-lab-win11", "kind": "vm", "image": "", "os": "", "state": "stopped", "detail": ""},
+        {"engine": "utm", "name": "dernvale-lab-win11", "kind": "vm", "image": "", "os": "", "state": "stopped", "detail": ""},
     ])
     monkeypatch.setattr(machines, "HIDDEN", {"archer-win11"})
-    assert [m["name"] for m in machines.listing(["utm"])] == ["rivendell-lab-win11"]
+    assert [m["name"] for m in machines.listing(["utm"])] == ["dernvale-lab-win11"]
     monkeypatch.setattr(machines, "HIDDEN", set())
-    assert [m["name"] for m in machines.listing(["utm"])] == ["archer-win11", "rivendell-lab-win11"]
+    assert [m["name"] for m in machines.listing(["utm"])] == ["archer-win11", "dernvale-lab-win11"]
 
 def test_all_host_names_includes_vms_outside_archer(monkeypatch):
     # For clash-free naming: every name on the host, Archer's and not
@@ -314,7 +314,7 @@ def test_utm_vms_are_managed_and_adopt_sets_their_os(monkeypatch, tmp_path):
     assert rows and rows[0]["known"] is True and rows[0]["os"] == "" and rows[0]["deletable"] is False
     machines.adopt("utm", "archer-win11", "windows")
     rows = machines.listing(["utm"])
-    # Setting the OS lets it be set up and recorded on; it's still not Rivendell's to delete
+    # Setting the OS lets it be set up and recorded on; it's still not Dernvale's to delete
     assert rows[0]["os"] == "windows" and rows[0]["deletable"] is False
 
 
@@ -329,48 +329,48 @@ def test_utm_engine_is_detected_on_macos(monkeypatch):
     assert e["blurb"] and "brew install --cask utm" not in e["install"]  # installed, so no install cmd
 
 
-# --- Rivendell: the lab's own machines, and what may be deleted ---
+# --- Dernvale: the lab's own machines, and what may be deleted ---
 
 def test_the_labs_own_machines_are_listed_with_their_os(monkeypatch, tmp_path):
     monkeypatch.setattr("src.mordor.lab.registry._PATH", str(tmp_path / "m.json"))
-    monkeypatch.setattr(machines, "LAB_WINDOWS_VM", "rivendell-lab-win11")
+    monkeypatch.setattr(machines, "LAB_WINDOWS_VM", "dernvale-lab-win11")
     monkeypatch.setattr(engines.Docker, "list", lambda self: [
         {"engine": "docker", "name": "lab-ubuntu", "kind": "container", "image": "", "os": "linux", "state": "running", "detail": ""}])
     monkeypatch.setattr(engines.Tart, "list", lambda self: [
-        {"engine": "tart", "name": "rivendell-lab-macos", "kind": "vm", "image": "", "os": "", "state": "stopped", "detail": ""}])
+        {"engine": "tart", "name": "dernvale-lab-macos", "kind": "vm", "image": "", "os": "", "state": "stopped", "detail": ""}])
     monkeypatch.setattr(engines.UTM, "list", lambda self: [
-        {"engine": "utm", "name": "rivendell-lab-win11", "uuid": "u", "kind": "vm", "image": "", "os": "", "state": "stopped", "detail": ""}])
+        {"engine": "utm", "name": "dernvale-lab-win11", "uuid": "u", "kind": "vm", "image": "", "os": "", "state": "stopped", "detail": ""}])
     rows = {m["name"]: m for m in machines.listing()}
     assert {n: (m["os"], m["lab"], m["deletable"]) for n, m in rows.items()} == {
-        "lab-ubuntu": ("linux", True, False), "rivendell-lab-macos": ("macos", True, False),
-        "rivendell-lab-win11": ("windows", True, False)}
-    assert machines.is_lab_windows("utm", "rivendell-lab-win11")
+        "lab-ubuntu": ("linux", True, False), "dernvale-lab-macos": ("macos", True, False),
+        "dernvale-lab-win11": ("windows", True, False)}
+    assert machines.is_lab_windows("utm", "dernvale-lab-win11")
 
 
-def test_delete_refuses_the_labs_machines_and_ones_rivendell_didnt_make(monkeypatch, tmp_path):
+def test_delete_refuses_the_labs_machines_and_ones_dernvale_didnt_make(monkeypatch, tmp_path):
     monkeypatch.setattr("src.mordor.lab.registry._PATH", str(tmp_path / "m.json"))
     deleted = []
     monkeypatch.setattr(engines.UTM, "delete", lambda self, name: deleted.append(name))
     monkeypatch.setattr(engines.Docker, "delete", lambda self, name: deleted.append(name))
     import src.mordor.lab.registry as reg
     reg.record("utm", "archer-win11", "utm-vm", "windows", "")  # Set OS on someone else's VM
-    for engine, name in (("utm", "archer-win11"), ("utm", "rivendell-lab-win11"), ("docker", "lab-ubuntu"), ("utm", "unknown")):
+    for engine, name in (("utm", "archer-win11"), ("utm", "dernvale-lab-win11"), ("docker", "lab-ubuntu"), ("utm", "unknown")):
         with pytest.raises(LabError):
             machines.delete(engine, name)
-    reg.record("docker", "rivendell-ubuntu-1", "ubuntu-container", "linux", "ubuntu:24.04", created=True)
-    machines.delete("docker", "rivendell-ubuntu-1")
-    assert deleted == ["rivendell-ubuntu-1"] and reg.get("docker", "rivendell-ubuntu-1") is None
+    reg.record("docker", "dernvale-ubuntu-1", "ubuntu-container", "linux", "ubuntu:24.04", created=True)
+    machines.delete("docker", "dernvale-ubuntu-1")
+    assert deleted == ["dernvale-ubuntu-1"] and reg.get("docker", "dernvale-ubuntu-1") is None
 
 
-def test_docker_lists_rivendells_and_the_labs_containers_once(monkeypatch):
+def test_docker_lists_dernvales_and_the_labs_containers_once(monkeypatch):
     rows = {
-        "label=rivendell.mordor=1": [{"Names": "rivendell-ubuntu-1", "Image": "ubuntu:24.04", "State": "running"}],
-        "label=com.docker.compose.project=rivendell-lab": [{"Names": "lab-ubuntu", "Image": "x", "State": "running"},
-                                                          {"Names": "rivendell-ubuntu-1", "Image": "ubuntu:24.04", "State": "running"}],
+        "label=dernvale.mordor=1": [{"Names": "dernvale-ubuntu-1", "Image": "ubuntu:24.04", "State": "running"}],
+        "label=com.docker.compose.project=dernvale-lab": [{"Names": "lab-ubuntu", "Image": "x", "State": "running"},
+                                                          {"Names": "dernvale-ubuntu-1", "Image": "ubuntu:24.04", "State": "running"}],
     }
     monkeypatch.setattr("src.mordor.lab.engines.run",
                         lambda argv, **k: "\n".join(json.dumps(r) for r in rows[argv[argv.index("--filter") + 1]]))
-    assert [m["name"] for m in engines.Docker().list()] == ["rivendell-ubuntu-1", "lab-ubuntu"]
+    assert [m["name"] for m in engines.Docker().list()] == ["dernvale-ubuntu-1", "lab-ubuntu"]
 
 
 def test_record_runs_the_script_with_command_not_file(monkeypatch, tmp_path):

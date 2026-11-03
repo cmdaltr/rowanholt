@@ -3,7 +3,7 @@ What this machine is, and which engines it can drive.
 
 OS and CPU architecture decide which templates are offered and which image a template uses
 (templates). An engine that isn't installed is reported with the command to
-install it — Rivendell detects and guides, it doesn't install hypervisors itself.
+install it — Dernvale detects and guides, it doesn't install hypervisors itself.
 """
 
 import platform
@@ -51,11 +51,11 @@ ENGINES = {
         "runs": "Windows, Linux and more via QEMU",
         "blurb": "QEMU VMs on macOS, including Windows 11 on ARM. The lab builds its Windows VM "
                  "from Microsoft's ISO (./lab.sh windows-vm create), or you build one in UTM; "
-                 "Rivendell then starts, snapshots, provisions and records it.",
+                 "Dernvale then starts, snapshots, provisions and records it.",
         "probe": ["utmctl", "version"],
         "install": {"macos": "brew install --cask utm"},
         "requires": {"os": "macos"},
-        "note": "The first time Rivendell drives utmctl, macOS asks you to allow Automation access "
+        "note": "The first time Dernvale drives utmctl, macOS asks you to allow Automation access "
                 "to UTM — grant it (System Settings → Privacy & Security → Automation), and open "
                 "the UTM app once.",
     },

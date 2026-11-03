@@ -8,10 +8,10 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from rivendell.analysis.iocs import extract_line_iocs  # noqa: E402
-from rivendell.process.extractions.artemis import eventlog_techniques  # noqa: E402
-from rivendell.process.extractions.registry.profile import last_write_moved  # noqa: E402
-from rivendell.process.extractions.registry.system import cleaned, run_key_records  # noqa: E402
+from dernvale.analysis.iocs import extract_line_iocs  # noqa: E402
+from dernvale.process.extractions.artemis import eventlog_techniques  # noqa: E402
+from dernvale.process.extractions.registry.profile import last_write_moved  # noqa: E402
+from dernvale.process.extractions.registry.system import cleaned, run_key_records  # noqa: E402
 
 
 class IocExtractionTest(unittest.TestCase):
@@ -121,8 +121,8 @@ class RunKeyRecordsTest(unittest.TestCase):
         import os
         import tempfile
         from unittest import mock
-        from rivendell.process.extractions.registry.profile import extract_registry_profile
-        from rivendell.process.extractions.registry.system import extract_registry_system
+        from dernvale.process.extractions.registry.profile import extract_registry_profile
+        from dernvale.process.extractions.registry.system import extract_registry_system
         rip = ("Launching run v.20200511\n----------------------------------------\n"
                "run v.20200511\n(Software, NTUSER.DAT) [Autostart] Get autostart key contents from Software hive\n\n"
                "Microsoft\\Windows\\CurrentVersion\\Run\nLastWrite Time 2026-10-25 20:56:20Z\n"

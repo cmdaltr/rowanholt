@@ -1,5 +1,5 @@
 """
-Common utilities for Rivendell DF Acceleration Suite
+Common utilities for Dernvale DF Acceleration Suite
 
 Provides unified implementations of frequently-used operations across
 acquisition and analysis modules.

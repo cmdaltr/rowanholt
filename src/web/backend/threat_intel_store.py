@@ -1,10 +1,10 @@
 """Threat intelligence indicators in Postgres (threat_intel_indicators), for the API and the worker.
 
-Parsing and matching live with Elrond, in rivendell/threat_intel/: the backend mounts that
+Parsing and matching live with Elrond, in dernvale/threat_intel/: the backend mounts that
 package (docker-compose.yml) and finds it through elrond_src(), as Mordor's routes find
 src/mordor. The worker image has it already, at /opt/elrond-src.
 
-Each indicator's expiry is in threat_intel_validity beside it (rivendell/threat_intel/validity.py):
+Each indicator's expiry is in threat_intel_validity beside it (dernvale/threat_intel/validity.py):
 expired indicators stay listed, marked, but are left out of what Elrond matches (export_csv) and
 what Eru and /enrich check (indicators()), until a refreshed import or an admin brings them back.
 """
@@ -24,7 +24,7 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-ELROND_SRC = os.environ.get("RIVENDELL_ELROND_SRC", "/opt/elrond-src")
+ELROND_SRC = os.environ.get("DERNVALE_ELROND_SRC", "/opt/elrond-src")
 FIELDS = ("evidential_element", "threat_group", "procedure_example", "technique_id", "technique_name", "tactic",
           "contextual_evidence", "reference_url", "navigation_layer_url", "source_type")
 INSERT_BATCH = 2000
@@ -32,25 +32,25 @@ Validity = ThreatIntelValidityModel
 
 
 class ThreatIntelUnavailable(RuntimeError):
-    """rivendell/threat_intel isn't importable here."""
+    """dernvale/threat_intel isn't importable here."""
 
 
 def threat_intel():
-    """The rivendell.threat_intel package, from Elrond's source tree."""
+    """The dernvale.threat_intel package, from Elrond's source tree."""
     if ELROND_SRC not in sys.path:
         sys.path.append(ELROND_SRC)  # appended: /app's modules keep priority
     try:
-        import rivendell.threat_intel as package
-        import rivendell.threat_intel.match  # noqa: F401 (the worker's export uses the package as a whole)
+        import dernvale.threat_intel as package
+        import dernvale.threat_intel.match  # noqa: F401 (the worker's export uses the package as a whole)
     except ImportError as exc:
-        raise ThreatIntelUnavailable(f"rivendell/threat_intel not found under {ELROND_SRC}: {exc}") from exc
+        raise ThreatIntelUnavailable(f"dernvale/threat_intel not found under {ELROND_SRC}: {exc}") from exc
     return package
 
 
 def validity_module():
-    """rivendell.threat_intel.validity, from Elrond's source tree."""
+    """dernvale.threat_intel.validity, from Elrond's source tree."""
     threat_intel()
-    import rivendell.threat_intel.validity as module
+    import dernvale.threat_intel.validity as module
     return module
 
 
@@ -194,7 +194,7 @@ class ThreatIntelStore:
         return removed
 
     def indicators(self, include_expired: bool = False, now: Optional[datetime] = None) -> List:
-        """The stored indicators that haven't expired (or every one), as rivendell.threat_intel Indicators."""
+        """The stored indicators that haven't expired (or every one), as dernvale.threat_intel Indicators."""
         Indicator = threat_intel().Indicator
         now = now or validity_module().utcnow()
         with self.Session() as session:
@@ -206,7 +206,7 @@ class ThreatIntelStore:
 
     def export_csv(self, path: str) -> int:
         """Every indicator that hasn't expired, as the CSV Elrond's --threatIntel reads."""
-        from rivendell.threat_intel.schema import write_csv  # threat_intel() put it on the path
+        from dernvale.threat_intel.schema import write_csv  # threat_intel() put it on the path
         return write_csv(path, self.indicators())
 
 

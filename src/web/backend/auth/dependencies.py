@@ -106,7 +106,7 @@ async def get_user_or_guest(
     # Return a guest user (not saved to database)
     return User(
         id="guest",
-        email="guest@rivendell.app",
+        email="guest@dernvale.app",
         username="guest",
         hashed_password="",
         role=UserRole.GUEST,

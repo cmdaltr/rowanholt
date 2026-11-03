@@ -1,7 +1,7 @@
 {
   "case_number": "TEST_gandalf_basic",
   "source_paths": [],
-  "destination_path": "/Volumes/Media5TB/rivendell_imgs/tests/gandalf_basic",
+  "destination_path": "/Volumes/Media5TB/dernvale_imgs/tests/gandalf_basic",
   "options": {
     "local": false,
     "gandalf": true,

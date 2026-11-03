@@ -9,7 +9,7 @@ from typing import Optional, List, Dict, Any
 
 from .models import MordorDataset, DatasetStatus, DatasetVerifyResult
 
-DEFAULT_STORAGE_DIR = "/tmp/rivendell/mordor"
+DEFAULT_STORAGE_DIR = "/tmp/dernvale/mordor"
 
 
 class MordorStorage:

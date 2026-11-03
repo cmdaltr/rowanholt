@@ -1,4 +1,4 @@
-# Rivendell Usage Guide
+# Dernvale Usage Guide
 
 **Version:** 2.1.0
 **Quick Reference for Common Tasks**
@@ -21,7 +21,7 @@
 Open your browser to: **http://localhost:5687**
 
 **Default Login:**
-- **Email**: admin@rivendell.app
+- **Email**: admin@dernvale.app
 - **Password**: IWasThere3000YearsAgo!
 
 ⚠️ **Change this password immediately in production!**
@@ -260,9 +260,9 @@ curl -X DELETE http://localhost:5688/api/jobs/{job_id} \
 - Select files by clicking checkboxes
 
 **Allowed Directories** (`allowed_paths` in `src/web/backend/config.py`, chosen by the OS the backend runs on):
-- Docker / Linux: `/Volumes`, `/mnt`, `/media`, `/tmp/rivendell`, `/host/tmp/rivendell`
-- macOS native: `/Volumes`, `/tmp/rivendell`
-- Windows: `C:\Temp\rivendell` (and `D:`–`F:`)
+- Docker / Linux: `/Volumes`, `/mnt`, `/media`, `/tmp/dernvale`, `/host/tmp/dernvale`
+- macOS native: `/Volumes`, `/tmp/dernvale`
+- Windows: `C:\Temp\dernvale` (and `D:`–`F:`)
 
 ### Supported Image Formats
 
@@ -283,13 +283,13 @@ curl -X DELETE http://localhost:5688/api/jobs/{job_id} \
 
 ### Access Output Files
 
-Output goes to the job's `destination_path`. Under Docker on macOS, use a path on `/Volumes` (both containers mount it) and the files appear directly on the host. Output under `/host/tmp/rivendell` in the backend maps to `/tmp/elrond/output` in the worker.
+Output goes to the job's `destination_path`. Under Docker on macOS, use a path on `/Volumes` (both containers mount it) and the files appear directly on the host. Output under `/host/tmp/dernvale` in the backend maps to `/tmp/elrond/output` in the worker.
 
 ### Output Structure
 
 ```
 <destination>/
-├── rivendell_audit.log        # CSV, one row per finished piece of work (UTC)
+├── dernvale_audit.log        # CSV, one row per finished piece of work (UTC)
 ├── mitre_techniques.txt
 ├── <case>_navigator.json      # if Navigator enabled
 └── <image>/
@@ -344,7 +344,7 @@ The Navigator layer is written by Elrond (`<case>_navigator.json`) or downloaded
 ```bash
 # Login
 TOKEN=$(curl -s -X POST http://localhost:5688/api/auth/login \
-  -d "username=admin@rivendell.app" --data-urlencode "password=IWasThere3000YearsAgo!" \
+  -d "username=admin@dernvale.app" --data-urlencode "password=IWasThere3000YearsAgo!" \
   | jq -r '.access_token')
 
 # Use token in requests
@@ -415,12 +415,12 @@ TOKEN=$(curl -s -X POST http://localhost:5688/api/auth/mfa/verify \
 
 **Check Celery worker:**
 ```bash
-docker logs rivendell-celery-worker --tail 100
+docker logs dernvale-celery-worker --tail 100
 ```
 
 **Restart worker:**
 ```bash
-docker restart rivendell-celery-worker
+docker restart dernvale-celery-worker
 ```
 
 Restarting the worker kills any running job.
@@ -429,8 +429,8 @@ Restarting the worker kills any running job.
 
 **Check permissions:**
 ```bash
-chmod 755 /tmp/rivendell
-ls -la /tmp/rivendell
+chmod 755 /tmp/dernvale
+ls -la /tmp/dernvale
 ```
 
 **Verify allowed_paths** in `/src/web/backend/config.py`
@@ -440,7 +440,7 @@ ls -la /tmp/rivendell
 Users are stored in the JSON file named by `USERS_FILE` (default `/app/data/users.json` in the backend container). When the file has no users, the next login creates the default admin from `default_admin_email` and `default_admin_password` in `config.py`. Moving the file aside resets it (`/app/data` is `src/web/backend/data` on the host); other accounts are kept in the `.bak` copy:
 
 ```bash
-docker exec rivendell-backend mv /app/data/users.json /app/data/users.json.bak
+docker exec dernvale-backend mv /app/data/users.json /app/data/users.json.bak
 ```
 
 ---

@@ -1,5 +1,5 @@
 """
-The engines Rivendell drives on the machine it runs on, behind one interface
+The engines Dernvale drives on the machine it runs on, behind one interface
 (create/start/stop/snapshot/revert/delete/status/logs/exec):
 
   docker   Linux containers. A snapshot is a committed image; revert recreates the
@@ -20,9 +20,9 @@ from typing import Dict, List
 
 from .runner import LabError, run, run_ok, spawn
 
-LABEL = "rivendell.mordor=1"  # marks the containers Rivendell made
-LAB_PROJECT = "com.docker.compose.project=rivendell-lab"  # the lab's own Gandalf targets (lab-ubuntu…)
-SNAP_TAG = "rivendell-snap"    # docker: snapshot images are rivendell-snap/<name>:<snap>
+LABEL = "dernvale.mordor=1"  # marks the containers Dernvale made
+LAB_PROJECT = "com.docker.compose.project=dernvale-lab"  # the lab's own Gandalf targets (lab-ubuntu…)
+SNAP_TAG = "dernvale-snap"    # docker: snapshot images are dernvale-snap/<name>:<snap>
 SNAP_SEP = ".snap."          # tart: a snapshot VM is <name>.snap.<snap>
 
 
@@ -72,7 +72,7 @@ class Docker:
     key = "docker"
 
     def list(self) -> List[Dict]:
-        # Rivendell's own machines and the lab's Gandalf targets (docker ANDs label filters, so two calls)
+        # Dernvale's own machines and the lab's Gandalf targets (docker ANDs label filters, so two calls)
         out = run(["docker", "ps", "-a", "--filter", f"label={LABEL}", "--format", "{{json .}}"])
         out += "\n" + run(["docker", "ps", "-a", "--filter", f"label={LAB_PROJECT}", "--format", "{{json .}}"],
                           check=False)
@@ -237,7 +237,7 @@ def parse_utm_list(out: str) -> List[Dict]:
 
 
 def utm_up() -> None:
-    """Open UTM in the background and out of the Dock when Rivendell is what launches it
+    """Open UTM in the background and out of the Dock when Dernvale is what launches it
     (lab/lib/common.sh's utm_up). UTM reads HideDockIcon as it starts, so the setting is put
     back once it's running: opening UTM yourself later shows its icon as usual."""
     if sys.platform != "darwin" or subprocess.run(["pgrep", "-xq", "UTM"]).returncode == 0:
@@ -281,7 +281,7 @@ class UTM:
         raise LabError("Build this VM in UTM first",
                        "utmctl can't create a VM from an image. Make it in the UTM app "
                        "(New → Virtualize or Emulate), name it without spaces, and it appears "
-                       "here for Rivendell to manage.")
+                       "here for Dernvale to manage.")
 
     def start(self, name: str):
         utmctl("start", name, timeout=180)

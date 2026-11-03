@@ -49,7 +49,7 @@ function NewAnalysis() {
     }
   };
 
-  // Check if case ID exists in Rivendell (debounced)
+  // Check if case ID exists in Dernvale (debounced)
   useEffect(() => {
     const timeoutId = setTimeout(async () => {
       if (caseNumber.length >= 6) {  // Only check if case number is valid length
@@ -163,9 +163,9 @@ function NewAnalysis() {
       return { valid: false, message: `Invalid character '${invalidChar ? invalidChar[0] : ''}' - only letters, numbers, hyphens, periods, and underscores allowed` };
     }
 
-    // Check if case ID already exists in Rivendell
+    // Check if case ID already exists in Dernvale
     if (caseIdExists) {
-      return { valid: false, message: `Case ID "${value}" already exists in Rivendell. Please use a different case ID or delete the existing job.` };
+      return { valid: false, message: `Case ID "${value}" already exists in Dernvale. Please use a different case ID or delete the existing job.` };
     }
 
     return { valid: true, message: '' };
@@ -737,7 +737,7 @@ function NewAnalysis() {
               fontSize: '1rem',
               textAlign: 'center'
             }}>
-              The following files are required but were not found in <code style={{ background: 'rgba(102, 217, 239, 0.2)', padding: '2px 6px', borderRadius: '3px' }}>/tmp/rivendell</code>
+              The following files are required but were not found in <code style={{ background: 'rgba(102, 217, 239, 0.2)', padding: '2px 6px', borderRadius: '3px' }}>/tmp/dernvale</code>
             </p>
 
             <div style={{ marginBottom: '1.5rem' }}>

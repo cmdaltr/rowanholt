@@ -1,10 +1,10 @@
 {
   "case_number": "TEST_linux_disk_and_memory",
   "source_paths": [
-    "/Volumes/Media5TB/rivendell_imgs/Linux_mail.vmdk.raw",
-    "/Volumes/Media5TB/rivendell_imgs/linux-memory.raw"
+    "/Volumes/Media5TB/dernvale_imgs/Linux_mail.vmdk.raw",
+    "/Volumes/Media5TB/dernvale_imgs/linux-memory.raw"
   ],
-  "destination_path": "/Volumes/Media5TB/rivendell_imgs/tests/linux_disk_and_memory",
+  "destination_path": "/Volumes/Media5TB/dernvale_imgs/tests/linux_disk_and_memory",
   "options": {
     "local": true,
     "gandalf": false,

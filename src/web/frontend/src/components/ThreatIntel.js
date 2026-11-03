@@ -167,7 +167,7 @@ function ThreatIntel() {
         <div data-guide="intel.import" className="card">
           <h3>Import</h3>
           <p>
-            XLSX (the Iran APT workbook's ten columns), CSV (Rivendell's columns or MITRESaw's procedures),
+            XLSX (the Iran APT workbook's ten columns), CSV (Dernvale's columns or MITRESaw's procedures),
             JSON (a STIX 2.1 bundle) or a .txt watchlist with one value per line.
             Indicators already stored are skipped.
           </p>

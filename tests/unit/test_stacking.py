@@ -1,4 +1,4 @@
-"""Stacking (rivendell/analysis/stacking.py): rare values across hosts, explainable reasons,
+"""Stacking (dernvale/analysis/stacking.py): rare values across hosts, explainable reasons,
 families compared only across hosts that have them, a baseline, and precision at k."""
 import csv
 import json
@@ -9,7 +9,7 @@ REPO = Path(__file__).resolve().parents[2]
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(REPO / "src" / "analysis"))
 
-from rivendell.analysis.stacking import (build_baseline, looks_generated, precision_at_k,  # noqa: E402
+from dernvale.analysis.stacking import (build_baseline, looks_generated, precision_at_k,  # noqa: E402
                                          stack_case)
 
 PROGRAMS = ["svchost.exe", "explorer.exe", "msedge.exe", "onedrive.exe", "teams.exe"]

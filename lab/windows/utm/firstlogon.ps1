@@ -58,5 +58,5 @@ if (-not (Get-NetFirewallRule -Name sshd -ErrorAction SilentlyContinue)) {
 Remove-Item -Force -ErrorAction SilentlyContinue C:\Windows\Panther\unattend.xml, C:\Windows\Panther\Unattend\unattend.xml
 
 Set-Content C:\lab\ready.txt (Get-Date -Format o)
-Write-Host "Rivendell lab Windows target ready"
+Write-Host "Dernvale lab Windows target ready"
 Stop-Transcript | Out-Null

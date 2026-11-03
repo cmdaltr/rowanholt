@@ -21,7 +21,7 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-PREFIX = "rivendell:signin:"
+PREFIX = "dernvale:signin:"
 # Failures across all addresses that lock a username everywhere, as a multiple of the
 # per-address limit
 EVERYWHERE = 10

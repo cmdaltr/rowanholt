@@ -5,8 +5,8 @@ Changes made during the October 2026 E2E matrix run (uncommitted at 22 Oct).
 ## Test Tooling
 
 - **`run_test.py --cancel JOB_ID [...]`** cancels specific jobs. A job in `awaiting_confirmation` returns 400 on `/cancel`, so it falls back to `/cancel-sudo`. Exits 1 if any cancel fails.
-- **`run_test.py` image discovery** also searches `/Volumes/*/rivendell` and `/Volumes/*/*/rivendell`.
-- **`tests/scripts/test_timings.py`** (new) extracts per-test and per-stage timings from every `rivendell_audit.log` into JSON, CSV or Markdown. It splits records on timestamps rather than newlines because `iocs.py` writes entries without a trailing newline.
+- **`run_test.py` image discovery** also searches `/Volumes/*/dernvale` and `/Volumes/*/*/dernvale`.
+- **`tests/scripts/test_timings.py`** (new) extracts per-test and per-stage timings from every `dernvale_audit.log` into JSON, CSV or Markdown. It splits records on timestamps rather than newlines because `iocs.py` writes entries without a trailing newline.
 - **`docs/PERFORMANCE.md`** (new) records what each option costs, measured from this run.
 
 ## Worker and Elrond Fixes
@@ -22,7 +22,7 @@ Changes made during the October 2026 E2E matrix run (uncommitted at 22 Oct).
 - `TEST_RUNNER_GUIDE.md` rewritten: current script paths, job control, clean-up after a cancel, silent steps, output layout and timings.
 - `TEST_RESULTS.md` regenerated from the Notion Test Plan.
 - `tests/docs/README.md`: corrected the `run_test.py` path and test count.
-- `docs/CLI.md`, `QUICKSTART.md`, `USAGE.md`, `docs/README.md`, root `README.md`, `src/web/README.md`: replaced commands that don't exist (Elrond short flags, `rivendell-ai`, `rivendell.mitre.*`, `rivendell.siem.*` and similar) with the real entry points, which must run from the repository root. Fixed the Gandalf syntax and output format (zip, not tar.gz), fixture paths, ports and dead links.
+- `docs/CLI.md`, `QUICKSTART.md`, `USAGE.md`, `docs/README.md`, root `README.md`, `src/web/README.md`: replaced commands that don't exist (Elrond short flags, `dernvale-ai`, `dernvale.mitre.*`, `dernvale.siem.*` and similar) with the real entry points, which must run from the repository root. Fixed the Gandalf syntax and output format (zip, not tar.gz), fixture paths, ports and dead links.
 - `docs/API.md`: added an authentication status section (simple file-based router mounted; job endpoints don't check tokens; MFA and admin routes not mounted), form-encoded login, the real job `options`, and endpoints that were missing.
 - `docs/ARCHITECTURE.md`, `ACCESSING-DATA.md`, `CONFIG.md`, `REQUIREMENTS.md`, `INSTALL.md`: current container names, Compose v2 syntax, the `siem` profile and live links.
 
@@ -78,7 +78,7 @@ Added automatic Docker restart functionality to all test scripts to prevent Dock
 ```bash
 # Manual restart required between tests
 ./batch1a-archive-lnk.sh
-docker restart rivendell-backend rivendell-celery-worker
+docker restart dernvale-backend dernvale-celery-worker
 ./batch1b-archive-docs.sh
 ```
 

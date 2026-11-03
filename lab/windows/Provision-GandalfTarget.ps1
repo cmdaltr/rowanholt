@@ -37,7 +37,7 @@ Write-Step "Lab user"
 if (Get-LocalUser -Name $LabUser -ErrorAction SilentlyContinue) {
     Set-LocalUser -Name $LabUser -Password $sec
 } else {
-    New-LocalUser -Name $LabUser -Password $sec -FullName "Rivendell lab" -PasswordNeverExpires | Out-Null
+    New-LocalUser -Name $LabUser -Password $sec -FullName "Dernvale lab" -PasswordNeverExpires | Out-Null
 }
 Add-LocalGroupMember -Group "Administrators" -Member $LabUser -ErrorAction SilentlyContinue
 Write-Host "  '$LabUser' is a local administrator (Invoke-Gandalf needs admin rights)."
@@ -74,7 +74,7 @@ $stomp = Get-Date "2019-03-14 09:26:53"
 (Get-Item "$lab\helper.ps1").LastWriteTime = $stomp
 
 # T1564.004: a script hidden in an alternate data stream of a text file.
-"Rivendell lab readme" | Set-Content -Path "C:\Users\Public\Documents\readme.txt"
+"Dernvale lab readme" | Set-Content -Path "C:\Users\Public\Documents\readme.txt"
 "Write-Output rivendell-lab" | Set-Content -Path "C:\Users\Public\Documents\readme.txt" -Stream "update.ps1"
 
 # T1546.003: WMI event subscription persistence; the consumer only runs "cmd /c exit 0".
@@ -98,7 +98,7 @@ New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" -Na
 # T1053.005: scheduled task persistence.
 $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ep bypass -File `"$lab\sync.ps1`""
 $trigger = New-ScheduledTaskTrigger -AtLogOn
-Register-ScheduledTask -TaskName "LabSync" -Action $action -Trigger $trigger -Description "Rivendell lab" -Force | Out-Null
+Register-ScheduledTask -TaskName "LabSync" -Action $action -Trigger $trigger -Description "Dernvale lab" -Force | Out-Null
 
 # T1003.001 strings (text only) for Potential_Credential_Access.
 "privilege::debug`r`nsekurlsa::logonpasswords`r`nmimikatz notes for the lab - password reuse on 198.51.100.23" |

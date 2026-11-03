@@ -1,8 +1,8 @@
 """
-rivendell anduril - administer Rivendell's Docker containers and images.
+dernvale anduril - administer Dernvale's Docker containers and images.
 
 Runs on the host against the Docker Desktop or OrbStack socket, applying the
-same Rivendell-only scope as the Anduril service behind the web UI. Rebuilds
+same Dernvale-only scope as the Anduril service behind the web UI. Rebuilds
 and enabling Anduril itself happen here because they need the compose files
 on the host.
 """
@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Callable, List, Optional
 
-# rivendell.py puts src/analysis first on sys.path, and its platform/ package
+# dernvale.py puts src/analysis first on sys.path, and its platform/ package
 # shadows the stdlib module, so this file uses sys.platform instead.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "common"))
 
@@ -93,13 +93,13 @@ def _start_runtime() -> Optional[List[str]]:
 
 
 def get_admin(assume_yes: bool, socket_path: Optional[str] = None) -> DockerAdmin:
-    """Connect to the engine hosting Rivendell, prompting to start it or to grant socket access."""
+    """Connect to the engine hosting Dernvale, prompting to start it or to grant socket access."""
     try:
         return DockerAdmin.locate(socket_path)
     except EngineUnavailable as exc:
         if exc.permission:
             user = os.environ.get("USER", "your user")
-            print(f"[!] Rivendell needs access to the Docker socket ({exc.socket_path}), and {user} cannot open it.")
+            print(f"[!] Dernvale needs access to the Docker socket ({exc.socket_path}), and {user} cannot open it.")
             if sys.platform.startswith("linux") and shutil.which("usermod"):
                 cmd = ["sudo", "usermod", "-aG", "docker", user]
                 if confirm(f"Grant access by adding {user} to the docker group ({' '.join(cmd)})?", assume_yes):
@@ -159,12 +159,12 @@ def compose_base(admin: DockerAdmin) -> List[str]:
         if files and workdir:
             missing = [f for f in files if not Path(f).exists()]
             if missing:
-                raise ScopeError(f"Compose files used to start Rivendell are missing: {', '.join(missing)}")
+                raise ScopeError(f"Compose files used to start Dernvale are missing: {', '.join(missing)}")
             cmd = ["docker", "compose", "-p", admin.project, "--project-directory", workdir]
             for f in files:
                 cmd += ["-f", f]
             return cmd
-    raise ScopeError("No Rivendell containers found to read the compose configuration from; start the stack first")
+    raise ScopeError("No Dernvale containers found to read the compose configuration from; start the stack first")
 
 
 def compose(admin: DockerAdmin, *args: str) -> None:
@@ -187,7 +187,7 @@ def backend_has_anduril(admin: DockerAdmin) -> bool:
         info = admin.engine.inspect_container(admin.resolve("backend")["Id"])
     except (ScopeError, EngineError):
         return False
-    return "rivendell-anduril" in ((info.get("NetworkSettings") or {}).get("Networks") or {})
+    return "dernvale-anduril" in ((info.get("NetworkSettings") or {}).get("Networks") or {})
 
 
 # --- commands ------------------------------------------------------------------------
@@ -204,7 +204,7 @@ def cmd_status(admin: DockerAdmin, args: argparse.Namespace) -> None:
         for p in c["job_processes"]:
             print(f"\n[!] Elrond running in {c['name']}: {p}")
     enabled = any(c["service"] == ANDURIL_SERVICE and c["state"] == "running" for c in admin.list_containers())
-    print(f"\nAnduril (web UI administration): {'enabled' if enabled else 'not enabled - run: rivendell anduril enable'}")
+    print(f"\nAnduril (web UI administration): {'enabled' if enabled else 'not enabled - run: dernvale anduril enable'}")
 
 
 def cmd_images(admin: DockerAdmin, args: argparse.Namespace) -> None:
@@ -213,7 +213,7 @@ def cmd_images(admin: DockerAdmin, args: argparse.Namespace) -> None:
          ", ".join(i["used_by"]) or "-", ", ".join(i["shared_with"]) or "-"]
         for i in admin.list_images()
     ]
-    table(rows, ["IMAGE", "TAGS", "SIZE", "SOURCE", "USED BY", "ALSO USED OUTSIDE RIVENDELL"])
+    table(rows, ["IMAGE", "TAGS", "SIZE", "SOURCE", "USED BY", "ALSO USED OUTSIDE DERNVALE"])
 
 
 def cmd_logs(admin: DockerAdmin, args: argparse.Namespace) -> None:
@@ -259,7 +259,7 @@ def cmd_update(admin: DockerAdmin, args: argparse.Namespace) -> None:
 
 def cmd_pull(admin: DockerAdmin, args: argparse.Namespace) -> None:
     image_id = admin.pull(args.ref, progress=lambda m: print(f"    {m}"))
-    print(f"[+] Pulled {args.ref} ({image_id.split(':')[-1][:12]}). Run `rivendell anduril update <service>` to use it.")
+    print(f"[+] Pulled {args.ref} ({image_id.split(':')[-1][:12]}). Run `dernvale anduril update <service>` to use it.")
 
 
 def cmd_rmi(admin: DockerAdmin, args: argparse.Namespace) -> None:
@@ -269,7 +269,7 @@ def cmd_rmi(admin: DockerAdmin, args: argparse.Namespace) -> None:
 
 
 def cmd_prune(admin: DockerAdmin, args: argparse.Namespace) -> None:
-    if not confirm("Remove dangling images built for Rivendell?", args.yes):
+    if not confirm("Remove dangling images built for Dernvale?", args.yes):
         raise Aborted()
     r = admin.prune()
     print(f"[+] Removed {len(r['removed'])} image(s), freed {human_bytes(r['freed_bytes'])}")
@@ -282,7 +282,7 @@ def cmd_rebuild(admin: DockerAdmin, args: argparse.Namespace) -> None:
     service = container_service(c)
     image = next((i for i in admin.engine.images() if i["Id"] == c.get("ImageID")), {})
     if not image_is_built(image, admin.project):
-        raise ScopeError(f"{service} uses an upstream image; use `rivendell anduril update {service}` instead")
+        raise ScopeError(f"{service} uses an upstream image; use `dernvale anduril update {service}` instead")
     try:
         check_action(service, "rebuild", admin.job_processes(), args.force, allow_self=True)
     except BusyError as exc:
@@ -300,9 +300,9 @@ def cmd_rebuild(admin: DockerAdmin, args: argparse.Namespace) -> None:
 
 def cmd_enable(admin: DockerAdmin, args: argparse.Namespace) -> None:
     print(
-        "Anduril lets admin users of the Rivendell web UI start, stop, restart, update and remove\n"
-        "Rivendell's own containers and images. To do that it needs:\n\n"
-        "  - the Docker socket (/var/run/docker.sock) mounted into the rivendell-anduril container.\n"
+        "Anduril lets admin users of the Dernvale web UI start, stop, restart, update and remove\n"
+        "Dernvale's own containers and images. To do that it needs:\n\n"
+        "  - the Docker socket (/var/run/docker.sock) mounted into the dernvale-anduril container.\n"
         "    Socket access is root-equivalent on the Docker VM, so Anduril is the only container\n"
         "    that holds it, it is reachable only from the backend on an internal network, and it\n"
         f"    refuses anything not labelled com.docker.compose.project={admin.project} and named {NAME_PREFIX}*.\n"
@@ -312,7 +312,7 @@ def cmd_enable(admin: DockerAdmin, args: argparse.Namespace) -> None:
         print(
             "[!] The backend is using the default JWT secret, so anyone could forge an admin token.\n"
             "    The web UI keeps Anduril disabled until you set SECRET_KEY (in your shell or a .env\n"
-            "    file next to docker-compose.yml) and re-run `rivendell anduril enable`.\n"
+            "    file next to docker-compose.yml) and re-run `dernvale anduril enable`.\n"
         )
     if not confirm("Grant Docker socket access to Anduril and enable it?", args.yes):
         raise Aborted()
@@ -333,15 +333,15 @@ def cmd_disable(admin: DockerAdmin, args: argparse.Namespace) -> None:
 
 
 def add_parser(subparsers: argparse._SubParsersAction) -> None:
-    """Register `rivendell anduril ...` on the main CLI."""
+    """Register `dernvale anduril ...` on the main CLI."""
     p = subparsers.add_parser("anduril", aliases=["aragorn"],
-                              help="Administer Rivendell Docker containers and images (Anduril)")
+                              help="Administer Dernvale Docker containers and images (Anduril)")
     p.add_argument("-y", "--yes", action="store_true", help="Answer yes to confirmation prompts (never to interrupting a job)")
-    p.add_argument("--socket", help="Docker socket to use (default: the engine running Rivendell)")
+    p.add_argument("--socket", help="Docker socket to use (default: the engine running Dernvale)")
     sub = p.add_subparsers(dest="anduril_command", metavar="COMMAND")
 
-    sub.add_parser("status", help="Rivendell containers and their state").set_defaults(anduril_func=cmd_status)
-    sub.add_parser("images", help="Rivendell images").set_defaults(anduril_func=cmd_images)
+    sub.add_parser("status", help="Dernvale containers and their state").set_defaults(anduril_func=cmd_status)
+    sub.add_parser("images", help="Dernvale images").set_defaults(anduril_func=cmd_images)
 
     s = sub.add_parser("logs", help="Tail a container's logs")
     s.add_argument("name")
@@ -353,8 +353,8 @@ def add_parser(subparsers: argparse._SubParsersAction) -> None:
     s.set_defaults(anduril_func=cmd_stats)
 
     for name in ("start", "stop", "restart"):
-        s = sub.add_parser(name, help=f"{name.title()} a Rivendell container")
-        s.add_argument("name", help="Container or service name, e.g. rivendell-backend or backend")
+        s = sub.add_parser(name, help=f"{name.title()} a Dernvale container")
+        s.add_argument("name", help="Container or service name, e.g. dernvale-backend or backend")
         s.add_argument("--force", action="store_true", help="Proceed even if Elrond is running")
         s.set_defaults(anduril_func=cmd_lifecycle, command_name=name)
 
@@ -363,21 +363,21 @@ def add_parser(subparsers: argparse._SubParsersAction) -> None:
     s.add_argument("--force", action="store_true")
     s.set_defaults(anduril_func=cmd_update)
 
-    s = sub.add_parser("pull", help="Pull a new version of an upstream image Rivendell uses")
+    s = sub.add_parser("pull", help="Pull a new version of an upstream image Dernvale uses")
     s.add_argument("ref", help="e.g. postgres:16-alpine")
     s.set_defaults(anduril_func=cmd_pull)
 
-    s = sub.add_parser("rebuild", help="Rebuild a Rivendell-built image and recreate its container")
+    s = sub.add_parser("rebuild", help="Rebuild a Dernvale-built image and recreate its container")
     s.add_argument("service", help="backend, celery-worker, frontend or anduril")
     s.add_argument("--no-cache", action="store_true")
     s.add_argument("--force", action="store_true")
     s.set_defaults(anduril_func=cmd_rebuild)
 
-    s = sub.add_parser("rmi", help="Remove an unused Rivendell image")
+    s = sub.add_parser("rmi", help="Remove an unused Dernvale image")
     s.add_argument("image", help="Image ID (at least 12 characters)")
     s.set_defaults(anduril_func=cmd_rmi)
 
-    sub.add_parser("prune", help="Remove dangling images built for Rivendell").set_defaults(anduril_func=cmd_prune)
+    sub.add_parser("prune", help="Remove dangling images built for Dernvale").set_defaults(anduril_func=cmd_prune)
 
     s = sub.add_parser("enable", help="Enable Anduril for the web UI (grants it Docker socket access)")
     s.add_argument("--recreate-backend", action="store_true", help="Recreate the backend even if already connected")

@@ -2,7 +2,7 @@
 # Clear Splunk cache aggressively
 # Run this when CSS/JS changes aren't showing up
 
-CONTAINER="rivendell-splunk"
+CONTAINER="dernvale-splunk"
 
 echo "=== Clearing Splunk Cache ==="
 

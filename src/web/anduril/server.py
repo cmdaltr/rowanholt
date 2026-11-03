@@ -1,10 +1,10 @@
-"""Anduril: Rivendell's Docker administration service.
+"""Anduril: Dernvale's Docker administration service.
 
-The only Rivendell container that holds the Docker socket. It serves a small
+The only Dernvale container that holds the Docker socket. It serves a small
 JSON API on the internal admin network to the backend, which authenticates
 with a token this process generates at start-up and writes to a volume only
 the backend mounts. Every request goes through the ``anduril`` package's scope rules,
-so the backend (and anything that compromises it) can act on Rivendell
+so the backend (and anything that compromises it) can act on Dernvale
 containers and images and nothing else.
 """
 
@@ -30,7 +30,7 @@ from anduril import BusyError, DockerAdmin, EngineError, EngineUnavailable, Scop
 from anduril.scope import check_action, container_service
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-logger = logging.getLogger("rivendell.anduril")
+logger = logging.getLogger("dernvale.anduril")
 
 TOKEN_PATH = Path(os.environ.get("ANDURIL_TOKEN_PATH", "/run/anduril/token"))
 PORT = int(os.environ.get("ANDURIL_PORT", "5690"))
@@ -130,7 +130,7 @@ def admin() -> DockerAdmin:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "rivendell-anduril"
+    server_version = "dernvale-anduril"
 
     def log_message(self, fmt: str, *args: Any) -> None:
         logger.info("%s %s", self.address_string(), fmt % args)
@@ -231,7 +231,7 @@ class Handler(BaseHTTPRequestHandler):
             admin().validate_remove(image_id)
             return 202, RUNNER.submit(Op("remove-image", image_id, lambda log: admin().remove_image(image_id))).as_dict()
         if parts == ["images", "prune"]:
-            return 202, RUNNER.submit(Op("prune", "rivendell images", lambda log: admin().prune())).as_dict()
+            return 202, RUNNER.submit(Op("prune", "dernvale images", lambda log: admin().prune())).as_dict()
         return 404, {"detail": "Not found"}
 
 

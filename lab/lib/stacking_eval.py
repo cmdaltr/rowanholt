@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 REPO = Path(__file__).resolve().parents[2]
-STACKING = REPO / "src" / "analysis" / "rivendell" / "analysis" / "stacking.py"
+STACKING = REPO / "src" / "analysis" / "dernvale" / "analysis" / "stacking.py"
 KS = (4, 8, 20)
 TABLE_END = "<!-- stacking-eval: rows above -->"
 

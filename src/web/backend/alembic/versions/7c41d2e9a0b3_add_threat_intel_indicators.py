@@ -1,6 +1,6 @@
 """add_threat_intel_indicators
 
-Threat intelligence indicators in the fixed 10-column schema (rivendell/threat_intel/schema.py):
+Threat intelligence indicators in the fixed 10-column schema (dernvale/threat_intel/schema.py):
 the Iran APT workbook, STIX, TAXII and MITRESaw, as imported through /api/threat-intel.
 Duplicates are dropped on import, by the indicator's key, rather than by a unique index: an
 index over the long text columns could exceed Postgres's btree row size on a long command line.

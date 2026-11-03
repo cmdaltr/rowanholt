@@ -1,7 +1,7 @@
 """
 User Administration CLI
 
-Run inside the backend container (`rivendell server users ...` does this):
+Run inside the backend container (`dernvale server users ...` does this):
     python -m auth.manage_users list
     python -m auth.manage_users add <username> <email> [--admin]   (password prompted)
     python -m auth.manage_users password <username>                (prompted)
@@ -41,7 +41,7 @@ def _user(users: dict, name: str) -> dict:
 
 def main(argv: list) -> int:
     """Entry point; returns the exit status."""
-    parser = argparse.ArgumentParser(prog="rivendell server users", description="Administer Rivendell's users")
+    parser = argparse.ArgumentParser(prog="dernvale server users", description="Administer Dernvale's users")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("list", help="Every user")
     add = sub.add_parser("add", help="Create a password user")

@@ -2,11 +2,11 @@
 
 ## ✅ Changes Applied
 
-The retry-on-file-descriptor-limit logic has been integrated into the critical file processing paths of Rivendell.
+The retry-on-file-descriptor-limit logic has been integrated into the critical file processing paths of Dernvale.
 
 ### Files Modified
 
-#### 1. **File Collection** (`rivendell/collect/files/compare.py`)
+#### 1. **File Collection** (`dernvale/collect/files/compare.py`)
 
 **Changes:**
 - Added imports: `from analysis.utils import retry_on_fd_limit, safe_open`
@@ -18,7 +18,7 @@ The retry-on-file-descriptor-limit logic has been integrated into the critical f
 - 10 retries with 1-30 second waits (exponential backoff)
 - Critical for tests like `win_collect_files_*` that process thousands of files
 
-#### 2. **IOC Extraction** (`rivendell/analysis/iocs.py`)
+#### 2. **IOC Extraction** (`dernvale/analysis/iocs.py`)
 
 **Changes:**
 - Added imports: `from analysis.utils import retry_on_fd_limit, safe_open`
@@ -102,7 +102,7 @@ Once containers are rebuilt, the retry logic will be active:
 
 ```bash
 # Rebuild containers with new code
-cd /Users/ben/Library/CloudStorage/OneDrive-Personal/Projects/GitHub/rivendell
+cd /Users/ben/Library/CloudStorage/OneDrive-Personal/Projects/GitHub/dernvale
 ./scripts/start-testing-mode.sh
 
 # Test file collection (previously failing)
@@ -117,10 +117,10 @@ cd tests/scripts/batch
 Check logs for retry messages:
 ```bash
 # Look for retry warnings
-docker logs rivendell-celery-worker 2>&1 | grep "File descriptor limit reached"
+docker logs dernvale-celery-worker 2>&1 | grep "File descriptor limit reached"
 
 # Look for successful completions after retries
-docker logs rivendell-celery-worker 2>&1 | grep "Garbage collection freed"
+docker logs dernvale-celery-worker 2>&1 | grep "Garbage collection freed"
 ```
 
 ## Additional Improvements

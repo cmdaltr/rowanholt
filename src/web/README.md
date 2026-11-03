@@ -66,7 +66,7 @@ elrond-web/
    - Frontend: http://localhost:5687
    - Backend API: http://localhost:5688
    - API Docs: http://localhost:5688/docs
-   - Splunk: http://localhost:7755 (username: admin, password: rivendell)
+   - Splunk: http://localhost:7755 (username: admin, password: dernvale)
    - Kibana: http://localhost:5601
    - Elasticsearch: http://localhost:9200
 
@@ -186,8 +186,8 @@ When SIEM export options (Splunk, Elastic, Navigator) are enabled:
 3. **Job Logs**: View detailed SIEM export progress in the job log
 
 **SIEM Credentials:**
-- Splunk: username `admin`, password `rivendell`
-- Elasticsearch/Kibana: username `elastic`, password `rivendell`
+- Splunk: username `admin`, password `dernvale`
+- Elasticsearch/Kibana: username `elastic`, password `dernvale`
 
 **Note**: Navigator JSON files can be uploaded to https://mitre-attack.github.io/attack-navigator/ for visualization
 
@@ -354,7 +354,7 @@ Both frontend and backend support hot reload in development mode:
 
 ## Production Deployment
 
-A shared, production install is Rivendell's server profile: Caddy with TLS in front, sign-in on every route, and nothing else published. See [docs/SERVER.md](../../docs/SERVER.md) (`rivendell server init <hostname>`, then `rivendell start`).
+A shared, production install is Dernvale's server profile: Caddy with TLS in front, sign-in on every route, and nothing else published. See [docs/SERVER.md](../../docs/SERVER.md) (`dernvale server init <hostname>`, then `dernvale start`).
 
 ## Support
 

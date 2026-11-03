@@ -76,7 +76,7 @@ function Pipeline() {
         {arrow('M332,68 L348,68')}{arrow('M470,68 L486,68')}{arrow('M608,68 L624,68')}
 
         {node(16, 120, 160, 48, 'mt-dg-origin', 'flask', 'Your lab', 'runs you record', 'is-lab')}
-        {node(16, 182, 160, 48, 'mt-dg-pub', 'db', 'Public datasets', 'shipped with Rivendell', 'is-pub')}
+        {node(16, 182, 160, 48, 'mt-dg-pub', 'db', 'Public datasets', 'shipped with Dernvale', 'is-pub')}
         {arrow('M176,144 C194,144 192,170 206,172')}
         {arrow('M176,206 C194,206 192,180 206,178')}
 
@@ -147,7 +147,7 @@ function Sources({ status, isAdmin, onUpdate }) {
       <p className="lab-note">
         Each recording is one tool run in a lab with logging on (Sysmon, Windows auditing, PowerShell, cloud audit logs),
         mapped to ATT&amp;CK by the people who recorded it. It shows that a technique can be recorded and by which log,
-        for that tool in that lab; not every way the technique can be done. The recordings ship with Rivendell;
+        for that tool in that lab; not every way the technique can be done. The recordings ship with Dernvale;
         {' '}<strong>Update</strong> (or <code>python3 -m src.mordor.telemetry --build</code>) fetches what the sources have changed since.
       </p>
       {status.build && status.build.state !== 'idle' && (
@@ -325,7 +325,7 @@ function MordorTelemetry() {
   return (
     <div className="journey-detail mt-page">
       <section className="hero-section">
-        <img src={`${process.env.PUBLIC_URL}/images/rivendell.png`} alt="Mordor Recordings" className="hero-image"
+        <img src={`${process.env.PUBLIC_URL}/images/dernvale.png`} alt="Mordor Recordings" className="hero-image"
              style={{ transform: 'scale(0.2)', transformOrigin: 'center top' }} />
       </section>
       <header>
@@ -344,8 +344,8 @@ function MordorTelemetry() {
         <h2>Generating telemetry</h2>
         <Pipeline />
         <p className="lab-note">
-          Recordings are real attacks run in a lab with logging on: the public datasets that ship with Rivendell, plus any you
-          record yourself in the lab (Aragorn → Deploy). Each is mapped to ATT&amp;CK, then Rivendell checks whether the
+          Recordings are real attacks run in a lab with logging on: the public datasets that ship with Dernvale, plus any you
+          record yourself in the lab (Aragorn → Deploy). Each is mapped to ATT&amp;CK, then Dernvale checks whether the
           indicators a detection matches actually appear in the recorded events. The result is the <strong>Recorded telemetry</strong>
           {' '}view below. No AI is involved.
         </p>
@@ -355,7 +355,7 @@ function MordorTelemetry() {
         <p className="lab-note">
           Record your own: the lab creates disposable containers and VMs, turns logging on, runs Atomic Red Team and brings
           each test's logs back here as <strong>Your lab</strong>. The machines are managed in Aragorn, with the rest of what
-          Rivendell runs on this host.
+          Dernvale runs on this host.
         </p>
         <a className="mt-pill-link" href="/aragorn#deploy">Record in the lab →</a>
       </div>

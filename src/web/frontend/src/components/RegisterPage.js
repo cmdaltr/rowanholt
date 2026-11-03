@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { register } from '../api';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rivendell.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/dernvale.png`;
 
 const RegisterPage = () => {
   const navigate = useNavigate();
@@ -71,7 +71,7 @@ const RegisterPage = () => {
       <section className="hero-section">
         <img
           src={heroImage}
-          alt="Rivendell - The Last Homely House"
+          alt="Dernvale"
           className="hero-image"
           style={{
             transform: 'scale(0.2)',
@@ -83,7 +83,7 @@ const RegisterPage = () => {
       <header>
         <h2>Register</h2>
         <p>
-          Create your Rivendell DF Acceleration Suite account.
+          Create your Dernvale DF Acceleration Suite account.
         </p>
       </header>
 

@@ -1,6 +1,6 @@
 # Test Results
 
-Final snapshot of the E2E matrix run of 12–24 Oct 2026. The Notion "Rivendell — Test Plan" database is the live record; [`docs/PERFORMANCE.md`](../../docs/PERFORMANCE.md) has the timing analysis.
+Final snapshot of the E2E matrix run of 12–24 Oct 2026. The Notion "Dernvale — Test Plan" database is the live record; [`docs/PERFORMANCE.md`](../../docs/PERFORMANCE.md) has the timing analysis.
 
 A FAIL here includes false passes: jobs the API marked COMPLETED that produced no or wrong output. Durations are wall-clock minutes from the audit log.
 

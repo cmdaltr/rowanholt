@@ -28,7 +28,7 @@ This document provides a comprehensive gap analysis of forensic artefacts across
 
 ### Windows Currently Processed
 
-#### Collection Phase (`rivendell/collect/windows.py`)
+#### Collection Phase (`dernvale/collect/windows.py`)
 
 | Category | Artefact | Location | Status |
 |----------|----------|----------|--------|
@@ -57,7 +57,7 @@ This document provides a comprehensive gap analysis of forensic artefacts across
 | | swapfile.sys | Root | ✅ Collected |
 | | MEMORY.DMP | `Windows/` | ✅ Collected |
 
-#### Processing Phase (`rivendell/process/windows.py`)
+#### Processing Phase (`dernvale/process/windows.py`)
 
 | Artefact | Parser | Output Format | Status |
 |----------|--------|---------------|--------|
@@ -80,7 +80,7 @@ This document provides a comprehensive gap analysis of forensic artefacts across
 
 ### Windows Quick Wins
 
-These Artemis extraction functions are **already implemented** in `rivendell/process/extractions/artemis.py` but **not called** from the main processing flow. Enabling them requires minimal effort.
+These Artemis extraction functions are **already implemented** in `dernvale/process/extractions/artemis.py` but **not called** from the main processing flow. Enabling them requires minimal effort.
 
 | Artefact | Function | Artemis Command | Output | ATT&CK Technique |
 |----------|----------|-----------------|--------|------------------|
@@ -96,7 +96,7 @@ These Artemis extraction functions are **already implemented** in `rivendell/pro
 
 #### Implementation Steps for Quick Wins
 
-1. Edit `rivendell/process/windows.py`
+1. Edit `dernvale/process/windows.py`
 2. Import the extraction functions from `artemis.py`
 3. Add detection logic for the artefact files
 4. Call the appropriate extraction function
@@ -106,7 +106,7 @@ Example implementation pattern:
 ```python
 # In process/windows.py
 
-from rivendell.process.extractions.artemis import extract_amcache
+from dernvale.process.extractions.artemis import extract_amcache
 
 def process_amcache(artefact_path, output_dir):
     """Process Amcache.hve for program execution history."""
@@ -151,7 +151,7 @@ def process_amcache(artefact_path, output_dir):
 
 ### macOS Currently Processed
 
-#### Collection Phase (`rivendell/collect/mac.py`)
+#### Collection Phase (`dernvale/collect/mac.py`)
 
 | Category | Artefact | Location | Status |
 |----------|----------|----------|--------|
@@ -179,14 +179,14 @@ def process_amcache(artefact_path, output_dir):
 | **Memory** | Sleep Image | `/var/vm/sleepimage` | ✅ Collected (volatility mode) |
 | | Swap | `/var/vm/swapfile` | ✅ Collected (volatility mode) |
 
-#### Processing Phase (`rivendell/process/mac.py`)
+#### Processing Phase (`dernvale/process/mac.py`)
 
 | Artefact | Parser | Output Format | Status |
 |----------|--------|---------------|--------|
 | Plist Files | plistlib | JSON | ✅ Active |
 | LaunchAgents/Daemons | Custom | JSON | ✅ Active |
 
-#### Enhanced Parsers (`rivendell/process/extractions/macos_enhanced.py`)
+#### Enhanced Parsers (`dernvale/process/extractions/macos_enhanced.py`)
 
 | Artefact | Parser Class | Output | Status |
 |----------|--------------|--------|--------|
@@ -252,7 +252,7 @@ These parsers exist in `macos_enhanced.py` but need integration:
 
 ### Linux Currently Processed
 
-#### Collection Phase (`rivendell/collect/linux.py`)
+#### Collection Phase (`dernvale/collect/linux.py`)
 
 | Category | Artefact | Location | Status |
 |----------|----------|----------|--------|
@@ -280,7 +280,7 @@ These parsers exist in `macos_enhanced.py` but need integration:
 | **Printing** | CUPS | `/var/cache/cups/` | ✅ Collected |
 | **Temp** | tmp | `/tmp/` | ✅ Collected |
 
-#### Enhanced Processing (`rivendell/process/extractions/linux_enhanced.py`)
+#### Enhanced Processing (`dernvale/process/extractions/linux_enhanced.py`)
 
 | Artefact | Parser | Output | Status |
 |----------|--------|--------|--------|
@@ -632,4 +632,4 @@ When adding new artefact parsers:
 
 ---
 
-*This document is part of the Rivendell Digital Forensics Acceleration Suite.*
+*This document is part of the Dernvale Digital Forensics Acceleration Suite.*

@@ -19,7 +19,7 @@ const errorText = (err) => {
 
 const SETTINGS = [
   ['LAB_DATA_DIR', 'Lab data directory', 'Collected acquisitions and Mordor datasets go here.'],
-  ['TEST_IMAGES_PATH', 'Test images root', "Rivendell's test root; the lab writes gandalf/ and mordor/ under it when set."],
+  ['TEST_IMAGES_PATH', 'Test images root', "Dernvale's test root; the lab writes gandalf/ and mordor/ under it when set."],
   ['LAB_VM_DIR', 'VM directory', 'Vagrant boxes, VirtualBox and Tart VMs.'],
   ['WINDOWS_VM_CPUS', 'Windows VM CPUs', ''],
   ['WINDOWS_VM_MEMORY_MB', 'Windows VM memory (MB)', ''],
@@ -37,8 +37,8 @@ function AgentPanel({ status, onRecheck }) {
     <div className="card">
       <h2>Lab agent not running</h2>
       <p>
-        The lab's containers and VMs run on this machine, outside Rivendell's containers, so the web UI drives
-        them through a small agent on the host. Start it from the repository on the machine running Rivendell:
+        The lab's containers and VMs run on this machine, outside Dernvale's containers, so the web UI drives
+        them through a small agent on the host. Start it from the repository on the machine running Dernvale:
       </p>
       <div className="lab-command"><code>cd lab && {status?.start_command || './lab.sh agent start'}</code></div>
       <p className="lab-note">
@@ -400,11 +400,11 @@ function LabManage({ section = 'lab', children = null }) {
         <h2>Maintenance</h2>
         <div>
           <div className="lab-actions">
-            <button className="secondary" disabled={busy} onClick={() => start('rivendell-env')}>Rivendell test settings</button>
+            <button className="secondary" disabled={busy} onClick={() => start('dernvale-env')}>Dernvale test settings</button>
             <button className="secondary" disabled={busy} onClick={() => start('teardown', [], 'Remove all lab containers and VMs? Collected data and the lab password are kept.')}>Tear down lab</button>
           </div>
           <p className="lab-note">
-            Test settings writes the paths <code>tests/scripts/run_test.py</code> needs and checks Rivendell's worker can
+            Test settings writes the paths <code>tests/scripts/run_test.py</code> needs and checks Dernvale's worker can
             read the lab's data directory. Teardown removes every target; collected data and the password are kept.
           </p>
         </div>

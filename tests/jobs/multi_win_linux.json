@@ -1,10 +1,10 @@
 {
   "case_number": "TEST_multi_win_linux",
   "source_paths": [
-    "/Volumes/Media5TB/rivendell_imgs/win7-64-nfury-c-drive.E01",
-    "/Volumes/Media5TB/rivendell_imgs/Linux_mail.vmdk.raw"
+    "/Volumes/Media5TB/dernvale_imgs/win7-64-nfury-c-drive.E01",
+    "/Volumes/Media5TB/dernvale_imgs/Linux_mail.vmdk.raw"
   ],
-  "destination_path": "/Volumes/Media5TB/rivendell_imgs/tests/multi_win_linux",
+  "destination_path": "/Volumes/Media5TB/dernvale_imgs/tests/multi_win_linux",
   "options": {
     "local": true,
     "gandalf": false,

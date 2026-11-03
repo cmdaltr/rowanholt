@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Start the Docker stack with progress and an ETA (`rivendell start --progress`).
+Start the Docker stack with progress and an ETA (`dernvale start --progress`).
 
 The start runs in four phases: waking Docker, getting the images (pulled, or built,
 which is most of a first start), starting the containers, and waiting for the web UI.
@@ -11,7 +11,7 @@ its own estimate from BuildKit's step counts as it goes.
 
 Output is the compose output, plus a line per second like
     @@progress {"fraction": 0.42, "eta": 95, "phase": "images", "message": "...", "learning": false}
-for Rivendell.app's journey across Middle-earth; --zenity prints zenity --progress's
+for Dernvale.app's journey across Middle-earth; --zenity prints zenity --progress's
 format instead. Stdlib only, Python 3.8+.
 """
 
@@ -42,16 +42,16 @@ MESSAGES = {
     "containers": "Raising the halls",
     "ui": "Opening the doors",
 }
-# Where the traveller is, by fraction of the journey (Rivendell.app draws the same road)
+# Where the traveller is, by fraction of the journey (Dernvale.app draws the same road)
 PLACES = [(0.0, "the Shire"), (0.18, "Bree"), (0.38, "Weathertop"), (0.55, "the Last Bridge"),
-          (0.7, "the Trollshaws"), (0.86, "the Ford of Bruinen"), (1.0, "Rivendell")]
+          (0.7, "the Trollshaws"), (0.86, "the Ford of Bruinen"), (1.0, "Dernvale")]
 HISTORY_KEEP = 20
 STEP = re.compile(r"^#\d+ \[([\w.-]+)(?:\s+[\w.-]+)?\s+(\d+)/(\d+)\]")
 
 
 def state_dir() -> Path:
     base = os.environ.get("XDG_STATE_HOME") or str(Path.home() / ".local" / "state")
-    return Path(base) / "rivendell"
+    return Path(base) / "dernvale"
 
 
 def load_history(kind: str) -> List[dict]:
@@ -163,7 +163,7 @@ class Reporter:
                 minutes = report["eta"] // 60
                 eta = "less than a minute" if report["eta"] < 60 else f"about {minutes + 1} minutes"
                 print(int(report["fraction"] * 100), flush=True)
-                print(f"# At {report['place']}: {report['message']}. {eta} to Rivendell", flush=True)
+                print(f"# At {report['place']}: {report['message']}. {eta} to Dernvale", flush=True)
             else:
                 print("@@progress " + json.dumps(report), flush=True)
 
@@ -300,7 +300,7 @@ def main(argv: List[str]) -> int:
             journey.enter("containers")
         journey.enter("ui")
         if not wait_for_ui(args.url, journey, args.timeout):
-            reporter.line(f"The stack started but nothing answered on {args.url}. Try 'rivendell status'.")
+            reporter.line(f"The stack started but nothing answered on {args.url}. Try 'dernvale status'.")
             return 1
         ok = True
         return 0
@@ -310,10 +310,10 @@ def main(argv: List[str]) -> int:
         if ok:
             with reporter.lock:
                 if args.zenity:
-                    print("100\n# Rivendell is ready", flush=True)
+                    print("100\n# Dernvale is ready", flush=True)
                 else:
                     print("@@progress " + json.dumps({"fraction": 1.0, "eta": 0, "phase": "ui",
-                                                      "message": "Rivendell is ready", "place": "Rivendell",
+                                                      "message": "Dernvale is ready", "place": "Dernvale",
                                                       "learning": journey.learning}), flush=True)
 
 

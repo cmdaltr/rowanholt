@@ -1,5 +1,5 @@
 """
-Unified timestamp utilities for Rivendell DF Acceleration Suite
+Unified timestamp utilities for Dernvale DF Acceleration Suite
 
 Provides consistent timestamp formatting across acquisition and analysis modules.
 Eliminates duplicate timestamp code found in 57+ files.

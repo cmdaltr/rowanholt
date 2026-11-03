@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { forgotPassword } from '../api';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rivendell.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/dernvale.png`;
 
 const ForgotPasswordPage = () => {
   const [email, setEmail] = useState('');
@@ -30,7 +30,7 @@ const ForgotPasswordPage = () => {
       <section className="hero-section">
         <img
           src={heroImage}
-          alt="Rivendell - The Last Homely House"
+          alt="Dernvale"
           className="hero-image"
           style={{
             transform: 'scale(0.2)',
@@ -42,7 +42,7 @@ const ForgotPasswordPage = () => {
       <header>
         <h2>Forgot Password</h2>
         <p>
-          Reset your Rivendell account password.
+          Reset your Dernvale account password.
         </p>
       </header>
 

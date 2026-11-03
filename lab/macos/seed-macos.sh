@@ -6,7 +6,7 @@ set -eu
 : "${LAB_PASSWORD:?}"
 
 if ! id gandalf >/dev/null 2>&1; then
-  sysadminctl -addUser gandalf -fullName "Rivendell lab" -password "$LAB_PASSWORD" -admin
+  sysadminctl -addUser gandalf -fullName "Dernvale lab" -password "$LAB_PASSWORD" -admin
   createhomedir -c -u gandalf >/dev/null 2>&1 || true
 else
   dscl . -passwd /Users/gandalf "$LAB_PASSWORD"

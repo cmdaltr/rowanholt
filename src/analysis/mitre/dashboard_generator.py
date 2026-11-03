@@ -4,7 +4,7 @@ MITRE ATT&CK Dashboard Generator
 Generates dashboards and visualizations for MITRE ATT&CK coverage.
 Supports Splunk, Elasticsearch/Kibana, and ATT&CK Navigator formats.
 
-Author: Rivendell DF Acceleration Suite
+Author: Dernvale DF Acceleration Suite
 Version: 2.1.0
 """
 
@@ -180,7 +180,7 @@ class MitreDashboardGenerator:
         # Build Splunk XML dashboard
         xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <form version="1.1">
-  <label>MITRE ATT&amp;CK Coverage - Rivendell</label>
+  <label>MITRE ATT&amp;CK Coverage - Dernvale</label>
   <description>ATT&amp;CK Framework Coverage Analysis (v{self.attck_data.get('version', 'unknown')})</description>
 
   <!-- Overall Coverage Statistics -->
@@ -327,7 +327,7 @@ class MitreDashboardGenerator:
                     "id": "mitre-attck-coverage",
                     "type": "dashboard",
                     "attributes": {
-                        "title": f"MITRE ATT&CK Coverage - Rivendell (v{self.attck_data.get('version', 'unknown')})",
+                        "title": f"MITRE ATT&CK Coverage - Dernvale (v{self.attck_data.get('version', 'unknown')})",
                         "description": "ATT&CK Framework Coverage Analysis",
                         "panelsJSON": json.dumps(
                             [
@@ -466,14 +466,14 @@ class MitreDashboardGenerator:
 
         # Create Navigator layer
         layer = {
-            "name": "Rivendell Coverage",
+            "name": "Dernvale Coverage",
             "versions": {
                 "attack": str(self.attck_data.get("version", "unknown")),
                 "navigator": "4.8.0",
                 "layer": "4.3",
             },
             "domain": "enterprise-attack",
-            "description": f"MITRE ATT&CK coverage from Rivendell analysis. "
+            "description": f"MITRE ATT&CK coverage from Dernvale analysis. "
             f"Coverage: {coverage['statistics']['coverage_percentage']:.1f}% "
             f"({coverage['statistics']['detected_techniques']}/{coverage['statistics']['total_techniques']} techniques)",
             "filters": {"platforms": ["windows", "linux", "macos"]},

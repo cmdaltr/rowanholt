@@ -37,7 +37,9 @@ TECHNIQUE = re.compile(r"^T\d{4}(?:\.\d{3})?$")
 EXCERPT = 600
 # Eru's MCP server (src/eru_mcp) sends this on every call, so what it writes reads as Eru's, on the
 # analyst's behalf, and never passes for the analyst's own work
-AGENT_HEADER = "X-Rivendell-Agent"
+AGENT_HEADER = "X-Dernvale-Agent"
+# What an MCP server from before the rename sends: still Eru, never the analyst
+OLD_AGENT_HEADER = "X-Rivendell-Agent"
 ERU_MCP = "eru-mcp"
 
 
@@ -234,7 +236,7 @@ def restart_refusal(job_id: str, confirm: bool) -> Optional[Dict]:
 
 def _by_eru(request: Request) -> bool:
     """Eru's MCP server says so in a header; an eru-mcp token is Eru whatever it says."""
-    return (request.headers.get(AGENT_HEADER, "").strip().lower() == ERU_MCP
+    return (any(request.headers.get(h, "").strip().lower() == ERU_MCP for h in (AGENT_HEADER, OLD_AGENT_HEADER))
             or access.token_scope(request) == ERU_MCP)
 
 

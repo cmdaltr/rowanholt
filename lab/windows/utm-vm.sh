@@ -10,7 +10,7 @@
 # creates the VM through UTM's AppleScript API and keeps it under
 # $LAB_VM_DIR/utm. Windows installs itself, provisions the lab target on first
 # logon and starts an SSH server, forwarded to 127.0.0.1:2232.
-# WINDOWS_CLEAN=<n> works on clean sibling n instead (rivendell-lab-win11-clean<n>,
+# WINDOWS_CLEAN=<n> works on clean sibling n instead (dernvale-lab-win11-clean<n>,
 # SSH on 2232+n, nothing seeded), for stacking one seeded host among clean ones.
 # The Windows 11 ARM64 ISO is the one manual download (Microsoft only hands out
 # links through its web form); put it in $LAB_DATA_DIR/isos/.
@@ -29,7 +29,7 @@ CLEAN="${WINDOWS_CLEAN:-}"
 if [ -n "$CLEAN" ]; then
   case "$CLEAN" in [1-9]) ;; *) die "WINDOWS_CLEAN is a number from 1 to 9" ;; esac
   # NetBIOS names stop at 15 characters
-  VM="rivendell-lab-win11-clean$CLEAN"; PORT=$((2232 + CLEAN)); COMPUTERNAME="LAB-WINCLEAN$CLEAN"
+  VM="dernvale-lab-win11-clean$CLEAN"; PORT=$((2232 + CLEAN)); COMPUTERNAME="LAB-WINCLEAN$CLEAN"
 fi
 UTM_DIR="$LAB_VM_DIR/utm"
 BUNDLE="$UTM_DIR/$VM.utm"
@@ -450,7 +450,7 @@ record() {
 case "$action" in
   create)
     # create always builds the lab's own VM (or a clean sibling), whatever WINDOWS_UTM_VM says
-    [ -n "$CLEAN" ] || { VM="rivendell-lab-win11"; BUNDLE="$UTM_DIR/$VM.utm"; }
+    [ -n "$CLEAN" ] || { VM="dernvale-lab-win11"; BUNDLE="$UTM_DIR/$VM.utm"; }
     require_password
     win="$(windows_iso)"
     if [ -z "$win" ] || [ ! -f "$win" ]; then
@@ -496,9 +496,9 @@ case "$action" in
     # Only ever delete a VM the lab built. An adopted VM is the user's own:
     # UTM's delete removes its files for good, so leave that to them.
     case "$VM" in
-      rivendell-lab-*) ;;
+      dernvale-lab-*) ;;
       *) warn "$VM was adopted, not built by the lab; not deleting it. Remove it in UTM yourself if you want it gone."
-         WINDOWS_UTM_VM="rivendell-lab-win11"; save_config >/dev/null
+         WINDOWS_UTM_VM="dernvale-lab-win11"; save_config >/dev/null
          exit 0 ;;
     esac
     confirm "Delete $VM and its disk?" n || exit 0

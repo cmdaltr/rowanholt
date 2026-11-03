@@ -1,18 +1,18 @@
-# Rivendell as a team's shared server. `rivendell start` layers this over
-# docker-compose.yml once `rivendell server init` has set the server up (or with --server).
+# Dernvale as a team's shared server. `dernvale start` layers this over
+# docker-compose.yml once `dernvale server init` has set the server up (or with --server).
 #
 # One way in: Caddy, with TLS, on 443 for the web app and API, and on Splunk's, Kibana's
-# and the Navigator's usual ports behind the Rivendell sign-in. Nothing else is published.
+# and the Navigator's usual ports behind the Dernvale sign-in. Nothing else is published.
 # The backend runs in server mode (sign-in on every route, jobs visible to their owner,
 # the people they're shared with and admins) and the frontend is a production build.
 #
-# Settings come from .env; `rivendell server init` writes them. Paths are relative to the
+# Settings come from .env; `dernvale server init` writes them. Paths are relative to the
 # repository root. Needs Docker Compose 2.24 or later (!reset).
 
 services:
   proxy:
     image: caddy:2.8
-    container_name: rivendell-proxy
+    container_name: dernvale-proxy
     restart: unless-stopped
     ports:
       - "80:80"
@@ -21,8 +21,8 @@ services:
       - "5601:5601" # Kibana
       - "5602:5602" # ATT&CK Navigator
     environment:
-      - RIVENDELL_HOSTNAME=${RIVENDELL_HOSTNAME:?Run rivendell server init first}
-      - RIVENDELL_TLS=${RIVENDELL_TLS:-internal}
+      - DERNVALE_HOSTNAME=${DERNVALE_HOSTNAME:?Run dernvale server init first}
+      - DERNVALE_TLS=${DERNVALE_TLS:-internal}
     volumes:
       - ./deploy/server/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./deploy/server/certs:/certs:ro
@@ -32,18 +32,18 @@ services:
       - backend
       - frontend
     networks:
-      - rivendell-network
+      - dernvale-network
 
   backend:
     ports: !reset []
     # No --reload; the proxy's X-Forwarded-* headers are trusted (only it can reach here)
     command: uvicorn main:app --host 0.0.0.0 --port 5688 --proxy-headers --forwarded-allow-ips=*
     environment:
-      - RIVENDELL_SERVER_MODE=true
-      - RIVENDELL_PUBLIC_URL=https://${RIVENDELL_HOSTNAME:?Run rivendell server init first}
-      - SECRET_KEY=${SECRET_KEY:?Run rivendell server init first}
-      - RIVENDELL_ADMIN_PASSWORD=${RIVENDELL_ADMIN_PASSWORD:?Run rivendell server init first}
-      - RIVENDELL_LOCAL_LOGIN=${RIVENDELL_LOCAL_LOGIN:-true}
+      - DERNVALE_SERVER_MODE=true
+      - DERNVALE_PUBLIC_URL=https://${DERNVALE_HOSTNAME:?Run dernvale server init first}
+      - SECRET_KEY=${SECRET_KEY:?Run dernvale server init first}
+      - DERNVALE_ADMIN_PASSWORD=${DERNVALE_ADMIN_PASSWORD:?Run dernvale server init first}
+      - DERNVALE_LOCAL_LOGIN=${DERNVALE_LOCAL_LOGIN:-true}
       - OIDC_ISSUER=${OIDC_ISSUER:-}
       - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
       - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}

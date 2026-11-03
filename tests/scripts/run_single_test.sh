@@ -100,7 +100,7 @@ fi
 echo "Checking backend status..." | tee -a "$LOG_FILE"
 if ! python3 scripts/run_test.py --status &> /dev/null; then
     echo "Backend not responsive, restarting containers..." | tee -a "$LOG_FILE"
-    docker restart rivendell-backend rivendell-celery-worker 2>&1 | tee -a "$LOG_FILE"
+    docker restart dernvale-backend dernvale-celery-worker 2>&1 | tee -a "$LOG_FILE"
     echo "Waiting 30s for services to start..." | tee -a "$LOG_FILE"
     sleep 30
 fi
@@ -126,7 +126,7 @@ fi
 if [ "$NO_RESTART" = false ]; then
     echo "" | tee -a "$LOG_FILE"
     echo "Restarting Docker containers to free resources..." | tee -a "$LOG_FILE"
-    docker restart rivendell-backend rivendell-celery-worker 2>&1 | tee -a "$LOG_FILE"
+    docker restart dernvale-backend dernvale-celery-worker 2>&1 | tee -a "$LOG_FILE"
 
     echo "Waiting 30s for services to stabilize..." | tee -a "$LOG_FILE"
     sleep 30

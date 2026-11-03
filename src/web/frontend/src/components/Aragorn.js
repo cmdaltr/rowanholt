@@ -44,7 +44,7 @@ const isBusy = (err) => {
 
 function EnablePanel({ status, onRecheck }) {
   const [copied, setCopied] = useState(false);
-  const command = status?.enable_command || 'rivendell anduril enable';
+  const command = status?.enable_command || 'dernvale anduril enable';
 
   const copy = async () => {
     try {
@@ -67,7 +67,7 @@ function EnablePanel({ status, onRecheck }) {
         </p>
       ) : (
         <p>
-          Anduril, Rivendell's Docker manager, needs access to the Docker socket to manage Rivendell's containers and images. Only the host
+          Anduril, Dernvale's Docker manager, needs access to the Docker socket to manage Dernvale's containers and images. Only the host
           can grant that, so run this on the machine running Docker Desktop or OrbStack. It explains what it
           grants and asks before changing anything.
         </p>
@@ -78,8 +78,8 @@ function EnablePanel({ status, onRecheck }) {
         <button className="aragorn-recheck" onClick={onRecheck}>Check again</button>
       </div>
       <p className="aragorn-note">
-        Anduril only sees containers labelled with the <code>rivendell</code> compose project and named
-        <code> rivendell-*</code>. Other containers and images on the same engine are never listed or touched.
+        Anduril only sees containers labelled with the <code>dernvale</code> compose project and named
+        <code> dernvale-*</code>. Other containers and images on the same engine are never listed or touched.
       </p>
       {status?.detail && <p className="aragorn-note">Last error: {status.detail}</p>}
     </div>
@@ -211,7 +211,7 @@ function AndurilPanel() {
   };
 
   const prune = async () => {
-    if (!window.confirm('Remove dangling images built for Rivendell?')) return;
+    if (!window.confirm('Remove dangling images built for Dernvale?')) return;
     try {
       await waitForOp(await andurilPruneImages());
     } catch (err) {
@@ -226,7 +226,7 @@ function AndurilPanel() {
       <div className="aragorn">
         <div className="card">
           <h2>Containers and images</h2>
-          <p>Docker administration is limited to Rivendell administrators. Sign in with an admin account.</p>
+          <p>Docker administration is limited to Dernvale administrators. Sign in with an admin account.</p>
         </div>
       </div>
     );
@@ -248,8 +248,8 @@ function AndurilPanel() {
       <div data-guide="aragorn.anduril" className="card">
         <h2>Containers and images</h2>
         <p className="aragorn-note">
-          Rivendell containers and images on <code>{status.socket}</code> (compose project <code>{status.project}</code>).
-          Rebuilding Rivendell's own images runs on the host: <code>rivendell anduril rebuild &lt;service&gt;</code>.
+          Dernvale containers and images on <code>{status.socket}</code> (compose project <code>{status.project}</code>).
+          Rebuilding Dernvale's own images runs on the host: <code>dernvale anduril rebuild &lt;service&gt;</code>.
         </p>
         {error && (
           <div className="error">
@@ -309,7 +309,7 @@ function AndurilPanel() {
 
       <div className="card">
         <h3>Images</h3>
-        <button className="secondary" onClick={prune}>Prune dangling Rivendell images</button>
+        <button className="secondary" onClick={prune}>Prune dangling Dernvale images</button>
         <table className="aragorn-table">
           <thead>
             <tr><th>Image</th><th>Size</th><th>Source</th><th>Used by</th><th>Actions</th></tr>
@@ -322,7 +322,7 @@ function AndurilPanel() {
                 <td>{i.built ? 'built' : 'upstream'}</td>
                 <td>
                   {i.used_by.join(', ') || '—'}
-                  {i.shared_with.length > 0 && <div className="aragorn-note">also used outside Rivendell: {i.shared_with.join(', ')}</div>}
+                  {i.shared_with.length > 0 && <div className="aragorn-note">also used outside Dernvale: {i.shared_with.join(', ')}</div>}
                 </td>
                 <td className="aragorn-actions">
                   {!i.built && i.tags[0] && <button className="secondary" onClick={() => pull(i.tags[0])}>Pull</button>}
@@ -371,8 +371,8 @@ function AndurilPanel() {
   );
 }
 
-// Aragorn: everything Rivendell runs on this host. Lab is the lab's targets and machines (the lab
-// agent); Deploy builds and runs a Gandalf, Elrond or Mordor run; Settings is Rivendell's containers
+// Aragorn: everything Dernvale runs on this host. Lab is the lab's targets and machines (the lab
+// agent); Deploy builds and runs a Gandalf, Elrond or Mordor run; Settings is Dernvale's containers
 // and images (Anduril, the aragorn service) and the lab's host, settings and password.
 const TABS = [['lab', 'Lab'], ['deploy', 'Deploy'], ['settings', 'Settings']];
 
@@ -382,12 +382,12 @@ function Aragorn() {
   const navigate = useNavigate();
   const tab = TABS.some(([k]) => `#${k}` === hash) ? hash.slice(1) : 'lab';
   const admin = user?.role === 'admin';
-  const adminOnly = <div className="card"><p>The lab is limited to Rivendell administrators. Sign in with an admin account.</p></div>;
+  const adminOnly = <div className="card"><p>The lab is limited to Dernvale administrators. Sign in with an admin account.</p></div>;
   return (
     <div className="journey-detail">
       <PageHero title="Aragorn">
-        Everything Rivendell runs on this machine: the lab's targets and machines, runs that deploy Gandalf, Elrond
-        or Mordor against them, and Rivendell's own containers and settings.
+        Everything Dernvale runs on this machine: the lab's targets and machines, runs that deploy Gandalf, Elrond
+        or Mordor against them, and Dernvale's own containers and settings.
       </PageHero>
       <div data-guide="aragorn.tabs" className="aragorn-tabs" role="tablist">
         {TABS.map(([key, label]) => (
@@ -403,7 +403,7 @@ function Aragorn() {
           <div data-guide="aragorn.lab" className="card">
             <h2>Lab machines</h2>
             <p className="lab-note">
-              Create and manage the containers and VMs Gandalf collects from and Mordor records on. Rivendell drives Docker
+              Create and manage the containers and VMs Gandalf collects from and Mordor records on. Dernvale drives Docker
               and Tart for Linux and macOS, and UTM for Windows. The machines are disposable: snapshot one before you turn
               logging on or run atomics, and revert when you're done. Recordings appear on the Mordor page as Your lab.
             </p>

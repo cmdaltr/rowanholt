@@ -11,11 +11,11 @@ from pathlib import Path
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from rivendell.analysis import keywords as kw  # noqa: E402
-from rivendell.post import yara as yara_post  # noqa: E402
-from rivendell.process import extra_artefacts as ex  # noqa: E402
-from rivendell.process.extractions import asl, biome, fsevents, macos_databases, ntfs_logfile  # noqa: E402
-from rivendell.process.extractions import paged_strings, powershell_history, thumbcache, unix_config  # noqa: E402
+from dernvale.analysis import keywords as kw  # noqa: E402
+from dernvale.post import yara as yara_post  # noqa: E402
+from dernvale.process import extra_artefacts as ex  # noqa: E402
+from dernvale.process.extractions import asl, biome, fsevents, macos_databases, ntfs_logfile  # noqa: E402
+from dernvale.process.extractions import paged_strings, powershell_history, thumbcache, unix_config  # noqa: E402
 
 COCOA_2026 = 800000000.0  # 2026-05-09 06:13:20Z in Cocoa seconds
 

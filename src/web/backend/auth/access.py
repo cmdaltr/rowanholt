@@ -6,7 +6,7 @@ Who is calling, and which jobs and cases they may see.
 Local mode (the default) keeps the API as open as it has always been on an analyst's
 own machine: a caller with no token acts as the local analyst, with admin rights.
 
-Server mode (settings.rivendell_server_mode) puts every /api route behind a signed-in
+Server mode (settings.dernvale_server_mode) puts every /api route behind a signed-in
 user, apart from PUBLIC_PATHS, so a route added later is covered without remembering
 to protect it. Admin-only areas are listed in ADMIN_PREFIXES. A job is visible to its
 owner, the users it's shared with, and admins; a job from before server mode has no
@@ -70,7 +70,7 @@ def configure(storage) -> None:
 
 
 def server_mode() -> bool:
-    return settings.rivendell_server_mode
+    return settings.dernvale_server_mode
 
 
 def user_from_request(request: Request) -> Optional[dict]:

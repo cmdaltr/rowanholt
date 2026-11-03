@@ -35,13 +35,13 @@ function FileBrowser({ onSelectFiles, selectedFiles = [], disabled = false }) {
 
       let paths;
       if (isWindows) {
-        paths = ['C:\\Temp\\rivendell', 'D:\\Temp\\rivendell', 'E:\\Temp\\rivendell', 'F:\\Temp\\rivendell'];
+        paths = ['C:\\Temp\\dernvale', 'D:\\Temp\\dernvale', 'E:\\Temp\\dernvale', 'F:\\Temp\\dernvale'];
       } else if (isMac) {
-        // Mac: /host/tmp/rivendell for host /tmp access, /Volumes for external drives
-        paths = ['/host/tmp/rivendell', '/Volumes'];
+        // Mac: /host/tmp/dernvale for host /tmp access, /Volumes for external drives
+        paths = ['/host/tmp/dernvale', '/Volumes'];
       } else {
-        // Linux: native uses /tmp/rivendell, Docker uses /host/tmp (for Docker on Mac)
-        paths = ['/Volumes', '/mnt', '/media', '/tmp/rivendell'];
+        // Linux: native uses /tmp/dernvale, Docker uses /host/tmp (for Docker on Mac)
+        paths = ['/Volumes', '/mnt', '/media', '/tmp/dernvale'];
       }
 
       setAllowedPaths(paths);
@@ -87,7 +87,7 @@ function FileBrowser({ onSelectFiles, selectedFiles = [], disabled = false }) {
     if (!path) return false;
     // Normalize path separators and check if path contains /jobs or ends with /jobs
     const normalizedPath = path.replace(/\\/g, '/');
-    return normalizedPath.includes('/rivendell/jobs/') || normalizedPath.endsWith('/rivendell/jobs');
+    return normalizedPath.includes('/dernvale/jobs/') || normalizedPath.endsWith('/dernvale/jobs');
   };
 
   const handleItemClick = (item) => {

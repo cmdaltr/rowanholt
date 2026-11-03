@@ -1,6 +1,6 @@
 # Gandalf test targets and the collector that runs against them.
-# Compose project 'rivendell-lab' (set by lab.sh), so Rivendell's own tooling
-# (including Anduril) never treats these as Rivendell containers.
+# Compose project 'dernvale-lab' (set by lab.sh), so Dernvale's own tooling
+# (including Anduril) never treats these as Dernvale containers.
 #
 # Targets are reached by hostname on the private lab network, so this works the
 # same on Docker Desktop and OrbStack, Intel and Apple silicon. Each target's SSH
@@ -22,7 +22,7 @@ services:
   ubuntu:
     <<: *target
     build: { context: ., args: { BASE: "ubuntu:24.04" } }
-    image: rivendell-lab-target:ubuntu
+    image: dernvale-lab-target:ubuntu
     hostname: lab-ubuntu
     container_name: lab-ubuntu
     ports: ["127.0.0.1:2221:22"]
@@ -30,7 +30,7 @@ services:
   rocky:
     <<: *target
     build: { context: ., args: { BASE: "rockylinux:9" } }
-    image: rivendell-lab-target:rocky
+    image: dernvale-lab-target:rocky
     hostname: lab-rocky
     container_name: lab-rocky
     ports: ["127.0.0.1:2222:22"]
@@ -40,7 +40,7 @@ services:
   ubuntu-clean-1:
     <<: *target
     build: { context: ., args: { BASE: "ubuntu:24.04", SEED: "0" } }
-    image: rivendell-lab-target:ubuntu-clean
+    image: dernvale-lab-target:ubuntu-clean
     hostname: lab-ubuntu-clean1
     container_name: lab-ubuntu-clean1
     ports: ["127.0.0.1:2223:22"]
@@ -49,7 +49,7 @@ services:
   ubuntu-clean-2:
     <<: *target
     build: { context: ., args: { BASE: "ubuntu:24.04", SEED: "0" } }
-    image: rivendell-lab-target:ubuntu-clean
+    image: dernvale-lab-target:ubuntu-clean
     hostname: lab-ubuntu-clean2
     container_name: lab-ubuntu-clean2
     ports: ["127.0.0.1:2224:22"]
@@ -61,7 +61,7 @@ services:
     profiles: [controller]
     build:
       context: ../controller
-    image: rivendell-lab-controller
+    image: dernvale-lab-controller
     container_name: lab-controller
     environment:
       - LAB_PASSWORD
@@ -76,4 +76,4 @@ services:
 
 networks:
   lab:
-    name: rivendell-lab
+    name: dernvale-lab

@@ -219,7 +219,7 @@ RUN pip3 install --no-cache-dir volatility3 && \
     echo "Volatility3 installed successfully"
 
 # =============================================================================
-# Step 5/5: Rivendell source code configuration
+# Step 5/5: Dernvale source code configuration
 # - Copy elrond forensics source code (avoids OneDrive file locking issues)
 # - Copy backend application code
 # - Create mount directories

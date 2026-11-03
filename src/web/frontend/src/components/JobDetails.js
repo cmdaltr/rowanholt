@@ -4,7 +4,7 @@ import { getJob, cancelJob, pauseJob, resumeJob, deleteJob, restartJob, exportSi
 import { serviceUrl } from '../apiBase';
 import JobSharing from './JobSharing';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rivendell.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/dernvale.png`;
 
 function JobDetails() {
   const { jobId } = useParams();
@@ -337,7 +337,7 @@ function JobDetails() {
         <section className="hero-section">
           <img
             src={heroImage}
-            alt="Rivendell - The Last Homely House"
+            alt="Dernvale"
             className="hero-image"
             style={{
               transform: 'scale(0.2)',
@@ -703,7 +703,7 @@ function JobDetails() {
       <section className="hero-section">
         <img
           src={heroImage}
-          alt="Rivendell - The Last Homely House"
+          alt="Dernvale"
           className="hero-image"
           style={{
             transform: 'scale(0.2)',

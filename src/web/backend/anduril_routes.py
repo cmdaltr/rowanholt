@@ -1,9 +1,9 @@
 """
-Anduril routes: administer Rivendell's Docker containers and images.
+Anduril routes: administer Dernvale's Docker containers and images.
 
 The backend never holds the Docker socket. These admin-only endpoints proxy
-to the Anduril service over the internal rivendell-anduril network, and
-Anduril enforces the Rivendell-only scope. Disabled until the JWT secret has
+to the Anduril service over the internal dernvale-anduril network, and
+Anduril enforces the Dernvale-only scope. Disabled until the JWT secret has
 been changed from its default, since a default secret lets anyone mint an
 admin token.
 """
@@ -39,9 +39,9 @@ router = APIRouter(tags=["anduril"])
 ANDURIL_URL = os.environ.get("ANDURIL_URL") or os.environ.get("ARAGORN_URL") or "http://anduril:5690"
 ANDURIL_TOKEN_PATH = Path(os.environ.get("ANDURIL_TOKEN_PATH", "/run/anduril/token"))
 DEFAULT_SECRET = "your-secret-key-change-in-production"
-ENABLE_COMMAND = "rivendell anduril enable"
+ENABLE_COMMAND = "dernvale anduril enable"
 # Services whose restart interrupts a running job (see anduril/scope.py).
-JOB_SENSITIVE_SERVICES = {"celery-worker", "rivendell-celery-worker", "postgres", "rivendell-postgres", "redis", "rivendell-redis"}
+JOB_SENSITIVE_SERVICES = {"celery-worker", "dernvale-celery-worker", "postgres", "dernvale-postgres", "redis", "dernvale-redis"}
 
 _bearer = HTTPBearer(auto_error=False)
 

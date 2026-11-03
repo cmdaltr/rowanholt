@@ -4,7 +4,7 @@ MITRE ATT&CK Standalone Dashboard Generator
 Generates interactive HTML dashboards without requiring SIEM.
 Complete offline dashboard with ATT&CK matrix, timeline, and evidence browser.
 
-Author: Rivendell DF Acceleration Suite
+Author: Dernvale DF Acceleration Suite
 Version: 2.1.0
 """
 

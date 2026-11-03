@@ -14,7 +14,7 @@
 
 set -e
 
-CONTAINER_NAME="rivendell-splunk"
+CONTAINER_NAME="dernvale-splunk"
 APP_NAME="elrond"
 EXPORT_DIR="/tmp/splunk_app_export"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -111,7 +111,7 @@ supported_themes = light,dark
 
 [launcher]
 author = cyberg3cko
-description = Digital Forensics and Incident Response (DFIR) analysis app for the Rivendell DF Acceleration Suite. Provides MITRE ATT&CK technique mapping, artifact analysis dashboards, and IOC detection capabilities.
+description = Digital Forensics and Incident Response (DFIR) analysis app for the Dernvale DF Acceleration Suite. Provides MITRE ATT&CK technique mapping, artifact analysis dashboards, and IOC detection capabilities.
 version = ${VERSION}
 
 [package]
@@ -139,7 +139,7 @@ cat > "${EXPORT_DIR}/${APP_NAME}/app.manifest" << EOF
       }
     ],
     "releaseDate": null,
-    "description": "Digital Forensics and Incident Response (DFIR) analysis app for the Rivendell DF Acceleration Suite. Provides MITRE ATT&CK technique mapping, artifact analysis dashboards, and IOC detection capabilities.",
+    "description": "Digital Forensics and Incident Response (DFIR) analysis app for the Dernvale DF Acceleration Suite. Provides MITRE ATT&CK technique mapping, artifact analysis dashboards, and IOC detection capabilities.",
     "classification": {
       "intendedAudience": "Security",
       "categories": ["Security, Fraud & Compliance"],
@@ -188,7 +188,7 @@ Version: ${VERSION}
 Description
 -----------
 Elrond is a Digital Forensics and Incident Response (DFIR) analysis app
-designed for the Rivendell DF Acceleration Suite. It provides:
+designed for the Dernvale DF Acceleration Suite. It provides:
 
 - MITRE ATT&CK technique mapping and visualization
 - Artifact analysis dashboards
@@ -199,7 +199,7 @@ designed for the Rivendell DF Acceleration Suite. It provides:
 Requirements
 ------------
 - Splunk Enterprise 8.0 or later
-- Rivendell DF Acceleration Suite (for data ingestion)
+- Dernvale DF Acceleration Suite (for data ingestion)
 
 Installation
 ------------
@@ -210,7 +210,7 @@ Installation
 Documentation
 -------------
 For full documentation, visit:
-https://github.com/cmdaltr/rivendell
+https://github.com/cmdaltr/dernvale
 
 Support
 -------

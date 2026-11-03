@@ -1,4 +1,4 @@
-# Rivendell Sample Keywords File
+# Dernvale Sample Keywords File
 # One keyword or phrase per line
 # Lines starting with # are comments
 

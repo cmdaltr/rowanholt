@@ -1,6 +1,6 @@
 # The YouTube walkthrough
 
-Rivendell's narrated walkthrough is filmed with Playwright against a running stack, narrated by
+Dernvale's narrated walkthrough is filmed with Playwright against a running stack, narrated by
 Piper and put together with ffmpeg. `regenerate.sh` also retakes the in-app guide's photographs,
 because both show the same pages.
 
@@ -9,7 +9,7 @@ folder except this README.
 
 ## Regenerating
 
-With Rivendell running (`rivendell start`):
+With Dernvale running (`dernvale start`):
 
 ```bash
 scripts/docs/video/regenerate.sh               # guide photographs, then the video
@@ -17,7 +17,7 @@ scripts/docs/video/regenerate.sh --refilm      # after a change to the web UI
 scripts/docs/video/regenerate.sh --video-only  # or --guide-only
 ```
 
-It asks for the admin password in a dialog, unless `RIVENDELL_PASSWORD` is already set. A
+It asks for the admin password in a dialog, unless `DERNVALE_PASSWORD` is already set. A
 full render takes about 25 minutes.
 
 Any other options are passed to `make_video.py`:
@@ -34,17 +34,17 @@ To retake only some of the guide's pages, run the capture directly. Page IDs com
 `src/web/frontend/src/guide/content.js`:
 
 ```bash
-~/.cache/rivendell-video/bin/python scripts/docs/guide/capture.py --only case intel
+~/.cache/dernvale-video/bin/python scripts/docs/guide/capture.py --only case intel
 ```
 
-Add `--username admin` (with `RIVENDELL_PASSWORD` set) for pages that need an admin: Account,
+Add `--username admin` (with `DERNVALE_PASSWORD` set) for pages that need an admin: Account,
 Aragorn and Aragorn's settings.
 
 ## What it needs
 
 | What | Where |
 |---|---|
-| Playwright and Chromium | `~/.cache/rivendell-video` (created on the first run if missing) |
+| Playwright and Chromium | `~/.cache/dernvale-video` (created on the first run if missing) |
 | Piper and the `en_GB-alan-medium` voice | `~/.local/share/piper` (install steps at the top of `make_video.py`) |
 | ffmpeg | `brew install ffmpeg` |
 | A finished demo case | see below |
@@ -71,8 +71,8 @@ In `OUT`:
 
 | File | What |
 |---|---|
-| `rivendell-walkthrough.mp4` | The video, with chapters |
-| `rivendell-walkthrough.srt` | Captions |
+| `dernvale-walkthrough.mp4` | The video, with chapters |
+| `dernvale-walkthrough.srt` | Captions |
 | `chapters.txt` | The chapter list for the YouTube description |
 | `thumbnail.jpg` | 1280×720 |
 | `scenes/` | The render cache. Keep it so later renders only redo what changed |
@@ -119,7 +119,7 @@ terminals come from the cache.
 - **A scene logs `… not found, skipped`:** a selector in `scenes.py` no longer matches the UI.
   Fix the selector, then re-run with `--only <section>`.
 - **The welcome covers the pages:** the render marks the welcome as already shown, using the
-  key the app reads (`rivendell.offeredAt` in localStorage, `OFFERED` in `make_video.py`). If
+  key the app reads (`dernvale.offeredAt` in localStorage, `OFFERED` in `make_video.py`). If
   the app's key changes, change `OFFERED` to match.
 - **Eru's answers don't appear:** without Ollama, Eru shows its offline questions, which are
   the ones `scenes.py` clicks. With a model running, the buttons are different.

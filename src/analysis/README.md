@@ -91,7 +91,7 @@ elrond/
 │   ├── settings.py        # Application settings
 │   └── __init__.py
 │
-├── rivendell/             # 🏰 Forensic Modules (Legacy)
+├── dernvale/             # 🏰 Forensic Modules (Legacy)
 │   ├── main.py            # Main orchestrator
 │   ├── collect/           # Artifact collection
 │   ├── process/           # Artifact processing
@@ -127,10 +127,10 @@ elrond/
 
 ### Option 1: Docker (Recommended)
 
-Elrond runs inside Rivendell's stack, as the Celery worker behind the web UI. From the repository root:
+Elrond runs inside Dernvale's stack, as the Celery worker behind the web UI. From the repository root:
 
 ```bash
-rivendell start --testing      # or ./rivendell start --testing
+dernvale start --testing      # or ./dernvale start --testing
 ```
 
 - **Web Interface**: http://localhost:5687
@@ -228,7 +228,7 @@ python elrond.py CASE-001 /evidence/disk.E01 /output --Collect
 
 ## 🐳 Docker Usage
 
-Rivendell's `docker-compose.yml` at the repository root runs Elrond; use `rivendell start | stop | restart | status` ([docs/CLI.md](../../docs/CLI.md#the-rivendell-command)). The compose files and `docs/DOCKER*.md` here describe the earlier standalone Elrond stack (ports 3000 and 8000) and are kept for reference only.
+Dernvale's `docker-compose.yml` at the repository root runs Elrond; use `dernvale start | stop | restart | status` ([docs/CLI.md](../../docs/CLI.md#the-dernvale-command)). The compose files and `docs/DOCKER*.md` here describe the earlier standalone Elrond stack (ports 3000 and 8000) and are kept for reference only.
 
 ## 🧪 Testing
 

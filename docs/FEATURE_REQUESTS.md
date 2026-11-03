@@ -20,12 +20,12 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 **Why.** Organisations run servers on the distributions they already support, and for many that's RHEL or one of its rebuilds. Today the server guide's tested shape is Ubuntu 24.04 with Docker's packages.
 
 **What it takes.**
-- **SELinux.** Rocky and RHEL enforce it, and a bind mount without a label is unreadable inside a container. The stack's own mounts in `docker-compose.yml` and the evidence folders from `RIVENDELL_EVIDENCE_PATHS` and `docker-compose.local.yml` need `:z` (or `bind: {selinux: z}` in the long form) on SELinux hosts. The Docker socket mount for Andúril needs a policy check, not just a label.
+- **SELinux.** Rocky and RHEL enforce it, and a bind mount without a label is unreadable inside a container. The stack's own mounts in `docker-compose.yml` and the evidence folders from `DERNVALE_EVIDENCE_PATHS` and `docker-compose.local.yml` need `:z` (or `bind: {selinux: z}` in the long form) on SELinux hosts. The Docker socket mount for Andúril needs a policy check, not just a label.
 - **firewalld.** `server init` opens 443 and 80 (redirects and ACME) and nothing else, or says exactly which `firewall-cmd` lines to run.
 - **Docker.** It comes from Docker's own RHEL repository; the distribution ships Podman. The runtime check should say so, not just "docker missing". Podman's Docker-compatible socket stays unsupported until it's tested with Andúril and the worker.
 - **The guide.** `docs/SERVER.md` gets a per-distribution set-up section.
 
-**Done when** `rivendell server init` and `rivendell start` bring up a working, signed-in server on Rocky 9 with SELinux enforcing, an analysis job reads evidence from a configured folder, and the same passes on Ubuntu 24.04.
+**Done when** `dernvale server init` and `dernvale start` bring up a working, signed-in server on Rocky 9 with SELinux enforcing, an analysis job reads evidence from a configured folder, and the same passes on Ubuntu 24.04.
 
 **Depends on** a Rocky 9 VM in the lab; headless is enough.
 
@@ -34,7 +34,7 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 **Why.** Some teams only get Windows Server from IT.
 
 **What it takes.**
-- Rivendell's images are Linux containers. Docker Desktop isn't supported or licensed for Windows Server, and Windows Server's native container runtime runs Windows containers only. The route is WSL 2 (Windows Server 2022 and 2025) with Docker Engine inside an Ubuntu distribution, or a Hyper-V Linux VM.
+- Dernvale's images are Linux containers. Docker Desktop isn't supported or licensed for Windows Server, and Windows Server's native container runtime runs Windows containers only. The route is WSL 2 (Windows Server 2022 and 2025) with Docker Engine inside an Ubuntu distribution, or a Hyper-V Linux VM.
 - In both cases the server is really Linux, so the work is set-up and plumbing:
   - a PowerShell `server init` that sets up WSL and Docker;
   - evidence on Windows volumes reached through `/mnt/<drive>`, which is slow for large images (copying to the WSL filesystem is the usual answer, and the guide must say so);
@@ -52,12 +52,12 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 
 **What it takes.**
 - `app/linux/package-rpm.sh`, mirroring `package-deb.sh`:
-  - the same `/opt/rivendell` layout, menu entry and icon;
+  - the same `/opt/dernvale` layout, menu entry and icon;
   - `Requires: zenity` and `Recommends: docker-ce docker-compose-plugin`.
 - Built by `rpmbuild` in a `rockylinux:9` container as a fourth job in `desktop-release.yml`, checked with `rpm -qpl` and `rpmlint`.
 - The SELinux work from FR-01, for the evidence folders setup writes.
 
-**Done when** the release attaches `rivendell-<version>.noarch.rpm`, `dnf install` adds the menu entry, and first-run setup starts the stack on a Rocky 9 desktop.
+**Done when** the release attaches `dernvale-<version>.noarch.rpm`, `dnf install` adds the menu entry, and first-run setup starts the stack on a Rocky 9 desktop.
 
 **Depends on** FR-01 (SELinux); a Rocky 9 desktop VM.
 
@@ -80,7 +80,7 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 **Why.** Phones are in scope for most intrusions that involve people: MFA prompts, messaging, mobile device management (MDM) profiles.
 
 **What it takes.**
-- **Input:** iTunes/Finder backups (encrypted, with the password), Android ADB backups and bug reports, and full file system extractions from a commercial tool's output folder. Rivendell doesn't do device extraction itself, which is a deliberately different job with its own tooling and legal footing.
+- **Input:** iTunes/Finder backups (encrypted, with the password), Android ADB backups and bug reports, and full file system extractions from a commercial tool's output folder. Dernvale doesn't do device extraction itself, which is a deliberately different job with its own tooling and legal footing.
 - **Parsing:**
   - iLEAPP and ALEAPP as subprocess tools, defined in `tools/definitions.py` like the others, into `cooked/`;
   - techniques from the Mobile ATT&CK matrix;
@@ -92,7 +92,7 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 
 ## FR-06: Network forensics (PCAP, Zeek, NetFlow)
 
-**Why.** Host evidence says what ran, and network evidence says where it talked. Today Rivendell only sees a network through host artefacts (connections in memory, DNS caches, firewall logs).
+**Why.** Host evidence says what ran, and network evidence says where it talked. Today Dernvale only sees a network through host artefacts (connections in memory, DNS caches, firewall logs).
 
 **What it takes.**
 - A new evidence type: PCAP files, Zeek logs and NetFlow/IPFIX exports.

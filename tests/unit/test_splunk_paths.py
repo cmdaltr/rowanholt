@@ -5,13 +5,13 @@ from pathlib import Path
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from rivendell.post.splunk.config import monitor_roots, splunk_can_see  # noqa: E402
+from dernvale.post.splunk.config import monitor_roots, splunk_can_see  # noqa: E402
 
 
 def test_default_and_custom_destinations_are_visible(monkeypatch):
     monkeypatch.delenv("SPLUNK_MONITOR_ROOTS", raising=False)
     assert splunk_can_see("/tmp/elrond/output/CASE-1/host")
-    assert splunk_can_see("/Volumes/Portable6TB/Data/rivendell/claude_testing/win_full/host")
+    assert splunk_can_see("/Volumes/Portable6TB/Data/dernvale/claude_testing/win_full/host")
 
 
 def test_paths_outside_the_mounts_are_not(monkeypatch):

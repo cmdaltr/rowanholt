@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Rivendell Architecture Diagram Generator
+# Dernvale Architecture Diagram Generator
 # Generates PNG, SVG, and PDF versions of all Graphviz DOT diagrams
 
 # Colors for output
@@ -11,7 +11,7 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}  Rivendell DFIR Suite - Diagram Generator${NC}"
+echo -e "${BLUE}  Dernvale DFIR Suite - Diagram Generator${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
 # Check if Graphviz is installed

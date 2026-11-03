@@ -72,7 +72,7 @@ async def indicators(q: str = "", source: str = "", limit: int = Query(100, le=5
 @router.post("/import")
 async def import_file(file: UploadFile = File(...)):
     """Indicators from an uploaded file: the Iran APT workbook, a STIX bundle,
-    MITRESaw's procedures, Rivendell's own CSV or a text watchlist."""
+    MITRESaw's procedures, Dernvale's own CSV or a text watchlist."""
     package = _package()
     name = os.path.basename(file.filename or "upload")
     if not name.lower().endswith(UPLOAD_SUFFIXES):
@@ -100,7 +100,7 @@ async def import_file(file: UploadFile = File(...)):
 async def import_taxii(request: TaxiiRequest):
     """Every object in a TAXII 2.1 collection (or those added after a date), as indicators."""
     _package()
-    from rivendell.threat_intel.stix import IntelFormatError, import_taxii_with_validity as pull
+    from dernvale.threat_intel.stix import IntelFormatError, import_taxii_with_validity as pull
     try:
         loaded, validity = pull(request.url, request.username, request.password, request.added_after)
     except IntelFormatError as exc:
@@ -115,7 +115,7 @@ async def import_taxii(request: TaxiiRequest):
 async def set_validity(indicator_id: int, request: ValidityRequest):
     """Extend an indicator's expiry, or clear it (no expiry); an expired one matches again once extended."""
     _package()
-    from rivendell.threat_intel.validity import parse_time
+    from dernvale.threat_intel.validity import parse_time
     until = None
     if request.valid_until:
         until = parse_time(request.valid_until)

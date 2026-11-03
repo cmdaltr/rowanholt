@@ -13,7 +13,7 @@ lab/windows/Invoke-MordorRecord.ps1 on a lab machine, each test's logs saved bes
 
 ./lab.sh mordor-record copies a run here from the Windows VM and rebuilds; on another machine,
 copy the run's folder here and run python -m src.mordor.telemetry --build --source lab.
-RIVENDELL_TELEMETRY_LAB points it elsewhere. The recordings hold your hosts' names, so they stay
+DERNVALE_TELEMETRY_LAB points it elsewhere. The recordings hold your hosts' names, so they stay
 on this machine: src/mordor/data/telemetry is gitignored and this source is local (INFO["local"]).
 """
 
@@ -25,9 +25,9 @@ from typing import Dict, Iterable, Optional, Tuple
 from .datasets import HERE, PARSER_VERSION, parse, summarise
 
 NAME = "lab"
-LAB_DIR = os.environ.get("RIVENDELL_TELEMETRY_LAB") or os.path.join(HERE, "data", "telemetry", "lab")
+LAB_DIR = os.environ.get("DERNVALE_TELEMETRY_LAB") or os.path.join(HERE, "data", "telemetry", "lab")
 INFO = {"name": "Your lab", "url": "", "licence": "Yours", "local": True,
-        "note": "Atomic Red Team tests recorded in the Rivendell lab (./lab.sh mordor-record). Never committed"}
+        "note": "Atomic Red Team tests recorded in the Dernvale lab (./lab.sh mordor-record). Never committed"}
 
 
 def runs() -> Iterable[Tuple[str, Dict]]:

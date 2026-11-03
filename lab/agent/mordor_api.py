@@ -27,14 +27,14 @@ _config: dict = {"at": 0.0}
 
 
 def _docker_context() -> str:
-    """The engine Rivendell runs on, as lab.sh's pick_docker_context chooses it."""
+    """The engine Dernvale runs on, as lab.sh's pick_docker_context chooses it."""
     try:
         names = subprocess.run(["docker", "context", "ls", "--format", "{{.Name}}"], capture_output=True,
                                text=True, timeout=15).stdout.split()
         for ctx in names:
             ps = subprocess.run(["docker", "--context", ctx, "ps", "--format", "{{.Names}}"], capture_output=True,
                                 text=True, timeout=15).stdout.split()
-            if "rivendell-backend" in ps:
+            if "dernvale-backend" in ps:
                 return ctx
     except (OSError, subprocess.SubprocessError):
         pass
@@ -48,7 +48,7 @@ def configure(lab_state: Callable[[], dict]) -> None:
     cfg = lab_state()
     tart_home = cfg.get("LAB_TART_HOME") or (f"{cfg['LAB_VM_DIR']}/tart" if cfg.get("LAB_VM_DIR") else "")
     runner.configure({"DOCKER_CONTEXT": _docker_context(), "TART_HOME": tart_home})
-    machines.LAB_WINDOWS_VM = cfg.get("WINDOWS_UTM_VM") or "rivendell-lab-win11"
+    machines.LAB_WINDOWS_VM = cfg.get("WINDOWS_UTM_VM") or "dernvale-lab-win11"
     machines.HIDDEN = {n for n in re.split(r"[,\s]+", cfg.get("LAB_HIDDEN_MACHINES", "")) if n}
     _config["at"] = time.time()
 

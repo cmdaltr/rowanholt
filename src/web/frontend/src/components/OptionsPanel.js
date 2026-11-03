@@ -11,7 +11,9 @@ function OptionsPanel({ options, onChange, disabled = false, hasImages = false, 
 
   // Load saved templates from localStorage on mount
   useEffect(() => {
-    const templates = JSON.parse(localStorage.getItem('rivendell_templates') || '[]');
+    // Templates saved before the rename are under the old key
+    const templates = JSON.parse(localStorage.getItem('dernvale_templates')
+      || localStorage.getItem('rivendell_templates') || '[]');
     setSavedTemplates(templates);
   }, []);
 
@@ -394,7 +396,7 @@ function OptionsPanel({ options, onChange, disabled = false, hasImages = false, 
   const deleteTemplate = (templateId) => {
     const updatedTemplates = savedTemplates.filter(t => t.id !== templateId);
     setSavedTemplates(updatedTemplates);
-    localStorage.setItem('rivendell_templates', JSON.stringify(updatedTemplates));
+    localStorage.setItem('dernvale_templates', JSON.stringify(updatedTemplates));
   };
 
   // Import a template from a JSON file
@@ -451,7 +453,7 @@ function OptionsPanel({ options, onChange, disabled = false, hasImages = false, 
 
         const updatedTemplates = [...savedTemplates, newTemplate];
         setSavedTemplates(updatedTemplates);
-        localStorage.setItem('rivendell_templates', JSON.stringify(updatedTemplates));
+        localStorage.setItem('dernvale_templates', JSON.stringify(updatedTemplates));
       } catch (err) {
         console.error('Failed to parse template file:', err);
       }

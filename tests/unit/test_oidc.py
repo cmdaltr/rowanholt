@@ -17,14 +17,14 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-TMP = tempfile.mkdtemp(prefix="rivendell-oidc-")
+TMP = tempfile.mkdtemp(prefix="dernvale-oidc-")
 os.chdir(TMP)  # the backend's settings read .env from here, never the repository's
 os.environ.update({
     "USERS_FILE": f"{TMP}/users.json",
     "SECRET_KEY": "test-secret-key-for-unit-tests-only-0123456789",
-    "RIVENDELL_PUBLIC_URL": "https://rivendell.test",
+    "DERNVALE_PUBLIC_URL": "https://dernvale.test",
     "OIDC_ISSUER": "https://idp.test",
-    "OIDC_CLIENT_ID": "rivendell",
+    "OIDC_CLIENT_ID": "dernvale",
     "OIDC_CLIENT_SECRET": "s3cret",
     "OIDC_ADMIN_GROUP": "dfir-leads",
     "OIDC_ALLOWED_GROUP": "dfir",
@@ -75,7 +75,7 @@ class OidcTest(unittest.TestCase):
 
     def id_token(self, nonce, access_token="at", **claims):
         at_hash = b64url(hashlib.sha256(access_token.encode()).digest()[:16])
-        body = {"iss": ISSUER, "aud": "rivendell", "sub": "u-123", "nonce": nonce, "at_hash": at_hash,
+        body = {"iss": ISSUER, "aud": "dernvale", "sub": "u-123", "nonce": nonce, "at_hash": at_hash,
                 "iat": int(time.time()), "exp": int(time.time()) + 300,
                 "preferred_username": "aragorn@gondor.example", "email": "aragorn@gondor.example",
                 "name": "Aragorn", "groups": ["dfir"], **claims}

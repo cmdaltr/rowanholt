@@ -31,7 +31,7 @@ def safe_name(name: str) -> str:
     return name
 
 
-# Set by the lab agent from the lab's config: DOCKER_CONTEXT (the engine Rivendell runs on, so
+# Set by the lab agent from the lab's config: DOCKER_CONTEXT (the engine Dernvale runs on, so
 # machines land on the same Docker as the lab's containers) and TART_HOME (LAB_TART_HOME)
 ENV: Dict[str, str] = {}
 

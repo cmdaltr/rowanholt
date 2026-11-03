@@ -1,4 +1,4 @@
-# Rivendell IOC Watchlist
+# Dernvale IOC Watchlist
 # Add known malicious indicators here (one per line)
 # Lines starting with # are comments
 

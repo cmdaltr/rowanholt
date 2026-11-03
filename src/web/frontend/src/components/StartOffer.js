@@ -61,12 +61,12 @@ function StartOffer({ guideRequested, onGuideClosed, offerRequested, onOfferClos
   if (!offer) return null;
 
   return (
-    <div className="guide-backdrop" role="dialog" aria-modal="true" aria-label="Welcome to Rivendell"
+    <div className="guide-backdrop" role="dialog" aria-modal="true" aria-label="Welcome to Dernvale"
          onClick={() => setOffer(false)}>
       <div className="start-offer tone-a" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="guide-close" onClick={() => setOffer(false)} aria-label="Close">×</button>
         <div className="start-offer-head">
-          <h2>Welcome to Rivendell</h2>
+          <h2>Welcome to Dernvale</h2>
           <blockquote className="start-offer-quote">
             “{quote.text}”
             <cite>{quote.who}, {quote.where}</cite>
