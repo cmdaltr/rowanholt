@@ -52,6 +52,25 @@ services:
       - OIDC_ADMIN_GROUP=${OIDC_ADMIN_GROUP:-}
       - OIDC_ALLOWED_GROUP=${OIDC_ALLOWED_GROUP:-}
 
+  # Eru's MCP server at https://<host>/mcp, for MCP hosts on analysts' machines. Off unless the
+  # "mcp" profile is on (COMPOSE_PROFILES=mcp); read-only unless ERU_MCP_ARGS=--allow-writes.
+  # Pending the threat model's review of the HTTP transport: not near a live case until then.
+  eru-mcp:
+    profiles: ["mcp"]
+    build:
+      context: .
+      dockerfile: deploy/server/Dockerfile.eru-mcp
+    container_name: dernvale-eru-mcp
+    restart: unless-stopped
+    environment:
+      - ERU_MCP_ARGS=${ERU_MCP_ARGS:-}
+      - DERNVALE_API=http://backend:5688
+      - DERNVALE_PUBLIC_URL=https://${DERNVALE_HOSTNAME:?Run dernvale server init first}
+    depends_on:
+      - backend
+    networks:
+      - dernvale-network
+
   frontend:
     build:
       context: ./src/web/frontend

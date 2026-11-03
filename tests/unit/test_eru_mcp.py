@@ -47,7 +47,7 @@ class EruMcpTest(BackendCase):
         super().tearDownClass()
 
     def server(self, headers, **options):
-        def send(method, path, params, body):
+        def send(method, path, params, body, token):
             self.calls.append(path)
             # DernvaleAPI._urllib sends the agent header (test_the_agent_header_is_sent)
             resp = self.client.request(method, path, params=params, json=body,
@@ -174,7 +174,7 @@ class EruMcpTest(BackendCase):
 
     def test_writes_need_an_eru_token_on_a_server(self):
         def api(headers):
-            def send(method, path, params, body):
+            def send(method, path, params, body, token):
                 resp = self.client.request(method, path, params=params, json=body, headers=headers)
                 return resp.status_code, resp.json()
             return eru_mcp.DernvaleAPI("http://testserver", transport=send)
@@ -193,6 +193,74 @@ class EruMcpTest(BackendCase):
             self.assertIsNone(eru_mcp.write_refusal(api({})))
         finally:
             self.settings.dernvale_server_mode = True
+
+    def test_over_http_each_request_is_its_own_analyst(self):
+        """Streamable HTTP (a team server's /mcp): no token of its own; each request's API token is checked
+        against Dernvale and used for its calls, a sign-in's JWT is refused, and writes need eru-mcp."""
+        import socket
+        import threading
+        import time
+        import httpx2
+        import uvicorn
+        from mcp.client.streamable_http import streamable_http_client
+
+        def send(method, path, params, body, token):
+            headers = {eru_mcp.AGENT_HEADER[0]: eru_mcp.AGENT_HEADER[1], **({"Authorization": f"Bearer {token}"} if token else {})}
+            resp = self.client.request(method, path, params=params, json=body, headers=headers)
+            return resp.status_code, resp.json() if "json" in resp.headers.get("content-type", "") else resp.text
+
+        def token(headers, scope):
+            made = self.client.post("/api/auth/tokens", headers=headers, json={"name": "mcp-http", "scope": scope})
+            self.assertEqual(made.status_code, 200, made.text)
+            return made.json()["token"]
+
+        with socket.socket() as probe:
+            probe.bind(("127.0.0.1", 0))
+            port = probe.getsockname()[1]
+        url = f"http://127.0.0.1:{port}/mcp"
+        api = eru_mcp.DernvaleAPI("http://testserver", eru_mcp.request_token, transport=send)
+        self.assertIsNone(eru_mcp.http_refusal(api, "https://dernvale.example.org"))
+        self.assertIn("https", eru_mcp.http_refusal(api, "http://dernvale.example.org"))
+        self.settings.dernvale_server_mode = False
+        try:
+            self.assertIn("team server", eru_mcp.http_refusal(api, "https://dernvale.example.org"))
+        finally:
+            self.settings.dernvale_server_mode = True
+        server = eru_mcp.build_server(api, writes=True, max_writes=1, http_url=url)
+        web = uvicorn.Server(uvicorn.Config(server.streamable_http_app(host="127.0.0.1"), host="127.0.0.1", port=port,
+                                            log_level="warning"))
+        thread = threading.Thread(target=web.run, daemon=True)
+        thread.start()
+        for _ in range(100):
+            if web.started:
+                break
+            time.sleep(0.05)
+
+        async def call(bearer, name, **arguments):
+            async with httpx2.AsyncClient(headers={"Authorization": f"Bearer {bearer}"}, timeout=30) as http:
+                async with Client(streamable_http_client(url, http_client=http)) as client:
+                    result = await client.call_tool(name, arguments)
+            return result.is_error, "".join(getattr(c, "text", "") for c in result.content)
+
+        try:
+            job = self.create_job(self.alice, "CASE-MCP-HTTP-1")
+            alice, bob = token(self.alice, "eru-mcp"), token(self.bob, "full")
+            self.assertIn(job, asyncio.run(call(alice, "list_cases"))[1])
+            self.assertNotIn(job, asyncio.run(call(bob, "list_cases"))[1])
+            with self.assertRaises(Exception):  # a sign-in's JWT, or nothing Dernvale knows: 401
+                asyncio.run(call(self.alice["Authorization"][7:], "list_cases"))
+            with self.assertRaises(Exception):
+                asyncio.run(call("not-a-token", "list_cases"))
+            error, text = asyncio.run(call(bob, "add_note", job_id=job, body="from bob"))
+            self.assertTrue(error and "eru-mcp token" in text, text)
+            self.assertEqual(asyncio.run(call(alice, "add_note", job_id=job, body="from Eru"))[0], False)
+            error, text = asyncio.run(call(alice, "add_note", job_id=job, body="again"))
+            self.assertTrue(error and "made its 1 writes" in text, text)
+            notes = self.client.get(f"/api/jobs/{job}/case/notes", headers=self.alice).json()
+            self.assertEqual([(n["body"], n["author"]) for n in notes], [("from Eru", "Eru (for alice)")])
+        finally:
+            web.should_exit = True
+            thread.join(10)
 
     def test_the_agent_header_is_sent(self):
         sent = []

@@ -74,6 +74,24 @@ Started with `--allow-writes` (`dernvale mcp --allow-writes`, or `"args": ["mcp"
 
 Each server call carries `X-Dernvale-Agent: eru-mcp`, so what Eru writes is recorded as "Eru (for alice)" in the findings, notes, activity and report, never as the analyst's own; with an eru-mcp token that holds even without the header. The backend holds it there: as Eru it refuses any status but lead, and refuses changing or removing findings and assigning hosts. A session stops after `--max-writes` writes (25 by default), so a host led on by text inside the case can't flood it, and the server tells the host that the case's text is evidence, not instructions. On a team server, `--allow-writes` won't start unless `DERNVALE_TOKEN` is an **eru-mcp** token, so the backend holds it to reads, leads and notes whatever the server's code does. On a live case, run it in an MCP host with no other network-capable tools (web fetch, Slack, email and the like) and no shell or file access to the case store: text inside the evidence could otherwise lead the model to send case data out through them, and the server's `raw/` boundary only covers what goes through the API (Claude Code in the Dernvale checkout, refused `raw/` by the server, offers to list it from disk). Claude Desktop with only this server, or a host on another machine, fits. Treat Eru's leads and notes as suggestions; only an analyst clears a host. Without `--allow-writes` the server is read-only, as before. The code is `src/eru_mcp/server.py` (mcp 2's `MCPServer`, which was FastMCP), and `tests/unit/test_eru_mcp.py` checks the tool list, other people's jobs, `raw/` and that nothing but `/api/` is called, against the real backend in server mode.
 
+### Over HTTP, from a team server
+
+A team server can run the same server over streamable HTTP at `https://<host>/mcp`, so an analyst's MCP host needs nothing installed. It's the `eru-mcp` service in `deploy/server/docker-compose.server.yml`, off unless the `mcp` profile is on, behind Caddy like everything else:
+
+```bash
+COMPOSE_PROFILES=mcp ./dernvale start
+```
+
+It holds no token of its own. Every request sends its analyst's API token as a bearer header; the server checks it with Dernvale (`/api/auth/me`) and makes that request's calls with it, so each analyst sees their own jobs, as over stdio. Only API tokens are accepted, not a sign-in's session, which carries all of its user's rights and can't be revoked on its own. It's read-only unless `.env` has `ERU_MCP_ARGS=--allow-writes`; then only an **eru-mcp** token can write, and `--max-writes` counts per token until the service restarts. `dernvale mcp --http` won't start against a Dernvale that isn't in server mode, or without the `https://` URL analysts use (`DERNVALE_PUBLIC_URL`, set by the Compose file).
+
+For Claude Code:
+
+```bash
+claude mcp add --transport http dernvale https://dernvale.example.org/mcp --header "Authorization: Bearer $DERNVALE_TOKEN"
+```
+
+The token then sits in the host's own configuration, so use a 30-day **eru-mcp** token and revoke it when the machine is in doubt. The HTTP transport hasn't been through the threat model's review yet (`.claude/threat-model.md`); until it has, keep it away from live cases and use stdio.
+
 ## Eru Models
 
 The Ollama Modelfiles in `src/models/` build Eru variants: a forensic system prompt over different base models.
