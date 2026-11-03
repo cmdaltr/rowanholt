@@ -51,6 +51,17 @@ run_bash() {
   local dest="$out_root/$host"
   mkdir -p "$dest"
   local enc="${GANDALF_ENCRYPTION:-None}"  # None or Key (Password needs a terminal)
+  # gandalf.sh only says "Failed to copy script", and sshpass prints nothing when the password is
+  # refused, so say why first
+  local probe
+  PATH="/opt/lab-bin:$PATH" ssh -o ConnectTimeout=20 "gandalf@${host}" true 2>&1 | sed 's/^/    ssh: /'
+  probe=${PIPESTATUS[0]}
+  case "$probe" in
+    0) echo "[+] $host: SSH as gandalf works" ;;
+    5) echo "[x] $host: the lab password was refused for gandalf (sshpass 5)" ;;
+    6) echo "[x] $host: unknown host key (sshpass 6)" ;;
+    *) echo "[x] $host: SSH failed (exit $probe)" ;;
+  esac
   echo "[*] gandalf.sh $enc Remote -h $host -u gandalf"
   # Only this run's archives count: an earlier run's are still in $dest.
   local since; since="$(mktemp)"
