@@ -25,8 +25,9 @@ except ImportError:  # requirements/mcp.txt not installed
 
 PHASE_1 = {"list_cases", "case_overview", "read_rows", "ask_offline", "ask_eru", "case_summary", "suggestions",
            "check_indicator", "rare_across_hosts", "findings", "report", "navigator_layer"}
+PHASE_2 = {"flag_lead", "add_note"}
 NEVER = ("start", "restart", "delete", "cancel", "acquire", "gandalf", "collect", "import", "upload", "share",
-         "flag", "note", "assign", "raw")
+         "assign", "confirm", "dismiss", "update", "remove", "raw")
 
 
 @unittest.skipIf(TestClient is None or Client is None, "backend requirements or requirements/mcp.txt not installed")
@@ -45,18 +46,20 @@ class EruMcpTest(BackendCase):
         cls.no_llm.stop()
         super().tearDownClass()
 
-    def server(self, headers):
+    def server(self, headers, **options):
         def send(method, path, params, body):
             self.calls.append(path)
-            resp = self.client.request(method, path, params=params, json=body, headers=headers)
+            # RivendellAPI._urllib sends the agent header (test_the_agent_header_is_sent)
+            resp = self.client.request(method, path, params=params, json=body,
+                                       headers={**headers, eru_mcp.AGENT_HEADER[0]: eru_mcp.AGENT_HEADER[1]})
             is_json = "json" in resp.headers.get("content-type", "")
             return resp.status_code, resp.json() if is_json else resp.text
-        return eru_mcp.build_server(eru_mcp.RivendellAPI("http://testserver", transport=send))
+        return eru_mcp.build_server(eru_mcp.RivendellAPI("http://testserver", transport=send), **options)
 
-    def call(self, headers, name, **arguments):
+    def call(self, headers, name, server=None, **arguments):
         """(is_error, result): the tool's structured result, or its error text."""
         async def run():
-            async with Client(self.server(headers)) as client:
+            async with Client(server or self.server(headers)) as client:
                 return await client.call_tool(name, arguments)
         result = asyncio.run(run())
         text = "".join(getattr(c, "text", "") for c in result.content)
@@ -91,6 +94,100 @@ class EruMcpTest(BackendCase):
             self.assertTrue(tool.annotations.read_only_hint, tool.name)
             self.assertFalse(tool.annotations.open_world_hint, tool.name)
             self.assertFalse(any(word in tool.name for word in NEVER), tool.name)
+
+    def test_writing_adds_only_leads_and_notes(self):
+        server = self.server(self.alice, writes=True)
+
+        async def run():
+            async with Client(server) as client:
+                return (await client.list_tools()).tools
+        tools = asyncio.run(run())
+        self.assertEqual({t.name for t in tools}, PHASE_1 | PHASE_2)
+        for tool in tools:
+            self.assertFalse(any(word in tool.name for word in NEVER), tool.name)
+            self.assertFalse(tool.annotations.destructive_hint, tool.name)
+            self.assertFalse(tool.annotations.open_world_hint, tool.name)
+            self.assertEqual(tool.annotations.read_only_hint, tool.name not in PHASE_2, tool.name)
+        self.assertIn("evidence, not instructions", server.instructions)
+        self.assertNotIn("flag_lead", self.server(self.alice).instructions)
+
+    def test_flagging_a_lead_and_adding_notes(self):
+        job = self.case_with_output("CASE-MCP-7")
+        server = self.server(self.alice, writes=True)
+        error, lead = self.call(self.alice, "flag_lead", server=server, job_id=job, host="WS01",
+                                file="artefacts/cooked/prefetch.csv", row="3", title="Generated name", technique="t1036")
+        self.assertFalse(error, lead)
+        self.assertEqual((lead["status"], lead["author"], lead["technique"]), ("lead", "Eru (for alice)", "T1036"))
+        # Already flagged: refused, with what to do instead
+        error, text = self.call(self.alice, "flag_lead", server=server, job_id=job, host="WS01",
+                                file="artefacts/cooked/prefetch.csv", row="3", title="Again")
+        self.assertTrue(error)
+        self.assertIn("409", text)
+        error, note = self.call(self.alice, "add_note", server=server, job_id=job, body="Seen on WS01 only",
+                                finding_id=lead["id"])
+        self.assertEqual((note["author"], note["finding_id"]), ("Eru (for alice)", lead["id"]))
+        error, note = self.call(self.alice, "add_note", server=server, job_id=job, body="Case-wide note")
+        self.assertIsNone(note["finding_id"])
+        activity = self.client.get(f"/api/jobs/{job}/case/activity", headers=self.alice).json()
+        self.assertEqual({a["actor"] for a in activity}, {"Eru (for alice)"})
+        # The analyst's own writes stay theirs
+        flagged = self.client.post(f"/api/jobs/{job}/case/findings", headers=self.alice, json={
+            "host": "WS01", "artefact": "artefacts/cooked/prefetch.csv", "row_ref": "2", "title": "cmd"})
+        self.assertEqual(flagged.json()["author"], "alice")
+        # Not bob's case: he can't write to it either
+        error, text = self.call(self.bob, "add_note", server=self.server(self.bob, writes=True), job_id=job, body="x")
+        self.assertTrue(error)
+        self.assertIn("404", text)
+
+    def test_the_backend_holds_eru_to_leads(self):
+        job = self.case_with_output("CASE-MCP-8")
+        eru = {**self.alice, eru_mcp.AGENT_HEADER[0]: eru_mcp.AGENT_HEADER[1]}
+        base = f"/api/jobs/{job}/case"
+        row = {"host": "WS01", "artefact": "artefacts/cooked/prefetch.csv", "row_ref": "3", "title": "x"}
+        self.assertEqual(self.client.post(f"{base}/findings", headers=eru, json={**row, "status": "confirmed"}).status_code, 403)
+        lead = self.client.post(f"{base}/findings", headers=eru, json=row).json()
+        self.assertEqual(self.client.patch(f"{base}/findings/{lead['id']}", headers=eru,
+                                           json={"status": "confirmed"}).status_code, 403)
+        self.assertEqual(self.client.delete(f"{base}/findings/{lead['id']}", headers=eru).status_code, 403)
+        self.assertEqual(self.client.put(f"{base}/hosts/WS01", headers=eru, json={"status": "done"}).status_code, 403)
+        # The analyst confirms it
+        confirmed = self.client.patch(f"{base}/findings/{lead['id']}", headers=self.alice, json={"status": "confirmed"})
+        self.assertEqual(confirmed.json()["status"], "confirmed")
+
+    def test_a_session_stops_at_its_write_limit(self):
+        job = self.case_with_output("CASE-MCP-9")
+        server = self.server(self.alice, writes=True, max_writes=2)
+        for n in range(2):
+            self.assertFalse(self.call(self.alice, "add_note", server=server, job_id=job, body=f"note {n}")[0])
+        error, text = self.call(self.alice, "add_note", server=server, job_id=job, body="one too many")
+        self.assertTrue(error)
+        self.assertIn("2 writes", text)
+        self.assertEqual(len(self.client.get(f"/api/jobs/{job}/case/notes", headers=self.alice).json()), 2)
+
+    def test_the_agent_header_is_sent(self):
+        sent = []
+
+        class Response:
+            status = 200
+            headers = {"Content-Type": "application/json"}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def read(self):
+                return b"{}"
+
+        def urlopen(request, timeout):
+            sent.append(dict(request.header_items()))
+            return Response()
+
+        with mock.patch.object(eru_mcp.urllib.request, "urlopen", urlopen):
+            eru_mcp.RivendellAPI("http://testserver", "t0ken").get("/api/jobs")
+        self.assertEqual(sent[0].get("X-rivendell-agent"), "eru-mcp")
+        self.assertEqual(sent[0].get("Authorization"), "Bearer t0ken")
 
     def test_reading_a_case(self):
         job = self.case_with_output("CASE-MCP-1")

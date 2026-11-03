@@ -146,6 +146,8 @@ Each feature's "Still to do" above, as work to schedule, then the Eru MCP server
 
 **Phase 1 built (31 October 2026):** `src/eru_mcp/server.py`, `rivendell mcp`, `requirements/mcp.txt`, documented in `docs/ERU.md`. mcp 2 renamed FastMCP to `MCPServer`, which it uses. Stdio only: the streamable HTTP option behind Caddy isn't built, because on a team server it would have to take each analyst's token from their request rather than the environment. The lab run on THREATINTEL-DEMO-01 is still to do; a smoke run over stdio against the local stack listed its cases and answered an offline question.
 
+**Phase 2 built (3 November 2026):** `flag_lead` and `add_note`, only with `rivendell mcp --allow-writes`. Leads only; every call sends `X-Rivendell-Agent: eru-mcp`, so the backend records the write as "Eru (for <user>)" and refuses Eru other statuses, edits, deletes and host assignment; `--max-writes` (25) caps a session. Tests in `test_eru_mcp.py`. Not reviewed yet: the threat model's review comes before a live case.
+
 **What it is.** One MCP server, built with FastMCP (mcp 2's `MCPServer`), through which an MCP host (Claude Desktop, Claude Code, OpenClaw) works a Rivendell case. It registers every Eru capability; nothing else registers tools.
 
 **How it's built.** A thin client of Rivendell's own API, not a second way into the case files.
@@ -192,4 +194,4 @@ The small items first: restart warning, assignees, "What's rare?", bash collecto
 1. **The `mcp` package: yes,** in its own `requirements/mcp.txt`, installed only where the MCP server runs, not in the worker or backend images.
 2. **containerd's bbolt database: a stdlib reader** in `process/extractions/`, read-only, no new dependency. The records inside are protobuf and need decoding by hand whichever way the file is read.
 3. **Threat intelligence expiry: yes,** as the `threat_intel_validity` side table and an Alembic migration; the ten columns stay as they are.
-4. **The MCP server's phase 2: deferred.** Phase 1 ships read-only; flagging leads and adding notes are decided once phase 1 has been used.
+4. **The MCP server's phase 2: deferred,** then built on 3 November: `flag_lead` and `add_note` behind `--allow-writes`, leads only, recorded as "Eru (for <user>)" (see `docs/ERU.md`). Before it's used on a live case, the threat model's review.

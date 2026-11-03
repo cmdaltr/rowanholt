@@ -89,7 +89,7 @@ Eru is the AI layer. It reads Elrond's case output and provides:
 ## Eru's MCP server
 
 - `src/eru_mcp/server.py` (`rivendell mcp`, stdio; mcp 2's `MCPServer`, formerly FastMCP; `requirements/mcp.txt`, Python 3.10+, never in the worker or backend images). Register every Eru capability through this one server — no parallel registration system
-- A thin client of Rivendell's API only (`RivendellAPI` refuses anything but `/api/` paths), read-only (phase 1); every tool `readOnlyHint`. Never expose starting/restarting/deleting jobs, Gandalf, threat intelligence import/delete, or `raw/`. Phase 2 (flag leads, add notes) is deferred and needs the threat model's review
+- A thin client of Rivendell's API only (`RivendellAPI` refuses anything but `/api/` paths), read-only by default; every phase 1 tool `readOnlyHint`. Never expose starting/restarting/deleting jobs, Gandalf, threat intelligence import/delete, host assignment, changing or removing findings, or `raw/`. Phase 2 (`flag_lead`, `add_note`) only with `--allow-writes`: leads only, every call sends `X-Rivendell-Agent: eru-mcp` so the backend records "Eru (for <user>)" and refuses Eru anything else, capped by `--max-writes`. Not to be used on a live case until the threat model's review
 - Tests: `tests/unit/test_eru_mcp.py` over `test_server_access.BackendCase` (the real backend in server mode)
 
 ## What not to do

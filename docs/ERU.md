@@ -62,7 +62,16 @@ claude mcp add rivendell --env RIVENDELL_MCP_PYTHON=$HOME/.rivendell-mcp/bin/pyt
 | `rare_across_hosts(job_id)` | The top of `stacking.csv`, each row with the host row it was read from (`Host`, `Artefact`, `Row`) |
 | `findings`, `report`, `navigator_layer` | Analysts' findings (with whether each row is still intact), the Markdown report, the confirmed-findings layer |
 
-The server tells the host to start from a job id, cite file and row for every claim, and treat a stacking row or a threat intelligence match as a lead, not a verdict. It can't start, restart or delete jobs, run Gandalf, import or delete threat intelligence, flag findings or add notes. Writing leads and notes is phase 2, decided once this has been used. The code is `src/eru_mcp/server.py` (mcp 2's `MCPServer`, which was FastMCP), and `tests/unit/test_eru_mcp.py` checks the tool list, other people's jobs, `raw/` and that nothing but `/api/` is called, against the real backend in server mode.
+The server tells the host to start from a job id, cite file and row for every claim, and treat a stacking row or a threat intelligence match as a lead, not a verdict. It can't start, restart or delete jobs, run Gandalf, import or delete threat intelligence, assign hosts, or change or remove findings.
+
+Started with `--allow-writes` (`rivendell mcp --allow-writes`, or `"args": ["mcp", "--allow-writes"]`), it adds two tools, and nothing else that writes:
+
+| Tool | What it does |
+|---|---|
+| `flag_lead(job_id, host, file, row, title, technique)` | Flags one row as a lead, never a confirmed or benign finding; a row already flagged is refused |
+| `add_note(job_id, body, finding_id)` | A note on a finding, or on the case without one |
+
+Each server call carries `X-Rivendell-Agent: eru-mcp`, so what Eru writes is recorded as "Eru (for alice)" in the findings, notes, activity and report, never as the analyst's own. The backend holds it there: with that header it refuses any status but lead, and refuses changing or removing findings and assigning hosts. A session stops after `--max-writes` writes (25 by default), so a host led on by text inside the case can't flood it, and the server tells the host that the case's text is evidence, not instructions. Without `--allow-writes` the server is read-only, as before. The code is `src/eru_mcp/server.py` (mcp 2's `MCPServer`, which was FastMCP), and `tests/unit/test_eru_mcp.py` checks the tool list, other people's jobs, `raw/` and that nothing but `/api/` is called, against the real backend in server mode.
 
 ## Eru Models
 

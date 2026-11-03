@@ -34,6 +34,10 @@ STATUSES = ("lead", "confirmed", "benign")
 HOST_STATUSES = ("to do", "in progress", "done")
 TECHNIQUE = re.compile(r"^T\d{4}(?:\.\d{3})?$")
 EXCERPT = 600
+# Eru's MCP server (src/eru_mcp) sends this on every call, so what it writes reads as Eru's, on the
+# analyst's behalf, and never passes for the analyst's own work
+AGENT_HEADER = "X-Rivendell-Agent"
+ERU_MCP = "eru-mcp"
 
 
 class Conflict(Exception):
@@ -214,8 +218,13 @@ def restart_refusal(job_id: str, confirm: bool) -> Optional[Dict]:
                        "Restart with confirm=true to go ahead."}
 
 
+def _by_eru(request: Request) -> bool:
+    return request.headers.get(AGENT_HEADER, "").strip().lower() == ERU_MCP
+
+
 def _actor(request: Request) -> str:
-    return access.current_user(request).get("username") or "local"
+    user = access.current_user(request).get("username") or "local"
+    return f"Eru (for {user})" if _by_eru(request) else user
 
 
 def _root(job_id: str) -> Path:
@@ -323,6 +332,8 @@ async def list_findings(job_id: str, status: str = "", verify: bool = False):
 async def flag(job_id: str, finding: FindingIn, request: Request):
     """Flag a row. The row is read here, so its hash and excerpt are what the case holds."""
     technique = _check(finding.status, finding.technique)
+    if _by_eru(request) and finding.status != "lead":
+        raise HTTPException(status_code=403, detail="Eru flags leads only: confirming or dismissing is an analyst's")
     try:
         row = case_files.find_row(_file(job_id, finding.host, finding.artefact), finding.row_ref)
     except case_files.CaseFileError as exc:
@@ -341,6 +352,8 @@ async def flag(job_id: str, finding: FindingIn, request: Request):
 
 @router.patch("/findings/{finding_id}")
 async def update_finding(job_id: str, finding_id: int, update: FindingUpdate, request: Request):
+    if _by_eru(request):
+        raise HTTPException(status_code=403, detail="Eru doesn't change findings: an analyst does")
     technique = _check(update.status, update.technique)
     try:
         changed = store().update_finding(job_id, finding_id, _actor(request), expected=update.updated_at,
@@ -357,6 +370,8 @@ async def update_finding(job_id: str, finding_id: int, update: FindingUpdate, re
 
 @router.delete("/findings/{finding_id}")
 async def delete_finding(job_id: str, finding_id: int, request: Request):
+    if _by_eru(request):
+        raise HTTPException(status_code=403, detail="Eru doesn't remove findings: an analyst does")
     if not store().delete_finding(job_id, finding_id, _actor(request)):
         raise HTTPException(status_code=404, detail="Finding not found")
     return {"deleted": finding_id}
@@ -389,6 +404,8 @@ async def add_note(job_id: str, note: NoteIn, request: Request):
 
 @router.put("/hosts/{host}")
 async def assign_host(job_id: str, host: str, update: HostUpdate, request: Request):
+    if _by_eru(request):
+        raise HTTPException(status_code=403, detail="Eru doesn't assign hosts: an analyst does")
     if update.status is not None and update.status not in HOST_STATUSES:
         raise HTTPException(status_code=400, detail=f"status is one of {', '.join(HOST_STATUSES)}")
     if host not in {h.name for h in case_files.hosts(_root(job_id))}:
