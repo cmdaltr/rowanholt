@@ -144,6 +144,35 @@ class ServerAccessTest(BackendCase):
         resp = self.client.put(f"/api/jobs/{job}/sharing", headers=self.bob, json={"usernames": []})
         self.assertEqual(resp.status_code, 403)
 
+    def test_shared_users_cant_destroy_the_job(self):
+        # Deleting, archiving and a fresh restart lose the owner's work: owner and admins only.
+        # A plain restart, which re-runs into the output, the people it's shared with can do
+        from models.job import JobStatus
+        job = self.create_job(self.alice, "CASE-SHARED-1")
+        self.client.put(f"/api/jobs/{job}/sharing", headers=self.alice, json={"usernames": ["bob"]})
+        stored = self.main.job_storage.get_job(job)
+        stored.status = JobStatus.COMPLETED
+        self.main.job_storage.save_job(stored)
+
+        for method, path in (("DELETE", f"/api/jobs/{job}"), ("POST", f"/api/jobs/{job}/archive"),
+                             ("POST", f"/api/jobs/{job}/restart"), ("POST", f"/api/jobs/{job}/restart?fresh=true")):
+            resp = self.client.request(method, path, headers=self.bob)
+            self.assertEqual(resp.status_code, 403, f"{method} {path}: {resp.text}")
+            self.assertIn("owner or an admin", resp.json()["detail"])
+        for path in ("/api/jobs/bulk/delete", "/api/jobs/bulk/archive", "/api/jobs/bulk/restart"):
+            [result] = self.client.post(path, headers=self.bob, json=[job]).json()["results"]
+            self.assertFalse(result["success"], path)
+            self.assertIn("owner or an admin", result["error"])
+        self.assertEqual(self.main.job_storage.get_job(job).status, JobStatus.COMPLETED)
+
+        resp = self.client.post(f"/api/jobs/{job}/restart?fresh=false", headers=self.bob)
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertFalse(self.main.job_storage.get_job(job).options.force_overwrite)
+        stored = self.main.job_storage.get_job(job)
+        stored.status = JobStatus.COMPLETED
+        self.main.job_storage.save_job(stored)
+        self.assertEqual(self.client.post(f"/api/jobs/{job}/archive", headers=self.alice).status_code, 200)
+
     def test_sharing_with_unknown_user_refused(self):
         job = self.create_job(self.alice, "CASE-ALICE-2")
         resp = self.client.put(f"/api/jobs/{job}/sharing", headers=self.alice, json={"usernames": ["nobody"]})

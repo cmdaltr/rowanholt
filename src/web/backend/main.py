@@ -142,6 +142,18 @@ def _job_for(request: Request, job_id: str) -> Optional[Job]:
     return job_storage.get_job(job_id)
 
 
+# Deleting, archiving and restarting with fresh output lose the owner's work, so the people a job
+# is shared with can't (as they can't change its sharing); a plain restart, which keeps it, they can
+NOT_THEIRS = "Only the job's owner or an admin can {}"
+
+
+def _manager_refusal(request: Request, job_id: str, action: str) -> Optional[str]:
+    """Why the caller may not do this to the job (they can see it but don't own it), or None."""
+    if access.can_manage_job(access.current_user(request), job_id):
+        return None
+    return NOT_THEIRS.format(action)
+
+
 def _with_access(jobs: List[Job]) -> List[Job]:
     """Fill in each job's owner and who it's shared with."""
     records = job_storage.all_access() if jobs else {}
@@ -580,7 +592,7 @@ async def update_job(job_id: str, update: JobUpdate):
 
 
 @app.delete("/api/jobs/{job_id}")
-async def delete_job(job_id: str):
+async def delete_job(job_id: str, request: Request):
     """
     Delete a job.
 
@@ -595,6 +607,10 @@ async def delete_job(job_id: str):
 
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
+
+        refusal = _manager_refusal(request, job_id, "delete it")
+        if refusal:
+            raise HTTPException(status_code=403, detail=refusal)
 
         # Only allow deleting completed/failed/cancelled jobs
         if job.status in [JobStatus.PENDING, JobStatus.RUNNING, JobStatus.PAUSED]:
@@ -692,6 +708,11 @@ async def bulk_delete_jobs(job_ids: list[str], request: Request):
                 results.append({"job_id": job_id, "success": False, "error": "Job not found"})
                 continue
 
+            refusal = _manager_refusal(request, job_id, "delete it")
+            if refusal:
+                results.append({"job_id": job_id, "success": False, "error": refusal})
+                continue
+
             if job.status in [JobStatus.PENDING, JobStatus.RUNNING, JobStatus.PAUSED]:
                 results.append({"job_id": job_id, "success": False, "error": "Cannot delete running job"})
                 continue
@@ -724,6 +745,11 @@ async def bulk_archive_jobs(job_ids: list[str], request: Request):
 
             if not job:
                 results.append({"job_id": job_id, "success": False, "error": "Job not found"})
+                continue
+
+            refusal = _manager_refusal(request, job_id, "archive it")
+            if refusal:
+                results.append({"job_id": job_id, "success": False, "error": refusal})
                 continue
 
             if job.status in [JobStatus.PENDING, JobStatus.RUNNING, JobStatus.PAUSED]:
@@ -781,6 +807,11 @@ async def bulk_restart_jobs(job_ids: list[str], request: Request, fresh: Optiona
                 continue
 
             clean = _restarts_fresh(job, fresh)
+            refusal = _manager_refusal(request, job_id, "restart it with fresh output (fresh=false re-runs into it)") \
+                if clean else None
+            if refusal:
+                results.append({"job_id": job_id, "success": False, "error": refusal})
+                continue
             # Reset job state
             job.status = JobStatus.PENDING
             job.progress = 0
@@ -936,7 +967,7 @@ def _restarts_fresh(job, fresh: Optional[bool]) -> bool:
 
 
 @app.post("/api/jobs/{job_id}/restart")
-async def restart_job(job_id: str, confirm: bool = False, fresh: Optional[bool] = None):
+async def restart_job(job_id: str, request: Request, confirm: bool = False, fresh: Optional[bool] = None):
     """
     Restart a failed, cancelled or completed job.
 
@@ -965,6 +996,10 @@ async def restart_job(job_id: str, confirm: bool = False, fresh: Optional[bool] 
             raise HTTPException(status_code=409, detail=refusal)
 
         clean = _restarts_fresh(job, fresh)
+        refusal = _manager_refusal(request, job_id, "restart it with fresh output (fresh=false re-runs into it)") \
+            if clean else None
+        if refusal:
+            raise HTTPException(status_code=403, detail=refusal)
         # Reset job state
         job.status = JobStatus.PENDING
         job.progress = 0
@@ -1073,7 +1108,7 @@ async def cancel_sudo(job_id: str):
 
 
 @app.post("/api/jobs/{job_id}/archive")
-async def archive_job(job_id: str):
+async def archive_job(job_id: str, request: Request):
     """
     Archive a completed, failed, or cancelled job.
 
@@ -1088,6 +1123,10 @@ async def archive_job(job_id: str):
 
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
+
+        refusal = _manager_refusal(request, job_id, "archive it")
+        if refusal:
+            raise HTTPException(status_code=403, detail=refusal)
 
         if job.status in [JobStatus.PENDING, JobStatus.RUNNING, JobStatus.PAUSED]:
             raise HTTPException(

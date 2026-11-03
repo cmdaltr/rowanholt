@@ -115,7 +115,7 @@ The ID token is verified against the issuer's published keys, its audience and t
 
 ## Sharing jobs
 
-A job belongs to the user who created it. On its page, the Access panel shows the owner and who it's shared with; the owner or an admin adds and removes people. The people it's shared with can see and work on it (cancel, restart, export, ask Eru), but can't reshare it. Jobs created before the server existed have no owner: admins see them and can share them.
+A job belongs to the user who created it. On its page, the Access panel shows the owner and who it's shared with; the owner or an admin adds and removes people. The people it's shared with can see and work on it (cancel, restart into its output with `fresh=false`, export, ask Eru), but can't reshare it, delete or archive it, or restart it with fresh output: those lose the owner's work, so they're the owner's or an admin's. Jobs created before the server existed have no owner: admins see them and can share them.
 
 Everyone who can see a job can work the case together from **Browse Case** on its page. They can flag rows as findings, confirm or dismiss them, assign hosts, keep notes, and follow the activity feed. All of that lives in Postgres and points at rows of the case's output; it never changes the case directory.
 
