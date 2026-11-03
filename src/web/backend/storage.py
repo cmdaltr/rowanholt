@@ -9,7 +9,8 @@ import os
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
-from sqlalchemy import create_engine, text, Column, String, Integer, Text, DateTime, Enum as SQLEnum, JSON
+from sqlalchemy import create_engine, text, Column, String, Integer, Text, DateTime, Enum as SQLEnum, JSON, \
+    UniqueConstraint
 from sqlalchemy.orm import sessionmaker, declarative_base, defer
 from sqlalchemy.pool import NullPool
 
@@ -113,6 +114,8 @@ class CaseFindingModel(Base):
     """A row of a case's output an analyst flagged: a reference to the evidence, never a copy of it.
     row_hash pins the row, so a re-run that moves or changes it shows up instead of re-pointing."""
     __tablename__ = "case_findings"
+    # One finding per row (migration c71d4e9a2b58): a second flag at the same moment fails here
+    __table_args__ = (UniqueConstraint("job_id", "host", "artefact", "row_ref", name="uq_case_findings_row"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     job_id = Column(String, nullable=False, index=True)

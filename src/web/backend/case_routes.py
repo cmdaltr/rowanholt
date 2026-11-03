@@ -15,6 +15,7 @@ from typing import Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 
 try:
     from . import case_files
@@ -46,6 +47,14 @@ class Conflict(Exception):
     def __init__(self, current: Dict):
         super().__init__(f"finding #{current['id']} changed")
         self.current = current
+
+
+class AlreadyFlagged(Exception):
+    """Someone flagged the row first: carries their finding (two flags at the same moment)."""
+
+    def __init__(self, finding: Dict):
+        super().__init__("already flagged")
+        self.finding = finding
 
 
 class CaseStore:
@@ -91,7 +100,12 @@ class CaseStore:
         with self.Session() as session:
             row = CaseFindingModel(job_id=job_id, author=actor, created_at=now, updated_at=now, **fields)
             session.add(row)
-            session.flush()
+            try:
+                session.flush()
+            except IntegrityError:
+                # Flagged by someone else since existing() looked (uq_case_findings_row)
+                session.rollback()
+                raise AlreadyFlagged(self.existing(job_id, fields["host"], fields["artefact"], fields["row_ref"]))
             self._log(session, job_id, actor, "flagged",
                       f"#{row.id} {row.title} ({row.host}: {row.artefact} row {row.row_ref})")
             session.commit()
@@ -344,12 +358,19 @@ async def flag(job_id: str, finding: FindingIn, request: Request):
         raise HTTPException(status_code=404, detail=f"No row {finding.row_ref} in {finding.artefact}")
     already = store().existing(job_id, finding.host, finding.artefact, finding.row_ref)
     if already:
-        raise HTTPException(status_code=409, detail=f"{already['author']} already flagged this row as "
-                            f"#{already['id']} ({already['title']}, {already['status']}): add a note to it instead")
+        raise _flagged_already(already)
     excerpt = "; ".join(f"{k}: {v}" for k, v in row.items() if v)[:EXCERPT]
-    return store().add_finding(job_id, _actor(request), host=finding.host, artefact=finding.artefact,
-                               row_ref=finding.row_ref, row_hash=case_files.row_hash(row), excerpt=excerpt,
-                               title=finding.title.strip(), technique=technique or None, status=finding.status)
+    try:
+        return store().add_finding(job_id, _actor(request), host=finding.host, artefact=finding.artefact,
+                                   row_ref=finding.row_ref, row_hash=case_files.row_hash(row), excerpt=excerpt,
+                                   title=finding.title.strip(), technique=technique or None, status=finding.status)
+    except AlreadyFlagged as exc:
+        raise _flagged_already(exc.finding)
+
+
+def _flagged_already(already: Dict) -> HTTPException:
+    return HTTPException(status_code=409, detail=f"{already['author']} already flagged this row as "
+                         f"#{already['id']} ({already['title']}, {already['status']}): add a note to it instead")
 
 
 @router.patch("/findings/{finding_id}")

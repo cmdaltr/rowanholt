@@ -87,6 +87,20 @@ def test_broken_json_is_a_400(client):
     assert broken.status_code == 400 and "isn't valid JSON" in broken.json()["detail"]
 
 
+
+def test_two_flags_on_one_row_at_once(client):
+    # Both passed the "already flagged" check before either was saved: the database refuses the second
+    api, _ = client
+    fields = {"host": "LAB-UBUNTU", "artefact": "artefacts/cooked/linux/cron.csv", "row_ref": "3",
+              "row_hash": "0" * 64, "title": "first"}
+    first = case_routes.store().add_finding(JOB, "frodo", **fields)
+    with pytest.raises(case_routes.AlreadyFlagged) as caught:
+        case_routes.store().add_finding(JOB, "sam", **{**fields, "title": "second"})
+    assert caught.value.finding["id"] == first["id"]
+    again = api.post(f"/api/jobs/{JOB}/case/findings", json={"host": "LAB-UBUNTU", "row_ref": "3", "title": "x",
+                                                            "artefact": "artefacts/cooked/linux/cron.csv"})
+    assert again.status_code == 409 and f"#{first['id']}" in again.json()["detail"]
+
 def test_rows_are_paged_and_filtered(client):
     api, _ = client
     rows = api.get(f"/api/jobs/{JOB}/case/rows", params={"host": "LAB-UBUNTU", "path": "artefacts/cooked/linux/cron.csv",

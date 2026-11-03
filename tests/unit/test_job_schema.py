@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "web" / "ba
 
 import storage  # noqa: E402
 
-HEAD = "a3f8c6e1d295"  # the newest file in src/web/backend/alembic/versions
+HEAD = "c71d4e9a2b58"  # the newest file in src/web/backend/alembic/versions
 
 
 def heads(url: str) -> list:
