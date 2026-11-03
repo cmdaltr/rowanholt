@@ -286,6 +286,57 @@ class EruMcpTest(BackendCase):
                                 json={"question_id": "analysis", "case_id": "CASE-MCP-6"})
         self.assertEqual(resp.status_code, 404)
 
+    def test_eru_reads_the_job_asked_for(self):
+        # Two of alice's jobs share a case number: each answers from its own output, not the first one's
+        first = self.case_with_output("CASE-MCP-21")
+        source = self.evidence / "CASE-MCP-21b.E01"
+        source.write_bytes(b"")
+        second = self.client.post("/api/jobs", headers=self.alice, json={
+            "case_number": "CASE-MCP-21", "source_paths": [str(source)],
+            "destination_path": str(self.evidence / "out" / "CASE-MCP-21b")}).json()["id"]
+        cooked = self.evidence / "out" / "CASE-MCP-21b" / "WS02" / "artefacts" / "cooked"
+        cooked.mkdir(parents=True)
+        (cooked / "prefetch.csv").write_text("Executable,LastRun\nNOTEPAD.EXE,2026-10-03\n")
+        for job, host, other in ((first, "WS01", "WS02"), (second, "WS02", "WS01")):
+            error, answer = self.call(self.alice, "ask_offline", job_id=job, question="hosts")
+            self.assertFalse(error, answer)
+            self.assertIn(host, answer["answer"])
+            self.assertNotIn(other, answer["answer"])
+        # Ask Eru lists each (completed) job, not one per case number
+        from models.job import JobStatus
+        for job in (first, second):
+            stored = self.main.job_storage.get_job(job)
+            stored.status = JobStatus.COMPLETED
+            self.main.job_storage.save_job(stored)
+        listed = {c.get("job_id") for c in self.client.get("/api/ai/cases", headers=self.alice).json()["cases"]}
+        self.assertLessEqual({first, second}, listed)
+        # Someone else's job, or a job that isn't this case: nothing
+        bobs = self.create_job(self.bob, "CASE-MCP-22")
+        for case in ("CASE-MCP-22", "CASE-MCP-21"):
+            resp = self.client.post("/api/ai/offline/answer", headers=self.alice,
+                                    json={"question_id": "hosts", "case_id": case, "job_id": bobs})
+            self.assertEqual(resp.status_code, 404, (case, resp.text))
+
+    def test_a_case_folder_is_for_admins(self):
+        # A folder in Eru's data directory has no job, so no owner: a user whose job has the same case
+        # number gets their job's output, not the folder
+        import ai_routes
+        data = self.evidence / "eru-data"
+        (data / "CASE-MCP-23" / "WS09" / "artefacts" / "cooked").mkdir(parents=True)
+        bobs = self.create_job(self.bob, "CASE-MCP-23")
+        (self.evidence / "out" / "CASE-MCP-23" / "WS01" / "artefacts" / "cooked").mkdir(parents=True)
+        with mock.patch.object(ai_routes, "RIVENDELL_DATA_DIR", str(data)):
+            def hosts(headers):
+                resp = self.client.post("/api/ai/offline/answer", headers=headers,
+                                        json={"question_id": "hosts", "case_id": "CASE-MCP-23"})
+                return resp.json()
+            self.assertIn("WS01", hosts(self.bob)["answer"])
+            self.assertNotIn("WS09", hosts(self.bob)["answer"])
+            self.assertEqual(hosts(self.bob)["job_id"], bobs)
+            self.assertIn("WS09", hosts(self.admin)["answer"])
+            listed = self.client.get("/api/ai/cases", headers=self.bob).json()["cases"]
+            self.assertFalse([c for c in listed if not c.get("job_id")], listed)
+
     def test_other_peoples_jobs_unreachable(self):
         job = self.case_with_output("CASE-MCP-2")
         error, cases = self.call(self.bob, "list_cases")

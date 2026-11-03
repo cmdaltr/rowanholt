@@ -9,6 +9,11 @@ const heroImage = `${process.env.PUBLIC_URL}/images/rivendell.png`;
 const API_BASE = API_BASE_URL;
 const CASE_HOST = '(case)'; // the case's own summaries (stacking.csv): a finding rests on a host's row, as in the case browser
 const rowKey = (row) => `${row.host}|${row.file}|${row.row_ref}`;
+// One entry per job (two jobs can share a case number), or per case folder with no job behind it
+const caseKey = (c) => c.job_id || c.case_id;
+// Eru reads that job's output, not the first visible job with the same case number
+const caseUrl = (c, action) =>
+  `${API_BASE}/api/ai/cases/${encodeURIComponent(c.case_id)}/${action}${c.job_id ? `?job_id=${c.job_id}` : ''}`;
 // The rows an answer cited, which can be flagged on its job's case
 const citedRows = (data) => (data.job_id ? { jobId: data.job_id, rows: (data.rows || []).filter((r) => r.host !== CASE_HOST) } : {});
 
@@ -17,7 +22,8 @@ function AIAssistant() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [cases, setCases] = useState([]);
-  const [selectedCase, setSelectedCase] = useState('');
+  const [selectedCase, setSelectedCase] = useState('');  // a caseKey
+  const current = cases.find((c) => caseKey(c) === selectedCase);  // the selected case, with its job
   const [llmStatus, setLlmStatus] = useState({ available: false, model: null, reason: '', checked: false });
   const [offlineQuestions, setOfflineQuestions] = useState([]);
   const [loadingCases, setLoadingCases] = useState(true);
@@ -58,7 +64,7 @@ function AIAssistant() {
         setCases(data.cases || []);
         // Auto-select first case if available
         if (data.cases && data.cases.length > 0) {
-          setSelectedCase(data.cases[0].case_id);
+          setSelectedCase(caseKey(data.cases[0]));
         }
       }
     } catch (error) {
@@ -111,7 +117,8 @@ function AIAssistant() {
       const response = await fetch(`${API_BASE}/api/ai/offline/answer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question_id: q.id, case_id: selectedCase || null }),
+        body: JSON.stringify({ question_id: q.id, case_id: current ? current.case_id : null,
+                               job_id: current ? current.job_id || null : null }),
       });
       const data = await response.json();
       setMessages(prev => [...prev, {
@@ -156,8 +163,8 @@ function AIAssistant() {
 
     try {
       // If a case is selected, query case-specific data
-      if (selectedCase) {
-        const response = await fetch(`${API_BASE}/api/ai/cases/${selectedCase}/query`, {
+      if (current) {
+        const response = await fetch(caseUrl(current, 'query'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -217,11 +224,11 @@ function AIAssistant() {
   };
 
   const handleGetSuggestions = async () => {
-    if (!selectedCase) return;
+    if (!current) return;
 
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/ai/cases/${selectedCase}/suggestions`, {
+      const response = await fetch(caseUrl(current, 'suggestions'), {
         method: 'POST',
       });
 
@@ -233,7 +240,7 @@ function AIAssistant() {
 
         setMessages(prev => [...prev, {
           role: 'assistant',
-          content: `**Investigation Path Suggestions for ${selectedCase}:**\n\n${suggestionsText}`,
+          content: `**Investigation Path Suggestions for ${current.case_id}:**\n\n${suggestionsText}`,
           ...citedRows(data)
         }]);
       }
@@ -245,11 +252,11 @@ function AIAssistant() {
   };
 
   const handleGetSummary = async () => {
-    if (!selectedCase) return;
+    if (!current) return;
 
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/ai/cases/${selectedCase}/summary`, {
+      const response = await fetch(caseUrl(current, 'summary'), {
         method: 'POST',
       });
 
@@ -257,7 +264,7 @@ function AIAssistant() {
         const data = await response.json();
         setMessages(prev => [...prev, {
           role: 'assistant',
-          content: `**Case Summary for ${selectedCase}:**\n\n${data.executive_summary || 'No summary available.'}`,
+          content: `**Case Summary for ${current.case_id}:**\n\n${data.executive_summary || 'No summary available.'}`,
           ...citedRows(data)
         }]);
       }
@@ -425,8 +432,10 @@ function AIAssistant() {
             >
               <option value="">-- General Assistant (No Case) --</option>
               {cases.map((c) => (
-                <option key={c.case_id} value={c.case_id}>
-                  {c.case_id} {c.indexed ? '(Indexed)' : ''}
+                <option key={caseKey(c)} value={caseKey(c)}>
+                  {c.case_id}
+                  {c.job_id && cases.filter((o) => o.case_id === c.case_id).length > 1 ? ` (job ${c.job_id.slice(0, 8)})` : ''}
+                  {c.indexed ? ' (Indexed)' : ''}
                 </option>
               ))}
             </select>
@@ -482,7 +491,7 @@ function AIAssistant() {
               opacity: 0.6
             }}>
               {selectedCase
-                ? `Ask questions about case "${selectedCase}" or use the quick actions below.`
+                ? `Ask questions about case "${current ? current.case_id : selectedCase}" or use the quick actions below.`
                 : 'Select a case to query case-specific data, or ask general forensics questions.'}
             </div>
           )}
@@ -718,7 +727,7 @@ function AIAssistant() {
             placeholder={!llmStatus.available && llmStatus.checked
               ? 'Free-text questions need the language model: pick a question above'
               : selectedCase
-                ? `Ask about case "${selectedCase}"...`
+                ? `Ask about case "${current ? current.case_id : selectedCase}"...`
                 : "Ask me anything about forensic analysis..."}
             disabled={loading || (llmStatus.checked && !llmStatus.available)}
             style={{

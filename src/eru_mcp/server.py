@@ -119,8 +119,8 @@ class RivendellAPI:
         # Positional-only: the case browser's rows take a `path` parameter of their own
         return self.call("GET", path, params)
 
-    def post(self, path: str, body: Optional[dict] = None) -> Any:
-        return self.call("POST", path, body=body)
+    def post(self, path: str, body: Optional[dict] = None, /, **params: Any) -> Any:
+        return self.call("POST", path, params, body)
 
 
 def _decode(raw: bytes, content_type: str) -> Any:
@@ -197,7 +197,10 @@ def build_server(api: RivendellAPI, writes: bool = False, max_writes: int = MAX_
         match = next((q for q in catalogue if wanted in (q["id"].lower(), q["question"].lower().rstrip("?"))), None)
         if match is None:
             return {"unknown question": question, "questions": [{"id": q["id"], "question": q["question"]} for q in catalogue]}
-        body = {"question_id": match["id"], "case_id": job(job_id)["case_number"] if match.get("needs_case") else None}
+        # The job asked for, not the first visible one with its case number
+        needs_case = match.get("needs_case")
+        body = {"question_id": match["id"], "case_id": job(job_id)["case_number"] if needs_case else None,
+                "job_id": job_id if needs_case else None}
         result = api.post(api.path("ai", "offline", "answer"), body)
         rows = [{"line": r["line"], "cite": f"{r['host']}: {r['file']} row {r['row_ref']} (sha256 {r['hash'][:16]})"}
                 for r in result.get("rows") or []]
@@ -210,7 +213,7 @@ def build_server(api: RivendellAPI, writes: bool = False, max_writes: int = MAX_
         unavailable = llm_unavailable()
         if unavailable:
             return unavailable
-        return api.post(api.path("ai", "cases", job(job_id)["case_number"], "query"), {"question": question})
+        return api.post(api.path("ai", "cases", job(job_id)["case_number"], "query"), {"question": question}, job_id=job_id)
 
     @server.tool(annotations=READ_ONLY)
     def case_summary(job_id: str) -> Dict[str, Any]:
@@ -218,7 +221,7 @@ def build_server(api: RivendellAPI, writes: bool = False, max_writes: int = MAX_
         unavailable = llm_unavailable()
         if unavailable:
             return unavailable
-        return api.post(api.path("ai", "cases", job(job_id)["case_number"], "summary"))
+        return api.post(api.path("ai", "cases", job(job_id)["case_number"], "summary"), None, job_id=job_id)
 
     @server.tool(annotations=READ_ONLY)
     def suggestions(job_id: str) -> Dict[str, Any]:
@@ -227,7 +230,7 @@ def build_server(api: RivendellAPI, writes: bool = False, max_writes: int = MAX_
         unavailable = llm_unavailable()
         if unavailable:
             return unavailable
-        return api.post(api.path("ai", "cases", job(job_id)["case_number"], "suggestions"))
+        return api.post(api.path("ai", "cases", job(job_id)["case_number"], "suggestions"), None, job_id=job_id)
 
     @server.tool(annotations=READ_ONLY)
     def check_indicator(value: str) -> Dict[str, Any]:

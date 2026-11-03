@@ -52,6 +52,8 @@ class QueryRequest(BaseModel):
 class OfflineRequest(BaseModel):
     question_id: str
     case_id: Optional[str] = None
+    # The job whose output to read; without it, the first visible job with case_id
+    job_id: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -187,7 +189,9 @@ async def answer_offline_question(request: OfflineRequest, http_request: Request
     if request.case_id and not access.case_allowed(access.current_user(http_request), request.case_id):
         raise HTTPException(status_code=404, detail="Case not found")
     user = access.current_user(http_request)
-    case_path, job_id = await _find_case(request.case_id, user) if request.case_id else (None, None)
+    case_path, job_id = await _find_case(request.case_id, user, request.job_id) if request.case_id else (None, None)
+    if request.case_id and not case_path:
+        raise HTTPException(status_code=404, detail="Case not found")
     try:
         result = eru_offline.answer_with_rows(request.question_id, case_path)
     except KeyError:
@@ -227,28 +231,23 @@ async def list_indexed_cases(request: Request):
             if job.status.value == "completed" and job.destination_path:
                 dest_path = Path(job.destination_path)
                 if dest_path.exists():
-                    # Check if already in list
-                    case_id = job.case_number
-                    if not any(c["case_id"] == case_id for c in cases):
-                        # Check for vector DB or cooked directory
-                        vector_db = dest_path / "vector_db"
-                        cooked = dest_path / "cooked"
-
-                        cases.append({
-                            "case_id": case_id,
-                            "path": str(dest_path),
-                            "indexed": vector_db.exists(),
-                            "has_artifacts": cooked.exists(),
-                            "job_id": job.id,
-                        })
+                    # One entry per job: two jobs can share a case number, and Eru reads the one chosen
+                    vector_db = dest_path / "vector_db"
+                    cooked = dest_path / "cooked"
+                    cases.append({
+                        "case_id": job.case_number,
+                        "path": str(dest_path),
+                        "indexed": vector_db.exists(),
+                        "has_artifacts": cooked.exists(),
+                        "job_id": job.id,
+                    })
 
     except Exception as e:
         logger.error(f"Error listing cases: {e}")
 
-    visible = access.visible_cases(access.current_user(request))
-    if visible is not None:
-        cases = [c for c in cases if c["case_id"] in visible]
-    return {"cases": cases}
+    user = access.current_user(request)
+    return {"cases": [c for c in cases if c.get("job_id") and access.can_access_job(user, c["job_id"])
+                      or not c.get("job_id") and _folder_cases_visible(user)]}
 
 
 @router.post("/chat")
@@ -288,7 +287,7 @@ async def general_chat(request: ChatRequest):
 
 
 @router.get("/cases/{case_id}/info")
-async def get_case_info(case_id: str):
+async def get_case_info(case_id: str, http_request: Request, job_id: Optional[str] = None):
     """
     Get information about a case.
 
@@ -298,24 +297,11 @@ async def get_case_info(case_id: str):
     Returns:
         Case information
     """
-    # Try to find case in data directory
-    case_path = os.path.join(RIVENDELL_DATA_DIR, case_id)
-    vector_db_path = os.path.join(case_path, "vector_db")
-
-    # Also check job storage
-    job_storage = JobStorage()
-
-    job_info = None
-    for job in job_storage.list_jobs(limit=100000):
-        if job.case_number == case_id:
-            job_info = job
-            if job.destination_path:
-                case_path = job.destination_path
-                vector_db_path = os.path.join(case_path, "vector_db")
-            break
-
-    if not os.path.exists(case_path):
+    case_path, found = await _find_case(case_id, access.current_user(http_request), job_id)
+    if not case_path or not os.path.exists(case_path):
         raise HTTPException(status_code=404, detail=f"Case {case_id} not found")
+    vector_db_path = os.path.join(case_path, "vector_db")
+    job_info = JobStorage().get_job(found) if found else None
 
     # Gather case info
     info = {
@@ -341,7 +327,7 @@ async def get_case_info(case_id: str):
 
 
 @router.post("/cases/{case_id}/query")
-async def query_case(case_id: str, request: QueryRequest, http_request: Request):
+async def query_case(case_id: str, request: QueryRequest, http_request: Request, job_id: Optional[str] = None):
     """
     Query a case using natural language.
 
@@ -356,7 +342,7 @@ async def query_case(case_id: str, request: QueryRequest, http_request: Request)
     import time
     start_time = time.time()
 
-    case_path, job_id = await _find_case(case_id, access.current_user(http_request))
+    case_path, job_id = await _find_case(case_id, access.current_user(http_request), job_id)
     if not case_path:
         raise HTTPException(status_code=404, detail=f"Case {case_id} not found")
 
@@ -420,7 +406,7 @@ Provide a detailed forensic analysis answer based on the case data provided."""
 
 
 @router.post("/cases/{case_id}/suggestions")
-async def get_investigation_suggestions(case_id: str, http_request: Request):
+async def get_investigation_suggestions(case_id: str, http_request: Request, job_id: Optional[str] = None):
     """
     Get AI-generated investigation path suggestions.
 
@@ -431,7 +417,7 @@ async def get_investigation_suggestions(case_id: str, http_request: Request):
         List of investigation suggestions, each with the rows it cites, and all of them with the job
     """
     # Find case path
-    case_path, job_id = await _find_case(case_id, access.current_user(http_request))
+    case_path, job_id = await _find_case(case_id, access.current_user(http_request), job_id)
 
     if not case_path:
         raise HTTPException(status_code=404, detail=f"Case {case_id} not found")
@@ -467,7 +453,7 @@ Format as a numbered list."""
 
 
 @router.post("/cases/{case_id}/summary")
-async def generate_case_summary(case_id: str, http_request: Request):
+async def generate_case_summary(case_id: str, http_request: Request, job_id: Optional[str] = None):
     """
     Generate an executive summary for a case.
 
@@ -478,7 +464,7 @@ async def generate_case_summary(case_id: str, http_request: Request):
         Case summary
     """
     # Find case path
-    case_path, job_id = await _find_case(case_id, access.current_user(http_request))
+    case_path, job_id = await _find_case(case_id, access.current_user(http_request), job_id)
 
     if not case_path:
         raise HTTPException(status_code=404, detail=f"Case {case_id} not found")
@@ -516,11 +502,34 @@ async def _find_case_path(case_id: str) -> Optional[str]:
     return (await _find_case(case_id))[0]
 
 
-async def _find_case(case_id: str, user: Optional[dict] = None) -> Tuple[Optional[str], Optional[str]]:
+def _folder_cases_visible(user: Optional[dict]) -> bool:
+    """A case folder in the data directory has no job, so no owner: on a team server, admins only."""
+    return user is None or not access.server_mode() or access.is_admin(user)
+
+
+def _job_case_root(job) -> Optional[str]:
+    """The folder with the host folders, as the case browser finds it: the destination or <destination>/<case>."""
+    if not job.destination_path:
+        return None
+    root = case_files.case_root(job.destination_path, job.case_number)
+    if root:
+        return str(root)
+    return job.destination_path if os.path.exists(job.destination_path) else None
+
+
+async def _find_case(case_id: str, user: Optional[dict] = None,
+                     job_id: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
     """(case path, the job it's the output of): a case in the data directory has no job; with `user`,
-    only jobs they can see."""
+    only jobs they can see. With `job_id`, that job's output and no other (two jobs can share a
+    case number), or nothing if it isn't the caller's or isn't this case."""
+    if job_id:
+        job = JobStorage().get_job(job_id)
+        if not job or job.case_number != case_id or (user is not None and not access.can_access_job(user, job.id)):
+            return None, None
+        return _job_case_root(job), job.id
+
     data_path = os.path.join(RIVENDELL_DATA_DIR, case_id)
-    if os.path.exists(data_path):
+    if os.path.exists(data_path) and _folder_cases_visible(user):
         return data_path, None
 
     try:
@@ -531,12 +540,9 @@ async def _find_case(case_id: str, user: Optional[dict] = None) -> Tuple[Optiona
                 continue
             if user is not None and not access.can_access_job(user, job.id):
                 continue
-            # The folder with the host folders, as the case browser finds it: the destination or <destination>/<case>
-            root = case_files.case_root(job.destination_path, job.case_number)
+            root = _job_case_root(job)
             if root:
-                return str(root), job.id
-            if os.path.exists(job.destination_path):
-                return job.destination_path, job.id
+                return root, job.id
     except Exception as e:
         logger.error(f"Error checking job storage: {e}")
 
