@@ -2,7 +2,8 @@
 
 Each host contributes the set of values it has in a few families: processes (Prefetch, Amcache,
 4688 and Sysmon 1), parent and child pairs, services (7045, systemd units), scheduled tasks
-(4698, task files), autoruns (Run keys, startup items, Linux autostart, BTM), WMI consumers and kernel modules. A value
+(4698, task files), autoruns (Run keys, startup items, Linux autostart, BTM), WMI consumers, drivers
+(Sysmon 6) and kernel modules. A value
 on few of the case's hosts is the long tail; <case>/stacking.csv lists it, ranked by a score
 that is the sum of named features, so every row says why it's there:
 
@@ -11,6 +12,18 @@ that is the sum of named features, so every row says why it's there:
     generated name   a name that looks machine-made: few vowels, a long consonant run, digits and
                      letters interleaved, or long hex
     not in baseline  absent from a clean baseline, when one is given (built with build_baseline)
+    unsigned         a kernel module that tainted the kernel as unsigned (E), or a driver Sysmon saw
+                     load without a valid signature
+    no team ID       a third-party BTM item (not com.apple.) whose code signature names no Team ID:
+                     ad hoc signed or not signed at all
+    outside logon hours
+                     a process, task, service or driver first seen on the host at an hour (UTC) when
+                     no one logs on to it: the host's interactive and remote logons (4624 types 2, 10
+                     and 11, accounts not ending $) give its hours, widened an hour each way, once
+                     there are LOGON_MIN of them
+
+The last three are the host's own: they only add to the score of a value that is already rare or
+new against the baseline, never put a common one on the list.
 
 A family is compared across the hosts of its operating system (a host's OS is that of the
 families it has values in), so a Windows host's processes aren't rare because the case also holds
@@ -54,17 +67,24 @@ USER_PATH = re.compile(r"(?i)(?:\\users\\|\\appdata\\|\\temp\\|\\programdata\\|^
 # Windows' own folders, where consonant-heavy names are Microsoft's (mscorsvw, comppkgsrv), not machine-made
 SYSTEM_PATH = re.compile(r"(?i)\\windows\\(?!temp\\)")
 MIN_HOSTS = 3  # hosts of an OS before a value on few of them counts as rare
-WEIGHTS = {"rare": 2.0, "user path": 1.5, "generated name": 1.0, "not in baseline": 1.0}
+WEIGHTS = {"rare": 2.0, "user path": 1.5, "generated name": 1.0, "not in baseline": 1.0, "unsigned": 1.5,
+           "no team ID": 1.0, "outside logon hours": 1.0}
+LOGON_MIN = 10  # interactive logons on a host before its logon hours say anything
+LOGON_TYPES = {"2", "10", "11"}  # interactive, remote interactive (RDP), cached interactive
+APPLE_TEAMS = {"", "apple", "APPLECOMPUTER"}  # process/mac_artefacts.py: Apple's own items carry no team
 VOWELS = set("aeiouy")
 FAMILY_OS = {"process": "windows", "parent > child": "windows", "scheduled task": "windows",
              "wmi consumer": "windows", "service (Windows)": "windows", "autorun (Windows)": "windows",
              "service (systemd)": "linux", "autorun (Linux)": "linux", "kernel module": "linux",
-             "autorun (macOS)": "macos"}
+             "autorun (macOS)": "macos", "driver (Windows)": "windows"}
 
 PERSISTENCE = {"scheduled task", "wmi consumer", "service (Windows)", "autorun (Windows)", "service (systemd)",
-               "autorun (Linux)", "kernel module", "autorun (macOS)"}
+               "autorun (Linux)", "kernel module", "autorun (macOS)", "driver (Windows)"}
 
-Value = Tuple[str, str, str, str]  # (family, value, example, row reference)
+# (family, value, example, row reference), optionally followed by the value's traits on this host
+# ("unsigned", ...) and when it was seen (ISO, UTC). A family starting "_" isn't stacked: "_logon"
+# carries a logon's time, for the host's logon hours.
+Value = Tuple[str, ...]
 
 # Fingerprints of a distribution family, looked for in a host's raw file names and its values
 DISTRO_MARKERS = {
@@ -121,6 +141,14 @@ def _event(record: dict) -> Tuple[Optional[int], Dict[str, str]]:
         return None, {}
 
 
+def _when(record: dict) -> str:
+    """An evtx record's SystemTime (UTC), as Elrond cooks it ("" without one)."""
+    created = (((record.get("data") or {}).get("Event") or {}).get("System") or {}).get("TimeCreated")
+    if isinstance(created, dict):
+        created = (created.get("#attributes") or {}).get("SystemTime") or created.get("SystemTime")
+    return str(created or "")
+
+
 def _base(path: str) -> str:
     return re.split(r"[\\/]", path.strip().strip('"'))[-1].lower()
 
@@ -154,29 +182,37 @@ def _security(path: str) -> Iterable[Value]:
         event_id, data = _event(r)
         if event_id == 4688 and data.get("NewProcessName"):
             child = _norm_path(data["NewProcessName"])
-            yield "process", child, data["NewProcessName"], ref
+            yield "process", child, data["NewProcessName"], ref, (), _when(r)
             if data.get("ParentProcessName"):
                 yield ("parent > child", f"{_base(data['ParentProcessName'])} > {_base(child)}",
-                       data.get("CommandLine", ""), ref)
+                       data.get("CommandLine", ""), ref, (), _when(r))
         elif event_id == 4698 and data.get("TaskName"):
-            yield "scheduled task", _norm_name(data["TaskName"].strip("\\")), data["TaskName"], ref
+            yield "scheduled task", _norm_name(data["TaskName"].strip("\\")), data["TaskName"], ref, (), _when(r)
+        elif (event_id == 4624 and data.get("LogonType") in LOGON_TYPES
+              and not data.get("TargetUserName", "").endswith("$")):
+            yield "_logon", "", "", ref, (), _when(r)
 
 
 def _sysmon(path: str) -> Iterable[Value]:
     for ref, r in _json_records(path):
         event_id, data = _event(r)
         if event_id == 1 and data.get("Image"):
-            yield "process", _norm_path(data["Image"]), data["Image"], ref
+            yield "process", _norm_path(data["Image"]), data["Image"], ref, (), _when(r)
             if data.get("ParentImage"):
                 yield ("parent > child", f"{_base(data['ParentImage'])} > {_base(data['Image'])}",
-                       data.get("CommandLine", ""), ref)
+                       data.get("CommandLine", ""), ref, (), _when(r))
+        elif event_id == 6 and data.get("ImageLoaded"):
+            signed = data.get("Signed", "").lower() == "true" and data.get("SignatureStatus", "Valid") == "Valid"
+            yield ("driver (Windows)", _norm_path(data["ImageLoaded"]),
+                   f"{data['ImageLoaded']} ({data.get('Signature') or 'no signature'})", ref,
+                   () if signed else ("unsigned",), _when(r))
 
 
 def _system(path: str) -> Iterable[Value]:
     for ref, r in _json_records(path):
         event_id, data = _event(r)
         if event_id == 7045 and data.get("ServiceName"):
-            yield "service (Windows)", data["ServiceName"].lower(), data.get("ImagePath", ""), ref
+            yield "service (Windows)", data["ServiceName"].lower(), data.get("ImagePath", ""), ref, (), _when(r)
 
 
 def _systemd(path: str) -> Iterable[Value]:
@@ -226,7 +262,10 @@ def _btm(path: str) -> Iterable[Value]:
     for ref, r in _csv_rows(path):
         value = r.get("ExecutablePath") or r.get("Identifier") or r.get("Name") or ""
         if value:
-            yield "autorun (macOS)", _norm_path(value), f"{r.get('Name', '')}: {r.get('ExecutablePath', '')}", ref
+            third_party = not (r.get("Identifier") or "").startswith("com.apple.")
+            no_team = third_party and (r.get("TeamIdentifier") or "") in APPLE_TEAMS
+            yield ("autorun (macOS)", _norm_path(value), f"{r.get('Name', '')}: {r.get('ExecutablePath', '')}", ref,
+                   ("no team ID",) if no_team else ())
 
 
 def _wmi(path: str) -> Iterable[Value]:
@@ -239,7 +278,8 @@ def _wmi(path: str) -> Iterable[Value]:
 def _kernel_modules(path: str) -> Iterable[Value]:
     for ref, r in _csv_rows(path):
         if r.get("Name"):
-            yield "kernel module", r["Name"].lower(), r.get("Path", ""), ref
+            yield ("kernel module", r["Name"].lower(), r.get("Path", ""), ref,
+                   ("unsigned",) if "E" in (r.get("Taint") or "") else ())
 
 
 # (test on the cooked path relative to the host's cooked folder, extractor)
@@ -260,11 +300,26 @@ SOURCES: List[Tuple[Callable[[str], bool], Callable[[str], Iterable[Value]]]] = 
 ]
 
 
-def host_values(host_dir: str) -> Dict[Tuple[str, str], Tuple[str, str, str]]:
-    """{(family, value): (artefact, example, row reference)} for one host: each value once, wherever it was
-    first seen."""
+def _hour(when: str) -> Optional[int]:
+    match = re.match(r"\d{4}-\d\d-\d\d[T ](\d\d):", when)
+    return int(match.group(1)) if match else None
+
+
+def logon_hours(logons: Iterable[str]) -> Optional[Set[int]]:
+    """The hours (UTC) people log on to a host, widened an hour each way; None with fewer than LOGON_MIN."""
+    hours = [h for h in (_hour(w) for w in logons) if h is not None]
+    if len(hours) < LOGON_MIN:
+        return None
+    return {(h + d) % 24 for h in hours for d in (-1, 0, 1)}
+
+
+def host_values(host_dir: str) -> Dict[Tuple[str, str], Tuple[str, str, str, Tuple[str, ...]]]:
+    """{(family, value): (artefact, example, row reference, traits)} for one host: each value once, wherever
+    it was first seen, with its traits there (unsigned, no team ID, outside logon hours)."""
     cooked = os.path.join(host_dir, "artefacts", "cooked")
-    found: Dict[Tuple[str, str], Tuple[str, str]] = {}
+    found: Dict[Tuple[str, str], Tuple[str, str, str, Tuple[str, ...]]] = {}
+    seen_at: Dict[Tuple[str, str], str] = {}
+    logons: List[str] = []
     for root, _, files in os.walk(cooked):
         for name in sorted(files):
             full = os.path.join(root, name)
@@ -273,10 +328,23 @@ def host_values(host_dir: str) -> Dict[Tuple[str, str], Tuple[str, str, str]]:
                 if not test(relative):
                     continue
                 try:
-                    for family, value, example, ref in extract(full):
-                        found.setdefault((family, value), (f"artefacts/cooked/{relative}", example[:300], ref))
+                    for family, value, example, ref, *more in extract(full):
+                        traits, when = (tuple(more[0]) if more else ()), (more[1] if len(more) > 1 else "")
+                        if family == "_logon":
+                            logons.append(when)
+                        elif (family, value) not in found:
+                            found[(family, value)] = (f"artefacts/cooked/{relative}", example[:300], ref, traits)
+                            if when:
+                                seen_at[(family, value)] = when
                 except (OSError, csv.Error):
                     continue  # an unreadable artefact leaves its values out; the rest still stack
+    hours = logon_hours(logons)
+    if hours is not None:
+        for key, when in seen_at.items():
+            hour = _hour(when)
+            if hour is not None and hour not in hours:
+                artefact, example, ref, traits = found[key]
+                found[key] = (artefact, example, ref, traits + ("outside logon hours",))
     return found
 
 
@@ -336,7 +404,7 @@ def looks_generated(name: str) -> bool:
 
 
 def reasons(family: str, value: str, with_it: int, hosts: int, baseline: Optional[Set[Tuple[str, str]]],
-            example: str = "") -> List[str]:
+            example: str = "", traits: Iterable[str] = ()) -> List[str]:
     """The named features behind a value's score. A process from Prefetch is valued by its name alone, so its
     example, the path it ran from, says whether a Windows folder vouches for the name."""
     found = []
@@ -349,7 +417,7 @@ def reasons(family: str, value: str, with_it: int, hosts: int, baseline: Optiona
         found.append("generated name")
     if baseline is not None and (family, value) not in baseline:
         found.append("not in baseline")
-    return found
+    return found + [t for t in WEIGHTS if t in set(traits) and t not in found]
 
 
 def hosts(output_directory: str) -> List[str]:
@@ -357,7 +425,7 @@ def hosts(output_directory: str) -> List[str]:
                   if os.path.isdir(os.path.join(output_directory, d, "artefacts", "cooked")))
 
 
-def stack(per_host: Dict[str, Dict[Tuple[str, str], Tuple[str, str, str]]],
+def stack(per_host: Dict[str, Dict[Tuple[str, str], Tuple[str, str, str, Tuple[str, ...]]]],
           baseline: Optional[Set[Tuple[str, str]]] = None,
           distros: Optional[Dict[str, str]] = None) -> List[Dict[str, str]]:
     """Ranked rows for every value that's rare across the hosts (or new against the baseline).
@@ -377,8 +445,10 @@ def stack(per_host: Dict[str, Dict[Tuple[str, str], Tuple[str, str, str]]],
         total = len(of_os[compared])
         if total < MIN_HOSTS and baseline is None:
             continue
-        artefact, example, ref = per_host[with_it[0]][(family, value)]
-        why = reasons(family, value, len(with_it), total, baseline, example)
+        artefact, example, ref, _ = per_host[with_it[0]][(family, value)]
+        # A trait on any host with the value counts: an unsigned copy among signed ones is the lead
+        traits = {t for h in with_it for t in per_host[h][(family, value)][3]}
+        why = reasons(family, value, len(with_it), total, baseline, example, traits)
         if total < MIN_HOSTS:
             why = [r for r in why if r != "rare"]
         if "rare" not in why and "not in baseline" not in why:

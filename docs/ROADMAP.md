@@ -92,7 +92,12 @@ Container forensics goes first because half of it is written. ML goes last becau
   - **rare**;
   - **user path** (Users, AppData, Temp, ProgramData, `/tmp`, `/dev/shm`, `/home`);
   - **generated name**;
-  - **not in baseline**.
+  - **not in baseline**;
+  - **unsigned**: a kernel module that tainted the kernel as unsigned (`E`), or a driver Sysmon (event 6) saw load without a valid signature;
+  - **no team ID**: a third-party BTM item whose code signature names no Team ID (ad hoc or unsigned);
+  - **outside logon hours**: a process, task, service or driver first seen at an hour (UTC) when no one logs on to that host. Its 4624 logons of types 2, 10 and 11 (accounts not ending `$`) give its hours, widened an hour each way, once there are ten. Windows only: the Linux and macOS families carry no times.
+
+  The last three (3 November) belong to the host, and only add to a value that's already rare or new against the baseline. Signatures come only from where the cooked artefacts already have them: Prefetch, Amcache and 4688 carry none, so a rare program's signature isn't judged.
 
   "Generated name" looks at shape: few vowels, a long consonant run, digits and letters interleaved, or long hex. Entropy alone flagged every long English compound (`backgroundtaskhost.exe`) on the demo case, and a program under `\Windows\` (not `\Windows\Temp\`) isn't called generated, so `mscorsvw.exe` stays quiet. At equal score, persistence (services, tasks, autoruns, WMI, kernel modules) ranks above programs.
 - **Baseline.** `python3 -m dernvale.analysis.stacking --baseline OUT CASE...` (from `src/analysis`) writes every value from clean cases. `--stackBaseline OUT` then scores what's absent from it, and with a baseline even a one-OS-host family is scored. It stays a lab-built, local file.
@@ -102,7 +107,7 @@ Container forensics goes first because half of it is written. ML goes last becau
 - **On real data.** Across the two Windows images in `claude_testing`, the two hosts differ in almost everything, which shows how little two hosts give. The list still surfaced `bcwipe service` on the nfury Windows 7 image, a disk wiper.
 
 **Still to do.**
-- **Evaluate in the lab per release.** The Linux and Windows runs above are the method. Signed or unsigned, and time of day against the host's logons, aren't features yet, because the cooked artefacts don't carry signatures and logon patterns need a per-host model of their own.
+- **Evaluate in the lab per release.** The Linux and Windows runs above are the method. The clean Windows VMs have no Sysmon (only `mordor-sensor` installs it, on the seeded one) and a few days' logons at most, so the signature and logon-hour reasons need a run on a case with both before their weights are trusted.
 - **No learned model (Ben, 29 October 2026).** An isolation forest was considered and dropped, with `scikit-learn`, because stacking found every plant in the lab. The note below is kept for the record.
 - **The isolation forest, as considered.** It would score how unusual each host's values are, not only how many hosts have them, catching what counting can't, such as a process every host runs but with an odd parent or command line on one. Against: `scikit-learn` (with numpy and scipy, about 30–40 MB) in the worker image, which the dependency rule needs agreed, and a score that's harder to explain than stacking's named reasons. Stacking found every plant with no noise on the lab case, so there was nothing for a forest to improve on.
 - **Eru's "What's rare in this case?"** (built 30 October). An offline question over `stacking.csv`: persistence rows first, then programs and process pairs, each with its hosts and reasons, and the reminder that a row is a lead, not a verdict.
