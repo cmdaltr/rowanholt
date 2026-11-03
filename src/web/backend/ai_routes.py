@@ -223,7 +223,7 @@ async def list_indexed_cases(request: Request):
         # Also check completed jobs for case data
         job_storage = JobStorage()
 
-        for job in job_storage.list_jobs():
+        for job in job_storage.list_jobs(limit=100000):
             if job.status.value == "completed" and job.destination_path:
                 dest_path = Path(job.destination_path)
                 if dest_path.exists():
@@ -306,7 +306,7 @@ async def get_case_info(case_id: str):
     job_storage = JobStorage()
 
     job_info = None
-    for job in job_storage.list_jobs():
+    for job in job_storage.list_jobs(limit=100000):
         if job.case_number == case_id:
             job_info = job
             if job.destination_path:
@@ -526,7 +526,7 @@ async def _find_case(case_id: str, user: Optional[dict] = None) -> Tuple[Optiona
     try:
         job_storage = JobStorage()
 
-        for job in job_storage.list_jobs():
+        for job in job_storage.list_jobs(limit=100000):
             if job.case_number != case_id or not job.destination_path:
                 continue
             if user is not None and not access.can_access_job(user, job.id):

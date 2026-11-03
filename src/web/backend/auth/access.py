@@ -14,10 +14,11 @@ owner, so only admins see it until one shares it.
 """
 
 import logging
+import posixpath
 import re
 from datetime import datetime
 from typing import Iterable, Optional
-from urllib.parse import unquote, urlsplit
+from urllib.parse import unquote
 
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -224,7 +225,11 @@ LAYER_PATH = re.compile(r"^/assets/([^/]+)\.json$")
 def layer_allowed(user: dict, uri: str) -> bool:
     """Whether `user` may fetch this Navigator URI. A case's layer follows the case; the
     Navigator's own assets (ATT&CK itself, its config) are for anyone signed in."""
-    match = LAYER_PATH.match(unquote(urlsplit(uri or "/").path))
+    # Normalised as the Navigator's nginx will (//, /./, ..), so another spelling of a case's
+    # layer can't skip the check
+    # (not urlsplit: it reads //assets/... as a host)
+    path = unquote((uri or "/").split("?", 1)[0].split("#", 1)[0])
+    match = LAYER_PATH.match(posixpath.normpath("/" + path.lstrip("/")))
     if not match:
         return True
     cases = visible_cases(user)

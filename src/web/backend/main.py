@@ -787,8 +787,8 @@ async def bulk_restart_jobs(job_ids: list[str], request: Request, fresh: Optiona
             job.error = None
             job.started_at = None
             job.completed_at = None
-            if clean:
-                job.options.force_overwrite = True
+            # Each restart decides afresh: a wipe isn't kept for the next one
+            job.options.force_overwrite = clean
             job.log.append(f"[{datetime.now().isoformat()}] Job restarted by user (bulk operation{', fresh output' if clean else ''})")
             job_storage.save_job(job)
 
@@ -971,8 +971,8 @@ async def restart_job(job_id: str, confirm: bool = False, fresh: Optional[bool] 
         job.error = None
         job.started_at = None
         job.completed_at = None
-        if clean:
-            job.options.force_overwrite = True
+        # Each restart decides afresh: a wipe isn't kept for the next one
+        job.options.force_overwrite = clean
         job.log.append(f"[{datetime.now().isoformat()}] Job restarted by user{' (fresh output)' if clean else ''}")
 
         job_storage.save_job(job)

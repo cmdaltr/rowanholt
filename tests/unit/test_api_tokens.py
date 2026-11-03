@@ -124,6 +124,19 @@ class ApiTokenTest(BackendCase):
             "case_number": "CASE-TOKEN-2", "source_paths": [str(source)]}).status_code, 403)
         self.assertEqual(self.client.delete(f"/api/jobs/{job}", headers=eru).status_code, 403)
 
+    def test_an_eru_token_can_ask_eru(self):
+        # The MCP server's ask_offline, ask_eru, case_summary and suggestions are POSTs that only read
+        from auth import tokens
+        token = {"scope": "eru-mcp"}
+        for path in ("/api/ai/offline/answer", "/api/ai/cases/CASE-1/query", "/api/ai/cases/CASE-1/summary",
+                     "/api/ai/cases/CASE-1/suggestions"):
+            self.assertIsNone(tokens.refusal(token, "POST", path, ("/api/admin",)), path)
+        for path in ("/api/ai/cases/CASE-1/query/x", "/api/ai/models/pull", "/api/ai/cases/CASE-1"):
+            self.assertIsNotNone(tokens.refusal(token, "POST", path, ("/api/admin",)), path)
+        eru = bearer(self.make(self.alice, name="Eru", scope="eru-mcp")["token"])
+        self.assertNotEqual(self.client.post("/api/ai/offline/answer", headers=eru,
+                                             json={"question_id": "general"}).status_code, 403)
+
     def test_an_admins_eru_token_has_no_admin_areas(self):
         eru = bearer(self.make(self.admin, name="Eru", scope="eru-mcp")["token"])
         self.assertEqual(self.client.get("/api/auth/me", headers=eru).status_code, 200)

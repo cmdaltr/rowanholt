@@ -188,6 +188,12 @@ class ServerAccessTest(BackendCase):
             resp = self.client.post(f"/api/jobs/{job}/restart{query}", headers=self.alice)
             self.assertEqual(resp.status_code, 200, resp.text)
             self.assertEqual(bool(self.main.job_storage.get_job(job).options.force_overwrite), fresh, (status, query))
+        # A fresh restart's wipe isn't kept: the next restart, of a failed run, keeps its output
+        stored = self.main.job_storage.get_job(job)
+        stored.status = JobStatus.FAILED
+        self.main.job_storage.save_job(stored)
+        self.client.post(f"/api/jobs/{job}/restart", headers=self.alice)
+        self.assertFalse(self.main.job_storage.get_job(job).options.force_overwrite)
 
     def test_case_clash_reported_without_listing_others_jobs(self):
         self.create_job(self.alice, "CASE-CLASH-1")
@@ -226,6 +232,10 @@ class ServerAccessTest(BackendCase):
         self.assertEqual(layer(self.admin, "/assets/CASE-LAYER-1.json"), 200)
         self.assertEqual(layer(self.bob, "/assets/CASE-LAYER-1.json"), 403)
         self.assertEqual(layer(self.bob, "/assets/CASE%2DLAYER%2D1.json?x=1"), 403)
+        # Other spellings of the same file, which the Navigator's nginx normalises and serves
+        for uri in ("/assets//CASE-LAYER-1.json", "/assets/./CASE-LAYER-1.json", "//assets/CASE-LAYER-1.json",
+                    "/assets/x/../CASE-LAYER-1.json", "/assets/%2E/CASE-LAYER-1.json"):
+            self.assertEqual(layer(self.bob, uri), 403, uri)
         # The Navigator itself, and its ATT&CK data
         self.assertEqual(layer(self.bob, "/assets/enterprise-attack.json"), 200)
         self.assertEqual(layer(self.bob, "/"), 200)

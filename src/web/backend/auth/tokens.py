@@ -31,6 +31,9 @@ TOUCH_EVERY = timedelta(minutes=1)
 
 # The only writes an eru-mcp token may make: Eru's flag_lead and add_note
 ERU_WRITES = re.compile(r"^/api/jobs/[0-9a-fA-F-]{36}/case/(findings|notes)$")
+# Eru's questions are POSTs that only read the case: the MCP server's ask_offline, ask_eru,
+# case_summary and suggestions
+ERU_QUESTIONS = re.compile(r"^/api/ai/(offline/answer|cases/[^/]+/(query|summary|suggestions))$")
 READ_METHODS = ("GET", "HEAD", "OPTIONS")
 # Never through a token: making or revoking tokens, and swapping one for a session
 SIGN_IN_ONLY = ("/api/auth/tokens", "/api/auth/session")
@@ -74,6 +77,6 @@ def refusal(token: dict, method: str, path: str, admin_prefixes: tuple) -> Optio
         return None
     if path.startswith(admin_prefixes):
         return "An eru-mcp token can't use admin areas"
-    if method in READ_METHODS or (method == "POST" and ERU_WRITES.match(path)):
+    if method in READ_METHODS or (method == "POST" and (ERU_WRITES.match(path) or ERU_QUESTIONS.match(path))):
         return None
     return "An eru-mcp token can only read, flag leads and add notes"
