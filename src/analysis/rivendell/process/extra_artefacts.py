@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 RAW = re.compile(r"/artefacts/raw(?:/vss\d+)?/(.+)$")
 PAGING_FILES = ("pagefile.sys", "swapfile.sys", "hiberfil.sys")
-STAGING_DIRS = ("tmp/", "shared/", "var_tmp/", "dev_shm/")
+STAGING_DIRS = ("tmp/", "shared/", "var_tmp/", "dev_shm/", "container_layer/")
 # dot-names the OS itself leaves in shared and temp directories
 BENIGN_DOTFILES = {".localized", ".ds_store", ".betamigrated", ".placeholder", ".x11-unix", ".ice-unix", ".font-unix",
                    ".xim-unix", ".test-unix", ".com.apple.timemachine.supported"}
@@ -183,7 +183,10 @@ def _route_staging(rel: str, artefact: str) -> Optional[Route]:
         techniques.append("T1105")
     if head[:4] in (b"\x7fELF", b"\xcf\xfa\xed\xfe", b"\xca\xfe\xba\xbe") or head[:2] in (b"#!", b"MZ"):
         flags.append("executable")
-    source = {"tmp": "/tmp", "shared": "/Users/Shared", "var_tmp": "/var/tmp", "dev_shm": "/dev/shm"}[folder]
+    if folder == "container_layer":  # container_layer/<id>/<path>: what the container gained since its image
+        source, parts = "container " + parts[0] + ":", parts[1:]
+    else:
+        source = {"tmp": "/tmp", "shared": "/Users/Shared", "var_tmp": "/var/tmp", "dev_shm": "/dev/shm"}[folder]
     row = {"Source": source + "/" + "/".join(parts), "Size": os.path.getsize(artefact), "SHA256": _sha256(artefact),
            "Hidden": "yes" if hidden else "no", "Flag": "; ".join(flags), "LastWriteTime": unix_config.mtime(artefact)}
     return "staged_files.csv", [row], "staged file", techniques

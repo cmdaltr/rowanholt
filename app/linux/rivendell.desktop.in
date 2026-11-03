@@ -1,0 +1,21 @@
+[Desktop Entry]
+Type=Application
+Name=Rivendell
+GenericName=DFIR Platform
+Comment=Gandalf, Elrond and Eru: acquisition, analysis and the AI analyst
+Exec=@EXEC@
+Icon=rivendell
+Terminal=false
+Categories=Development;Security;
+Keywords=DFIR;forensics;Gandalf;Elrond;Eru;
+StartupNotify=true
+StartupWMClass=Rivendell
+Actions=Setup;Stop;
+
+[Desktop Action Setup]
+Name=Set Up Rivendell
+Exec=@EXEC@ --setup
+
+[Desktop Action Stop]
+Name=Stop Rivendell
+Exec=@EXEC@ --stop

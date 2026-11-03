@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getJob, cancelJob, pauseJob, resumeJob, deleteJob, restartJob, exportSiem, confirmSudo, cancelSudo } from '../api';
+import { serviceUrl } from '../apiBase';
+import JobSharing from './JobSharing';
 
 const heroImage = `${process.env.PUBLIC_URL}/images/rivendell.png`;
 
@@ -103,7 +105,19 @@ function JobDetails() {
   const handleRestart = async () => {
     setActionLoading(true);
     try {
-      await restartJob(jobId);
+      try {
+        await restartJob(jobId);
+      } catch (err) {
+        // The case has findings: the backend says how many, and the restart waits for a yes
+        if (err.response?.status !== 409) throw err;
+        const { findings } = err.response.data.detail;
+        if (!window.confirm(
+          `This case has ${findings} finding${findings === 1 ? '' : 's'}. Restarting rewrites the case's output, so any `
+          + 'row that changes will show "row changed" in the case browser. Restart anyway?')) {
+          return;
+        }
+        await restartJob(jobId, true);
+      }
       await loadJob();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to restart job');
@@ -203,6 +217,7 @@ function JobDetails() {
       'userprofiles': 'User Profiles',
       'nsrl': 'NSRL',
       'extract_iocs': 'Extract IOCs',
+      'threat_intel': 'Threat Intelligence',
       'splunk': 'Splunk',
       'elastic': 'Elastic',
       'navigator': 'Navigator'
@@ -231,12 +246,12 @@ function JobDetails() {
     if (!job) return null;
     switch (optionKey) {
       case 'splunk':
-        return 'http://localhost:7755/en-GB/app/elrond/mitre';
+        return serviceUrl(7755, '/en-GB/app/elrond/mitre');
       case 'elastic':
-        return `http://localhost:5601/app/discover#/?_g=(filters:!(),refreshInterval:(pause:!t,value:60000),time:(from:now-20y,to:now))&_a=(columns:!(),filters:!(),index:${job.case_number},interval:auto,query:(language:kuery,query:''),sort:!(!('@timestamp',desc)))`;
+        return `${serviceUrl(5601)}/app/discover#/?_g=(filters:!(),refreshInterval:(pause:!t,value:60000),time:(from:now-20y,to:now))&_a=(columns:!(),filters:!(),index:${job.case_number},interval:auto,query:(language:kuery,query:''),sort:!(!('@timestamp',desc)))`;
       case 'navigator':
-        const layerUrl = `http://localhost:5602/assets/${job.case_number}.json`;
-        return `http://localhost:5602/#layerURL=${encodeURIComponent(layerUrl)}`;
+        const layerUrl = serviceUrl(5602, `/assets/${job.case_number}.json`);
+        return `${serviceUrl(5602)}/#layerURL=${encodeURIComponent(layerUrl)}`;
       default:
         return null;
     }
@@ -711,7 +726,7 @@ function JobDetails() {
             </h2>
             <div className="job-id">ID: {job.id}</div>
           </div>
-          <div className="job-actions">
+          <div data-guide="job.actions" className="job-actions">
             {(job.status === 'running' || job.status === 'paused') && (
               <button
                 className="secondary"
@@ -753,6 +768,11 @@ function JobDetails() {
                 </button>
               </>
             )}
+            {job.status === 'completed' && (
+              <Link to={`/jobs/${job.id}/case`}>
+                <button data-guide="job.case">Browse Case</button>
+              </Link>
+            )}
             <Link to="/jobs">
               <button>Back to Jobs</button>
             </Link>
@@ -762,7 +782,7 @@ function JobDetails() {
         {error && <div className="error">{error}</div>}
 
         {/* Row 1: Case # | Duration | Destination */}
-        <div className="job-info-grid" style={{ display: 'grid', gridTemplateColumns: '0.5fr 0.5fr 2fr', gap: '1rem', marginBottom: '1rem' }}>
+        <div data-guide="job.info" className="job-info-grid" style={{ display: 'grid', gridTemplateColumns: '0.5fr 0.5fr 2fr', gap: '1rem', marginBottom: '1rem' }}>
           <div className="info-item">
             <strong>Case #:</strong>
             <span>{job.case_number}</span>
@@ -777,7 +797,7 @@ function JobDetails() {
           </div>
         </div>
         {/* Row 3: Progress bar */}
-        <div className="job-info-grid" style={{ marginBottom: '0.5rem' }}>
+        <div data-guide="job.progress" className="job-info-grid" style={{ marginBottom: '0.5rem' }}>
           <div className="progress-bar" style={{ width: '100%' }}>
             <div
               className="progress-fill"
@@ -795,8 +815,10 @@ function JobDetails() {
           </div>
         )}
 
+        <JobSharing jobId={job.id} />
+
         <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '2rem' }}>
-          <div className="source-paths-section" style={{ flex: '1', minWidth: '0' }}>
+          <div data-guide="job.sources" className="source-paths-section" style={{ flex: '1', minWidth: '0' }}>
             <h3>Source Images ({job.source_paths.length})</h3>
             <ul>
               {job.source_paths.map((path, index) => (
@@ -805,7 +827,7 @@ function JobDetails() {
             </ul>
           </div>
 
-          <div className="options-section" style={{ flex: '1', minWidth: '0' }}>
+          <div data-guide="job.options" className="options-section" style={{ flex: '1', minWidth: '0' }}>
             <h3>Enabled Options</h3>
             {getEnabledOptions().length > 0 ? (
               <div className="options-tags">
@@ -848,7 +870,7 @@ function JobDetails() {
           </div>
         </div>
 
-        <div className="log-section">
+        <div data-guide="job.log" className="log-section">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <button

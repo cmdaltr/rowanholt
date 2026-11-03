@@ -1347,7 +1347,8 @@ function New-Archive {
 
     $Message = "archived artefacts from '$Hostnames'"
     Add-LogEntry $ShowProgress $OutputDirectory $Hostnames $ArchiveFile $Message
-    Remove-Item -Path $SourcePath -Recurse > $null
+    # The copies keep their attributes: hidden or system files (desktop.ini) and read-only hives
+    Remove-Item -LiteralPath $SourcePath -Recurse -Force -Confirm:$false > $null
 }
 
 function Optimize-Archive {

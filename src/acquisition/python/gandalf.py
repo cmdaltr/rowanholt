@@ -499,6 +499,9 @@ def main():
                 sshin, sshout, ssherr = ssh.exec_command(
                     "mkdir -p {}".format(gandalf_directory)
                 )  # making gandalf directories
+                # exec_command returns once the command is sent: wait for mkdir, or the scp
+                # below can reach the host first and fail with "No such file or directory"
+                sshout.channel.recv_exit_status()
                 scp = SCPClient(ssh.get_transport())
                 if memory:  # sending memory dump tools
                     for tool in available_memory_tools():

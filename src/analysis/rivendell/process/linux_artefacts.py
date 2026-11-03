@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from rivendell.audit import write_audit_log_entry
-from rivendell.process.extractions import artemis
+from rivendell.process.extractions import artemis, containers, k8s_audit
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,14 @@ HEADERS = {
     "viminfo.csv": ["User", "Kind", "Value"],
     "wget_hsts.csv": ["User", "Host", "Port", "IncludeSubdomains", "Created"],
     "recently_used.csv": ["User", "URI", "Applications", "Added", "Modified", "Visited"],
+    **containers.HEADERS,
+    "k8s_audit.csv": k8s_audit.HEADER,
 }
+DOCKER_CONTAINERS = "/var/lib/docker/containers/"
+CONTAINERD_META = "/var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db"
+# Podman's state: SQLite from 4.8 (its -wal beside it is read with it), bbolt before
+PODMAN_SQLITE = "/var/lib/containers/storage/db.sql"
+PODMAN_BOLT = "/var/lib/containers/storage/libpod/bolt_state.db"
 
 
 def _cooked(output_directory: str, img: str, vss_path_insert: str) -> str:
@@ -571,10 +578,44 @@ def _route_linux(artefact: str) -> Tuple[str, List[Dict], str, List[str]]:
         return "kernel_modules.csv", rows, "kernel module list", ["T1547.006"] if odd else []
     if name == "gandalf+tmp_executables.csv":
         return "tmp_executables.csv", tmp_executable_rows(artefact), "temporary-directory executables", []
+    if path.startswith(DOCKER_CONTAINERS):
+        return _route_docker(artefact, path)
+    if path == CONTAINERD_META:
+        rows = containers.containerd_rows(artefact)
+        return "docker_containers.csv", rows, "containerd containers", containers.container_techniques(rows)
+    if path in (PODMAN_SQLITE, PODMAN_BOLT):
+        rows = containers.podman_sqlite_rows(artefact) if path == PODMAN_SQLITE else containers.podman_bolt_rows(artefact)
+        return "docker_containers.csv", rows, "Podman containers", containers.container_techniques(rows)
+    if path.startswith("/var/log/pods/") and re.search(r"\.log(?:\.\d+)?$", path):
+        parts = path.split("/")  # /var/log/pods/<namespace>_<pod>_<uid>/<container>/<n>.log
+        if len(parts) >= 7:
+            return "container_logs.csv", containers.cri_log_rows(artefact, parts[4], parts[5]), "pod log", []
+    if name == "gandalf+container_changes.csv":
+        rows = containers.container_change_rows(artefact)
+        return "container_changes.csv", rows, "container writable layers", containers.change_techniques(rows)
+    if path.startswith("/etc/kubernetes/manifests/") and path.endswith((".yaml", ".yml", ".json")):
+        row = containers.static_pod_row(artefact, path)
+        rows = [row] if row else []
+        return "static_pods.csv", rows, "static pod manifest", containers.static_pod_techniques(rows)
+    if path.startswith(("/var/log/kubernetes/", "/var/log/kube-apiserver")) and k8s_audit.looks_like_audit_log(artefact):
+        rows = k8s_audit.audit_rows(artefact)
+        return "k8s_audit.csv", rows, "Kubernetes audit log", k8s_audit.audit_techniques(rows)
     if name.startswith(WEB_ROOTS) and name.lower().endswith(WEB_SCRIPTS):
         row = webshell_row(artefact)
         return "webshells.csv", [row] if row else [], "web script", ["T1505.003"] if row else []
     return "", [], "", []
+
+
+def _route_docker(artefact: str, path: str) -> Tuple[str, List[Dict], str, List[str]]:
+    """A container's config.v2.json (read with the hostconfig.json beside it) or its json-file log."""
+    container = path[len(DOCKER_CONTAINERS):].split("/")[0]
+    if path.endswith("/config.v2.json"):
+        row = containers.docker_container_row(artefact, artefact.replace("config.v2.json", "hostconfig.json"))
+        rows = [row] if row else []
+        return "docker_containers.csv", rows, "Docker container", containers.container_techniques(rows)
+    if re.search(r"-json\.log(?:\.\d+)?$", path):
+        return "container_logs.csv", containers.docker_log_rows(artefact, container), "container log", []
+    return "", [], "", []  # hostconfig.json, read with config.v2.json
 
 
 def _route_user(artefact: str) -> Tuple[str, List[Dict], str, List[str]]:

@@ -428,7 +428,7 @@ function NewAcquisition() {
         {error && <div className="error">{error}</div>}
 
         <form onSubmit={handleSubmit}>
-          <div className="form-row">
+          <div data-guide="gandalf.case" className="form-row">
             <div className="form-group">
               <label htmlFor="caseNumber">
                 Case Number / Investigation ID *
@@ -469,7 +469,7 @@ function NewAcquisition() {
             </div>
           </div>
 
-          <div className="form-group">
+          <div data-guide="gandalf.config" className="form-group">
             <label>Acquisition Configuration *</label>
             <div className="dropdown-row">
               <select
@@ -560,7 +560,7 @@ function NewAcquisition() {
             </div>
           </div>
 
-          <div className="form-row">
+          <div data-guide="gandalf.hosts" className="form-row">
             <div className="form-group">
               <label htmlFor="hostnames">
                 Hostname(s) (comma-separated)
@@ -590,7 +590,7 @@ function NewAcquisition() {
             </div>
           </div>
 
-          <div className="form-group">
+          <div data-guide="gandalf.options" className="form-group">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
               <label style={{ margin: 0 }}>Collection Options</label>
               {isCaseNumberValid && (
@@ -892,7 +892,7 @@ function NewAcquisition() {
             )}
           </div>
 
-          <div className="acquisition-actions">
+          <div data-guide="gandalf.command" className="acquisition-actions">
             <div className="command-block-container">
               <div className="command-block-header">
                 <label>Generated Command</label>

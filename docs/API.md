@@ -17,12 +17,14 @@
 6. [File System](#file-system)
 7. [Docker Administration (Anduril)](#docker-administration-anduril)
 8. [Mordor: Recorded Attack Telemetry](#mordor-recorded-attack-telemetry)
-9. [Eru (AI Analyst)](#eru-ai-analyst)
-10. [Lab](#lab)
-11. [Health Check](#health-check)
-12. [Request/Response Formats](#requestresponse-formats)
-13. [Error Handling](#error-handling)
-14. [Code Examples](#code-examples)
+9. [Threat Intelligence](#threat-intelligence)
+10. [Case Browser and Collaboration](#case-browser-and-collaboration)
+11. [Eru (AI Analyst)](#eru-ai-analyst)
+12. [Lab](#lab)
+13. [Health Check](#health-check)
+14. [Request/Response Formats](#requestresponse-formats)
+15. [Error Handling](#error-handling)
+16. [Code Examples](#code-examples)
 
 ---
 
@@ -760,12 +762,16 @@ Paths are passed to the worker unchanged, except `/host/tmp/rivendell/…`, whic
 
 **Endpoint:** `POST /api/jobs/{job_id}/restart`
 
-**Description:** Restart a failed or cancelled job. Creates new Celery task.
+**Description:** Restart a failed, cancelled or completed job. Creates new Celery task. A job with findings is refused unless the request confirms, since the re-run rewrites the rows they point at.
 
 **Authentication:** Not enforced in the current build (see [Authentication Status](#authentication-status))
 
 **Path Parameters:**
 - `job_id`: UUID of the job
+
+**Query Parameters:**
+- `confirm` (bool, default `false`): restart even though the job has findings
+- `fresh` (bool, default `true` for a completed job, `false` for a failed or cancelled one): remove the job's output first. Elrond skips any artefact whose cooked file is already there, so a completed job re-run into its old output comes out unchanged. The worker never removes an output directory that holds one of the job's sources
 
 **Response:** `200 OK`
 ```json
@@ -778,8 +784,9 @@ Paths are passed to the worker unchanged, except `/host/tmp/rivendell/…`, whic
 ```
 
 **Errors:**
-- `400 Bad Request`: Job not in failed/cancelled state
+- `400 Bad Request`: Job not in failed/cancelled/completed state
 - `404 Not Found`: Job not found
+- `409 Conflict`: The job has findings and `confirm` wasn't set; `detail` is `{"findings": 3, "message": "..."}`
 
 ---
 
@@ -841,7 +848,11 @@ Paths are passed to the worker unchanged, except `/host/tmp/rivendell/…`, whic
 
 **Endpoint:** `POST /api/jobs/bulk/restart`
 
-**Description:** Restart failed, cancelled or completed jobs. Takes a bare JSON array of job IDs and returns a result per job.
+**Description:** Restart failed, cancelled or completed jobs. Takes a bare JSON array of job IDs and returns a result per job. Without `confirm=true`, a job with findings is skipped: its result has `success: false`, the reason in `error` and the count in `findings`.
+
+**Query Parameters:**
+- `fresh` (bool, default `true` for completed jobs, `false` for failed or cancelled ones): remove each job's previous output before it runs again
+- `confirm` (bool, default `false`): restart jobs that have findings too
 
 ---
 
@@ -1090,23 +1101,65 @@ A job returns `202` with a lab run (`id`, `label`, `status`); poll `/api/lab/run
 
 ---
 
+## Threat Intelligence
+
+**Authentication:** none to read; `ADMIN` to import, pull or delete on a team server
+
+The indicators in `threat_intel_indicators`, in the fixed ten-column schema (Evidential Element, Threat Group, Procedure Example, Technique ID, Technique Name, Tactic, Contextual Evidence, Reference URL, Navigation Layer URL, Source Type). Parsing and matching are Elrond's (`src/analysis/rivendell/threat_intel/`); the backend mounts that package. A job with `"threat_intel": true` exports them for Elrond's `--threatIntel`.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/threat-intel` | `total`, `groups`, `expired` (past their `valid_until`, left out of matching) and `sources`: `[{source, count}]` |
+| `GET` | `/api/threat-intel/indicators?q=&source=&limit=&offset=` | Indicators whose element, group or technique ID contains `q`; `limit` up to 500. Each has `valid_until` (null: no expiry), `confidence`, `first_seen` and `expired` |
+| `POST` | `/api/threat-intel/import` | Multipart `file`: the Iran APT workbook (XLSX), a STIX 2.1 bundle (JSON), Rivendell's or MITRESaw's CSV, or a `.txt` watchlist. Up to 200 MB. Returns `read`, `added`, `duplicates` and `sources`; indicators already stored under the same element, group, technique and source are skipped, but their expiry is renewed. A STIX indicator keeps its own `valid_until` and `confidence`; IPs and domains from other sources hold for 90 days from import, everything else doesn't expire |
+| `POST` | `/api/threat-intel/taxii` | `{"url", "username", "password", "added_after"}`: every object in a TAXII 2.1 collection. `502` when the collection can't be read |
+| `PUT` | `/api/threat-intel/indicators/{id}/validity` | `{"valid_until": "2027-01-01"}` extends one indicator, `{"valid_until": null}` clears its expiry; admins only on a team server. `400` for a date that isn't ISO, `404` for no such indicator |
+| `DELETE` | `/api/threat-intel/sources/{source}` | Every indicator from one source |
+| `GET` | `/api/threat-intel/enrich?value=` | What the indicators say about one process name, command line, path, IP, domain or hash: per element, its `kind`, `breadth` (groups using it), `common` (more than 15), `groups`, `techniques` and `sources` |
+
+`503` means the package isn't mounted in the backend (`docker compose up -d backend` after pulling).
+
+---
+
+## Case Browser and Collaboration
+
+**Authentication:** whoever can see the job (its owner, the people it's shared with, admins); everyone in local mode
+
+A job's output, read-only, and the team's findings, notes, host assignments and activity on it (`case_routes.py`, `case_files.py`). Only `<host>/artefacts/cooked/`, `<host>/analysis/` and the case's top-level CSVs are readable; `raw/` never is, and nothing writes to the case directory. Findings reference a row by file, row (`2` onwards for a CSV line, `#0` onwards for a JSON record) and the SHA-256 of the row, so a re-run that changes it shows up.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/jobs/{job_id}/case` | `hosts` (each with `files`, `assignee`, `status`), `case_files`, and `findings` counted by status. `404` until the job has output |
+| `GET` | `/api/jobs/{job_id}/case/rows?host=&path=&q=&offset=&limit=` | Rows of one table containing `q` in any field: `columns`, `rows` (`ref`, `hash`, `cells`), `total`, and `exact` (false when the count stopped early). `host` is `(case)` for the case's own files |
+| `GET` | `/api/jobs/{job_id}/case/findings?status=&verify=` | Findings; with `verify=true`, `intact` says whether each row still hashes the same |
+| `POST` | `/api/jobs/{job_id}/case/findings` | `{"host", "artefact", "row_ref", "title", "technique", "status"}`; the row is read server-side for its hash and excerpt. `status` is `lead` (default), `confirmed` or `benign`; `technique` an ATT&CK ID. `409` if the row is already flagged |
+| `PATCH` | `/api/jobs/{job_id}/case/findings/{id}` | Change `title`, `technique` or `status`; pass the `updated_at` you loaded and a change someone else made first returns `409` instead of being overwritten |
+| `DELETE` | `/api/jobs/{job_id}/case/findings/{id}` | Remove a finding and its notes |
+| `GET` `POST` | `/api/jobs/{job_id}/case/notes` | Notes, Markdown: `{"body", "finding_id"}`, `finding_id` null for the case |
+| `PUT` | `/api/jobs/{job_id}/case/hosts/{host}` | `{"assignee", "status"}`; status is `to do`, `in progress` or `done`. In server mode the assignee must be an active user (username or email, stored as the username), otherwise `400`; `""` unassigns |
+| `GET` | `/api/jobs/{job_id}/case/activity?since=` | Who did what, newest first; `since` (the highest `id` seen) for polling |
+| `GET` | `/api/jobs/{job_id}/case/report` | Markdown: case notes, then confirmed findings by host with their notes |
+| `GET` | `/api/jobs/{job_id}/case/layer` | An ATT&CK Navigator layer of confirmed findings' techniques only |
+
+---
+
 ## Eru (AI Analyst)
 
 **Authentication:** none
 
-Ask Eru's back end. Free-text answers come from Ollama at `OLLAMA_HOST` (default `http://host.docker.internal:11434`) with the model `RIVENDELL_MODEL_NAME` (default `llama3.2:3b`). Without them, `/status` says why and the offline endpoints answer fixed questions from Elrond's output.
+Ask Eru's back end. Free-text answers come from Ollama at `OLLAMA_HOST` (default `http://host.docker.internal:11434`) with the model `RIVENDELL_MODEL_NAME` (default `llama3.2:3b`) and a `RIVENDELL_NUM_CTX`-token window (default 8192). Without them, `/status` says why and the offline endpoints answer fixed questions from Elrond's output.
 
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/ai/status` | `llm_available`, `ollama_running`, `model_name`, `models`, `ollama_host`, `data_dir`, and `reason`: why free text won't work (empty when it will) |
-| `GET` | `/api/ai/offline/questions` | The fixed questions: `id`, `question`, `needs_case` |
-| `POST` | `/api/ai/offline/answer` | `{"question_id": "techniques", "case_id": "CASE-001"}` (`case_id` only where `needs_case`). Returns `{"answer", "offline": true}`; `404` for an unknown question |
-| `GET` | `/api/ai/cases` | Cases Eru can see: indexed vector stores and completed jobs, with `indexed` and `has_artifacts` |
+| `GET` | `/api/ai/offline/questions` | The fixed questions: `id`, `question`, `needs_case` (including `threat_intel` and `findings`) |
+| `POST` | `/api/ai/offline/answer` | `{"question_id": "techniques", "case_id": "CASE-001", "job_id": "..."}` (`case_id` only where `needs_case`; `job_id`, optional, reads that job's output, as for `/query`). Returns `{"answer", "rows", "job_id", "offline": true}`: `rows` are the rows the answer's shown lines came from (`host`, `file`, `row_ref`, `hash`, `line`), the reference a finding stores, so `POST /api/jobs/{job_id}/case/findings` can flag one; `job_id` is the job (one the caller can see) whose case was read, and `rows` is empty without one. Counts (hosts, IOCs, logins by user) cite nothing. `404` for an unknown question |
+| `GET` | `/api/ai/cases` | Cases Eru can see: one entry per completed job (`job_id`; two jobs can share a case number), with `indexed` and `has_artifacts`, and, for admins only on a team server, case folders in Eru's data directory, which have no job |
 | `POST` | `/api/ai/chat` | `{"message": "..."}` without case context. Returns `{"response", "model", "processing_time"}` |
-| `GET` | `/api/ai/cases/{case_id}/info` | What is indexed for a case |
-| `POST` | `/api/ai/cases/{case_id}/query` | `{"question": "..."}` answered from the case's data |
-| `POST` | `/api/ai/cases/{case_id}/suggestions` | Investigation paths to follow |
-| `POST` | `/api/ai/cases/{case_id}/summary` | An executive summary of the case |
+| `GET` | `/api/ai/cases/{case_id}/info` | What is indexed for a case (`?job_id=` as for `/query`) |
+| `POST` | `/api/ai/cases/{case_id}/query` | `{"question": "..."}` answered from the case's data. `?job_id=` reads that job's output (`404` if the caller can't see it or it isn't this case); without it, the first job with the case number the caller can see; `rows` are the rows the answer cites by tag (`host`, `file`, `row_ref`, `hash`, `line`, `tag`), only ones it was given, on `job_id` (empty without a job) |
+| `POST` | `/api/ai/cases/{case_id}/suggestions` | Five investigation paths from the model, each with the `rows` its text cites; `rows` and `job_id` for all of them, as for `/query` |
+| `POST` | `/api/ai/cases/{case_id}/summary` | An executive summary of the case, with the `rows` it cites and `job_id`, as for `/query` |
 
 The LLM endpoints return `503` when Ollama or the model isn't available.
 

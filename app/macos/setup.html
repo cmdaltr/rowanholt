@@ -1,0 +1,184 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Set up Rivendell</title>
+<style>
+:root { color-scheme: dark; --bg: #0b1210; --card: #101a17; --line: #1d2b26; --text: #b9c9b4;
+        --dim: #7d907a; --strong: #e1ecdc; --ok: #8fc79a; --warn: #e8c27a; --bad: #e8a07a;
+        --button: #1d3a2e; --button-line: #2f5a47; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 -apple-system, system-ui, sans-serif; }
+main { max-width: 760px; margin: 0 auto; padding: 28px 24px 40px; }
+header { text-align: center; margin-bottom: 18px; }
+header img { width: 300px; max-width: 60vw; }
+header p { margin: 4px 0 0; color: var(--dim); }
+section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin: 14px 0; }
+h2 { margin: 0 0 6px; font-size: 15px; color: var(--strong); display: flex; align-items: center; gap: 10px; }
+h2 .n { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--button-line); display: inline-flex;
+        align-items: center; justify-content: center; font-size: 12px; color: var(--dim); }
+.chip { margin-left: auto; font-size: 12px; font-weight: 500; padding: 1px 9px; border-radius: 10px; border: 1px solid currentColor; }
+.ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); } .dim { color: var(--dim); }
+p { margin: 6px 0; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+button { padding: 6px 14px; background: var(--button); color: var(--strong); border: 1px solid var(--button-line);
+         border-radius: 6px; font: inherit; cursor: pointer; }
+button.quiet { background: transparent; color: var(--text); }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { padding: 9px 26px; font-size: 15px; }
+input.address { width: min(420px, 100%); padding: 6px 10px; background: #050908; color: var(--strong);
+                border: 1px solid var(--button-line); border-radius: 6px; font: 13px "JetBrains Mono", Menlo, monospace; }
+section[hidden] { display: none; }
+label.choice { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; cursor: pointer; }
+label.choice input { margin-top: 4px; accent-color: var(--ok); }
+code { font: 12px "JetBrains Mono", Menlo, monospace; color: var(--strong); background: #050908; padding: 1px 5px; border-radius: 4px; word-break: break-all; }
+.bar { height: 6px; background: #050908; border-radius: 3px; overflow: hidden; margin-top: 8px; }
+.bar div { height: 100%; background: var(--ok); width: 0; transition: width .2s; }
+ul { list-style: none; margin: 8px 0 0; padding: 0; }
+li { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-top: 1px solid var(--line); }
+li:first-child { border-top: 0; }
+li code { flex: 1; }
+li button { padding: 2px 10px; font-size: 12px; }
+footer { text-align: center; margin-top: 20px; }
+#error { margin-top: 10px; }
+.small { font-size: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="rivendell.png" alt="Rivendell">
+    <p>A few steps, then Rivendell starts. Come back any time from the Rivendell menu: Set Up Rivendell…</p>
+  </header>
+
+  <section>
+    <h2><span class="n">1</span>Where Rivendell runs</h2>
+    <div id="location"></div>
+  </section>
+
+  <section id="runtime-section">
+    <h2><span class="n">2</span>Container runtime <span id="runtime-chip" class="chip dim">Checking…</span></h2>
+    <p id="runtime-text">Rivendell runs as a set of Docker containers.</p>
+    <div id="runtime-actions" class="row"></div>
+    <div id="orb-progress" hidden><p id="orb-text" class="small"></p><div class="bar"><div id="orb-bar"></div></div></div>
+    <p class="small dim">OrbStack and Docker Desktop are free for personal use; commercial use of either may need a paid licence.</p>
+  </section>
+
+  <section id="evidence-section">
+    <h2><span class="n">3</span>Evidence folders <span class="chip dim">Optional</span></h2>
+    <p>Folders of disk images, memory dumps and Gandalf archives to make visible inside Rivendell, at the same paths.
+       External drives under <code>/Volumes</code> are always visible.</p>
+    <p id="evidence-locked" class="warn small" hidden>This copy has a hand-written <code>docker-compose.local.yml</code>, so setup leaves its mounts alone.</p>
+    <ul id="evidence"></ul>
+    <div class="row"><button id="add-evidence">Add folder…</button></div>
+  </section>
+
+  <footer>
+    <button id="finish" class="primary">Start Rivendell</button>
+    <p id="error" class="bad" hidden></p>
+    <p id="busy" class="dim" hidden></p>
+  </footer>
+</main>
+<script>
+const send = (action, extra) => webkit.messageHandlers.rivendell.postMessage(Object.assign({ action }, extra || {}));
+const el = (tag, props, ...children) => {
+  const node = Object.assign(document.createElement(tag), props || {});
+  children.forEach(c => node.append(c));
+  return node;
+};
+const button = (text, action, extra, quiet) =>
+  el('button', { textContent: text, className: quiet ? 'quiet' : '', onclick: () => send(action, extra) });
+
+// Each render rebuilds the address box; keep the caret in it while it's being typed in
+let typingAddress = false;
+document.addEventListener('mousedown', (e) => { if (e.target.className !== 'address') typingAddress = false; });
+document.getElementById('add-evidence').onclick = () => send('addEvidence');
+document.getElementById('finish').onclick = () => send('finish');
+
+function render(s) {
+  // 1. Runtime
+  const chip = document.getElementById('runtime-chip');
+  const text = document.getElementById('runtime-text');
+  const actions = document.getElementById('runtime-actions');
+  actions.replaceChildren();
+  const states = {
+    checking: ['Checking…', 'dim', 'Looking for Docker…'],
+    running: ['Ready', 'ok', `${s.runtime.name} is running.`],
+    installed: ['Installed', 'ok', `${s.runtime.name} is installed. Rivendell starts it when it launches.`],
+    missing: ['Not installed', 'bad', 'Rivendell needs OrbStack or Docker Desktop. OrbStack is lighter and faster on a Mac; this installs it for you.'],
+  };
+  const [label, cls, body] = states[s.runtime.status];
+  chip.textContent = label;
+  chip.className = `chip ${cls}`;
+  text.textContent = body;
+  if (s.runtime.status === 'missing') {
+    const install = button('Install OrbStack', 'installOrbStack');
+    install.disabled = s.orb.busy;
+    actions.append(install,
+      button('Get Docker Desktop instead', 'openURL', { url: 'https://www.docker.com/products/docker-desktop/' }, true),
+      button('Check again', 'recheck', null, true));
+  } else if (s.runtime.status === 'installed' && s.runtime.name === 'OrbStack') {
+    actions.append(button('Open OrbStack', 'openRuntime', null, true));
+  }
+  const progress = document.getElementById('orb-progress');
+  progress.hidden = !s.orb.busy && !s.orb.error && !s.orb.text;
+  document.getElementById('orb-text').textContent = s.orb.error || s.orb.text || '';
+  document.getElementById('orb-text').className = 'small ' + (s.orb.error ? 'bad' : '');
+  document.getElementById('orb-bar').style.width = `${Math.round((s.orb.pct || 0) * 100)}%`;
+
+  // 2. Files
+  const loc = document.getElementById('location');
+  loc.replaceChildren();
+  const choice = (mode, title, detail, controls) => {
+    const radio = el('input', { type: 'radio', name: 'mode', checked: s.mode === mode, onchange: () => send('mode', { mode }) });
+    return el('label', { className: 'choice' }, radio, el('div', {}, el('div', { textContent: title }), detail, controls || ''));
+  };
+  if (s.bundled) {
+    loc.append(choice('bundled', `Install Rivendell ${s.version}`,
+      el('div', { className: 'small dim' }, 'Into ', el('code', { textContent: s.installPath }), s.installNote ? ` — ${s.installNote}` : ''),
+      el('div', { className: 'row' }, button('Change…', 'chooseInstall', null, true))));
+  }
+  loc.append(choice('existing', 'Use a copy I already have',
+    el('div', { className: 'small dim' }, s.existingPath ? el('code', { textContent: s.existingPath }) : 'A git clone of github.com/cmdaltr/rivendell, for instance.'),
+    el('div', { className: 'row' }, button('Choose folder…', 'chooseExisting', null, true))));
+  const address = el('input', {
+    type: 'text', value: s.serverAddress, placeholder: 'rivendell.example.org', spellcheck: false,
+    oninput: (e) => { typingAddress = true; send('serverAddress', { address: e.target.value }); },
+    onfocus: () => { typingAddress = true; if (s.mode !== 'server') send('mode', { mode: 'server' }); },
+  });
+  address.className = 'address';
+  loc.append(choice('server', "Connect to my team's Rivendell server",
+    el('div', { className: 'small dim' }, 'Nothing runs on this Mac: no Docker, no files. Your team signs in on the server.'),
+    el('div', { className: 'row' }, address)));
+  if (typingAddress && s.mode === 'server') {
+    address.focus();
+    address.setSelectionRange(address.value.length, address.value.length);
+  }
+  const server = s.mode === 'server';
+  document.getElementById('runtime-section').hidden = server;
+  document.getElementById('evidence-section').hidden = server;
+
+  // 3. Evidence
+  document.getElementById('evidence-locked').hidden = !s.evidenceLocked;
+  document.getElementById('add-evidence').disabled = s.evidenceLocked;
+  const list = document.getElementById('evidence');
+  list.replaceChildren(...s.evidence.map(path =>
+    el('li', {}, el('code', { textContent: path }), button('Remove', 'removeEvidence', { path }, true))));
+
+  // Finish
+  const ready = s.mode === 'server' ? s.serverValid
+    : s.runtime.status !== 'missing' && s.runtime.status !== 'checking' && (s.mode === 'bundled' || s.existingPath);
+  const finish = document.getElementById('finish');
+  finish.disabled = !ready || !!s.busy;
+  finish.textContent = s.mode === 'server' ? 'Connect' : 'Start Rivendell';
+  const error = document.getElementById('error');
+  error.hidden = !s.error;
+  error.textContent = s.error || '';
+  const busy = document.getElementById('busy');
+  busy.hidden = !s.busy;
+  busy.textContent = s.busy || '';
+}
+send('ready');
+</script>
+</body>
+</html>

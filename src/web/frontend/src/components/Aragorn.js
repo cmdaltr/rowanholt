@@ -57,7 +57,7 @@ function EnablePanel({ status, onRecheck }) {
   };
 
   return (
-    <div className="card aragorn-enable">
+    <div data-guide="aragorn.anduril" className="card aragorn-enable">
       <h2>Anduril is not enabled</h2>
       {status?.reason === 'secret_key' ? (
         <p>
@@ -245,7 +245,7 @@ function AndurilPanel() {
 
   return (
     <div className="aragorn">
-      <div className="card">
+      <div data-guide="aragorn.anduril" className="card">
         <h2>Containers and images</h2>
         <p className="aragorn-note">
           Rivendell containers and images on <code>{status.socket}</code> (compose project <code>{status.project}</code>).
@@ -389,7 +389,7 @@ function Aragorn() {
         Everything Rivendell runs on this machine: the lab's targets and machines, runs that deploy Gandalf, Elrond
         or Mordor against them, and Rivendell's own containers and settings.
       </PageHero>
-      <div className="aragorn-tabs" role="tablist">
+      <div data-guide="aragorn.tabs" className="aragorn-tabs" role="tablist">
         {TABS.map(([key, label]) => (
           <button key={key} type="button" role="tab" aria-selected={tab === key}
                   className={`aragorn-tab${tab === key ? ' is-active' : ''}`}
@@ -400,7 +400,7 @@ function Aragorn() {
       </div>
       {tab === 'lab' && (admin ? (
         <LabManage section="lab">
-          <div className="card">
+          <div data-guide="aragorn.lab" className="card">
             <h2>Lab machines</h2>
             <p className="lab-note">
               Create and manage the containers and VMs Gandalf collects from and Mordor records on. Rivendell drives Docker

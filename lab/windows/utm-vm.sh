@@ -10,6 +10,8 @@
 # creates the VM through UTM's AppleScript API and keeps it under
 # $LAB_VM_DIR/utm. Windows installs itself, provisions the lab target on first
 # logon and starts an SSH server, forwarded to 127.0.0.1:2232.
+# WINDOWS_CLEAN=<n> works on clean sibling n instead (rivendell-lab-win11-clean<n>,
+# SSH on 2232+n, nothing seeded), for stacking one seeded host among clean ones.
 # The Windows 11 ARM64 ISO is the one manual download (Microsoft only hands out
 # links through its web form); put it in $LAB_DATA_DIR/isos/.
 set -euo pipefail
@@ -22,18 +24,24 @@ uses_tart || die "The UTM VM is for Apple silicon. On x86-64 hosts the lab uses 
 
 VM="$WINDOWS_UTM_VM"
 PORT=2232
+COMPUTERNAME="LAB-WIN11"
+CLEAN="${WINDOWS_CLEAN:-}"
+if [ -n "$CLEAN" ]; then
+  case "$CLEAN" in [1-9]) ;; *) die "WINDOWS_CLEAN is a number from 1 to 9" ;; esac
+  # NetBIOS names stop at 15 characters
+  VM="rivendell-lab-win11-clean$CLEAN"; PORT=$((2232 + CLEAN)); COMPUTERNAME="LAB-WINCLEAN$CLEAN"
+fi
 UTM_DIR="$LAB_VM_DIR/utm"
 BUNDLE="$UTM_DIR/$VM.utm"
 ISO_DIR="$LAB_DATA_DIR/isos"
-CFG_ISO="$UTM_DIR/labcfg.iso"
+CFG_ISO="$UTM_DIR/labcfg-$VM.iso"
 VIRTIO_URL="https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso"
 OPENSSH_URL="https://github.com/PowerShell/Win32-OpenSSH/releases/latest/download/OpenSSH-ARM64.zip"
 SSH="$LAB_ROOT/lib/ssh.exp"
-COMPUTERNAME="LAB-WIN11"
 
 utm() { osascript -e "tell application \"UTM\"" -e "$1" -e "end tell"; }
-vm_registered() { utmctl list 2>/dev/null | awk '{print $3}' | grep -qx "$VM"; }
-vm_status() { utmctl status "$VM" 2>/dev/null || echo "not registered"; }
+vm_registered() { utm_up; utmctl list --hide 2>/dev/null | awk '{print $3}' | grep -qx "$VM"; }
+vm_status() { utm_up; utmctl status --hide "$VM" 2>/dev/null || echo "not registered"; }
 
 windows_iso() {
   if [ -n "${WINDOWS_ARM_ISO:-}" ]; then echo "$WINDOWS_ARM_ISO"; return; fi
@@ -64,6 +72,7 @@ stage_lab_files() {
 build_config_iso() {
   local stage="$UTM_DIR/labcfg"
   stage_lab_files "$stage"
+  [ -z "$CLEAN" ] || : > "$stage/clean.txt"
   local pw_xml
   pw_xml="$(printf '%s' "$LAB_PASSWORD" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g')"
   python3 - "$LAB_ROOT/windows/utm/autounattend.xml" "$stage/autounattend.xml" "$pw_xml" "$COMPUTERNAME" <<'PY'
@@ -172,7 +181,7 @@ PY
 }
 
 add_port_forward() {
-  if [ "$(vm_status)" != stopped ]; then utmctl stop "$VM" >/dev/null 2>&1 || true; sleep 3; fi
+  if [ "$(vm_status)" != stopped ]; then utmctl stop --hide "$VM" >/dev/null 2>&1 || true; sleep 3; fi
   write_port_forward
   utm "reload configuration (virtual machine named \"$VM\")" >/dev/null
   ok "$VM: 127.0.0.1:$PORT -> guest port 22"
@@ -253,7 +262,7 @@ adopt_vm() {
     sleep 5
   done
   if [ -z "$touched" ]; then
-    utmctl stop "$VM" >/dev/null 2>&1 || true
+    utmctl stop --hide "$VM" >/dev/null 2>&1 || true
     die "UTM is running a different copy of $VM (one imported into UTM's own storage), not $BUNDLE. In UTM, remove $VM (right-click > Remove, which deletes UTM's copy), then run adopt again: it opens $BUNDLE in place."
   fi
 
@@ -298,7 +307,7 @@ start_vm() {
   register_vm
   if [ "$(vm_status)" != started ]; then
     info "Starting $VM"
-    utmctl start "$VM" >/dev/null 2>&1 || true
+    utmctl start --hide "$VM" >/dev/null 2>&1 || true
     local _
     for _ in $(seq 1 30); do [ "$(vm_status)" = started ] && break; sleep 2; done
     [ "$(vm_status)" = started ] || die "UTM didn't start $VM (status: $(vm_status)). UTM may be showing a dialog: check its window, or quit and reopen UTM."
@@ -350,6 +359,16 @@ collect() {
   rm -rf "${dest:?}/$host"
   mv "$tmp/$host" "$dest/"
   rmdir "$tmp" 2>/dev/null || true
+  # A file can go missing on the way (G36): fetch whatever the VM has that didn't arrive
+  local name missing=""
+  for name in $(ssh_vm "Get-ChildItem -Name -File C:\\lab\\acquisitions\\powershell_collection\\acquisitions\\$host" | tr -d '\r' | grep -E '^[A-Za-z0-9._+-]+$'); do
+    [ -e "$dest/$host/$name" ] && continue
+    warn "$name didn't arrive; fetching it again"
+    LAB_SSH_PASSWORD="$LAB_PASSWORD" expect "$SSH" pull gandalf 127.0.0.1 "$PORT" \
+      "C:/lab/acquisitions/powershell_collection/acquisitions/$host/$name" "$dest/$host/" >/dev/null || true
+    [ -e "$dest/$host/$name" ] || missing="$missing $name"
+  done
+  [ -z "$missing" ] || warn "Still missing from $dest/$host:$missing (copy them from the VM by hand)"
   ok "Windows acquisition: $dest/$host"
 }
 
@@ -430,8 +449,8 @@ record() {
 
 case "$action" in
   create)
-    # create always builds the lab's own VM, whatever WINDOWS_UTM_VM says
-    VM="rivendell-lab-win11"; BUNDLE="$UTM_DIR/$VM.utm"
+    # create always builds the lab's own VM (or a clean sibling), whatever WINDOWS_UTM_VM says
+    [ -n "$CLEAN" ] || { VM="rivendell-lab-win11"; BUNDLE="$UTM_DIR/$VM.utm"; }
     require_password
     win="$(windows_iso)"
     if [ -z "$win" ] || [ ! -f "$win" ]; then
@@ -459,20 +478,20 @@ case "$action" in
     # Detach the install media; the config ISO holds the lab password.
     if plutil -p "$BUNDLE/config.plist" | grep -q '"ImageName" => "lab-'; then
       info "Detaching the install media"
-      utmctl stop --request "$VM" >/dev/null 2>&1 || true  # a clean Windows shutdown
+      utmctl stop --hide --request "$VM" >/dev/null 2>&1 || true  # a clean Windows shutdown
       for _ in $(seq 1 60); do [ "$(vm_status)" = stopped ] && break; sleep 2; done
-      [ "$(vm_status)" = stopped ] || utmctl stop --force "$VM" >/dev/null 2>&1 || true
+      [ "$(vm_status)" = stopped ] || utmctl stop --hide --force "$VM" >/dev/null 2>&1 || true
       set_install_media
       rm -f "$CFG_ISO"
       utm "reload configuration (virtual machine named \"$VM\")" >/dev/null
       start_vm
       wait_ready "${WINDOWS_BOOT_WAIT:-30}" "boot"
     fi
-    WINDOWS_UTM_VM="$VM"; save_config >/dev/null
+    [ -n "$CLEAN" ] || { WINDOWS_UTM_VM="$VM"; save_config >/dev/null; }
     ;;
   adopt) require_password; mkdir -p "$UTM_DIR"; adopt_vm "${2:-}" ;;
   start) start_vm; wait_ready "${WINDOWS_BOOT_WAIT:-30}" "boot" ;;
-  stop) vm_registered && utmctl stop "$VM" || true; ok "$VM stopped" ;;
+  stop) vm_registered && utmctl stop --hide "$VM" || true; ok "$VM stopped" ;;
   delete)
     # Only ever delete a VM the lab built. An adopted VM is the user's own:
     # UTM's delete removes its files for good, so leave that to them.
@@ -483,7 +502,7 @@ case "$action" in
          exit 0 ;;
     esac
     confirm "Delete $VM and its disk?" n || exit 0
-    if vm_registered; then utmctl stop "$VM" 2>/dev/null || true; utm "delete (virtual machine named \"$VM\")"; fi
+    if vm_registered; then utmctl stop --hide "$VM" 2>/dev/null || true; utm "delete (virtual machine named \"$VM\")"; fi
     rm -f "$CFG_ISO"
     ok "$VM deleted" ;;
   status)

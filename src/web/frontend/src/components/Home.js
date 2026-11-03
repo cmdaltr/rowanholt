@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom';
 const heroImage = `${process.env.PUBLIC_URL}/images/rivendell.png`;
 const gandalfImage = `${process.env.PUBLIC_URL}/images/gandalf.png`;
 const elrondImage = `${process.env.PUBLIC_URL}/images/elrond.png`;
+const pippinImage = `${process.env.PUBLIC_URL}/images/pippin.png`;
+const aragornImage = `${process.env.PUBLIC_URL}/images/aragorn.png`;
 const mordorClosedImage = `${process.env.PUBLIC_URL}/images/mordor_closed.jpg`;
 const mordorOpenImage = `${process.env.PUBLIC_URL}/images/mordor_open.jpg`;
 
@@ -105,7 +107,7 @@ const Home = ({ onScrollProgress }) => {
 
   return (
     <div className="home">
-      <section className="hero-section">
+      <section data-guide="home.hero" className="hero-section">
         <img
           src={heroImage}
           alt="Rivendell - The Last Homely House"
@@ -117,12 +119,12 @@ const Home = ({ onScrollProgress }) => {
         />
       </section>
 
-      <section
+      <section data-guide="home.journeys"
         className="journey-grid"
         style={{ transform: `translateY(${cardOffset}px)` }}
       >
         <Link to="/gandalf" className="journey-card">
-          <img src={gandalfImage} alt="Gandalf Acquisition" />
+          <div className="journey-card__image"><img src={gandalfImage} alt="Gandalf Acquisition" /></div>
           <div className="journey-card__content">
             <h2>Gandalf Acquisition</h2>
             <p>Collect evidence from live or remote systems with encrypted packaging.</p>
@@ -130,15 +132,32 @@ const Home = ({ onScrollProgress }) => {
         </Link>
 
         <Link to="/elrond" className="journey-card">
-          <img src={elrondImage} alt="Elrond Analysis" />
+          <div className="journey-card__image"><img src={elrondImage} alt="Elrond Analysis" /></div>
           <div className="journey-card__content">
             <h2>Elrond Analysis</h2>
             <p>Process timelines, memory and artifacts to map incidents to MITRE ATT&CK.</p>
           </div>
         </Link>
+
+        {/* Second row: Pippin under Gandalf, Aragorn under Elrond (the Aragorn page itself is for admins) */}
+        <Link to="/pippin" className="journey-card">
+          <div className="journey-card__image"><img src={pippinImage} alt="Pippin Threat Intelligence" /></div>
+          <div className="journey-card__content">
+            <h2>Pippin Threat Intelligence</h2>
+            <p>Import indicators, match cases against them and see whose tradecraft the evidence resembles.</p>
+          </div>
+        </Link>
+
+        <Link to="/aragorn" className="journey-card">
+          <div className="journey-card__image"><img src={aragornImage} alt="Aragorn Administration" /></div>
+          <div className="journey-card__content">
+            <h2>Aragorn Administration</h2>
+            <p>Keep the realm: Rivendell's containers, users, settings and the test lab.</p>
+          </div>
+        </Link>
       </section>
 
-      <section
+      <section data-guide="home.mordor"
         className="mordor-section"
         style={{ transform: `translateY(${cardOffset}px)` }}
       >
@@ -148,10 +167,12 @@ const Home = ({ onScrollProgress }) => {
           onMouseEnter={() => setMordorHovered(true)}
           onMouseLeave={() => setMordorHovered(false)}
         >
-          <img
-            src={mordorHovered ? mordorOpenImage : mordorClosedImage}
-            alt="Mordor Recordings"
-          />
+          <div className="journey-card__image">
+            <img
+              src={mordorHovered ? mordorOpenImage : mordorClosedImage}
+              alt="Mordor Recordings"
+            />
+          </div>
           <div className="journey-card__content">
             <h2>Mordor Recordings</h2>
             <p>Access pre-recorded security event datasets for threat research, detection development, and testing.</p>

@@ -51,15 +51,29 @@ run_bash() {
   local dest="$out_root/$host"
   mkdir -p "$dest"
   local enc="${GANDALF_ENCRYPTION:-None}"  # None or Key (Password needs a terminal)
+  # gandalf.sh only says "Failed to copy script", and sshpass prints nothing when the password is
+  # refused, so say why first
+  local probe
+  PATH="/opt/lab-bin:$PATH" ssh -o ConnectTimeout=20 "gandalf@${host}" true 2>&1 | sed 's/^/    ssh: /'
+  probe=${PIPESTATUS[0]}
+  case "$probe" in
+    0) echo "[+] $host: SSH as gandalf works" ;;
+    5) echo "[x] $host: the lab password was refused for gandalf (sshpass 5)" ;;
+    6) echo "[x] $host: unknown host key (sshpass 6)" ;;
+    *) echo "[x] $host: SSH failed (exit $probe)" ;;
+  esac
   echo "[*] gandalf.sh $enc Remote -h $host -u gandalf"
+  # Only this run's archives count: an earlier run's are still in $dest.
+  local since; since="$(mktemp)"
   ( cd "$work/bash" && PATH="/opt/lab-bin:$PATH" bash ./gandalf.sh "$enc" Remote -h "$host" -u gandalf -o "$dest" ) 2>&1 | tee "$dest/collector.log"
   local rc=${PIPESTATUS[0]}
   fetch_truth "$host" "$dest"
-  if ls "$dest"/*.tar.gz* >/dev/null 2>&1; then
-    echo "[+] $host: $(ls "$dest" | grep -c 'tar.gz') archive(s)"
+  local fresh; fresh="$(find "$dest" -maxdepth 1 -name '*.tar.gz*' -newer "$since")"; rm -f "$since"
+  if [ "$rc" = "0" ] && [ -n "$fresh" ]; then
+    echo "[+] $host: $(echo "$fresh" | grep -c 'tar.gz') archive(s)"
     if [ "$workarounds" = "1" ]; then
       # Known gap: Elrond's --Gandalf mode reads .zip/.7z only, gandalf.sh writes .tar.gz.
-      for t in "$dest"/*.tar.gz; do
+      for t in $(echo "$fresh" | grep '\.tar\.gz$'); do
         local x; x="$(mktemp -d)"; tar -xzf "$t" -C "$x" && (cd "$x" && zip -qr "$dest/$(basename "$t" .tar.gz).zip" .); rm -rf "$x"
         echo "[!] Workaround: repacked $(basename "$t") as zip for Elrond"
       done
@@ -83,9 +97,10 @@ run_python() {
   for host in "${hosts[@]}"; do
     dest="$out_root/$host"; mkdir -p "$dest"
     # Remote archives are fetched into the working directory.
-    mv "$work"/"$host".zip* "$dest"/ 2>/dev/null || true
+    # Only this run's archive counts: an earlier run's is still in $dest.
+    local got=0; mv "$work"/"$host".zip* "$dest"/ 2>/dev/null && got=1
     fetch_truth "$host" "$dest"
-    if ls "$dest"/*.zip* >/dev/null 2>&1; then echo "[+] $host: $(ls "$dest" | grep -c zip) archive(s)"; else echo "[x] $host: no archive produced"; status=1; fi
+    if [ "$got" = "1" ]; then echo "[+] $host: $(ls "$dest" | grep -c zip) archive(s)"; else echo "[x] $host: no archive produced"; status=1; fi
   done
 }
 

@@ -222,6 +222,8 @@ curl -X POST http://localhost:5688/api/jobs/{job_id}/restart \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
+A job with findings answers 409 with their count: the re-run rewrites the rows they point at, and any that change show "row changed". Add `?confirm=true` to restart anyway.
+
 ### Archive Completed Jobs
 
 **Web Interface:** Select jobs → Bulk Actions → Archive

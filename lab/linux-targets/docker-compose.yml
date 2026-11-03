@@ -35,6 +35,26 @@ services:
     container_name: lab-rocky
     ports: ["127.0.0.1:2222:22"]
 
+  # Clean Ubuntu hosts for stacking: with lab-ubuntu, three of one OS with the plants on one, so
+  # stacking's rarity and precision@k can be measured. Only with `./lab.sh linux-targets stacking`.
+  ubuntu-clean-1:
+    <<: *target
+    build: { context: ., args: { BASE: "ubuntu:24.04", SEED: "0" } }
+    image: rivendell-lab-target:ubuntu-clean
+    hostname: lab-ubuntu-clean1
+    container_name: lab-ubuntu-clean1
+    ports: ["127.0.0.1:2223:22"]
+    profiles: [stacking]
+
+  ubuntu-clean-2:
+    <<: *target
+    build: { context: ., args: { BASE: "ubuntu:24.04", SEED: "0" } }
+    image: rivendell-lab-target:ubuntu-clean
+    hostname: lab-ubuntu-clean2
+    container_name: lab-ubuntu-clean2
+    ports: ["127.0.0.1:2224:22"]
+    profiles: [stacking]
+
   # Runs gandalf.py and gandalf.sh against the targets. Started on demand by
   # `./lab.sh gandalf-collect`, never left running.
   controller:

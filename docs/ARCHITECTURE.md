@@ -25,8 +25,11 @@ The Rivendell DFIR (Digital Forensics and Incident Response) Acceleration Suite 
 
 - **Gandalf**: Evidence acquisition module
 - **Elrond**: Forensic analysis and artifact processing engine
+- **Eru**: The AI analyst, with fixed answers from the case files when no model is available
+- **Pippin**: Threat intelligence indicators that cases are matched against
 - **Mordor**: Security dataset exploration and threat simulation
-- **Web Interface**: Unified control panel for all operations
+- **Aragorn**: Administration (Andúril for Rivendell's containers, the test lab)
+- **Web Interface**: Unified control panel for all operations, including the case browser where a team flags and confirms findings
 
 ### Technology Stack
 
@@ -672,6 +675,24 @@ audit_logs:     user_id, timestamp, action
 
 ---
 
+### 6.2 Tables in Postgres today
+
+The diagram above is the original design. What Postgres holds now, created by the Alembic migrations in `src/web/backend/alembic/versions/` (users live in a file store, `auth/users.py`, not in Postgres):
+
+| Table | Holds | Migration |
+|---|---|---|
+| `jobs` | Every job: case number, sources, destination, options, status, progress, log, result | `3e5a9c1b7d20` |
+| `job_access` | Each job's owner and who it's shared with (server mode) | `b7e4c2d9a810` |
+| `threat_intel_indicators` | Pippin's indicators, in the fixed ten-column schema | `7c41d2e9a0b3` |
+| `case_findings` | Rows flagged in the case browser: file, row, row hash, excerpt, title, technique, status, author | `4d8b1f6e2c57` |
+| `case_notes` | Markdown notes on a case or a finding | `4d8b1f6e2c57` |
+| `case_hosts` | Who a host is assigned to, and its status | `4d8b1f6e2c57` |
+| `case_activity` | Who flagged, marked, assigned, noted or exported what | `4d8b1f6e2c57` |
+
+Case data itself stays in case directories on disk; nothing in Postgres copies evidence.
+
+---
+
 ## 7. API Architecture
 
 ### 7.1 RESTful API Structure
@@ -706,7 +727,25 @@ audit_logs:     user_id, timestamp, action
 │   ├── POST   /{job_id}/unarchive    Restore archived job
 │   ├── GET    /archived              List archived jobs
 │   ├── POST   /bulk/archive          Archive multiple jobs
-│   └── POST   /bulk/delete           Delete multiple jobs
+│   ├── POST   /bulk/delete           Delete multiple jobs
+│   └── /{job_id}/case                 [Case browser: read-only tables, findings, notes]
+│       ├── GET    /                  Hosts, their tables and assignments
+│       ├── GET    /rows              Rows of one table, paged and filtered
+│       ├── GET|POST /findings        Findings (flag a row)
+│       ├── PATCH|DELETE /findings/{id}
+│       ├── GET|POST /notes           Notes on the case or a finding
+│       ├── PUT    /hosts/{host}      Assign a host, set its status
+│       ├── GET    /activity          Who did what
+│       ├── GET    /report            Markdown from confirmed findings
+│       └── GET    /layer             Navigator layer from confirmed findings
+│
+├── /threat-intel                      [Pippin: threat intelligence]
+│   ├── GET    /                      Totals and sources
+│   ├── GET    /indicators            Search indicators
+│   ├── POST   /import                Upload XLSX, STIX, CSV or a watchlist
+│   ├── POST   /taxii                 Pull a TAXII 2.1 collection
+│   ├── DELETE /sources/{source}      Remove one source's indicators
+│   └── GET    /enrich                What the indicators say about one value
 │
 ├── /export                            [Export/Import]
 │   ├── POST   /export                Export data to JSON

@@ -334,13 +334,13 @@ function MordorTelemetry() {
       </header>
       {error && <div className="card lab-error">{error}</div>}
 
-      <div className="mt-tiles">
+      <div data-guide="mordor.tiles" className="mt-tiles">
         <div className="mt-tile is-recordings"><div className="mt-num">{status ? status.datasets.toLocaleString() : '–'}</div><div>Recordings</div></div>
         <div className="mt-tile is-techniques"><div className="mt-num">{status ? status.techniques : '–'}</div><div>Techniques</div></div>
         <div className="mt-tile is-check"><div className="mt-num">{status ? (status.values ? 'Ready' : 'No values') : '–'}</div><div>Indicator check</div></div>
       </div>
 
-      <div className="card">
+      <div data-guide="mordor.generate" className="card">
         <h2>Generating telemetry</h2>
         <Pipeline />
         <p className="lab-note">
@@ -360,7 +360,7 @@ function MordorTelemetry() {
         <a className="mt-pill-link" href="/aragorn#deploy">Record in the lab →</a>
       </div>
 
-      <div className="card">
+      <div data-guide="mordor.recorded" className="card">
         <h2>Recorded telemetry</h2>
         <p className="lab-note">Every recorded technique and the logs most of its recordings hold. Open one for its recordings, the event types they hold and Defender XDR's alerting on it; an OTRF recording can be downloaded for Elrond to analyse. Search finds the techniques whose recorded events contain a value. Datasets that span several techniques (APT29's days, for example) are in <a href="#datasets">Downloadable datasets</a> below, with bulk download.</p>
         <TelemetryViews refreshKey={refreshKey} />

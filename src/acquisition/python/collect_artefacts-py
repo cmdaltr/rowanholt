@@ -4,7 +4,9 @@ import glob
 import hashlib
 import os
 import platform
+import re
 import shutil
+import stat
 import subprocess
 from datetime import datetime
 from zipfile import ZipFile
@@ -64,7 +66,6 @@ LABELLED = {
     "conf": (4, 1 << 20, ()),
     "journal": (3, 1 << 30, (".journal", ".journal~")),
     "audit": (1, 512 << 20, ()),
-    "docker_containers": (2, 64 << 20, (".json", ".log")),
     "package_log": (2, 64 << 20, ()),
     "cron_jobs": (3, 1 << 20, ()),
     "at_jobs": (2, 1 << 20, ()),
@@ -82,18 +83,20 @@ LABELLED = {
 # Folders deliberately not copied, and why: taken elsewhere, too large to be useful in
 # a triage archive, or key material Gandalf doesn't take
 NOT_COLLECTED = {
-    "unified_logs": "exported by collect_macos_staging (log show) rather than as raw tracev3",
+    "unified_logs": "exported by collect_macos_staging (log show); the raw store by collect_macos_stores",
     "coreduet": "collect_macos_extras", "tcc": "collect_macos_extras",
     "kernel_modules": "listed in linux/gandalf+kernel_modules.csv",
     "login_records": "collect_linux_extras", "failed_logins": "collect_linux_extras",
     "startup_scripts": "collect_linux_extras", "system_log": "the logs walk", "install_log": "the logs walk",
-    "docker_volumes": "whole volume contents", "docker_overlay": "whole container filesystems",
-    "spotlight": "the Spotlight index runs to gigabytes",
+    "docker_containers": "collect_linux_extras, with the other container artefacts",
+    "docker_volumes": "whole volume contents",
+    "docker_overlay": "listed by collect_linux_volatile_files, executables copied by collect_container_layers",
+    "spotlight": "collect_macos_stores, capped per store",
     "filevault": "key material", "keychains": "key material",
     "wmi_repo": "Windows (the PowerShell collector takes it)",
 }
 # /var/log subdirectories with their own entry, which the logs walk leaves to it
-LOGS_OWN_ENTRY = ("journal", "audit", "DiagnosticReports")
+LOGS_OWN_ENTRY = ("journal", "audit", "DiagnosticReports", "pods", "containers", "kubernetes")
 LOGS_MAX_BYTES = 256 << 20
 
 
@@ -538,6 +541,68 @@ def collect_macos_staging(gandalf_artefact_destination, gandalf_host):
     )
 
 
+# The raw unified-log store (tracev3 under diagnostics/, format strings under uuidtext/),
+# newest first up to GANDALF_UNIFIED_LOG_STORE_MAX bytes (default 2 GB; 0 turns it off),
+# into unified_log_store/ with its layout kept, which log-archive readers need
+MACOS_LOG_STORES = (("/private/var/db/diagnostics", "diagnostics"), ("/private/var/db/uuidtext", "uuidtext"))
+# Spotlight's index stores, each up to GANDALF_SPOTLIGHT_MAX bytes (default 1 GB; 0 turns it off)
+MACOS_SPOTLIGHT_ROOTS = ("/System/Volumes/Data/.Spotlight-V100", "/.Spotlight-V100")
+MACOS_SPOTLIGHT_FILES = ("store.db", ".store.db", "VolumeConfiguration.plist")
+MACOS_SPOTLIGHT_MAPS = re.compile(r"^dbStr-\d+\.map\.")  # store.db can't be read without them
+
+
+def _byte_limit(variable, default):
+    try:
+        return int(os.environ.get(variable, default))
+    except ValueError:
+        return default
+
+
+def collect_macos_stores(gandalf_artefact_destination, gandalf_host):
+    """
+    The unified-log store as tracev3 and Spotlight's index, both too large to take
+    whole on every host, so each is capped (G17). uuidtext is taken before the
+    tracev3 files because the logs can't be read without it.
+    """
+    budget = _byte_limit("GANDALF_UNIFIED_LOG_STORE_MAX", 2 << 30)
+    store = os.path.join(gandalf_artefact_destination, "unified_log_store")
+    for top, label in reversed(MACOS_LOG_STORES):
+        if budget <= 0 or not os.path.isdir(top):
+            continue
+        files = []
+        for source in _walk_files(top, 4):
+            try:
+                if not os.path.islink(source):
+                    files.append((os.path.getmtime(source), os.path.getsize(source), source))
+            except OSError:
+                pass
+        for _, size, source in sorted(files, reverse=True):
+            if size > budget:
+                continue
+            if _collect_one(source, os.path.join(store, label, os.path.relpath(source, top)), gandalf_host):
+                budget -= size
+    limit = _byte_limit("GANDALF_SPOTLIGHT_MAX", 1 << 30)
+    for top in MACOS_SPOTLIGHT_ROOTS:
+        if limit <= 0 or not os.path.isdir(top):
+            continue
+        for source in _walk_files(top, 3):
+            try:
+                name = os.path.basename(source)
+                if (name not in MACOS_SPOTLIGHT_FILES and not MACOS_SPOTLIGHT_MAPS.match(name)) or os.path.islink(source) or \
+                        os.path.getsize(source) > limit:
+                    continue
+            except OSError:
+                continue
+            rel = os.path.relpath(source, top).replace(os.sep, "+")
+            _collect_one(source, os.path.join(gandalf_artefact_destination, "spotlight", rel), gandalf_host)
+        break
+    print(
+        "      \033[1;32mAcquired unified-log store and Spotlight index from '{}'\033[1;m".format(
+            gandalf_host.split("/")[-1]
+        )
+    )
+
+
 def collect_macos_more(gandalf_artefact_destination, gandalf_host):
     """
     BTM login and background items, shared file lists, Notification Center,
@@ -604,6 +669,10 @@ LINUX_EXTRA_FILES = (
     "/etc/bashrc", "/etc/rc.local", "/etc/sudoers", "/run/utmp", "/var/run/utmp", "/var/log/wtmp",
     "/var/log/btmp", "/var/log/lastlog", "/var/log/faillog",
     "/var/lib/wtmpdb/wtmp.db", "/var/lib/lastlog/lastlog2.db",
+    "/var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db",
+    "/var/lib/containers/storage/overlay-containers/containers.json",
+    "/var/lib/containers/storage/db.sql", "/var/lib/containers/storage/db.sql-wal",
+    "/var/lib/containers/storage/libpod/bolt_state.db",
 )
 # directory, depth, largest file, file name suffixes (empty: any)
 LINUX_EXTRA_DIRS = (
@@ -622,7 +691,15 @@ LINUX_EXTRA_DIRS = (
     ("/etc/nginx", 3, 1 << 20, ()),
     ("/etc/apache2", 3, 1 << 20, ()),
     ("/etc/httpd", 3, 1 << 20, ()),
+    ("/var/lib/docker/containers", 2, 10 << 20, ("config.v2.json", "hostconfig.json")),
+    ("/var/lib/docker/containers", 2, 64 << 20, ("-json.log",)),
+    ("/var/log/pods", 3, 64 << 20, (".log",)),
+    ("/etc/kubernetes/manifests", 1, 1 << 20, (".yaml", ".yml", ".json")),
+    ("/var/log/kubernetes", 2, 256 << 20, (".log",)),
 )
+CONTAINER_MAX_FILES = 5000  # per container, in its writable-layer listing
+CONTAINER_COPY_MAX_FILES = 500  # executables copied per container, into container_layer/<id>/
+CONTAINER_COPY_MAX_BYTES = 64 << 20
 LINUX_WEB_ROOTS = ("/var/www", "/srv/www", "/srv/http", "/usr/share/nginx/html")
 LINUX_WEB_SCRIPTS = (".php", ".phtml", ".php3", ".php4", ".php5", ".php7", ".phar", ".inc", ".jsp", ".jspx",
                      ".asp", ".aspx", ".ashx", ".asmx", ".cgi", ".pl", ".py", ".sh", ".cfm")
@@ -707,6 +784,74 @@ def kernel_module_listing():
     return rows
 
 
+def _container_layers(root=""):
+    """(container id, writable-layer directory) for each Docker container on overlay2."""
+    docker = root + "/var/lib/docker"
+    try:
+        ids = sorted(os.listdir(docker + "/containers"))
+    except OSError:
+        return
+    for cid in ids:
+        try:
+            with open(os.path.join(docker, "image/overlay2/layerdb/mounts", cid, "mount-id")) as fh:
+                upper = os.path.join(docker, "overlay2", fh.read().strip(), "diff")
+        except OSError:
+            continue
+        yield cid, upper
+
+
+def container_change_listing(root=""):
+    """Each Docker container's writable layer: everything changed since its image, with deleted
+    files as overlay whiteouts (character devices 0/0). Listed and hashed; the executables
+    among them are copied by collect_container_layers."""
+    rows = []
+    for cid, upper in _container_layers(root):
+        for count, source in enumerate(_walk_files(upper, 12)):
+            if count >= CONTAINER_MAX_FILES:
+                break
+            try:
+                info = os.lstat(source)
+            except OSError:
+                continue
+            kind, digest = "", ""
+            if stat.S_ISCHR(info.st_mode):
+                kind = "deleted"
+            elif stat.S_ISREG(info.st_mode):
+                kind = _executable_kind(source)
+                if kind and info.st_size <= LINUX_HASH_MAX_BYTES:
+                    try:
+                        digest = _sha256_file(source)
+                    except OSError:
+                        pass
+            else:
+                continue
+            rows.append({"Container": cid[:12], "Path": source[len(upper):], "Size": info.st_size,
+                         "Mode": oct(info.st_mode & 0o7777), "Kind": kind, "SHA256": digest,
+                         "MTime": int(info.st_mtime)})
+    return rows
+
+
+def collect_container_layers(gandalf_artefact_destination, gandalf_host):
+    """The executables and scripts each container gained since its image (what an
+    attacker drops into a running container), into container_layer/<id>/ with '/' as
+    '+'. At most 500 per container, each up to 64 MB."""
+    for cid, upper in _container_layers():
+        taken = 0
+        for source in _walk_files(upper, 12):
+            if taken >= CONTAINER_COPY_MAX_FILES:
+                break
+            try:
+                if os.path.islink(source) or not os.path.isfile(source) or \
+                        os.path.getsize(source) > CONTAINER_COPY_MAX_BYTES or not _executable_kind(source):
+                    continue
+            except OSError:
+                continue
+            destination = os.path.join(gandalf_artefact_destination, "container_layer", cid[:12],
+                                       source[len(upper):].lstrip("/").replace("/", "+"))
+            if _collect_one(source, destination, gandalf_host):
+                taken += 1
+
+
 def collect_linux_volatile_files(gandalf_artefact_destination, gandalf_host):
     """Listings of what changes fastest: loaded kernel modules and the executables in
     the temp directories, into linux/ as Elrond reads them."""
@@ -730,6 +875,7 @@ def collect_linux_volatile_files(gandalf_artefact_destination, gandalf_host):
             rows.append({"Path": source, "Size": info.st_size, "Mode": oct(info.st_mode & 0o7777), "UID": info.st_uid,
                          "Kind": kind, "SHA256": digest, "MTime": int(info.st_mtime)})
     _write_listing(os.path.join(linux, "gandalf+tmp_executables.csv"), rows, gandalf_host)
+    _write_listing(os.path.join(linux, "gandalf+container_changes.csv"), container_change_listing(), gandalf_host)
 
 
 def _read_proc(source, destination):
@@ -775,10 +921,15 @@ def collect_linux_extras(gandalf_artefact_destination, gandalf_host):
     """
     Linux persistence, login-record and history artefacts the system_artefacts walk
     misses (preload, PAM, sudoers.d, udev, generators, autostart, utmp/wtmp/btmp,
-    lastlog, web roots, extra shell histories).
+    lastlog, web roots, extra shell histories), and os-release for the distribution.
     """
     linux = os.path.join(gandalf_artefact_destination, "linux")
     seen = set()
+    # The distribution, as gandalf.sh takes it (etc+os-release, raw/os-release in Elrond); usually a
+    # symlink to /usr/lib/os-release, which take() would skip, so it's copied through the link here
+    for source in ("/etc/os-release", "/usr/lib/os-release"):
+        if _collect_one(source, os.path.join(gandalf_artefact_destination, "etc+os-release"), gandalf_host):
+            break
 
     def take(source, destination, limit=None):
         try:
@@ -1473,8 +1624,10 @@ def acquire_artefacts(
     if platform.system() == "Darwin":
         collect_macos_extras(gandalf_artefact_destination, gandalf_host)
         collect_macos_more(gandalf_artefact_destination, gandalf_host)
+        collect_macos_stores(gandalf_artefact_destination, gandalf_host)
     elif platform.system() == "Linux":
         collect_linux_extras(gandalf_artefact_destination, gandalf_host)
+        collect_container_layers(gandalf_artefact_destination, gandalf_host)
     if access_times != "None":
         print()
         print(

@@ -1,0 +1,86 @@
+# Rivendell as a team's shared server. `rivendell start` layers this over
+# docker-compose.yml once `rivendell server init` has set the server up (or with --server).
+#
+# One way in: Caddy, with TLS, on 443 for the web app and API, and on Splunk's, Kibana's
+# and the Navigator's usual ports behind the Rivendell sign-in. Nothing else is published.
+# The backend runs in server mode (sign-in on every route, jobs visible to their owner,
+# the people they're shared with and admins) and the frontend is a production build.
+#
+# Settings come from .env; `rivendell server init` writes them. Paths are relative to the
+# repository root. Needs Docker Compose 2.24 or later (!reset).
+
+services:
+  proxy:
+    image: caddy:2.8
+    container_name: rivendell-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "7755:7755" # Splunk
+      - "5601:5601" # Kibana
+      - "5602:5602" # ATT&CK Navigator
+    environment:
+      - RIVENDELL_HOSTNAME=${RIVENDELL_HOSTNAME:?Run rivendell server init first}
+      - RIVENDELL_TLS=${RIVENDELL_TLS:-internal}
+    volumes:
+      - ./deploy/server/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./deploy/server/certs:/certs:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - rivendell-network
+
+  backend:
+    ports: !reset []
+    # No --reload; the proxy's X-Forwarded-* headers are trusted (only it can reach here)
+    command: uvicorn main:app --host 0.0.0.0 --port 5688 --proxy-headers --forwarded-allow-ips=*
+    environment:
+      - RIVENDELL_SERVER_MODE=true
+      - RIVENDELL_PUBLIC_URL=https://${RIVENDELL_HOSTNAME:?Run rivendell server init first}
+      - SECRET_KEY=${SECRET_KEY:?Run rivendell server init first}
+      - RIVENDELL_ADMIN_PASSWORD=${RIVENDELL_ADMIN_PASSWORD:?Run rivendell server init first}
+      - RIVENDELL_LOCAL_LOGIN=${RIVENDELL_LOCAL_LOGIN:-true}
+      - OIDC_ISSUER=${OIDC_ISSUER:-}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
+      - OIDC_DISPLAY_NAME=${OIDC_DISPLAY_NAME:-single sign-on}
+      - OIDC_GROUPS_CLAIM=${OIDC_GROUPS_CLAIM:-groups}
+      - OIDC_ADMIN_GROUP=${OIDC_ADMIN_GROUP:-}
+      - OIDC_ALLOWED_GROUP=${OIDC_ALLOWED_GROUP:-}
+
+  frontend:
+    build:
+      context: ./src/web/frontend
+      dockerfile: Dockerfile.prod
+      args:
+        # Empty: the app calls /api on its own origin, through the proxy
+        REACT_APP_API_URL: ""
+    ports: !reset []
+    volumes: !reset []
+    environment: !reset []
+
+  postgres:
+    ports: !reset []
+
+  redis:
+    ports: !reset []
+
+  splunk:
+    ports: !reset []
+
+  elastic:
+    ports: !reset []
+
+  kibana:
+    ports: !reset []
+
+  navigator:
+    ports: !reset []
+
+volumes:
+  caddy_data:
+  caddy_config:

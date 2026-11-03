@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { listApiTokens, createApiToken, revokeApiToken } from '../api';
 
 const heroImage = `${process.env.PUBLIC_URL}/images/rivendell.png`;
 
@@ -24,10 +25,13 @@ const AccountPage = () => {
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [showMfaSetup, setShowMfaSetup] = useState(false);
 
-  // API tokens state
-  const [apiTokens, setApiTokens] = useState([]);
-  const [newTokenName, setNewTokenName] = useState('');
+  // Long-lived tokens for scripts and Eru's MCP server (auth/tokens.py)
   const [generatedToken, setGeneratedToken] = useState('');
+  const [apiTokens, setApiTokens] = useState([]);
+  const [tokensAvailable, setTokensAvailable] = useState(true);
+  const [tokenName, setTokenName] = useState('');
+  const [tokenScope, setTokenScope] = useState('eru-mcp');
+  const [tokenDays, setTokenDays] = useState(90);
 
   // Messages
   const [profileMessage, setProfileMessage] = useState({ type: '', text: '' });
@@ -49,6 +53,21 @@ const AccountPage = () => {
     navigate('/login');
   };
 
+  // Hooks before the redirect below: React needs the same hooks on every render
+  const loadTokens = async () => {
+    try {
+      setApiTokens(await listApiTokens());
+    } catch (error) {
+      // 400 on an analyst's own machine: the API needs no token there
+      if (error.response?.status === 400) setTokensAvailable(false);
+      setTokenMessage({ type: 'error', text: error.response?.data?.detail || 'Could not list your tokens.' });
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated) loadTokens();
+  }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
     navigate('/login');
@@ -60,7 +79,7 @@ const AccountPage = () => {
     setProfileMessage({ type: '', text: '' });
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token');
       const response = await fetch('/api/auth/profile', {
         method: 'PUT',
         headers: {
@@ -96,7 +115,7 @@ const AccountPage = () => {
     }
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token');
       const response = await fetch('/api/auth/change-password', {
         method: 'POST',
         headers: {
@@ -131,7 +150,7 @@ const AccountPage = () => {
       setMfaMessage({ type: 'info', text: 'MFA setup requires backend implementation. Coming soon.' });
     } else {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('access_token');
         const response = await fetch('/api/auth/mfa/disable', {
           method: 'POST',
           headers: {
@@ -154,54 +173,40 @@ const AccountPage = () => {
   const handleGenerateToken = async (e) => {
     e.preventDefault();
     setTokenMessage({ type: '', text: '' });
-    setGeneratedToken('');
-
-    if (!newTokenName.trim()) {
-      setTokenMessage({ type: 'error', text: 'Please enter a token name.' });
-      return;
-    }
-
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/auth/tokens', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ name: newTokenName })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setGeneratedToken(data.token);
-        setApiTokens([...apiTokens, { name: newTokenName, created: new Date().toISOString() }]);
-        setNewTokenName('');
-        setTokenMessage({ type: 'success', text: 'Token generated. Copy it now - it won\'t be shown again.' });
-      } else {
-        setTokenMessage({ type: 'error', text: 'Failed to generate token.' });
-      }
+      const made = await createApiToken(tokenName.trim(), tokenScope, Number(tokenDays));
+      setGeneratedToken(made.token);
+      setTokenName('');
+      setTokenMessage({ type: 'success', text: 'Copy it now: it is not shown again.' });
+      loadTokens();
     } catch (error) {
-      setTokenMessage({ type: 'error', text: 'API tokens require backend support. Coming soon.' });
+      setTokenMessage({ type: 'error', text: error.response?.data?.detail || 'Could not make a token.' });
     }
   };
 
-  const handleRevokeToken = async (tokenName) => {
+  const handleRevokeToken = async (token) => {
+    setTokenMessage({ type: '', text: '' });
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/auth/tokens/${tokenName}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        setApiTokens(apiTokens.filter(t => t.name !== tokenName));
-        setTokenMessage({ type: 'success', text: 'Token revoked.' });
-      }
+      await revokeApiToken(token.id);
+      setTokenMessage({ type: 'success', text: `Revoked ${token.name}.` });
+      loadTokens();
     } catch (error) {
-      setTokenMessage({ type: 'error', text: 'Failed to revoke token.' });
+      setTokenMessage({ type: 'error', text: error.response?.data?.detail || 'Could not revoke the token.' });
+    }
+  };
+
+  const shortDate = (value) => (value ? new Date(value).toLocaleDateString() : '–');
+  const tokenState = (token) => {
+    if (token.revoked_at) return 'revoked';
+    return new Date(token.expires_at) < new Date() ? 'expired' : 'active';
+  };
+
+  const copyToken = async () => {
+    try {
+      await navigator.clipboard.writeText(generatedToken);
+      setTokenMessage({ type: 'success', text: 'Copied.' });
+    } catch {
+      setTokenMessage({ type: 'error', text: 'Copy it from the box: the browser refused the clipboard.' });
     }
   };
 
@@ -227,7 +232,7 @@ const AccountPage = () => {
       </header>
 
       {/* Tab Navigation */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div data-guide="account.settings" className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{
           display: 'flex',
           borderBottom: '1px solid #3f4b2a',
@@ -351,71 +356,77 @@ const AccountPage = () => {
                 </form>
               </div>
 
-              {/* Rivendell API Tokens */}
+              {/* Tokens for scripts and Eru's MCP server */}
               <div style={{ paddingTop: '2rem', borderTop: '1px solid #3f4b2a' }}>
-                <h3 style={{ marginBottom: '1.5rem' }}>Rivendell API Tokens</h3>
+                <h3 style={{ marginBottom: '1.5rem' }}>Tokens for scripts and Eru's MCP server</h3>
 
                 <p style={{ marginBottom: '1rem', color: '#a09580' }}>
-                  Generate API tokens for programmatic access to Rivendell services.
+                  A token lasts until it expires or you revoke it, and is shown once, when it's made. An{' '}
+                  <code>eru-mcp</code> token can only read, flag leads and add notes, recorded as Eru acting for you;
+                  a <code>full</code> token does what you can do, so keep it like a password. For{' '}
+                  <code>rivendell mcp</code>, set it as <code>RIVENDELL_TOKEN</code> (docs/ERU.md).
                 </p>
 
+                {tokenMessage.text && (
+                  <div className={tokenMessage.type === 'error' ? 'alert-error' : 'alert-success'}>{tokenMessage.text}</div>
+                )}
+
                 {generatedToken && (
-                  <div className="alert-success" style={{ wordBreak: 'break-all' }}>
-                    <strong>New Token:</strong> {generatedToken}
-                    <br />
-                    <small>Copy this token now. It won't be shown again.</small>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                    <input type="text" readOnly value={generatedToken} style={{ flex: 1, fontFamily: 'monospace' }}
+                      onFocus={(e) => e.target.select()} />
+                    <button type="button" className="secondary" onClick={copyToken}>Copy</button>
                   </div>
                 )}
 
-                <form onSubmit={handleGenerateToken} style={{ marginBottom: '1.5rem' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'end' }}>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label>Token Name</label>
-                      <input
-                        type="text"
-                        value={newTokenName}
-                        onChange={(e) => setNewTokenName(e.target.value)}
-                        placeholder="e.g., CI/CD Pipeline, Script Access"
-                      />
-                    </div>
-                    <button type="submit" style={{ height: '42px' }}>Generate Token</button>
-                  </div>
-                </form>
+                {tokensAvailable && (
+                  <>
+                    <form onSubmit={handleGenerateToken} style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '1.5rem' }}>
+                      <div style={{ flex: '2 1 12rem' }}>
+                        <label>Name</label>
+                        <input type="text" value={tokenName} onChange={(e) => setTokenName(e.target.value)}
+                          placeholder="e.g. Claude Desktop on my laptop" maxLength={100} required />
+                      </div>
+                      <div style={{ flex: '1 1 8rem' }}>
+                        <label>Scope</label>
+                        <select value={tokenScope} onChange={(e) => setTokenScope(e.target.value)}>
+                          <option value="eru-mcp">eru-mcp</option>
+                          <option value="full">full</option>
+                        </select>
+                      </div>
+                      <div style={{ flex: '1 1 6rem' }}>
+                        <label>Days</label>
+                        <input type="number" min={1} max={365} value={tokenDays} onChange={(e) => setTokenDays(e.target.value)} />
+                      </div>
+                      <button type="submit" style={{ height: '42px' }}>Make a token</button>
+                    </form>
 
-                {apiTokens.length > 0 && (
-                  <div>
-                    <h4 style={{ marginBottom: '0.5rem', color: '#f0dba5' }}>Active Tokens</h4>
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Name</th>
-                          <th>Created</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {apiTokens.map((token, index) => (
-                          <tr key={index}>
-                            <td>{token.name}</td>
-                            <td>{new Date(token.created).toLocaleDateString()}</td>
-                            <td>
-                              <button
-                                className="secondary"
-                                style={{ padding: '0.25rem 0.75rem', fontSize: '0.875rem' }}
-                                onClick={() => handleRevokeToken(token.name)}
-                              >
-                                Revoke
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {apiTokens.length === 0 && (
-                  <p style={{ color: '#666', fontStyle: 'italic' }}>No API tokens generated yet.</p>
+                    {apiTokens.length > 0 && (
+                      <table style={{ width: '100%', fontSize: '0.9rem' }}>
+                        <thead>
+                          <tr><th>Name</th><th>Token</th><th>Scope</th><th>Made</th><th>Expires</th><th>Last used</th><th>State</th><th /></tr>
+                        </thead>
+                        <tbody>
+                          {apiTokens.map((token) => (
+                            <tr key={token.id}>
+                              <td>{token.name}</td>
+                              <td><code>{token.prefix}…</code></td>
+                              <td>{token.scope}</td>
+                              <td>{shortDate(token.created_at)}</td>
+                              <td>{shortDate(token.expires_at)}</td>
+                              <td>{shortDate(token.last_used_at)}</td>
+                              <td>{tokenState(token)}</td>
+                              <td>
+                                {tokenState(token) === 'active' && (
+                                  <button type="button" className="secondary" onClick={() => handleRevokeToken(token)}>Revoke</button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </>
                 )}
               </div>
 

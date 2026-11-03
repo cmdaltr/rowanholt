@@ -147,25 +147,6 @@ def validate_analysis_options(analysis: bool, process: bool) -> None:
         )
 
 
-def validate_navigator_options(navigator: bool, splunk: bool) -> None:
-    """
-    Validate MITRE Navigator options.
-
-    Args:
-        navigator: Navigator flag
-        splunk: Splunk flag
-
-    Raises:
-        ValidationError: If validation fails
-    """
-    if navigator and not splunk:
-        raise ValidationError(
-            "Navigator (-N) requires Splunk (-S)\n"
-            "The MITRE ATT&CK Navigator integration works with Splunk indexing.\n"
-            "Usage: -N -S"
-        )
-
-
 def validate_nsrl_options(
     metacollected: bool, nsrl: bool, superquick: bool, quick: bool
 ) -> None:
@@ -370,9 +351,6 @@ def validate_all_arguments(args) -> dict:
 
         # Validate analysis options
         validate_analysis_options(args.Analysis, args.Process)
-
-        # Validate navigator options
-        validate_navigator_options(args.Navigator, args.Splunk)
 
         # Validate NSRL options
         validate_nsrl_options(

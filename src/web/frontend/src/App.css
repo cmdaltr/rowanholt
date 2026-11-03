@@ -1002,6 +1002,11 @@ table input[type="checkbox"] {
   border-top: 1px solid #2a2a5a;
 }
 
+/* Image paths have no spaces to break at */
+.source-paths-section li {
+  overflow-wrap: anywhere;
+}
+
 .options-tags {
   display: flex;
   flex-wrap: wrap;
@@ -1106,7 +1111,7 @@ table input[type="checkbox"] {
 
 .journey-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));  /* two columns: Gandalf over Pippin, Elrond over Aragorn */
   gap: 1.5rem;
   will-change: transform;
   margin-bottom: 0;
@@ -1122,6 +1127,36 @@ table input[type="checkbox"] {
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   display: flex;
   flex-direction: column;
+}
+
+@media (max-width: 640px) { .journey-grid { grid-template-columns: 1fr; } }
+
+/* Each portrait is drawn 20% smaller (zoomed out, centred) in a frame 15% shorter than before,
+   so more of the figure shows and the bottom is trimmed. Mordor's photo fills the width, so it's
+   only trimmed: drawn smaller it would leave bars down both sides */
+.journey-card__image {
+  height: 432px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.journey-card--landscape .journey-card__image {
+  height: 460px;
+}
+
+.journey-card .journey-card__image img {
+  width: 80%;
+  height: auto;
+  object-fit: initial;
+  align-self: flex-start;
+}
+
+.journey-card--landscape .journey-card__image img {
+  width: 100%;
+  height: 540px;
+  object-fit: cover;
 }
 
 .journey-card img {
@@ -1655,23 +1690,12 @@ table input[type="checkbox"] {
   grid-template-columns: repeat(6, 1fr) !important;
 }
 
-/* Analysis grid layout (8 items):
-   Row 1: Automated Analysis | Extract IOCs | Memory Collection (span 2 each)
-   Row 2: Disk Image Timeline | Memory Timeline (span 3 each)
-   Row 3: Keywords Search | YARA Rules | Collect Specific Files (span 2 each) */
-.wizard-options.analysis-grid .wizard-option-item:nth-child(1),
-.wizard-options.analysis-grid .wizard-option-item:nth-child(2),
-.wizard-options.analysis-grid .wizard-option-item:nth-child(3),
-.wizard-options.analysis-grid .wizard-option-item:nth-child(6),
-.wizard-options.analysis-grid .wizard-option-item:nth-child(7),
-.wizard-options.analysis-grid .wizard-option-item:nth-child(8) {
+/* Analysis grid layout (9 items, span 2 each):
+   Row 1: Automated Analysis | Extract IOCs | Threat Intelligence
+   Row 2: Memory Collection | Disk Image Timeline | Memory Timeline
+   Row 3: Keywords Search | YARA Rules | Collect Specific Files */
+.wizard-options.analysis-grid .wizard-option-item {
   grid-column: span 2 !important;
-}
-
-/* Analysis grid: items 4-5 span 3 columns each (50% width, row 2) */
-.wizard-options.analysis-grid .wizard-option-item:nth-child(4),
-.wizard-options.analysis-grid .wizard-option-item:nth-child(5) {
-  grid-column: span 3 !important;
 }
 
 /* Collection grid layout (18 items):
@@ -2576,6 +2600,8 @@ select.large-select:disabled {
   border-radius: 4px;
   display: flex;
   align-items: center;
+  gap: 0.45rem;
+  font-size: inherit;
   transition: all 0.3s ease;
   outline: none;
   box-shadow: none;
@@ -3022,3 +3048,166 @@ select.large-select.lb-select { width: auto; min-width: 16rem; padding: 0.45rem 
 @media (max-width: 800px) { .lb-tools { grid-template-columns: 1fr; } }
 a.mt-pill-link { display: inline-block; padding: 0.4rem 1rem; border: 1px solid #3a3a6a; border-radius: 999px; color: #66d9ef; text-decoration: none; }
 a.mt-pill-link:hover { border-color: #66d9ef; }
+
+/* ── The guide and the start-up offer (components/Guide.js, StartOffer.js) ───────────── */
+.App-header nav .nav-guide {
+  background: transparent;
+  color: #f0dba5;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 1rem;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  transition: all 0.3s ease;
+}
+.App-header nav .nav-guide:hover { background: rgba(167, 219, 108, 0.2); color: #a7db6c; }
+.App-header nav .nav-welcome {
+  background: transparent;
+  border: none;
+  color: #f0dba5;
+  padding: 0.5rem 0.4rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  box-shadow: none;
+  transition: all 0.3s ease;
+}
+.App-header nav .nav-welcome:hover { background: rgba(167, 219, 108, 0.2); color: #a7db6c; transform: none; }
+
+.guide-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(5, 8, 16, 0.78);
+  backdrop-filter: blur(2px);
+}
+
+.guide,
+.start-offer {
+  position: relative;
+  background: #1a1a2e;
+  border: 1px solid #2a2a5a;
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  color: #d8d2c4;
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+}
+.guide { width: min(1400px, 100%); padding: 1.25rem 1.5rem 1rem; }
+.start-offer { width: min(980px, 100%); padding: 1.5rem 1.75rem 1.25rem; }
+
+.guide h2, .start-offer h2 { color: #c3e88d; font-family: 'Cinzel', 'Times New Roman', serif; margin: 0; }
+.guide h3, .start-offer h3 { color: #f0dba5; font-family: 'Cinzel', 'Times New Roman', serif; margin: 0 0 0.5rem; }
+
+.guide-head { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; padding-right: 2.5rem; }
+.guide-head select { width: auto; min-width: 12rem; margin: 0; }
+
+.guide-close {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.75rem;
+  background: transparent;
+  color: #a09580;
+  font-size: 1.6rem;
+  line-height: 1;
+  padding: 0.25rem 0.5rem;
+}
+.guide-close:hover { color: #f0dba5; background: transparent; }
+
+.guide-body { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(16rem, 1fr); gap: 1.5rem; align-items: start; }
+@media (max-width: 900px) { .guide-body { grid-template-columns: 1fr; } }
+
+/* A tall page scrolls inside its own box, which follows the current section, so the dialog
+   and its tickbox always fit the window */
+.guide-shot { max-height: calc(100vh - 11rem); overflow: auto; border-radius: 6px; border: 1px solid #2a2a5a; }
+.guide-frame { position: relative; width: 100%; }
+.guide-frame img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+/* Every section is outlined faintly; the current one glows and pulses, with the rest of the
+   page dimmed around it */
+.guide-box {
+  position: absolute;
+  padding: 0;
+  background: transparent;
+  border: 1px dashed rgba(240, 219, 165, 0.35);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: box-shadow 0.4s ease, border-color 0.4s ease;
+}
+.guide-box:hover { background: rgba(195, 232, 141, 0.06); border-color: rgba(195, 232, 141, 0.6); }
+.guide-box.is-current {
+  border: 2px solid #c3e88d;
+  box-shadow: 0 0 0 9999px rgba(5, 8, 16, 0.55), 0 0 18px rgba(195, 232, 141, 0.55);
+  animation: guide-pulse 1.8s ease-in-out infinite;
+  z-index: 1;
+}
+@keyframes guide-pulse {
+  0%, 100% { box-shadow: 0 0 0 9999px rgba(5, 8, 16, 0.55), 0 0 10px 0 rgba(195, 232, 141, 0.45); }
+  50% { box-shadow: 0 0 0 9999px rgba(5, 8, 16, 0.55), 0 0 26px 6px rgba(195, 232, 141, 0.75); }
+}
+@media (prefers-reduced-motion: reduce) { .guide-box.is-current { animation: none; } }
+
+.guide-noshot { display: grid; place-content: center; min-height: 18rem; text-align: center; border: 1px dashed #2a2a5a; border-radius: 6px; }
+.guide-dim { color: #8a8270; font-size: 0.9rem; }
+
+.guide-intro { color: #a09580; font-style: italic; margin: 0 0 1rem; }
+.guide-section { animation: guide-in 0.35s ease; }
+@keyframes guide-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.guide-section p { margin: 0 0 0.9rem; line-height: 1.55; }
+.guide-section dl { margin: 0; }
+.guide-section dt { color: #c3e88d; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 0.6rem; }
+.guide-section dd { margin: 0.2rem 0 0; line-height: 1.5; }
+
+.guide-dots { display: flex; gap: 0.4rem; margin: 1.1rem 0 0.9rem; }
+.guide-dots span { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: #2a2a5a; }
+.guide-dots span.is-current { background: #c3e88d; }
+
+.guide-nav { display: flex; gap: 0.75rem; }
+.guide-nav button { flex: 1; }
+.guide-secondary { background: transparent; color: #f0dba5; border: 1px solid #4a4370; }
+.guide-secondary:hover:not(:disabled) { background: rgba(167, 219, 108, 0.12); }
+.guide-secondary:disabled { opacity: 0.4; cursor: default; }
+.guide-link { background: transparent; color: #a7db6c; padding: 0.5rem 0; margin-top: 0.75rem; font-size: 0.95rem; }
+.guide-link:hover { background: transparent; text-decoration: underline; }
+
+.guide-check { display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem; color: #a09580; font-size: 0.95rem; cursor: pointer; }
+.guide-check input { width: auto; margin: 0; }
+
+.start-offer-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 2rem; padding-right: 2rem; }
+.start-offer-quote { margin: 0; max-width: 55%; text-align: right; font-style: italic; color: #cdbb8a; line-height: 1.45; font-size: 0.95rem; }
+.start-offer-quote cite { display: block; margin-top: 0.3rem; font-style: normal; font-size: 0.85rem; color: #a09580; }
+@media (max-width: 720px) { .start-offer-head { flex-direction: column; gap: 0.75rem; } .start-offer-quote { max-width: none; text-align: left; } }
+.start-offer-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 1rem; border-top: 1px solid #2a2a5a; }
+.start-offer-part { padding: 1.1rem 0; display: flex; flex-direction: column; }
+.start-offer-part .guide-check { margin-top: auto; padding-top: 1rem; }
+.start-offer-part > button { align-self: flex-start; }
+@media (max-width: 720px) { .start-offer-columns { grid-template-columns: 1fr; gap: 0; } }
+.start-offer-part p { margin: 0 0 0.9rem; line-height: 1.55; }
+.start-offer-tip { border-left: 3px solid #c3e88d; padding-left: 0.9rem; }
+.start-offer-actions { display: flex; align-items: center; gap: 1rem; }
+.start-offer-actions .guide-link { margin-top: 0; }
+
+/* The welcome's type: a serif body, sentence case, for reading rather than the Cinzel of the rest */
+.start-offer.tone-a p, .start-offer.tone-a .start-offer-quote, .start-offer.tone-a .guide-check {
+  font-family: 'Georgia', 'Garamond', serif; letter-spacing: 0; text-transform: none;
+}
+.start-offer.tone-a .start-offer-part p { font-size: 1.02rem; line-height: 1.6; }
+.start-offer.tone-a .start-offer-quote { max-width: 46ch; font-size: 0.98rem; }
+.start-offer.tone-a .guide-check { font-size: 0.92rem; }
+
+/* The welcome's colours (tone A, parchment): gold display type, warm cream body, one green accent for actions */
+.start-offer.tone-a { background: #1c1b26; border-color: #3a3550; }
+.start-offer.tone-a h2 { color: #f0dba5; }
+.start-offer.tone-a h3 { color: #d9c48f; font-size: 1.05rem; letter-spacing: 0.06em; }
+.start-offer.tone-a p { color: #e6dfcf; }
+.start-offer.tone-a .start-offer-quote { color: #cdbb8a; }
+.start-offer.tone-a .start-offer-quote cite { color: #8f8670; font-family: 'Cinzel', serif; letter-spacing: 0.04em; }
+.start-offer.tone-a .start-offer-tip { border-left-color: #a7db6c; }
+.start-offer.tone-a .guide-check { color: #9d957f; }
+.start-offer.tone-a .guide-check input { accent-color: #a7db6c; }
+.start-offer.tone-a .start-offer-columns, .start-offer.tone-a .start-offer-head + * { border-top-color: #34304a; }

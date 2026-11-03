@@ -150,14 +150,14 @@ def extract_memory_artefacts(
                 "mac.malfind.Malfind",
                 "mac.mount.Mount",
                 "mac.netstat.Netstat",
-                "mac.proc_maps.Proc_maps",
+                "mac.proc_maps.Maps",
                 "mac.psaux.Psaux",
-                "mac.pslist.Pslist",
-                "mac.pstree.Pstree",
+                "mac.pslist.PsList",
+                "mac.pstree.PsTree",
                 "mac.socket_filters.Socket_filters",
                 "mac.timers.Timers",
                 "mac.trustedbsd.Trustedbsd",
-                "mac.vfsevents.Vfsevents",
+                "mac.vfsevents.VFSevents",
             ]
         else:
             volplugins = [
@@ -172,9 +172,9 @@ def extract_memory_artefacts(
                 "linux.lsmod.Lsmod",
                 "linux.lsof.Lsof",
                 "linux.malfind.Malfind",
-                "linux.proc.Proc",
-                "linux.pslist.Pslist",
-                "linux.pstree.Pstree",
+                "linux.proc.Maps",
+                "linux.pslist.PsList",
+                "linux.pstree.PsTree",
                 "linux.tty_check.tty_check",
             ]
         if memtimeline:

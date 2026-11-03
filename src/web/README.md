@@ -354,47 +354,7 @@ Both frontend and backend support hot reload in development mode:
 
 ## Production Deployment
 
-### Using Docker Compose (Production)
-
-1. **Update configuration**:
-   - Set `DEBUG=False` in `.env`
-   - Change `SECRET_KEY` to a secure random value
-   - Update `CORS_ORIGINS` to your production domain
-   - Configure reverse proxy (nginx/traefik)
-
-2. **Build production images**:
-   ```bash
-   docker-compose -f docker-compose.prod.yml build
-   ```
-
-3. **Start services**:
-   ```bash
-   docker-compose -f docker-compose.prod.yml up -d
-   ```
-
-### Reverse Proxy Example (nginx)
-
-```nginx
-server {
-    listen 80;
-    server_name elrond.example.com;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-
-    location /api/ {
-        proxy_pass http://localhost:5688;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
+A shared, production install is Rivendell's server profile: Caddy with TLS in front, sign-in on every route, and nothing else published. See [docs/SERVER.md](../../docs/SERVER.md) (`rivendell server init <hostname>`, then `rivendell start`).
 
 ## Support
 

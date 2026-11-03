@@ -1,6 +1,5 @@
 import axios from 'axios';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5688';
+import { API_BASE_URL } from './apiBase';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -84,8 +83,9 @@ export const resumeJob = async (jobId) => {
   return response.data;
 };
 
-export const restartJob = async (jobId) => {
-  const response = await api.post(`/api/jobs/${jobId}/restart`);
+// A job with findings answers 409 unless confirm is set: restarting rewrites the rows they point at
+export const restartJob = async (jobId, confirm = false) => {
+  const response = await api.post(`/api/jobs/${jobId}/restart`, null, { params: confirm ? { confirm: true } : {} });
   return response.data;
 };
 
@@ -124,8 +124,8 @@ export const bulkArchiveJobs = async (jobIds) => {
   return response.data;
 };
 
-export const bulkRestartJobs = async (jobIds) => {
-  const response = await api.post('/api/jobs/bulk/restart', jobIds);
+export const bulkRestartJobs = async (jobIds, confirm = false) => {
+  const response = await api.post('/api/jobs/bulk/restart', jobIds, { params: confirm ? { confirm: true } : {} });
   return response.data;
 };
 
@@ -181,6 +181,42 @@ export const logout = async () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('user');
   }
+};
+
+export const getAuthConfig = async () => {
+  const response = await api.get('/api/auth/config');
+  return response.data;
+};
+
+// After single sign-on the session is a cookie; trade it for the bearer token the rest
+// of the app keeps
+export const completeSsoSignIn = async () => {
+  const response = await api.post('/api/auth/session');
+  localStorage.setItem('access_token', response.data.access_token);
+  localStorage.setItem('user', JSON.stringify(response.data.user));
+  return response.data;
+};
+
+// Long-lived, revocable tokens for scripts and RIVENDELL_TOKEN (rivendell mcp), made from a sign-in.
+// The token itself comes back once, from createApiToken; the list has only its first characters
+export const listApiTokens = async () => (await api.get('/api/auth/tokens')).data.tokens;
+export const createApiToken = async (name, scope, days) =>
+  (await api.post('/api/auth/tokens', { name, scope, days })).data;
+export const revokeApiToken = async (id) => (await api.delete(`/api/auth/tokens/${id}`)).data;
+
+export const getJobSharing = async (jobId) => {
+  const response = await api.get(`/api/jobs/${jobId}/sharing`);
+  return response.data;
+};
+
+export const setJobSharing = async (jobId, usernames) => {
+  const response = await api.put(`/api/jobs/${jobId}/sharing`, { usernames });
+  return response.data;
+};
+
+export const getUserDirectory = async () => {
+  const response = await api.get('/api/auth/directory');
+  return response.data;
 };
 
 export const getCurrentUser = async () => {
@@ -316,3 +352,85 @@ export const getMordorLabLogs = async (engine, name) =>
   (await api.get('/api/mordor/lab/logs', { params: { engine, name } })).data;
 export const getMordorLabSteps = async (os) => (await api.get('/api/mordor/lab/provision-steps', { params: { os } })).data;
 export const postMordorLab = async (verb, body) => (await api.post(`/api/mordor/lab/${verb}`, body)).data;
+
+// Threat intelligence API
+export const getThreatIntelSummary = async () => {
+  const response = await api.get('/api/threat-intel');
+  return response.data;
+};
+
+export const searchThreatIntel = async (params = {}) => {
+  const response = await api.get('/api/threat-intel/indicators', { params });
+  return response.data;
+};
+
+export const importThreatIntel = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await api.post('/api/threat-intel/import', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+};
+
+export const importTaxii = async (request) => {
+  const response = await api.post('/api/threat-intel/taxii', request);
+  return response.data;
+};
+
+export const deleteThreatIntelSource = async (source) => {
+  const response = await api.delete(`/api/threat-intel/sources/${encodeURIComponent(source)}`);
+  return response.data;
+};
+
+// validUntil: an ISO date, or null for no expiry (admins, on a team server)
+export const setThreatIntelValidity = async (id, validUntil) =>
+  (await api.put(`/api/threat-intel/indicators/${id}/validity`, { valid_until: validUntil })).data;
+
+export const enrichValue = async (value) => {
+  const response = await api.get('/api/threat-intel/enrich', { params: { value } });
+  return response.data;
+};
+
+// Case browser and collaboration API
+const caseBase = (jobId) => `/api/jobs/${jobId}/case`;
+
+export const getCase = async (jobId) => (await api.get(caseBase(jobId))).data;
+
+export const getCaseRows = async (jobId, params) => (await api.get(`${caseBase(jobId)}/rows`, { params })).data;
+
+export const getFindings = async (jobId, verify = false) =>
+  (await api.get(`${caseBase(jobId)}/findings`, { params: { verify } })).data;
+
+export const flagFinding = async (jobId, finding) => (await api.post(`${caseBase(jobId)}/findings`, finding)).data;
+
+export const updateFinding = async (jobId, id, changes) =>
+  (await api.patch(`${caseBase(jobId)}/findings/${id}`, changes)).data;
+
+export const deleteFinding = async (jobId, id) => (await api.delete(`${caseBase(jobId)}/findings/${id}`)).data;
+
+export const getCaseNotes = async (jobId) => (await api.get(`${caseBase(jobId)}/notes`)).data;
+
+export const addCaseNote = async (jobId, body, findingId = null) =>
+  (await api.post(`${caseBase(jobId)}/notes`, { body, finding_id: findingId })).data;
+
+export const assignHost = async (jobId, host, changes) =>
+  (await api.put(`${caseBase(jobId)}/hosts/${encodeURIComponent(host)}`, changes)).data;
+
+export const getCaseActivity = async (jobId, since = 0) =>
+  (await api.get(`${caseBase(jobId)}/activity`, { params: { since } })).data;
+
+export const getCaseReport = async (jobId) =>
+  (await api.get(`${caseBase(jobId)}/report`, { responseType: 'text' })).data;
+
+export const getConfirmedLayer = async (jobId) => (await api.get(`${caseBase(jobId)}/layer`)).data;
+
+// How many findings a job's case has (0 when it has no output to flag yet): restarting rewrites the
+// rows they point at, so the restart buttons warn first
+export const countFindings = async (jobId) => {
+  try {
+    return (await getFindings(jobId)).length;
+  } catch {
+    return 0;
+  }
+};

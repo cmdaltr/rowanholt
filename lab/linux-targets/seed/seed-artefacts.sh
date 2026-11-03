@@ -101,6 +101,9 @@ chown -R gandalf:gandalf "$H" 2>/dev/null || chown -R gandalf "$H"
 chmod 700 "$H/.ssh"
 chmod 600 "$H/.ssh/authorized_keys"
 
+# A Docker host's and a Kubernetes node's state on disk, nothing running
+sh "$(dirname "$0")/seed-containers.sh"
+
 # Ground truth for the E2E checks (copied off the target by lab.sh).
 cat > /etc/rivendell-lab/expected.json <<'EOF'
 {
@@ -123,8 +126,17 @@ cat > /etc/rivendell-lab/expected.json <<'EOF'
     {"path": "/var/tmp/.lab-elf", "cooked": "tmp_executables.csv"},
     {"path": "/var/log/btmp", "attack": "T1110.001", "cooked": "login_records.csv", "expect": ["198.51.100.77"]},
     {"path": "/home/gandalf/.mysql_history", "cooked": "shell_histories.csv", "expect": ["wp_users"]},
-    {"path": "/home/gandalf/.viminfo", "cooked": "viminfo.csv", "expect": ["/etc/shadow"]}
+    {"path": "/home/gandalf/.viminfo", "cooked": "viminfo.csv", "expect": ["/etc/shadow"]},
+    {"path": "/var/lib/docker/containers/4f1c9e2ab3d7c0de5eedfacade1b0b0c4f1c9e2ab3d7c0de5eedfacade1b0b0c/config.v2.json", "attack": "T1611", "cooked": "docker_containers.csv", "expect": ["container runtime socket mounted"]},
+    {"path": "/var/lib/docker/containers/4f1c9e2ab3d7c0de5eedfacade1b0b0c4f1c9e2ab3d7c0de5eedfacade1b0b0c/4f1c9e2ab3d7c0de5eedfacade1b0b0c4f1c9e2ab3d7c0de5eedfacade1b0b0c-json.log", "cooked": "container_logs.csv", "expect": ["c2.rivendell-lab.test"]},
+    {"path": "/var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db", "attack": "T1611", "cooked": "docker_containers.csv", "expect": ["containerd", "lab-escape", "host PID namespace"]},
+    {"path": "/var/lib/containers/storage/db.sql", "attack": "T1611", "cooked": "docker_containers.csv", "expect": ["podman", "lab-sock", "container runtime socket mounted (/run/podman/podman.sock)"]},
+    {"artefact": "container writable layer", "attack": "T1105", "cooked": "container_changes.csv", "expect": ["/tmp/.x/lab-miner", "cron changed"]},
+    {"path": "/etc/kubernetes/manifests/lab-node-agent.yaml", "attack": "T1543.005", "cooked": "static_pods.csv"},
+    {"path": "/var/log/pods/payments_api-7d9f_0b1c/api/0.log", "cooked": "container_logs.csv", "expect": ["payments"]},
+    {"path": "/var/log/kubernetes/audit/audit.log", "attack": "T1552.007", "cooked": "k8s_audit.csv", "expect": ["T1609", "T1098.006"]}
   ],
-  "iocs": ["198.51.100.23", "198.51.100.77", "c2.rivendell-lab.test", "update.rivendell-lab.test"]
+  "iocs": ["198.51.100.23", "198.51.100.77", "c2.rivendell-lab.test", "update.rivendell-lab.test"],
+  "stacking": ["lab-sync.service", "lab-agent.service", "lab updater"]
 }
 EOF

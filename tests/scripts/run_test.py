@@ -712,7 +712,7 @@ MEMORY_TESTS = [
             "analysis": True,
             "memory": True,
         },
-        expected_outputs=["artefacts/cooked/", "memory_linux.info.Info.json"],
+        expected_outputs=["artefacts/cooked/", "linux.pslist.PsList.json"],
         tags=["linux", "memory", "disk", "combined"],
         estimated_duration_minutes=45,
     ),
@@ -1057,7 +1057,7 @@ LINUX_TESTS = [
         options={
             "memory": True,
         },
-        expected_outputs=["memory_linux.info.Info.json"],
+        expected_outputs=["linux.pslist.PsList.json"],
         tags=["linux", "memory"],
         estimated_duration_minutes=30,
     ),

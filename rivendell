@@ -19,7 +19,10 @@ usage() {
 Usage: rivendell <command> [options]
 
 The platform (Docker):
-  start | stop | restart | status   Run the stack (--testing: no Splunk/Elastic; --logs: follow logs)
+  start | stop | restart | status   Run the stack (--testing: no Splunk/Elastic; --logs: follow logs;
+                                    --server: the shared-server profile, automatic after 'server init';
+                                    --progress[=zenity]: phases and an ETA, waiting for the web UI)
+  server init|users|ca              A team server: TLS proxy, sign-in, per-user jobs (docs/SERVER.md)
   anduril <command>                 Administer Rivendell's containers (status, logs, restart, ...)
 
 Forensics (run from the directory you're working in; relative paths stay relative):
@@ -28,6 +31,8 @@ Forensics (run from the directory you're working in; relative paths stay relativ
   analyse <args>                    Elrond (rivendell analyse --help); 'analyze' works too
   mordor <command>                  Security datasets: list, download, info, local, verify, ...
   web                               The web UI and API without Docker
+  mcp                               Eru's MCP server over stdio, for Claude Desktop, Claude Code and the like
+                                    (RIVENDELL_API, RIVENDELL_TOKEN; needs requirements/mcp.txt; docs/ERU.md)
 
 The lab and the scripts:
   lab <command>                     The test lab (lab/lab.sh: linux-targets, windows-vm, gandalf-collect, ...)
@@ -37,6 +42,7 @@ The lab and the scripts:
 Set-up:
   install [dir]                     Link this command into dir (default ~/.local/bin) to run it from anywhere
   uninstall [dir]                   Remove that link
+  app [install|uninstall] [--dock]  The desktop app: Rivendell.app (macOS) or a menu entry (Linux)
   map [realm|elrond|gandalf|journey] Open an architecture page (journey is the 3D one)
   help                              This list
 
@@ -61,23 +67,44 @@ detect_compose() {
     fi
 }
 
+# Starts the engine the current Docker context points at (OrbStack or Docker Desktop),
+# headless: no window, nothing new in the Dock. One that's already starting is waited
+# for, not joined by the other.
+start_docker_engine() {
+    local context engine=""
+    context="$(docker context show 2>/dev/null)"
+    case "$context" in
+        orbstack) engine=orbstack ;;
+        desktop-linux) engine=desktop ;;
+    esac
+    if [ -z "$engine" ]; then
+        if pgrep -q com.docker.backend; then engine=desktop
+        elif [ -d /Applications/OrbStack.app ] || command -v orb &>/dev/null; then engine=orbstack
+        else engine=desktop
+        fi
+    fi
+    if [ "$engine" = orbstack ]; then
+        echo "Starting OrbStack..."
+        # orb start runs the engine without the app's window
+        orb start &>/dev/null || open -g -j -a OrbStack
+    else
+        echo "Starting Docker Desktop..."
+        if pgrep -q com.docker.backend; then
+            echo "(already starting; waiting for it)"
+        else
+            docker desktop start --detach &>/dev/null || open -g -j -a Docker
+        fi
+    fi
+}
+
 ensure_docker() {
     if docker info &>/dev/null; then
         return 0
     fi
     echo "Docker is not running."
     if [[ "$(uname)" == "Darwin" ]]; then
-        # Prefer OrbStack, fall back to Docker Desktop
-        if command -v orb &>/dev/null; then
-            echo "Starting OrbStack..."
-            open -a OrbStack
-        elif open -a OrbStack &>/dev/null; then
-            echo "Starting OrbStack..."
-        else
-            echo "Starting Docker Desktop..."
-            open -a Docker
-        fi
-        for i in $(seq 1 60); do
+        start_docker_engine
+        for i in $(seq 1 180); do
             sleep 1
             if docker info &>/dev/null; then
                 echo "Docker started."
@@ -94,6 +121,16 @@ ensure_docker() {
 
 print_urls() {
     echo ""
+    if $SERVER; then
+        local host
+        host="$(sed -n 's/^RIVENDELL_HOSTNAME=//p' "$ROOT/.env" | tail -1)"
+        echo "  Rivendell:     https://$host"
+        echo "  Splunk, Kibana, Navigator (with COMPOSE_PROFILES=siem): https://$host:7755, :5601, :5602"
+        echo ""
+        echo "  Users: 'rivendell server users list'. Nothing else is published."
+        echo ""
+        return
+    fi
     if $TESTING; then
         echo "  Frontend:    http://localhost:5687"
         echo "  Backend API: http://localhost:5688"
@@ -118,10 +155,17 @@ stack() {
     shift
     TESTING=false
     FOLLOW_LOGS=false
+    SERVER=false
+    PROGRESS=""
+    # `rivendell server init` marks a server in .env; --server asks for it explicitly
+    grep -q '^RIVENDELL_DEPLOYMENT=server' "$ROOT/.env" 2>/dev/null && SERVER=true
     for arg in "$@"; do
         case "$arg" in
             --testing) TESTING=true ;;
             --logs)    FOLLOW_LOGS=true ;;
+            --server)  SERVER=true ;;
+            --progress) PROGRESS=json ;;
+            --progress=zenity) PROGRESS=zenity ;;
             *)
                 echo "Error: unknown argument: $arg" >&2
                 exit 1
@@ -133,13 +177,28 @@ stack() {
     if $TESTING; then
         COMPOSE_FILES="$COMPOSE_FILES -f tests/docker-compose.testing.yml"
     fi
+    if $SERVER; then
+        server_preflight
+        COMPOSE_FILES="$COMPOSE_FILES -f deploy/server/docker-compose.server.yml"
+    fi
+    # Evidence folders added in the desktop app's setup (gitignored, so a pull never touches it)
+    if [ -f "$ROOT/docker-compose.local.yml" ]; then
+        COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.local.yml"
+    fi
+    if [ "$command" = start ] && [ -n "$PROGRESS" ] && progress_python; then
+        start_with_progress
+        return
+    fi
     ensure_docker
     case "$command" in
         start)
             echo "Starting Rivendell..."
-            compose_cmd up -d
+            prepare_app_copy
+            compose_cmd up -d $BUILD_FLAG || exit 1
+            [ -n "$BUILD_FLAG" ] && cat "$ROOT/.rivendell-version" > "$ROOT/.rivendell-built"
             print_urls
-            $FOLLOW_LOGS && compose_cmd logs -f
+            # Not `$FOLLOW_LOGS && ...`: without --logs that leaves start's exit status at 1
+            if $FOLLOW_LOGS; then compose_cmd logs -f; fi
             ;;
         stop)
             echo "Stopping Rivendell..."
@@ -156,6 +215,67 @@ stack() {
             compose_cmd ps
             ;;
     esac
+}
+
+# start --progress: src/common/startup_progress.py wakes Docker, starts the stack and
+# waits for the web UI, timing each phase against this machine's earlier starts for the
+# ETA (Rivendell.app's journey; zenity on Linux)
+progress_python() {
+    command -v "$PYTHON" &>/dev/null || return 1
+    # On a Mac without the command-line tools, /usr/bin/python3 is a stub that opens an installer
+    if [[ "$(uname)" == "Darwin" ]] && [ "$(command -v "$PYTHON")" = /usr/bin/python3 ] && ! xcode-select -p &>/dev/null; then
+        return 1
+    fi
+}
+
+start_with_progress() {
+    local url="http://localhost:5687" status
+    $SERVER && url="https://localhost"
+    prepare_app_copy
+    local args=(--root "$ROOT" --url "$url")
+    [ -n "$BUILD_FLAG" ] && args+=(--build)
+    $SERVER && args+=(--server)
+    [ "$PROGRESS" = zenity ] && args+=(--zenity)
+    # shellcheck disable=SC2086 # DC and COMPOSE_FILES are word lists
+    "$PYTHON" "$ROOT/src/common/startup_progress.py" "${args[@]}" -- $DC $COMPOSE_FILES
+    status=$?
+    [ $status -eq 0 ] || exit $status
+    [ -n "$BUILD_FLAG" ] && cat "$ROOT/.rivendell-version" > "$ROOT/.rivendell-built"
+    [ "$PROGRESS" = zenity ] || print_urls
+}
+
+# The server profile resets the base file's published ports with !reset (Compose 2.24)
+server_preflight() {
+    local version major minor
+    version="$($DC version --short 2>/dev/null | sed 's/^v//')"
+    major="${version%%.*}"; minor="${version#*.}"; minor="${minor%%.*}"
+    if [ "${major:-0}" -lt 2 ] || { [ "$major" -eq 2 ] && [ "${minor:-0}" -lt 24 ]; }; then
+        echo "Error: the server profile needs Docker Compose 2.24 or later (this is ${version:-unknown})." >&2
+        exit 1
+    fi
+    if ! grep -q '^RIVENDELL_HOSTNAME=' "$ROOT/.env" 2>/dev/null; then
+        echo "Error: this isn't set up as a server yet. Run: rivendell server init <hostname>" >&2
+        exit 1
+    fi
+}
+
+# A copy the desktop app installed (not a git clone) carries .rivendell-version. It gets
+# a .env with its own SECRET_KEY on first start, and its images are rebuilt once after
+# each update, since the worker image copies the source in at build time.
+prepare_app_copy() {
+    BUILD_FLAG=""
+    [ -f "$ROOT/.rivendell-version" ] || return 0
+    if [ ! -f "$ROOT/.env" ] && [ -f "$ROOT/.env.example" ]; then
+        local key
+        key="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
+        sed "s/^SECRET_KEY=.*/SECRET_KEY=$key/" "$ROOT/.env.example" > "$ROOT/.env"
+        chmod 600 "$ROOT/.env"
+        echo "Created .env with a new SECRET_KEY."
+    fi
+    if [ "$(cat "$ROOT/.rivendell-version")" != "$(cat "$ROOT/.rivendell-built" 2>/dev/null)" ]; then
+        echo "New Rivendell version: rebuilding the images (this takes a while)..."
+        BUILD_FLAG="--build"
+    fi
 }
 
 # ── Scripts under scripts/ ────────────────────────────────────────────────────
@@ -238,6 +358,33 @@ uninstall_link() {
     fi
 }
 
+# The desktop app: app/macos builds Rivendell.app, app/linux installs a desktop entry;
+# on Windows it's app/windows/install.ps1, run from PowerShell
+desktop_app() {
+    local action="${1:-install}"
+    [ $# -gt 0 ] && shift
+    case "$action" in
+        install|uninstall) ;;
+        *) echo "Usage: rivendell app [install|uninstall] [--dock] [dir]" >&2; return 1 ;;
+    esac
+    case "$(uname -s)" in
+        Darwin)
+            if [ "$action" = uninstall ]; then
+                exec bash "$ROOT/app/macos/build.sh" --uninstall "$@"
+            fi
+            exec bash "$ROOT/app/macos/build.sh" "$@" ;;
+        Linux)
+            if [ "$action" = uninstall ]; then
+                exec bash "$ROOT/app/linux/install.sh" --uninstall
+            fi
+            exec bash "$ROOT/app/linux/install.sh" ;;
+        *)
+            echo "On Windows, from PowerShell:" >&2
+            echo "  powershell -ExecutionPolicy Bypass -File \"$ROOT/app/windows/install.ps1\"" >&2
+            return 1 ;;
+    esac
+}
+
 open_map() {
     local dir="$ROOT/src/web/frontend/public/architecture" page
     case "${1:-realm}" in
@@ -271,6 +418,7 @@ case "$COMMAND" in
     install) install_link "$@" ;;
     uninstall) uninstall_link "$@" ;;
     map) open_map "$@" ;;
+    app) desktop_app "$@" ;;
     where) echo "$ROOT" ;;
     lab) exec "$ROOT/lab/lab.sh" "$@" ;;
     gandalf)
@@ -284,6 +432,8 @@ case "$COMMAND" in
     analyse|analyze) exec "$PYTHON" "$ROOT/src/cli/rivendell.py" analyze "$@" ;;
     anduril|aragorn) exec "$PYTHON" "$ROOT/src/cli/rivendell.py" anduril "$@" ;;
     mordor) exec "$PYTHON" "$ROOT/src/cli/mordor.py" "$@" ;;
+    # stdout is the MCP protocol: nothing else may print to it
+    mcp) PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}" exec "${RIVENDELL_MCP_PYTHON:-$PYTHON}" -m eru_mcp.server "$@" ;;
     scripts) list_scripts ;;
     *)
         if [ -d "$ROOT/scripts/$COMMAND" ] && [ -z "${1:-}" ]; then

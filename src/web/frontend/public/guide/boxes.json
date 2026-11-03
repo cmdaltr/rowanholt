@@ -1,0 +1,364 @@
+{
+ "home": {
+  "image": "home.jpg",
+  "width": 1440,
+  "height": 2209,
+  "boxes": {
+   "home.hero": [
+    30,
+    0,
+    1379,
+    552
+   ],
+   "home.journeys": [
+    30,
+    536,
+    1379,
+    1050
+   ],
+   "home.mordor": [
+    30,
+    1639,
+    1379,
+    547
+   ]
+  }
+ },
+ "gandalf": {
+  "image": "gandalf.jpg",
+  "width": 1440,
+  "height": 597,
+  "boxes": {
+   "gandalf.case": [
+    54,
+    24,
+    1332,
+    97
+   ],
+   "gandalf.config": [
+    54,
+    121,
+    1332,
+    79
+   ],
+   "gandalf.hosts": [
+    54,
+    223,
+    1332,
+    97
+   ],
+   "gandalf.options": [
+    54,
+    321,
+    1332,
+    64
+   ],
+   "gandalf.command": [
+    54,
+    415,
+    1332,
+    159
+   ]
+  }
+ },
+ "elrond": {
+  "image": "elrond.jpg",
+  "width": 1440,
+  "height": 1139,
+  "boxes": {
+   "elrond.case": [
+    54,
+    24,
+    654,
+    74
+   ],
+   "elrond.source": [
+    731,
+    24,
+    654,
+    74
+   ],
+   "elrond.browse": [
+    54,
+    121,
+    1332,
+    365
+   ],
+   "elrond.options": [
+    54,
+    509,
+    1332,
+    605
+   ]
+  }
+ },
+ "jobs": {
+  "image": "jobs.jpg",
+  "width": 1440,
+  "height": 314,
+  "boxes": {
+   "jobs.filters": [
+    54,
+    24,
+    285,
+    46
+   ],
+   "jobs.table": [
+    54,
+    85,
+    1332,
+    205
+   ]
+  }
+ },
+ "job": {
+  "image": "job.jpg",
+  "width": 1440,
+  "height": 1146,
+  "boxes": {
+   "job.actions": [
+    772,
+    24,
+    614,
+    46
+   ],
+   "job.info": [
+    54,
+    99,
+    1332,
+    47
+   ],
+   "job.progress": [
+    54,
+    162,
+    1332,
+    52
+   ],
+   "job.sources": [
+    54,
+    469,
+    654,
+    130
+   ],
+   "job.options": [
+    731,
+    469,
+    654,
+    130
+   ],
+   "job.sharing": [
+    54,
+    222,
+    1332,
+    194
+   ],
+   "job.log": [
+    54,
+    630,
+    1332,
+    492
+   ]
+  }
+ },
+ "eru": {
+  "image": "eru.jpg",
+  "width": 1440,
+  "height": 823,
+  "boxes": {
+   "eru.help": [
+    54,
+    24,
+    1332,
+    202
+   ],
+   "eru.case": [
+    54,
+    241,
+    1332,
+    71
+   ],
+   "eru.chat": [
+    54,
+    335,
+    1332,
+    57
+   ],
+   "eru.quick": [
+    54,
+    407,
+    1332,
+    323
+   ],
+   "eru.ask": [
+    54,
+    753,
+    1332,
+    46
+   ]
+  }
+ },
+ "mordor": {
+  "image": "mordor.jpg",
+  "width": 1440,
+  "height": 1500,
+  "boxes": {
+   "mordor.tiles": [
+    30,
+    24,
+    1379,
+    91
+   ],
+   "mordor.generate": [
+    30,
+    150,
+    1379,
+    1051
+   ],
+   "mordor.recorded": [
+    30,
+    1246,
+    1379,
+    2992
+   ]
+  }
+ },
+ "archive": {
+  "image": "archive.jpg",
+  "width": 1440,
+  "height": 332,
+  "boxes": {
+   "archive.list": [
+    30,
+    24,
+    1379,
+    284
+   ]
+  }
+ },
+ "account": {
+  "image": "account.jpg",
+  "width": 1440,
+  "height": 543,
+  "boxes": {
+   "account.settings": [
+    30,
+    24,
+    1379,
+    495
+   ]
+  }
+ },
+ "aragorn": {
+  "image": "aragorn.jpg",
+  "width": 1440,
+  "height": 1347,
+  "boxes": {
+   "aragorn.tabs": [
+    30,
+    24,
+    1379,
+    50
+   ],
+   "aragorn.lab": [
+    30,
+    600,
+    1379,
+    722
+   ]
+  }
+ },
+ "aragorn-settings": {
+  "image": "aragorn-settings.jpg",
+  "width": 1440,
+  "height": 297,
+  "boxes": {
+   "aragorn.anduril": [
+    30,
+    24,
+    1379,
+    249
+   ]
+  }
+ },
+ "about": {
+  "image": "about.jpg",
+  "width": 1440,
+  "height": 1500,
+  "boxes": {
+   "about.docs": [
+    30,
+    24,
+    1379,
+    1589
+   ]
+  }
+ },
+ "case": {
+  "image": "case.jpg",
+  "width": 1440,
+  "height": 1500,
+  "boxes": {
+   "case.hosts": [
+    30,
+    24,
+    341,
+    494
+   ],
+   "case.table": [
+    387,
+    24,
+    1023,
+    321
+   ],
+   "case.findings": [
+    30,
+    564,
+    1379,
+    561
+   ],
+   "case.notes": [
+    30,
+    1171,
+    682,
+    582
+   ],
+   "case.activity": [
+    728,
+    1171,
+    682,
+    456
+   ]
+  }
+ },
+ "intel": {
+  "image": "intel.jpg",
+  "width": 1440,
+  "height": 1500,
+  "boxes": {
+   "intel.sources": [
+    30,
+    24,
+    1379,
+    217
+   ],
+   "intel.import": [
+    30,
+    286,
+    1379,
+    314
+   ],
+   "intel.enrich": [
+    30,
+    646,
+    1379,
+    150
+   ],
+   "intel.browse": [
+    30,
+    841,
+    1379,
+    3043
+   ]
+  }
+ }
+}

@@ -180,7 +180,7 @@ box(MX + 20, MY + 440, 330, 286, "Gandalf <span class='sub'>acquisition</span>",
 
 box(MX + 250, MY + 70, 360, 168, "Web UI and API <span class='sub'>:5687 · :5688</span>",
     "React front end and FastAPI back end: start jobs, upload or pick images, watch progress, read results, "
-    "Ask Eru. Users and roles; admins also see Aragorn.",
+    "Ask Eru, Pippin (threat intelligence), shared findings. Admins also see Aragorn.",
     TEAL, kicker="The Prancing Pony, Bree")
 
 box(MX + 400, MY + 530, 330, 196, "Elrond worker <span class='sub'>Celery</span>",
@@ -221,9 +221,9 @@ steps = [
     ("01", "Identify and mount", "E01, VMDK, raw and dd images; memory; Gandalf archives (checked, extracted, "
      "laid out); Mordor datasets; cloud logs"),
     ("02", "Collect", "Per OS: hives, event logs, $MFT and journals; launchd, BTM, unified logs; cron, systemd, "
-     "PAM, logins. Shadow copies too."),
+     "PAM, logins, containers. Shadow copies too."),
     ("03", "Process", "Parsers and tools turn raw artefacts into cooked CSV and JSON with a LastWriteTime column"),
-    ("04", "Analyse", "Keywords, YARA, IOC extraction, timestomping, ADS, masquerading, misplaced binaries"),
+    ("04", "Analyse", "Keywords, YARA, IOCs, threat intelligence, stacking across hosts, timestomping, ADS, masquerading"),
     ("05", "ATT&amp;CK", "Techniques tagged from artefacts and event-log rules; Navigator layer"),
     ("06", "Timeline", "Plaso super-timeline across every source"),
     ("07", "Export", "Splunk, Elastic, case archive with hashes"),
@@ -251,10 +251,10 @@ inputs = [
     ("Windows hosts", "Event logs, registry and hives with logs, $MFT, $UsnJrnl, Prefetch, SRUM, Amcache, "
      "tasks, BITS, Search, Defender, browsers, memory", ["windows"], GREEN),
     ("Linux hosts", "Logs, journal, cron, systemd, PAM, sudoers, logins, histories, web roots, kernel modules, "
-     "memory (AVML)", ["linux"], GREEN),
+     "Docker and Kubernetes node state, memory (AVML)", ["linux"], GREEN),
     ("macOS hosts", "launchd and BTM items, unified-log export, TCC, KnowledgeC, quarantine, ExecPolicy, "
      "XProtect, Biome, browsers", ["macos"], GREEN),
-    ("Cloud", "AWS, Azure and GCP: instances, disk snapshots, CloudTrail and activity logs", ["aws", "azure"], GREEN),
+    ("Cloud", "AWS, Azure and GCP: instances, disk snapshots, CloudTrail and activity logs; Kubernetes audit logs", ["aws", "azure"], GREEN),
     ("Disk and memory images", "E01, VMDK, raw and dd, VHD(X); memory dumps, hiberfil, pagefile. "
      "Straight to Elrond, no Gandalf needed.", [], TEAL),
 ]
@@ -267,12 +267,13 @@ for i, (t, body, icons, col) in enumerate(inputs):
 parts.append(f'<div class="column-title" style="left:2160px;top:172px;width:360px">What Returns'
              f'<div class="column-sub">what the analyst gets</div></div>')
 outputs = [
-    ("Case directory", "raw/ as collected, cooked/ CSV and JSON per artefact, analysis/ (IOCs, findings), "
+    ("Case directory", "raw/ as collected, cooked/ CSV and JSON per artefact, analysis/ (IOCs, threat intelligence matches), "
      "audit log of every step", GOLD),
     ("ATT&amp;CK Navigator", "A layer of every technique tagged in the case, served by the bundled Navigator", GOLD),
     ("Timeline", "One Plaso super-timeline of every source, also indexed into Splunk or Kibana", GOLD),
     ("Dashboards", "Splunk app and Kibana dashboards over the same cooked data", RUST),
-    ("Answers", "Eru: case summaries and suggestions with a model; exact answers from the files without one",
+    ("Answers and findings", "Eru: case summaries and suggestions with a model; exact answers from the files "
+     "without one. Findings the team confirmed in the case browser, as a report and a layer",
      VIOLET),
 ]
 oys = []
@@ -376,7 +377,7 @@ arrivals = [
     ("Memory images", "Raw dumps, AFF4, hiberfil.sys, pagefile.sys, MEMORY.DMP, a VM's .vmem.", []),
     ("Gandalf archives", "Per-host archives from all three collectors, encrypted or not.", []),
     ("Event datasets", "OTRF Security-Datasets (Mordor) and the lab's own recordings of Atomic tests.", []),
-    ("Cloud", "Instances' disk snapshots, CloudTrail and activity logs from AWS, Azure and GCP.", ["aws", "azure"]),
+    ("Cloud", "Instances' disk snapshots, CloudTrail and activity logs from AWS, Azure and GCP; Kubernetes audit logs.", ["aws", "azure"]),
 ]
 ay = []
 for i, (t, body, icons) in enumerate(arrivals):
@@ -408,10 +409,10 @@ lanes = [
      "userassist; hiberfil.sys and MEMORY.DMP read as memory."),
     ("Linux", "The North-way", 545,
      ("/etc (passwd, group, shadow, sudoers, PAM, preload, profile), /var/log and the journal, cron, systemd units and "
-      "generators, utmp/wtmp/btmp, wtmpdb and lastlog2, udev, autostart, web roots, histories."),
+      "generators, utmp/wtmp/btmp, wtmpdb and lastlog2, udev, autostart, web roots, histories, Docker and Kubernetes."),
      ("Logs, services and groups to CSV; logins and failed logins; PAM, sudoers and preload flagged; udev, desktop "
       "and user units; kernel modules without a file; executables in /tmp and /dev/shm; web shells; bash, zsh and "
-      "vim histories."),
+      "vim histories; containers flagged for what they can reach."),
      "linux.pslist, pstree, bash, lsof, malfind, lsmod, check_modules, check_syscall, check_idt, check_creds, "
      "tty_check."),
     ("macOS", "The Elven-path", 890,
@@ -468,7 +469,8 @@ parts.append(f'<div class="column-title" style="left:{sx}px;top:172px;width:{sw}
              f'<div class="column-sub">every host, whichever road it came by</div></div>')
 stages = [
     ("Analyse", "Keyword and YARA searches, IOC extraction, timestomping and alternate data streams in $MFT, "
-     "masquerading and misplaced binaries, NSRL matching."),
+     "masquerading and misplaced binaries, NSRL matching. <code>--threatIntel</code> matches the case and ranks "
+     "groups by what matched; stacking ranks what few of the hosts have, with its reasons."),
     ("ATT&amp;CK", "Techniques tagged from artefacts, event-log rules and Mordor datasets into "
      "<code>mitre_techniques.txt</code>; a Navigator layer."),
     ("Timeline", "<b>Plaso</b> (psteal) builds one super-timeline across every source of a host."),

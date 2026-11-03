@@ -232,6 +232,12 @@ def test_all_host_names_includes_vms_outside_archer(monkeypatch):
 
 # --- UTM engine (Windows/Linux VMs via QEMU; utmctl-driven, create is manual) ---
 
+@pytest.fixture(autouse=True)
+def no_utm_launch(monkeypatch):
+    """utm_up would really open UTM on a Mac: never in tests."""
+    monkeypatch.setattr("src.mordor.lab.engines.utm_up", lambda: None)
+
+
 def test_parse_utm_list_reads_the_table_and_marks_running():
     out = ("UUID                                  Status   Name\n"
            "11111111-1111-1111-1111-111111111111  started  archer-win11\n"
@@ -262,7 +268,7 @@ def test_utm_clone_uses_utmctl(monkeypatch):
     calls = []
     monkeypatch.setattr("src.mordor.lab.engines.run", lambda argv, **k: calls.append(list(argv)) or "")
     engines.UTM().clone("archer-win11", "archer-win11-2")
-    assert ["utmctl", "clone", "archer-win11", "--name", "archer-win11-2"] in calls
+    assert ["utmctl", "clone", "--hide", "archer-win11", "--name", "archer-win11-2"] in calls
 
 
 def test_machines_clone_carries_the_source_os(monkeypatch, tmp_path):

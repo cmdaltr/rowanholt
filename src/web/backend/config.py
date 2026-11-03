@@ -83,9 +83,46 @@ class Settings(BaseSettings):
     max_concurrent_analyses: int = 3
     analysis_timeout: int = 86400  # 24 hours
 
+    # Server mode (RIVENDELL_SERVER_MODE, set by deploy/server): one Rivendell shared by a
+    # team. Every API route outside sign-in needs a user, each job is visible to its owner,
+    # the people it's shared with and admins, sign-up and guest access are off, and the
+    # first admin's password comes from RIVENDELL_ADMIN_PASSWORD. Off (the default), the
+    # API stays open to whoever reaches it, as on an analyst's own machine.
+    rivendell_server_mode: bool = False
+    rivendell_admin_password: str = ""
+    # The URL people open, e.g. https://rivendell.example.org (CORS, cookies, OIDC redirects)
+    rivendell_public_url: str = ""
+    # More places evidence may be read from and written to, separated by commas, as the
+    # containers see them (a server's evidence share mounted at /srv/evidence, say)
+    rivendell_evidence_paths: str = ""
+
+    # Password sign-in alongside single sign-on; turn off to make the IdP the only way in
+    rivendell_local_login: bool = True
+
+    # Single sign-on (OpenID Connect): on when issuer, client ID and secret are all set
+    oidc_issuer: str = ""
+    oidc_client_id: str = ""
+    oidc_client_secret: str = ""
+    oidc_display_name: str = "single sign-on"
+    oidc_scopes: str = "openid profile email"
+    oidc_groups_claim: str = "groups"
+    oidc_admin_group: str = ""  # members become Rivendell admins
+    oidc_allowed_group: str = ""  # when set, only its members may sign in
+
+    @property
+    def oidc_enabled(self) -> bool:
+        """Whether single sign-on is configured."""
+        return bool(self.oidc_issuer and self.oidc_client_id and self.oidc_client_secret)
+
     @property
     def allowed_paths(self) -> list:
-        """Get OS-specific allowed directories for file browsing."""
+        """Directories evidence may come from and output go to: this OS's defaults, plus
+        RIVENDELL_EVIDENCE_PATHS."""
+        extra = [path.strip() for path in self.rivendell_evidence_paths.split(",") if path.strip()]
+        return self._default_paths() + [path for path in extra if path.startswith("/") or ":" in path]
+
+    def _default_paths(self) -> list:
+        """This OS's default places for evidence."""
         system = platform.system()
 
         if system == "Windows":
@@ -152,6 +189,10 @@ def _persistent_secret_key() -> str:
 
 if settings.secret_key in ("", DEFAULT_SECRET_KEY):
     settings.secret_key = _persistent_secret_key()
+
+# A server answers only its own origin; a local stack keeps the localhost list
+if settings.rivendell_server_mode and settings.rivendell_public_url:
+    settings.cors_origins = [settings.rivendell_public_url.rstrip("/")]
 
 # Create necessary directories
 settings.upload_dir.mkdir(parents=True, exist_ok=True)

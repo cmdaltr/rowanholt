@@ -29,6 +29,7 @@ Gandalf (acquisition) → Elrond (analysis) → Eru (AI analyst)
 - AI analyst: **Eru**
 - Administration: **Aragorn**; its Docker manager: **Andúril** (`anduril` in code)
 - Attack datasets and the lab's recordings: **Mordor**
+- Threat intelligence (the web app's page): **Pippin**, who looked into the palantír
 - All Tolkien names are intentional and load-bearing for docs, CLI output, and logging
 
 ## Layout
@@ -39,10 +40,15 @@ Gandalf (acquisition) → Elrond (analysis) → Eru (AI analyst)
 | `src/acquisition/` | Gandalf: `bash/gandalf.sh`, `python/gandalf.py` + `collect_artefacts-py`, `windows/Invoke-Gandalf.ps1` + `Set-ArtefactCollection` |
 | `src/analysis/elrond.py`, `src/analysis/rivendell/` | Elrond: `core/` (incl. Gandalf ingest and manifest check), `collect/`, `process/`, `analysis/`, `memory/`, `post/` (Splunk, Elastic, ATT&CK), `cloud/`, `ai/` (Eru's CLI) |
 | `src/analysis/tools/definitions.py` | Forensic tool definitions (executables, paths, platforms) |
-| `src/web/backend/` | FastAPI (:5688): jobs, auth, `ai_routes.py` + `eru_offline.py` (Eru), Mordor, lab, Andúril proxy |
+| `src/web/backend/` | FastAPI (:5688): jobs, auth, `ai_routes.py` + `eru_offline.py` (fixed answers) + `eru_context.py` (the model's numbered context) (Eru), Mordor, lab, Andúril proxy |
 | `src/web/frontend/` | React (:5687); About is `components/HelpPage.js` |
+| `deploy/server/`, `scripts/server/` | Team server profile: Compose override (Caddy in front, nothing else published, production frontend), Caddyfile, `server init/users/ca`; guide in `docs/SERVER.md` |
+| `src/web/backend/auth/` | Sign-in: `users.py` (file store), `access.py` (the server-mode middleware: every route, job ownership and sharing via the `job_access` table), `tokens.py` (long-lived API tokens, `full` or `eru-mcp` scope), `oidc.py` (SSO), `manage_users.py` |
+| `src/common/startup_progress.py` | `rivendell start --progress`: phases, ETA from start history, the Shire-to-Rivendell places the apps draw |
 | `src/mordor/` | Security datasets and recorded attack telemetry |
+| `src/eru_mcp/` | Eru's MCP server (`rivendell mcp`), read-only over Rivendell's API |
 | `src/models/` | Ollama Modelfiles for the eru-* models |
+| `app/` | Desktop app: `macos/` (Swift WebKit app + first-run setup, `build.sh`/`package.sh` → DMG), `linux/` (launcher + zenity setup, `.deb`), `windows/` (launcher, Inno Setup installer); release builds in `.github/workflows/desktop-release.yml`; `rivendell app install` for a checkout; see `app/README.md` |
 | `lab/` | Test lab: Linux targets, Tart/UTM VMs, Gandalf against seeded hosts; bugs in `tests/docs/BUGS.md` |
 | `src/analysis/web/`, `src/analysis/docker/` | Legacy standalone Elrond stack (ports 3000/8000), not used |
 
@@ -70,18 +76,25 @@ Gandalf (acquisition) → Elrond (analysis) → Eru (AI analyst)
 ## What Eru touches
 
 Eru is the AI layer. It reads Elrond's case output and provides:
-- Natural-language answers, case summaries and investigation suggestions (with Ollama)
+- Natural-language answers, case summaries and investigation suggestions (with Ollama), from per-host rows tagged `[R1]`…; answers return only the cited rows they were given, which Ask Eru offers to flag
 - Fixed questions answered straight from the case files when Ollama or the model isn't available (`eru_offline.py`): hosts, ATT&CK techniques, persistence, logins, IOCs, suspicious commands
 - ATT&CK mapping itself is Elrond's (`post/mitre/`), not Eru's
 
-## Planned, not in the repo yet
+## Threat intelligence, collaboration, stacking
 
-- Eru MCP tool server (FastMCP). When it's built, register every Eru capability through that one server — no parallel registration system
-- Iran APT threat-intel XLSX integration: loader at `rivendell/threat_intel/iran_apt_loader.py` (path to be settled, since `rivendell` is now the launcher script); 10-column schema: Evidential Element, Threat Group, Procedure Example, Technique ID, Technique Name, Tactic, Contextual Evidence, Reference URL, Navigation Layer URL, Source Type; `enrich_artefact()` as the Eru-facing function (process name, command or file path in, matching indicators out); table `threat_intel_indicators` — don't rename or restructure without asking
+- Threat intelligence: `src/analysis/rivendell/threat_intel/` (Iran APT loader `iran_apt_loader.py`, STIX/TAXII, MITRESaw, matching, `enrich_artefact()` as the Eru-facing function); fixed 10-column schema: Evidential Element, Threat Group, Procedure Example, Technique ID, Technique Name, Tactic, Contextual Evidence, Reference URL, Navigation Layer URL, Source Type; table `threat_intel_indicators` — don't rename or restructure without asking. Expiry and confidence live beside it in `threat_intel_validity` (`threat_intel/validity.py`; STIX's own, else 90 days for IPs and domains); expired indicators stay listed but are left out of the CSV export (Elrond's matching) and the value index (`/enrich`, Eru) Elrond `--threatIntel`, API `/api/threat-intel`, the Intel page
+- Case browser and collaboration: `src/web/backend/case_routes.py` + `case_files.py` (read-only over cooked/ and analysis/, never raw/), tables `case_findings`, `case_notes`, `case_hosts`, `case_activity`
+- Stacking across hosts: `src/analysis/rivendell/analysis/stacking.py` (stdlib; run by `--Analysis` on 2+ hosts, rarity needs 3+ of an OS, Linux grouped by distro family, persistence ranked above programs at equal score); no learned model (scikit-learn was dropped)
+
+## Eru's MCP server
+
+- `src/eru_mcp/server.py` (`rivendell mcp`, stdio; mcp 2's `MCPServer`, formerly FastMCP; `requirements/mcp.txt`, Python 3.10+, never in the worker or backend images). Register every Eru capability through this one server — no parallel registration system
+- A thin client of Rivendell's API only (`RivendellAPI` refuses anything but `/api/` paths), read-only by default; every phase 1 tool `readOnlyHint`. Never expose starting/restarting/deleting jobs, Gandalf, threat intelligence import/delete, host assignment, changing or removing findings, or `raw/`. Phase 2 (`flag_lead`, `add_note`) only with `--allow-writes`: leads only, every call sends `X-Rivendell-Agent: eru-mcp` so the backend records "Eru (for <user>)" and refuses Eru anything else, capped by `--max-writes`. An `eru-mcp` API token (`auth/tokens.py`, table `api_tokens`) makes the backend treat the caller as Eru without the header and refuse anything but reads, leads and notes; on a team server `--allow-writes` won't start without one (`write_refusal`). Reviewed 3 November 2026 with conditions (`.claude/threat-model.md`): on a live case only in an MCP host with no other network-capable tools and no shell or file access to the case store; any new tool needs a fresh review
+- Tests: `tests/unit/test_eru_mcp.py` over `test_server_access.BackendCase` (the real backend in server mode)
 
 ## What not to do
 
-- Do not rename Gandalf, Elrond, Eru, Aragorn, Andúril or Mordor
+- Do not rename Gandalf, Elrond, Eru, Aragorn, Andúril, Mordor or Pippin
 - Do not restructure the execution graph model without explicit instruction
 - Do not add new Python dependencies without checking `requirements/` (and `src/web/backend/requirements.txt`) first
 - Do not convert subprocess tool calls to library imports — the subprocess boundary is intentional (isolation)

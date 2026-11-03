@@ -37,6 +37,10 @@ It follows its own link back to the repository, so moving the clone means runnin
 | Command | Runs |
 |---|---|
 | `rivendell start \| stop \| restart \| status [--testing] [--logs]` | The Docker stack (`--testing` leaves out Splunk and Elastic) |
+| `rivendell start --progress[=zenity]` | The same, reporting progress and an ETA learnt from earlier starts (what the desktop apps show) |
+| `rivendell server init <hostname> [--tls internal\|<email>\|files]` | Turns this install into a team server; `start`, `stop` and `status` then use the server profile (`--server` forces it). See `docs/SERVER.md` |
+| `rivendell server users <list\|add\|password\|role\|disable\|enable>` | A server's accounts |
+| `rivendell server ca` | Prints the root certificate clients trust when the server uses Caddy's own CA |
 | `rivendell gandalf [bash\|python] <args>` | `gandalf.sh` (the default) or `gandalf.py` |
 | `rivendell acquire <args>` | Gandalf through the Python CLI |
 | `rivendell analyse <args>` | Elrond (`analyze` works too) |
@@ -47,6 +51,7 @@ It follows its own link back to the repository, so moving the clone means runnin
 | `rivendell scripts` | Lists every script under `scripts/` |
 | `rivendell <group> <name> [args]` | One of them, e.g. `rivendell jobs status`, `rivendell siem splunk-restart`, `rivendell docker clean` |
 | `rivendell map [realm\|elrond\|gandalf\|journey]` | Opens an architecture page; `journey` (3D, also `machine`) is served on 127.0.0.1:5690 until Ctrl-C |
+| `rivendell app [install\|uninstall] [--dock]` | The desktop app: builds `Rivendell.app` on macOS (`--dock` pins it), a menu entry on Linux; see `app/README.md` |
 | `rivendell where` | Prints the repository path |
 
 Forensic commands keep the directory you call them from, so relative evidence and output paths work as typed. Scripts under `scripts/` and the stack commands run from the repository root. Scripts are found when they're run (`scripts/<group>/<group>-<name>.sh`, `scripts/<group>/<name>.sh` or `.py`, or `scripts/<name>.sh`), so a new script needs no wiring. Python commands use `python3`; set `RIVENDELL_PYTHON` to use a virtualenv with Rivendell's requirements installed instead. The Windows collector is PowerShell and runs on Windows: `Invoke-Gandalf.ps1` in `src/acquisition/windows`.
@@ -60,7 +65,7 @@ Forensic commands keep the directory you call them from, so relative evidence an
 | Gandalf | `src/acquisition/python/gandalf.py`, `src/acquisition/bash/gandalf.sh`, `src/acquisition/windows/Invoke-Gandalf.ps1` | Live acquisition, local or remote |
 | Elrond | `src/analysis/elrond.py` | Collection, processing and analysis of images and acquisitions |
 | MITRE tools | `src.analysis.mitre.cli`, `src.analysis.mitre.coverage_cli` | ATT&CK data, technique mapping, coverage |
-| Cloud tools | `src.analysis.rivendell.cloud.cli` | AWS, Azure and GCP acquisition and log analysis |
+| Cloud tools | `src.analysis.rivendell.cloud.cli` | AWS, Azure and GCP acquisition and log analysis; Kubernetes audit logs |
 | AI tools (Eru) | `src.analysis.rivendell.ai.cli` | Natural-language queries over case output |
 
 The web UI and API (see [API.md](API.md)) drive Elrond through the same command line.
@@ -234,10 +239,12 @@ On macOS, both the Bash and Python collectors gather:
 | Scheduled and event | `/etc/periodic`, `periodic.conf`, `*.local`, `launchd.conf`, `rc.common`, emond rules and clients |
 | Usage | `InstallHistory.plist`, PowerLog, Biome streams (up to 2,000 files of 10 MB) |
 | Unified logs | A filtered export (`log show --style ndjson`) of sudo, su, sshd, loginwindow, screen sharing, syspolicyd, XProtect, authd, TCC and BTM events over the last day (`GANDALF_UNIFIED_LOG_WINDOW`, e.g. `3d`), capped at 500,000 events |
+| Unified-log store | The raw store: `uuidtext/` first, then the `tracev3` files under `diagnostics/`, newest first, up to 2 GB (`GANDALF_UNIFIED_LOG_STORE_MAX`, in bytes; `0` turns it off), into `unified_log_store/` with its layout kept for log-archive readers |
+| Spotlight | Each volume's index stores (`store.db`, `.store.db`, the `dbStr-*.map.*` files `store.db` can't be read without, `VolumeConfiguration.plist`), each file up to 1 GB (`GANDALF_SPOTLIGHT_MAX`; `0` turns it off), into `spotlight/` |
 
-TCC.db, KnowledgeC, Safari, Mail, ExecPolicy and XPdb are protected by macOS: they're only readable when the process collecting them has Full Disk Access (for Remote mode, enable "Allow full disk access for remote users" under System Settings → General → Sharing → Remote Login). Anything unreadable is skipped and left out of `log.meta`. SQLite databases come with their `-wal`, so rows not yet checkpointed aren't lost. The full unified-log store isn't taken (it runs to gigabytes and Elrond has no `tracev3` parser); the export above is the live-host substitute, so a disk image has no unified logs.
+TCC.db, KnowledgeC, Safari, Mail, ExecPolicy and XPdb are protected by macOS: they're only readable when the process collecting them has Full Disk Access (for Remote mode, enable "Allow full disk access for remote users" under System Settings → General → Sharing → Remote Login). Anything unreadable is skipped and left out of `log.meta`. SQLite databases come with their `-wal`, so rows not yet checkpointed aren't lost. Elrond parses the export above into `unified_log.csv`, and the raw store (in `raw/unified_log_store/`, also taken from a macOS disk image, by the same rules) into `unified_log_store.csv`, keeping the same processes and subsystems as the export, over however far back the store goes. The store reader (`process/extractions/tracev3.py`, stdlib) reads LZ4 chunksets (macOS up to 26) and LZBITMAP ones (macOS 27), resolves format strings from `uuidtext/` and the shared cache's `dsc/`, and times each message from `timesync/`; it reads log messages only (not activities, signposts or state dumps), arguments logged as private read `<private>`, and Apple's own value decoders (`%{network:…}`, masked hashes, enum names) print the raw value. On a macOS 27 store (LZBITMAP) it matched `log show` on 97 to 99.9% of messages; on the lab's macOS 15 store (LZ4), 1,744 of the 1,745 messages found in both matched exactly, time included. A copy of the store lacks what `logd` still held in memory when it was taken (136 of the export's 1,881 messages on the lab VM). Spotlight's index is parsed into `spotlight.csv` (below).
 
-Elrond parses the macOS additions into `btm_items.csv` (third-party items flagged; enabled ones tag **T1543.001** or **T1547.015**), `shared_file_lists.csv` (paths decoded from the bookmarks), `notifications.csv`, `execpolicy_*.csv`, `kextpolicy_*.csv` (third-party kexts tag **T1547.006**), `xprotect_*.csv`, `emond_rules.csv` (**T1546.014**), `periodic.csv` and `unified_log.csv`, and also:
+Elrond parses the macOS additions into `btm_items.csv` (third-party items flagged; enabled ones tag **T1543.001** or **T1547.015**), `shared_file_lists.csv` (paths decoded from the bookmarks), `notifications.csv`, `execpolicy_*.csv`, `kextpolicy_*.csv` (third-party kexts tag **T1547.006**), `xprotect_*.csv`, `emond_rules.csv` (**T1546.014**), `periodic.csv`, `unified_log.csv` and `unified_log_store.csv`, and also:
 
 | Artefact | Elrond output |
 |---|---|
@@ -247,6 +254,7 @@ Elrond parses the macOS additions into `btm_items.csv` (third-party items flagge
 | Biome streams | `biome.csv`: each SEGB record (v1 and v2) with its stream, state, times and the strings in its protobuf payload |
 | ASL stores | `asl.csv`: `/var/log/asl`, DiagnosticMessages and powermanagement records with sender, level, IDs and key/value pairs |
 | FSEvents | `fsevents.csv`: path, event ID, flags (created, removed, renamed, modified…) and inode, with each page file's time |
+| Spotlight index | `spotlight.csv`: one row per indexed item, its path rebuilt from the index itself, with content type, kind, created, modified, last used, use count, date added, downloaded, where-froms (download URLs), size and owner, the rest in `Other`; `Complete` is "no" for a record that couldn't be read to its end. Elrond's image collection takes the stores too. Checked against `mdls` on a test volume (every value matched); Apple's per-user CoreSpotlight stores, which Gandalf doesn't take, read less fully |
 | Staging folders | `staged_files.csv`: every file collected from `/Users/Shared` and `/private/tmp` with its hash; hidden names tag **T1564.001**, download tooling **T1105** |
 
 PowerLog is collected for the analyst only.
@@ -265,6 +273,8 @@ On Linux, both collectors also take, into `linux/` (Elrond's image collection ta
 | SSH and accounts | `authorized_keys`, `known_hosts`, `sshd_config`, `passwd` with `shadow` | `ssh_keys.csv` (forced commands, root keys, keys whose comment names another host: **T1098.004**), `sshd_config.csv`, `accounts.csv` (password state and hash type only, never the hash; a second UID 0 tags **T1136.001**) |
 | Web | web-root scripts (`/var/www`, `/srv/www`, `/srv/http`, nginx html; up to 5,000 of 1 MB) and nginx/Apache configs | `webshells.csv` (**T1505.003**) |
 | Histories | zsh, vim (`.viminfo`), less, python, mysql, psql, wget HSTS, `recently-used.xbel` | `shell_histories.csv`, `viminfo.csv`, `wget_hsts.csv`, `recently_used.csv` |
+| Docker | each container's `config.v2.json` and `hostconfig.json`, its `json-file` log (up to 64 MB); each container's writable layer (everything changed since its image, deleted files included) listed with hashes, and the executables and scripts among those changes copied (up to 500 per container, 64 MB each, into `container_layer/<id>/`); containerd's `meta.db`; Podman's state (`db.sql` with its `-wal`, or `libpod/bolt_state.db` before 4.8) and Podman/CRI-O's `containers.json` | `docker_containers.csv` (privileged, a runtime socket or a sensitive host path mounted, the host's namespaces, escape capabilities: **T1611**, and **T1610** when it was also told to run a shell or fetch something), `container_logs.csv`, `container_changes.csv` (executables dropped in temp or hidden paths **T1105**; cron, SSH keys, accounts, `ld.so.preload` or shell start-up changed inside a container tag their technique); the copied executables in `staged_files.csv` as `container <id>:/path` (hash, executable, hidden name, download commands); containerd's containers from `meta.db` in `docker_containers.csv` as well (`Runtime` `containerd`; every namespace but Docker's `moby`), flagged by the same rules; Podman's containers likewise (`Runtime` `podman`, from either store; its API socket counts as a runtime socket); `containers.json` is kept unparsed (it holds names and images, not settings) |
+| Kubernetes node | static pod manifests (`/etc/kubernetes/manifests`), pod logs (`/var/log/pods`), the API server's audit log (`/var/log/kubernetes`) | `static_pods.csv` (a static pod that isn't the control plane's: **T1543.005**, **T1611** if it can reach the host), `container_logs.csv`, `k8s_audit.csv` (secrets read **T1552.007**, exec into pods **T1609**, cluster-admin bindings **T1098.006**, service-account tokens **T1528**, jobs **T1053.007**, privileged pods **T1611**, cluster-wide discovery **T1613**) |
 
 Endpoint antivirus on the analysis machine may quarantine or block collected web shells (and archives holding them), so they can be missing from `webshells.csv`; Elrond logs the file as unreadable ("Operation not permitted") and carries on. Exclude the case directory from scanning if that matters.
 
@@ -323,7 +333,8 @@ Memory analysis reads memory images from `SOURCE_DIR` alongside the disk images;
 | Option | Does |
 |---|---|
 | `--Process` | Parse collected artefacts (always runs) |
-| `--Analysis` | MFT analysis: extended attributes other than Windows' own, and timestomping ($SI created before $FN created) of executables and scripts in user-writable paths; hits under `Users\Default` and `ProgramData\Microsoft` are marked likely benign (Windows setup copies them with their original times). Alternate data streams from the raw `$MFT`; Mark of the Web, WOF compression and other Windows streams are marked likely benign |
+| `--Analysis` | MFT analysis: extended attributes other than Windows' own, and timestomping ($SI created before $FN created) of executables and scripts in user-writable paths; hits under `Users\Default` and `ProgramData\Microsoft` are marked likely benign (Windows setup copies them with their original times). Alternate data streams from the raw `$MFT`; Mark of the Web, WOF compression and other Windows streams are marked likely benign. On a case of two or more hosts, also stacking: processes, parent and child pairs, services, scheduled tasks, autoruns, WMI consumers and kernel modules found on few of the hosts of the same OS, Linux hosts within their distribution family (three or more of that OS or family before anything counts as rare; with fewer, only `--stackBaseline` finds anything), ranked in the case's `stacking.csv` with the reasons for each score (rare, user path, generated name, not in baseline), and the host row each value was read from (`Host`, `Artefact`, `Row`, the case browser's reference; `Sources` lists it for every host with the value) so it can be flagged there. Nothing is tagged with a technique on a score |
+| `--stackBaseline FILE` | A baseline of clean hosts for stacking; values absent from it score higher. Build one with `python3 -m rivendell.analysis.stacking --baseline OUT CASE_DIR ...` (from `src/analysis`) |
 | `--Memory` | Volatility 3 analysis of memory images |
 | `--Timeline` | Plaso timeline of the disk image. Very slow (105 min on a 12 GB E01) |
 | `--memorytimeline` | Volatility timeliner on memory images |
@@ -338,6 +349,7 @@ Memory analysis reads memory images from `SOURCE_DIR` alongside the disk images;
 | `--symlinks` | Follow symbolic links when copying folders. Slow |
 | `--extractIocs` | Extract IOCs from processed files. Slow |
 | `--iocsFile FILE` | Match extracted IOCs against a watchlist |
+| `--threatIntel FILE [FILE ...]` | Match the case against threat intelligence: the Iran APT workbook, STIX 2.1 bundles, MITRESaw procedures, Rivendell's CSV or a text watchlist. Writes `<host>/analysis/threat_intel_matches.csv`, fills `watchlist_match` in `iocs.csv`, and ranks groups in the case's `threat_groups.csv` with the basis for each rank. Runs after the analysis phase |
 | `--Keywords FILE` | Search for keywords. Remove blank and `#` lines first: they match every line |
 | `--Yara DIR` | Scan with YARA rules, against the whole mounted image or only collected files. Symbolic links are not followed (`yara -N`). A rule whose `meta` has `attack = "T1059.001, T1105"` (or `mitre`, `technique`) tags those techniques when it matches; any match on a web-root script tags **T1505.003** |
 | `--misplacedBinaries` | Find Windows system binaries in unexpected locations (**T1036.005**) |
@@ -359,7 +371,7 @@ Memory analysis reads memory images from `SOURCE_DIR` alongside the disk images;
 |---|---|
 | `--Splunk` | Index output into the local Splunk instance |
 | `--Elastic` | Index output into the local Elasticsearch instance |
-| `--Navigator` | Build an ATT&CK Navigator layer (requires `--Splunk`) |
+| `--Navigator` | Build an ATT&CK Navigator layer from the case's `mitre_techniques.txt` |
 | `--Ziparchive` | Zip raw data after processing |
 | `--Delete` | Delete raw data after processing |
 
@@ -478,7 +490,7 @@ The ATT&CK Navigator layer for a case comes from Elrond (`--Navigator`) or the A
 ## Cloud Forensics
 
 ```bash
-python3 -m src.analysis.rivendell.cloud.cli {aws|azure|gcp} COMMAND [OPTIONS]
+python3 -m src.analysis.rivendell.cloud.cli {aws|azure|gcp|k8s} COMMAND [OPTIONS]
 ```
 
 | Command | Options | Does |
@@ -490,11 +502,14 @@ python3 -m src.analysis.rivendell.cloud.cli {aws|azure|gcp} COMMAND [OPTIONS]
 
 `--region` applies to AWS (and Azure location), `--resource-group` to Azure, `--zone` to GCP.
 
+`k8s` takes only `analyze-logs`, with no credentials: an API server audit log exported from EKS, AKS, GKE or a self-managed cluster (JSON lines, a JSON array or an `EventList`), written as `k8s_audit.csv` and `k8s_audit_analysis.json` with the same flags and techniques as a node's collected audit log.
+
 ```bash
 python3 -m src.analysis.rivendell.cloud.cli aws list -c aws_creds.json --region eu-west-2
 python3 -m src.analysis.rivendell.cloud.cli aws acquire-disk -i i-1234567890abcdef0 -o ./snapshots/AWS-001 --wait
 python3 -m src.analysis.rivendell.cloud.cli azure acquire-logs --days 30 -o ./logs/AZURE-001 --analyze
 python3 -m src.analysis.rivendell.cloud.cli gcp acquire-disk -i myinstance --zone europe-west2-a -o ./snapshots/GCP-001
+python3 -m src.analysis.rivendell.cloud.cli k8s analyze-logs -f eks-audit.json -o ./logs/K8S-001
 ```
 
 ---

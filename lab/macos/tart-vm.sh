@@ -24,6 +24,8 @@ SSH="$LAB_ROOT/lib/ssh.exp"
 
 vm_exists() { "$TART" list --quiet 2>/dev/null | grep -qx "$VM"; }
 vm_ip() { "$TART" ip "$VM" 2>/dev/null || true; }
+# tart ip keeps answering from the DHCP lease after a stop, so it can't say whether the VM runs
+vm_running() { "$TART" list 2>/dev/null | awk -v vm="$VM" '$2 == vm {print $NF}' | grep -qx running; }
 
 wait_ip() {
   local i ip
@@ -40,13 +42,48 @@ start_forward() {
   ok "$VM SSH on 127.0.0.1:$PORT (-> $ip:22)"
 }
 
+# tart ip finds a VM's address by its MAC. A clone keeps its image's MAC, so another VM cloned
+# from the same image (another project's, under the default TART_HOME) answers for this one,
+# and provisioning and collection go to that machine instead. Refuse while one is running.
+mac_of() { TART_HOME="$1" "$TART" get "$2" --format json 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["MACAddress"].lower())' 2>/dev/null || true; }
+
+check_mac() {
+  local mine home name
+  mine="$(mac_of "$TART_HOME" "$VM")"
+  [ -n "$mine" ] || die "Couldn't read $VM's MAC address"
+  for home in "$TART_HOME" "${HOME}/.tart"; do
+    [ -d "$home" ] || continue
+    for name in $(TART_HOME="$home" "$TART" list --format json 2>/dev/null | python3 -c 'import json,sys; print(" ".join(v["Name"] for v in json.load(sys.stdin) if v.get("Running") and v.get("Source") == "local"))' 2>/dev/null); do
+      [ "$home" = "$TART_HOME" ] && [ "$name" = "$VM" ] && continue
+      if [ "$(mac_of "$home" "$name")" = "$mine" ]; then
+        die "$name (in $home) is running with $VM's MAC address ($mine), so $VM's IP would be its. Give $VM its own: TART_HOME=\"$TART_HOME\" tart set $VM --random-mac"
+      fi
+    done
+  done
+}
+
 start_vm() {
-  if [ -z "$(vm_ip)" ]; then
+  check_mac
+  if ! vm_running; then
     info "Starting $VM (headless)"
     nohup "$TART" run --no-graphics "$VM" >"$RUN_DIR/$VM.log" 2>&1 &
   fi
   local ip; ip="$(wait_ip)"
   start_forward "$ip"
+  wait_ssh
+}
+
+wait_ssh() {
+  # An IP comes well before sshd, on macOS especially: until the banner answers through the
+  # forward, anything that connects (Gandalf's scp) is refused or cut off without saying why
+  local i banner line
+  info "Waiting for SSH on 127.0.0.1:$PORT"
+  for i in $(seq 1 200); do
+    banner="$( { exec 3<>"/dev/tcp/127.0.0.1/$PORT" && IFS= read -r -t 5 line <&3 && echo "$line"; exec 3<&-; } 2>/dev/null || true)"
+    case "$banner" in SSH-*) ok "$VM SSH is up"; return ;; esac
+    sleep 3
+  done
+  die "$VM has an IP but SSH didn't answer within 10 minutes (log: $RUN_DIR/$VM.log)"
 }
 
 provision() {
@@ -78,7 +115,7 @@ case "$action" in
       [ "$kind" = "macos" ] && warn "The macOS image is about 25 GB; the first pull takes a while."
       info "Pulling $IMAGE"
       "$TART" clone "$IMAGE" "$VM"
-      "$TART" set "$VM" --memory "$MEM" --cpu "$CPU"
+      "$TART" set "$VM" --memory "$MEM" --cpu "$CPU" --random-mac
     else
       info "$VM already exists"
     fi
@@ -122,7 +159,7 @@ case "$action" in
     # Running without an IP is a boot still in progress (a first boot off a USB drive takes up to an hour)
     # tart ip still answers from the DHCP lease after a stop, so check the state first
     if ! vm_exists; then echo "$VM: not created"
-    elif ! "$TART" list 2>/dev/null | awk -v vm="$VM" '$2 == vm {print $NF}' | grep -qx running; then echo "$VM: stopped"
+    elif ! vm_running; then echo "$VM: stopped"
     elif [ -n "$(vm_ip)" ]; then echo "$VM: running at $(vm_ip), SSH 127.0.0.1:$PORT"
     else echo "$VM: booting (no IP yet)"; fi ;;
   *) die "unknown action $action" ;;

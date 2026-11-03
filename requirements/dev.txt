@@ -9,3 +9,4 @@ flake8>=4.0
 mypy>=0.950
 sphinx>=4.0
 sphinx-rtd-theme>=1.0
+playwright>=1.40  # scripts/docs/guide/capture.py (python -m playwright install chromium)

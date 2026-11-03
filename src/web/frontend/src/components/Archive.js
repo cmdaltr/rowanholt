@@ -88,7 +88,7 @@ function Archive() {
         <p>View and manage archived forensic analysis jobs.</p>
       </header>
 
-      <div className="card">
+      <div data-guide="archive.list" className="card">
         <div className="list-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <Link to="/jobs">
             <button>← Back to Jobs</button>

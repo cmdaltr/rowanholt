@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { login as apiLogin, loginAsGuest as apiLoginAsGuest } from '../api';
+import { login as apiLogin, loginAsGuest as apiLoginAsGuest, getAuthConfig } from '../api';
+import { API_BASE_URL } from '../apiBase';
 
 const heroImage = `${process.env.PUBLIC_URL}/images/rivendell.png`;
 
@@ -10,8 +11,15 @@ const LoginPage = () => {
   const { login: setUser } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [searchParams] = useSearchParams();
+  const [error, setError] = useState(searchParams.get('sso_error') || '');
   const [loading, setLoading] = useState(false);
+  // What this Rivendell offers: a local stack has guests and sign-up, a server may have SSO
+  const [config, setConfig] = useState({ local_login: true, guest: true, register: true, sso: { enabled: false } });
+
+  useEffect(() => {
+    getAuthConfig().then(setConfig).catch(() => {});
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -76,6 +84,23 @@ const LoginPage = () => {
           </div>
         )}
 
+        {config.sso.enabled && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <button
+                type="button"
+                onClick={() => { window.location.href = `${API_BASE_URL}/api/auth/oidc/login`; }}
+                disabled={loading}
+                style={{ width: '100%' }}
+              >
+                Sign in with {config.sso.name}
+              </button>
+            </div>
+            {config.local_login && <div className="divider" data-text="or"></div>}
+          </>
+        )}
+
+        {config.local_login && (
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label htmlFor="username">Username or Email</label>
@@ -115,25 +140,36 @@ const LoginPage = () => {
             </button>
           </div>
         </form>
+        )}
 
-        <div className="divider" data-text="or"></div>
+        {config.guest && (
+          <>
+            <div className="divider" data-text="or"></div>
 
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <button
-            onClick={handleGuestLogin}
-            disabled={loading}
-            className="secondary"
-            style={{ width: '100%' }}
-          >
-            {loading ? 'Continuing...' : 'Continue as Guest'}
-          </button>
-        </div>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <button
+                onClick={handleGuestLogin}
+                disabled={loading}
+                className="secondary"
+                style={{ width: '100%' }}
+              >
+                {loading ? 'Continuing...' : 'Continue as Guest'}
+              </button>
+            </div>
+          </>
+        )}
 
         <div className="text-center" style={{ marginTop: '1.5rem' }}>
-          Don't have an account?{' '}
-          <Link to="/register" className="text-link">
-            Register
-          </Link>
+          {config.register ? (
+            <>
+              Don't have an account?{' '}
+              <Link to="/register" className="text-link">
+                Register
+              </Link>
+            </>
+          ) : (
+            'Accounts on this server come from its administrators.'
+          )}
         </div>
       </div>
 

@@ -42,7 +42,7 @@ Param(
     [Parameter(Position = 4)][switch]$ShowProgress,
     [Parameter(Position = 5)][switch]$CollectFiles,
     # Accept the defaults for every question (no encryption confirmation,
-    # overwrite the output directory, continue without disk_tools.zip).
+    # overwrite the output directory).
     [Parameter(Position = 6)][switch]$NoPrompt
 )
 
@@ -255,7 +255,7 @@ function Invoke-RemoteArtefactCollection {
 
     Invoke-Command -Session $Session -ScriptBlock { if (Test-Path -LiteralPath "C:\TEMP\gandalf") { Remove-Item "C:\TEMP\gandalf" -Recurse -Force } }
     Invoke-Command -Session $Session -ScriptBlock { New-Item -Path "C:\TEMP\gandalf" -ItemType Directory > $null }; Invoke-Command -Session $Session -ScriptBlock { New-Item -Path "C:\TEMP\gandalf\gandalf" -ItemType Directory > $null }; Invoke-Command -Session $Session -ScriptBlock { New-Item -Path "C:\TEMP\gandalf\acquisitions" -ItemType Directory > $null }; Invoke-Command -Session $Session -ScriptBlock { New-Item -Path "C:\TEMP\gandalf\gandalf\tools" -ItemType Directory > $null }; Invoke-Command -Session $Session -ScriptBlock { New-Item -Path "C:\TEMP\gandalf\gandalf\tools\memory" -ItemType Directory > $null }; Invoke-Command -Session $Session -ScriptBlock { New-Item -Path "C:\TEMP\gandalf\gandalf\lists" -ItemType Directory > $null }
-    Copy-Item -ToSession $Session -Path $DiskTools -Destination "C:\TEMP\gandalf\gandalf\tools\disk_tools.zip" -Force -Recurse; Copy-Item -ToSession $Session -Path $InvokeArtefactAcquisition -Destination "C:\TEMP\gandalf\gandalf\tools\Invoke-ArtefactAcquisition.ps1" -Force
+    if (Test-Path -LiteralPath $DiskTools) { Copy-Item -ToSession $Session -Path $DiskTools -Destination "C:\TEMP\gandalf\gandalf\tools\disk_tools.zip" -Force }; Copy-Item -ToSession $Session -Path $InvokeArtefactAcquisition -Destination "C:\TEMP\gandalf\gandalf\tools\Invoke-ArtefactAcquisition.ps1" -Force
 
     if ($Memory -And $Memory -ne "False") {
         Copy-Item -ToSession $Session -Path $DumpIt -Destination "C:\TEMP\gandalf\gandalf\tools\memory\DumpIt.exe" -Force; Copy-Item -ToSession $Session -Path $DumpItx86 -Destination "C:\TEMP\gandalf\gandalf\tools\memory\DumpItx86.exe" -Force
@@ -318,15 +318,10 @@ else {
 $GandalfHome = Split-Path -Parent $PSScriptRoot
 $DiskToolsPath = [IO.Path]::Combine($GandalfHome, "tools", "disk_tools.zip")
 
-# Checking existance of disk_tools.zip
+# disk_tools.zip (RawCopy, third-party, not shipped) is only a fallback: locked files are read off
+# the raw volume first, then from a temporary shadow copy, so nothing is lost without it
 if (-Not (Test-Path -LiteralPath $DiskToolsPath)) {
-    Clear-Host
-    Write-Host "`n`n`n`n      WARNING: '$DiskToolsPath' does not exist." -Foreground Yellow; Write-Host "       As a result, hiberfil.sys and pagefile.sys will not be collected (`$MFT is read directly; Amcache and SRUM come from a shadow copy)." -Foreground White
-    if ($NoPrompt) { $ContinueWithoutDiskTools = "y" } else { $ContinueWithoutDiskTools = Read-Host "      Do you wish to continue? y/N [N] " }
-    if ($ContinueWithoutDiskTools -ne "y") {
-        Write-Host "`n`n       Read the " -NoNewLine; Write-Host "Configuration" -Foreground Grey -NoNewLine; Write-Host " section in the README.md before trying again.`n`n"
-        Exit
-    }
+    Write-Host "      '$DiskToolsPath' isn't there: locked files are read off the raw volume, with a shadow copy as the fallback (docs/CLI.md)." -Foreground White
 }
 
 # Removing files which if exist during second attempt will cause failures

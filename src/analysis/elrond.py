@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import os
 import sys
+from datetime import datetime
 
 # Set TERM environment variable to prevent warnings from subprocess commands
 if 'TERM' not in os.environ:
@@ -11,6 +12,7 @@ if 'TERM' not in os.environ:
 from rivendell.main import main
 from rivendell.core.identify import process_deferred_memory, load_memory_profiles
 from rivendell.mount import unmount_images, cleanup_stale_mounts
+from rivendell.audit import write_audit_log_entry
 from rivendell.post.clean import archive_artefacts
 from rivendell.post.siem import SIEMUnavailableError, ensure_remote_siem_reachable
 
@@ -107,6 +109,21 @@ parser.add_argument(
     help="IOC watchlist file to match against extracted IOCs; Example syntax: --iocsFile /path/to/iocs.txt",
 )
 parser.add_argument(
+    "--threatIntel",
+    nargs="+",
+    metavar="FILE",
+    help="Match the case against threat intelligence: the Iran APT workbook (XLSX), STIX 2.1 bundles "
+    "(JSON), MITRESaw's mitre_procedures.csv, Rivendell's indicator CSV or a text watchlist; writes "
+    "<host>/analysis/threat_intel_matches.csv and threat_groups.csv. Example: --threatIntel iran_apt.xlsx feed.json",
+)
+parser.add_argument(
+    "--stackBaseline",
+    nargs=1,
+    metavar="FILE",
+    help="A baseline of clean hosts for stacking (Analysis on a case of two or more hosts writes stacking.csv; rarity needs three of an OS); "
+    "values absent from it score higher. Build one with python3 -m rivendell.analysis.stacking --baseline OUT CASE...",
+)
+parser.add_argument(
     "--misplacedBinaries",
     help="Find Windows system binaries in unexpected locations (MITRE ATT&CK T1036.005 - Masquerading: Match Legitimate Name or Location)",
     action="store_const",
@@ -136,7 +153,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--Navigator",
-    help="Map identified artefacts to MITRE ATT&CK® navigator (requires --Splunk flag)",
+    help="Map identified artefacts to MITRE ATT&CK® navigator (a layer from mitre_techniques.txt)",
     action="store_const",
     const=True,
     default=False,
@@ -247,6 +264,8 @@ gandalf = args.Gandalf
 collectfiles = args.collectFiles
 extractiocs = args.extractIocs
 iocsfile = args.iocsFile
+threatintel = args.threatIntel or []
+stackbaseline = args.stackBaseline[0] if args.stackBaseline else ""
 misplaced_binaries = args.misplacedBinaries
 masquerading = args.masquerading
 keywords = args.Keywords
@@ -448,6 +467,10 @@ asciitext = [
 
 
 if __name__ == "__main__":
+    # Gandalf archives and Mordor datasets are collected already: the presets below only
+    # switch on collection options (user profiles, the disk timeline) when there's a disk
+    # to collect from. Asked for by name, they still fail the check in main().
+    precollected = gandalf or mordor
     if exhaustive:
         brisk = True
         delete = True
@@ -455,7 +478,7 @@ if __name__ == "__main__":
         volatility = True
         nsrl = True
         splunk = True
-        timeline = True
+        timeline = timeline or not precollected
         memorytimeline = True
         archive = True
     if brisk:
@@ -465,9 +488,9 @@ if __name__ == "__main__":
         # extractiocs = True  # Don't override extractIocs - respect command line flag
         magicbytes = True  # File signature mismatch detection
         metacollected = True
-        # navigator = True  # Removed: Navigator requires Splunk, which slows down brisk mode
+        # navigator stays off in brisk mode: it needs the siem profile's Navigator running
         process = True
-        userprofiles = True
+        userprofiles = userprofiles or not precollected
     if threathunt:
         # Threat Hunt Mode: Aggressive threat-hunting analysis
         analysis = True
@@ -479,7 +502,7 @@ if __name__ == "__main__":
         process = True
         splunk = True
         elastic = True
-        userprofiles = True
+        userprofiles = userprofiles or not precollected
     if mordor:
         # Mordor input type: Treat like Gandalf (pre-collected artefacts)
         # Mordor datasets are pre-collected attack simulation data from OTRF
@@ -875,6 +898,45 @@ if __name__ == "__main__":
             print(f"  -> Continuing to next source...", flush=True)
 
     print("\n  ----------------------------------------\n  -> Completed Analysis Phase.\n", flush=True)
+
+    # ========== PHASE 4b: THREAT INTELLIGENCE (the whole case at once) ==========
+    if threatintel and mounted_data:
+        print("\n  -> \033[1;36mCommencing Threat Intelligence Phase...\033[1;m\n  ----------------------------------------", flush=True)
+        try:
+            from rivendell.threat_intel import load_all
+            from rivendell.threat_intel.match import match_case
+
+            indicators = load_all(threatintel)
+            print(f"     Loaded {len(indicators)} indicators from {len(threatintel)} file(s)", flush=True)
+            totals = match_case(output_directory, indicators, log=lambda m: print(f"     {m}", flush=True))
+            entry, prnt = "{},{},threat intelligence,{} indicators; {} elements matched; {} iocs; {} groups; {} of Gandalf's own records left out\n".format(
+                datetime.now().isoformat(), case, totals["indicators"], totals["elements"], totals["iocs"], totals["groups"],
+                totals["collector"],
+            ), " -> {} -> matched the case against {} threat intelligence indicators: {} elements found".format(
+                datetime.now().isoformat().replace("T", " "), totals["indicators"], totals["elements"]
+            )
+            write_audit_log_entry(verbosity, output_directory, entry, prnt)
+        except (OSError, ValueError) as e:
+            print(f"  -> WARNING: threat intelligence matching failed: {e}", flush=True)
+        print("  ----------------------------------------\n  -> Completed Threat Intelligence Phase.\n", flush=True)
+
+    # ========== PHASE 4c: STACKING (least frequency of occurrence across hosts) ==========
+    if analysis and mounted_data:
+        try:
+            from rivendell.analysis.stacking import stack_case
+
+            stacked = stack_case(output_directory, stackbaseline)
+            if stacked is None:
+                print("     Stacking skipped: it compares hosts, and this case has one", flush=True)
+            else:
+                entry, prnt = "{},{},stacking,{} hosts; {} values; {} rare\n".format(
+                    datetime.now().isoformat(), case, stacked["hosts"], stacked["values"], stacked["rows"]
+                ), " -> {} -> stacked {} values across {} hosts: {} rare, in stacking.csv".format(
+                    datetime.now().isoformat().replace("T", " "), stacked["values"], stacked["hosts"], stacked["rows"]
+                )
+                write_audit_log_entry(verbosity, output_directory, entry, prnt)
+        except (OSError, ValueError, KeyError) as e:
+            print(f"  -> WARNING: stacking failed: {e}", flush=True)
 
     # ========== PHASE 5: SIEM INDEXING (Splunk/Elastic/Navigator) ==========
     if splunk or elastic:

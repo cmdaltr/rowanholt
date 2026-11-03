@@ -387,7 +387,7 @@ def ingest_elastic_data(
 ):
     imgs_to_ingest = []
     for _, img in allimgs.items():
-        if img not in str(imgs_to_ingest):
+        if img not in imgs_to_ingest:
             imgs_to_ingest.append(img)
         if not os.path.exists(output_directory + img.split("::")[0] + "/elastic/"):
             os.makedirs(

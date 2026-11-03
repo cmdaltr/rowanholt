@@ -160,11 +160,19 @@ def main(
             collectand = "timeline switch (-t)"
         elif (not collect or gandalf) and userprofiles:
             collectand = "userprofiles switch (-U)"
-        print(
-            "\n\n  In order to use the {}, you must also invoke the {}. Please try again.\n\n\n\n".format(
-                collectand, gandalforcollect
+        if gandalf:
+            # A Gandalf archive (or Mordor dataset) is collected already: nothing to collect from
+            print(
+                "\n\n  The {} can't be used with the {}: a Gandalf archive has nothing left to collect. Please try again.\n\n\n\n".format(
+                    collectand, gandalforcollect
+                )
             )
-        )
+        else:
+            print(
+                "\n\n  In order to use the {}, you must also invoke the {}. Please try again.\n\n\n\n".format(
+                    collectand, gandalforcollect
+                )
+            )
         sys.exit(1)
     if memorytimeline and not volatility:
         print(
@@ -196,11 +204,6 @@ def main(
             "\n\n  '{}' is not a keywords file or does not exist. Please try again.\n\n\n\n".format(
                 keywords[0]
             )
-        )
-        sys.exit(1)
-    if navigator and not splunk:
-        print(
-            "\n\n  You cannot provide the Navigator switch (-N) without providing the Splunk switch (-S). Please try again.\n\n\n\n"
         )
         sys.exit(1)
     starttime, ot, imgs, foundimgs, doneimgs, d, vssmem = (
@@ -1003,7 +1006,7 @@ def main(
                         sha256,
                         nsrl,
                     )
-                if img.split("::")[0] not in str(imgs_metad):
+                if img.split("::")[0] not in imgs_metad:
                     imgs_metad.append(img.split("::")[0])
                 print(
                     "     Completed collection of metadata from processed artefacts for '{}'".format(

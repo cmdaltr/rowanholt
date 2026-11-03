@@ -32,10 +32,12 @@ Add-MpPreference -ExclusionPath C:\lab, C:\ProgramData\RivendellLab, C:\TEMP, C:
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue C:\lab\scripts, C:\lab\gandalf-src
 Copy-Item -Recurse -Force "$cfg\lab-scripts" C:\lab\scripts
 Copy-Item -Recurse -Force "$cfg\gandalf-src" C:\lab\gandalf-src
+# Files off a CD keep their read-only attribute, and utm-vm.sh collect then can't copy the current scripts over them
+Get-ChildItem -Recurse -File C:\lab\scripts, C:\lab\gandalf-src | ForEach-Object { $_.IsReadOnly = $false }
 
 # Lab target: user, WinRM, seeded artefacts (same script as the x64 Vagrant VM)
 $env:LAB_PASSWORD = (Get-Content -Raw "$cfg\lab-password.txt").Trim()
-& C:\lab\scripts\Provision-GandalfTarget.ps1
+& C:\lab\scripts\Provision-GandalfTarget.ps1 -Clean:(Test-Path "$cfg\clean.txt")
 Remove-Item Env:\LAB_PASSWORD
 Remove-Item -Force -ErrorAction SilentlyContinue "$cfg\lab-password.txt"
 

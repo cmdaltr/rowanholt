@@ -13,7 +13,7 @@ load_config
 
 VAGRANT_DIR="$LAB_ROOT/vagrant"
 TESTS_ENV="$LAB_CONFIG_DIR/rivendell-tests.env"
-LINUX_CONTAINERS="lab-ubuntu lab-rocky"
+LINUX_CONTAINERS="lab-ubuntu lab-rocky lab-ubuntu-clean1 lab-ubuntu-clean2"
 
 vagrant_env() {
   require_password
@@ -204,15 +204,17 @@ cmd_linux_targets() {
   export REPO_ROOT ACQ_ROOT
   mkdir -p "$ACQ_ROOT"
   if [ -z "$sub" ]; then
-    menu "Linux container targets ($DOCKER_CONTEXT)" "Build and start" "Stop" "Rebuild from scratch (re-seed)" "Status"
-    case "$MENU_CHOICE" in 1) sub=up ;; 2) sub=down ;; 3) sub=reset ;; 4) sub=status ;; *) return ;; esac
+    menu "Linux container targets ($DOCKER_CONTEXT)" "Build and start" "Build and start, with two clean Ubuntu hosts for stacking" "Stop" "Rebuild from scratch (re-seed)" "Status"
+    case "$MENU_CHOICE" in 1) sub=up ;; 2) sub=stacking ;; 3) sub=down ;; 4) sub=reset ;; 5) sub=status ;; *) return ;; esac
   fi
   case "$sub" in
-    up)     build_lab_images && lab_compose up -d --no-build && ok "Targets up: $LINUX_CONTAINERS (SSH on 127.0.0.1:2221-2222)" ;;
-    down)   lab_compose down && ok "Targets stopped" ;;
-    reset)  lab_compose down -v; build_lab_images && lab_compose up -d --no-build --force-recreate && ok "Targets rebuilt and re-seeded" ;;
-    status) lab_compose ps ;;
-    *) die "linux-targets up|down|reset|status" ;;
+    up)     build_lab_images && lab_compose up -d --no-build && ok "Targets up: lab-ubuntu lab-rocky (SSH on 127.0.0.1:2221-2222)" ;;
+    stacking) build_lab_images && lab_compose --profile stacking up -d --no-build \
+              && ok "Targets up, with two clean Ubuntu hosts for stacking (SSH on 127.0.0.1:2221-2224)" ;;
+    down)   lab_compose --profile stacking down && ok "Targets stopped" ;;
+    reset)  lab_compose --profile stacking down -v; build_lab_images && lab_compose up -d --no-build --force-recreate && ok "Targets rebuilt and re-seeded" ;;
+    status) lab_compose --profile stacking ps ;;
+    *) die "linux-targets up|stacking|down|reset|status" ;;
   esac
 }
 
@@ -377,6 +379,30 @@ cmd_gandalf_collect() {
   find "$ACQ_ROOT" -maxdepth 4 \( -name '*.zip' -o -name '*.7z' -o -name '*.tar.gz*' \) -exec ls -lh {} \; 2>/dev/null | awk '{print "  " $5 "  " $9}'
   [ "$rc" = 0 ] && ok "Collection finished. Next: ./lab.sh rivendell-env" || warn "Some collections failed; see the collector logs next to the archives."
   return $rc
+}
+
+# stacking-eval: the Linux stacking targets collected afresh, Elrond over all four as one case, and
+# stacking.csv scored against the plants (lib/stacking_eval.py), with a row added to README.md
+cmd_stacking_eval() {
+  pick_docker_context
+  require_password
+  docker ps --format '{{.Names}}' | grep -qx rivendell-celery-worker || die "Rivendell isn't running: ./rivendell start"
+  local root="${TEST_IMAGES_PATH:-$LAB_DATA_DIR}" case_id dest acq
+  docker exec rivendell-celery-worker test -d "$root" || die "Rivendell's worker can't see $root: run ./lab.sh rivendell-env"
+  case_id="STACKEVAL-$(date +%Y%m%d-%H%M)"
+  dest="$root/stacking-eval/$case_id"
+  # A collection of its own, so hosts left from earlier runs aren't stacked with these
+  ACQ_ROOT="$dest/gandalf"
+  acq="$ACQ_ROOT/python_collection/acquisitions/"
+  mkdir -p "$ACQ_ROOT" "$dest/elrond"
+  cmd_linux_targets stacking || return 1
+  GANDALF_WORKAROUNDS=0 cmd_gandalf_collect python "lab-ubuntu lab-rocky lab-ubuntu-clean1 lab-ubuntu-clean2" || return 1
+  step "Elrond over the four hosts as $case_id"
+  docker exec rivendell-celery-worker sh -c 'cd "${ELROND_HOME:-/opt/elrond}" && python3 elrond.py "$@"' elrond \
+    "$case_id" "$acq" "$dest/elrond" --Gandalf --Process --Analysis || return 1
+  step "Stacking against the plants"
+  python3 "$LAB_ROOT/lib/stacking_eval.py" "$dest/elrond" "$acq" --readme "$LAB_ROOT/README.md" \
+    --label "Linux containers (python collector)"
 }
 
 # ------------------------------------------------------------------------- mordor
@@ -674,11 +700,12 @@ Usage: ./lab.sh [command]
   check               Host, tools and settings report
   install             Install prerequisites for this Mac (Homebrew)
   configure           Data location, VM sizes, lab password
-  linux-targets [up|down|reset|status]   Four seeded Linux containers
+  linux-targets [up|stacking|down|reset|status]   Two seeded Linux containers (stacking: plus two clean Ubuntu)
   linux-vm [create|start|stop|delete|status]
   macos-vm [create|start|stop|delete|status|move <dir>]   (Apple silicon)
   windows-vm [create|start|stop|provision|gui|delete|status]
   gandalf-collect [bash|python|powershell|all] ["targets"]
+  stacking-eval       Collect the Linux stacking targets, run Elrond, score stacking.csv (adds a row to README.md)
   mordor-download [test paths...]   e.g. apt29/day1 atomic/persistence
   mordor-sensor       Sysmon + Atomic Red Team in the Windows VM
   mordor-capture      Run atomics and export a dataset
@@ -750,6 +777,7 @@ case "${1:-}" in
   macos-vm) shift; cmd_macos_vm "$@" ;;
   windows-vm) shift; cmd_windows_vm "$@" ;;
   gandalf-collect) shift; cmd_gandalf_collect "$@" ;;
+  stacking-eval) cmd_stacking_eval ;;
   mordor-download) shift; cmd_mordor_download "$@" ;;
   mordor-sensor) cmd_mordor_sensor ;;
   mordor-capture) shift; cmd_mordor_capture "$@" ;;

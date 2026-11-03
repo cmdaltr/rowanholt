@@ -1,0 +1,211 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>The road to Rivendell</title>
+<style>
+:root { color-scheme: dark; --bg: #0b1210; --text: #b9c9b4; --dim: #7d907a; --strong: #e1ecdc;
+        --bad: #e8a07a; --ink: #4a3a22; --road: #6b4f2a; --line: #1d2b26; }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+       background: var(--bg); color: var(--text); font: 14px/1.5 -apple-system, system-ui, sans-serif; padding: 24px; }
+h1 { margin: 0 0 14px; font: italic 500 22px Georgia, "Times New Roman", serif; color: var(--strong); letter-spacing: .02em; }
+.map { position: relative; width: min(940px, 92vw); aspect-ratio: 520 / 300; border-radius: 10px; overflow: hidden;
+       box-shadow: 0 0 0 1px #3b2f1c, 0 10px 40px rgba(0,0,0,.5); background: #d8c7a0; }
+.map img, .map svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.map img { filter: sepia(.15) contrast(1.05); }
+.road-left { fill: none; stroke: var(--road); stroke-width: 1.6; stroke-dasharray: 3 3; opacity: .55; }
+.road-done { fill: none; stroke: #7a2e12; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.stop circle { fill: #f3e7c6; stroke: var(--ink); stroke-width: 1; }
+.stop.reached circle { fill: #7a2e12; }
+.stop text { font: italic 9px Georgia, serif; fill: var(--ink); paint-order: stroke; stroke: #e9dcb8; stroke-width: 2.5px; }
+.stop.here text { font-weight: bold; }
+#walker .bob { animation: bob .55s ease-in-out infinite alternate; }
+#walker.resting .bob { animation: none; }
+@keyframes bob { from { transform: translateY(0); } to { transform: translateY(-1.6px); } }
+.glow { fill: #ffe9a8; opacity: .0; transition: opacity 1.2s; }
+.arrived .glow { opacity: .55; }
+.status { margin-top: 16px; text-align: center; min-height: 64px; }
+#where { font: italic 17px Georgia, serif; color: var(--strong); }
+#eta { margin-top: 2px; font-size: 15px; }
+#phase { margin-top: 2px; color: var(--dim); font-size: 13px; }
+.error #where { color: var(--bad); font-style: normal; font-family: inherit; font-size: 15px; }
+button { margin-top: 12px; padding: 6px 18px; background: #1d3a2e; color: #d6e6d0; border: 1px solid #2f5a47;
+         border-radius: 6px; font: inherit; cursor: pointer; display: none; }
+.error button { display: inline-block; }
+details { width: min(940px, 92vw); margin-top: 14px; color: var(--dim); }
+summary { cursor: pointer; font-size: 12px; }
+pre { height: 26vh; overflow: auto; margin: 8px 0 0; padding: 12px; background: #050908; border: 1px solid var(--line);
+      border-radius: 6px; font: 12px "JetBrains Mono", Menlo, monospace; color: #8fa58a; white-space: pre-wrap; }
+.plain .map, .plain h1 { display: none; }
+.plain .status { margin-top: 0; }
+.plain-logo { display: none; width: 360px; max-width: 70vw; margin-bottom: 8px; }
+.plain .plain-logo { display: block; }
+</style>
+</head>
+<body>
+<img class="plain-logo" src="rivendell.png" alt="Rivendell">
+<h1>The road to Rivendell</h1>
+<div class="map" id="map">
+  <img src="journey.png" alt="">
+  <svg viewBox="0 0 520 300" id="svg">
+    <circle class="glow" cx="332" cy="95" r="26"/>
+    <path id="road-left" class="road-left"/>
+    <path id="road-done" class="road-done"/>
+    <g id="stops"></g>
+    <!-- Gandalf: hat, face and beard, grey robe, staff -->
+    <g id="walker">
+      <g class="bob" transform="scale(1.35)">
+        <ellipse cx="0" cy="1" rx="6" ry="1.4" fill="rgba(60,40,20,.35)"/>
+        <line x1="7" y1="-18" x2="7" y2="1" stroke="#5a4127" stroke-width="1.3" stroke-linecap="round"/>
+        <path d="M-6,0 L-4.5,-9 L4.5,-9 L6,0 Z" fill="#8d939c" stroke="#4d525a" stroke-width=".5"/>
+        <path d="M-2.4,-9 Q0,-3 2.4,-9 Z" fill="#efeee8"/>
+        <circle cx="0" cy="-10.6" r="2.3" fill="#ead9b4"/>
+        <ellipse cx="0" cy="-12.6" rx="6.2" ry="1.3" fill="#7d838c"/>
+        <path d="M-3.2,-12.8 L0.6,-23 L3.4,-12.8 Z" fill="#8d939c" stroke="#4d525a" stroke-width=".5"/>
+      </g>
+    </g>
+  </svg>
+</div>
+<div class="status" id="status">
+  <div id="where">Gandalf sets out from the Shire</div>
+  <div id="eta">Reckoning the road…</div>
+  <div id="phase"></div>
+  <button onclick="webkit.messageHandlers.rivendell.postMessage('retry')">Try again</button>
+</div>
+<details>
+  <summary>The road's log</summary>
+  <pre id="log"></pre>
+</details>
+<script>
+// The road, in the map image's pixels, where each place falls in the journey, and where
+// its label sits (dx, dy, anchor). startup_progress.py names the same places at the same
+// fractions.
+const STOPS = [
+  [0.0, 60, 190, 'The Shire', 0, 16, 'middle'], [0.18, 150, 178, 'Bree', 0, -8, 'middle'],
+  [0.38, 212, 165, 'Weathertop', 0, 16, 'middle'], [0.55, 255, 148, 'The Last Bridge', 4, 15, 'start'],
+  [0.7, 285, 125, 'The Trollshaws', -7, -4, 'end'], [0.86, 310, 108, 'Ford of Bruinen', 7, 9, 'start'],
+  [1.0, 332, 95, 'Rivendell', 0, -9, 'middle'],
+];
+const NS = 'http://www.w3.org/2000/svg';
+const pathFor = (pts) => pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+const stopsGroup = document.getElementById('stops');
+STOPS.forEach(([, x, y, name, dx, dy, anchor], i) => {
+  const g = document.createElementNS(NS, 'g');
+  g.setAttribute('class', 'stop');
+  const c = document.createElementNS(NS, 'circle');
+  c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', i === STOPS.length - 1 ? 4 : 3);
+  const t = document.createElementNS(NS, 'text');
+  t.setAttribute('x', x + dx); t.setAttribute('y', y + dy); t.setAttribute('text-anchor', anchor);
+  t.textContent = name;
+  g.append(c, t);
+  stopsGroup.append(g);
+});
+
+function pointAt(f) {
+  f = Math.max(0, Math.min(1, f));
+  for (let i = 1; i < STOPS.length; i++) {
+    const [f0, x0, y0] = STOPS[i - 1], [f1, x1, y1] = STOPS[i];
+    if (f <= f1) {
+      const t = (f - f0) / (f1 - f0);
+      return [x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, i - 1];
+    }
+  }
+  const last = STOPS[STOPS.length - 1];
+  return [last[1], last[2], STOPS.length - 1];
+}
+
+let shown = 0, target = 0, lastReport = 0, startedAt = Date.now(), failed = false, finished = false;
+// A typical start on this Mac, for walking without reports (expect() from Rivendell.app)
+let typical = 150;
+
+function draw() {
+  const [x, y, leg] = pointAt(shown);
+  const done = STOPS.filter(s => s[0] <= shown).map(s => [s[1], s[2]]).concat([[x, y]]);
+  const left = [[x, y]].concat(STOPS.filter(s => s[0] > shown).map(s => [s[1], s[2]]));
+  document.getElementById('road-done').setAttribute('d', pathFor(done));
+  document.getElementById('road-left').setAttribute('d', pathFor(left));
+  document.getElementById('walker').setAttribute('transform', `translate(${x.toFixed(1)},${y.toFixed(1)})`);
+  [...stopsGroup.children].forEach((g, i) => {
+    g.classList.toggle('reached', STOPS[i][0] <= shown + 1e-6);
+    g.classList.toggle('here', i === leg);
+  });
+}
+
+function frame() {
+  // Ease towards the reported position; with no reports (no Python for the timings), walk
+  // on by elapsed time against this Mac's typical start so the road still moves
+  if (!lastReport && !failed && !finished) {
+    const elapsed = (Date.now() - startedAt) / 1000;
+    if (elapsed > 5) {
+      target = Math.min(0.95, elapsed / typical);
+      const left = typical - elapsed;
+      document.getElementById('eta').textContent = left > 0 ? formatEta(left) : 'Nearly there';
+    }
+  }
+  shown += (target - shown) * 0.06;
+  if (Math.abs(target - shown) < 0.0005) shown = target;
+  draw();
+  document.getElementById('walker').classList.toggle('resting', failed || finished || Math.abs(target - shown) < 0.002 && shown >= 0.999);
+  requestAnimationFrame(frame);
+}
+
+function formatEta(seconds) {
+  if (seconds <= 0) return 'Arrived';
+  if (seconds < 45) return 'Less than a minute to Rivendell';
+  if (seconds < 90) return 'About a minute to Rivendell';
+  const minutes = Math.round(seconds / 60);
+  return minutes < 60 ? `About ${minutes} minutes to Rivendell` : `About ${Math.floor(minutes / 60)} h ${minutes % 60} min to Rivendell`;
+}
+
+function placeLine(r) {
+  if (r.fraction >= 1) return 'Gandalf has come to Rivendell';
+  const name = STOPS.filter(s => s[0] <= r.fraction).slice(-1)[0][3];
+  return name === 'The Shire' ? 'Gandalf sets out from the Shire' : `Gandalf has passed ${name}`;
+}
+
+// From Rivendell.app: the median of this Mac's earlier starts, in seconds
+function expect(seconds) { if (seconds > 0) typical = seconds; }
+
+// From Rivendell.app: one @@progress report from startup_progress.py
+function progress(r) {
+  lastReport = Date.now();
+  target = Math.max(target, r.fraction);
+  finished = r.fraction >= 1;
+  document.getElementById('map').classList.toggle('arrived', finished);
+  document.getElementById('where').textContent = placeLine(r);
+  document.getElementById('eta').textContent = formatEta(r.eta) + (r.learning && !finished ? ' (a first guess: this Mac has no timings yet)' : '');
+  document.getElementById('phase').textContent = r.message;
+}
+
+function line(t) { const l = document.getElementById('log'); l.textContent += t + '\n'; l.scrollTop = l.scrollHeight; }
+
+function status(t, error) {
+  failed = !!error;
+  document.getElementById('status').classList.toggle('error', failed);
+  document.getElementById('where').textContent = t;
+  if (failed) {
+    document.getElementById('eta').textContent = '';
+    document.getElementById('phase').textContent = 'The log below says what happened.';
+    document.querySelector('details').open = true;
+  } else if (document.body.classList.contains('plain')) {
+    document.getElementById('phase').textContent = '';
+  } else if (!lastReport) {
+    document.getElementById('phase').textContent = t;
+    document.getElementById('where').textContent = 'Gandalf sets out from the Shire';
+  }
+}
+
+// Stopping the stack or connecting to a server: no journey, just the words
+function plain(t) {
+  document.body.classList.add('plain');
+  document.getElementById('where').textContent = t;
+  document.getElementById('eta').textContent = '';
+  finished = true;
+}
+
+draw();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

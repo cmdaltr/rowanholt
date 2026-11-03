@@ -138,7 +138,7 @@ def select_pre_process_artefacts(
             # Check if this is a memory image by looking at the type field (index 2)
             # Format: filename::mount_point::type (where type is 'disk' or 'memory')
             img_type = img.split("::")[2] if len(img.split("::")) > 2 else ""
-            if img_basename not in str(processed_imgs) and img_type != "memory":  # identifying artefacts for processing
+            if img_basename not in processed_imgs and img_type != "memory":  # identifying artefacts for processing
                 # Use safe_iterdir for macOS Docker VirtioFS filesystem compatibility
                 for entry in safe_iterdir(output_directory):
                     each = entry.name

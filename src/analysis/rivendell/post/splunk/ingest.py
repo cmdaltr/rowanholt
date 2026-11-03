@@ -15,7 +15,7 @@ def ingest_splunk_data(
 ):
     imgs_to_index = []
     for _, img in allimgs.items():
-        if img not in str(imgs_to_index):
+        if img not in imgs_to_index:
             imgs_to_index.append(img)
     for img in imgs_to_index:
         if "vss" in img.split("::")[1]:

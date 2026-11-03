@@ -76,6 +76,7 @@ function OptionsPanel({ options, onChange, disabled = false, hasImages = false, 
       options: [
         { key: 'analysis', label: 'Automated Analysis', description: 'Conduct automated forensic analysis (includes magic-byte checks)', time: 30 },
         { key: 'extract_iocs', label: 'Extract IOCs', description: 'Extract Indicators of Compromise', time: 20 },
+        { key: 'threat_intel', label: 'Threat Intelligence', description: 'Match artefacts and IOCs against\nthe indicators in Pippin', time: 10 },
         { key: 'memory', label: 'Memory Collection & Analysis', description: 'Analyze memory using Volatility', time: 45, slow: true },
         { key: 'timeline', label: 'Disk Image Timeline', description: 'Create timeline using plaso', time: 180, slow: true, disabledForGandalf: true },
         { key: 'memory_timeline', label: 'Memory Timeline', description: 'Create memory timeline using timeliner', time: 60, slow: true },
@@ -632,7 +633,7 @@ function OptionsPanel({ options, onChange, disabled = false, hasImages = false, 
               const isCollectionStep = currentStepData.key === 'collection';
               const filteredOptions = getFilteredOptions();
 
-              const analysisOrder = ['analysis', 'extract_iocs', 'memory', 'timeline', 'memory_timeline', 'keywords', 'yara', 'collectFiles'];
+              const analysisOrder = ['analysis', 'extract_iocs', 'threat_intel', 'memory', 'timeline', 'memory_timeline', 'keywords', 'yara', 'collectFiles'];
 
               const orderedOptions = (isAnalysisStep ? analysisOrder : [])
                 .map(key => filteredOptions.find(opt => opt.key === key))
@@ -658,12 +659,11 @@ function OptionsPanel({ options, onChange, disabled = false, hasImages = false, 
                     const layoutStyle = {};
 
                     if (isAnalysisStep) {
-                      // 2 rows x 3 columns layout using 6-column grid
-                      // Row 1: Automated Analysis | Extract IOCs | Memory Collection
-                      // Row 2: Memory Timeline | Disk Image Timeline | (empty)
+                      // 3 rows x 3 columns using a 6-column grid (App.css)
                       const spans = {
                         analysis: 2,
                         extract_iocs: 2,
+                        threat_intel: 2,
                         memory: 2,
                         memory_timeline: 2,
                         timeline: 2,

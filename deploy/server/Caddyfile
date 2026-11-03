@@ -1,0 +1,69 @@
+# Rivendell's reverse proxy on a server (deploy/server/docker-compose.server.yml).
+#
+# RIVENDELL_TLS picks the certificate:
+#   internal                        Caddy's own CA (the default): trust its root on clients,
+#                                   rivendell server ca prints it
+#   you@example.org                 Let's Encrypt, for a name reachable from the internet
+#   /certs/rivendell.crt /certs/rivendell.key
+#                                   your organisation's certificate, in deploy/server/certs
+
+{
+	admin off
+}
+
+# Splunk, Kibana and the Navigator have no idea who Rivendell's users are, so the
+# backend vouches for each request; anyone not signed in goes to the sign-in page, and
+# the Navigator's case layers follow job sharing
+(signed_in) {
+	forward_auth backend:5688 {
+		uri /api/auth/verify?login_redirect=1&service={args[0]}
+		copy_headers X-Rivendell-User
+	}
+}
+
+(hardened) {
+	tls {$RIVENDELL_TLS}
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy same-origin
+		-Server
+	}
+}
+
+{$RIVENDELL_HOSTNAME} {
+	import hardened
+	header X-Frame-Options SAMEORIGIN
+
+	handle /api/* {
+		reverse_proxy backend:5688 {
+			# Evidence uploads and long analyses
+			transport http {
+				read_timeout 30m
+				write_timeout 30m
+			}
+		}
+	}
+	handle {
+		reverse_proxy frontend:80
+	}
+}
+
+{$RIVENDELL_HOSTNAME}:7755 {
+	import hardened
+	import signed_in splunk
+	reverse_proxy splunk:8000
+}
+
+{$RIVENDELL_HOSTNAME}:5601 {
+	import hardened
+	import signed_in kibana
+	reverse_proxy kibana:5601
+}
+
+{$RIVENDELL_HOSTNAME}:5602 {
+	import hardened
+	import signed_in navigator
+	reverse_proxy navigator:4200
+}

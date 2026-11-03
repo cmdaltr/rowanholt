@@ -20,7 +20,7 @@ def linux_vol3(
         volver: Volatility version (should be "3")
         profile: Linux profile/symbol table
         symbolorprofile: Label for profile field
-        plugin: Plugin name (e.g., "linux.pslist.Pslist")
+        plugin: Plugin name (e.g., "linux.pslist.PsList")
         plugoutlist: Volatility command output split by newlines
         jsondict: Dictionary template for JSON entries
         jsonlist: List to append parsed entries to

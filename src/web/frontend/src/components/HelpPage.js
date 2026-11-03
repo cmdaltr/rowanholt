@@ -319,6 +319,8 @@ sudo python3 python/gandalf.py Password Remote -O /evidence/CASE-001`}
             <li>ClamAV malware scanning</li>
             <li>Memory analysis with Volatility</li>
             <li>Memory timeline generation</li>
+            <li>Threat intelligence matching against Pippin's indicators</li>
+            <li>Stacking across hosts: what few hosts of the same OS have, ranked with its reasons</li>
           </ul>
 
           <h4>Output Destinations</h4>
@@ -327,6 +329,46 @@ sudo python3 python/gandalf.py Password Remote -O /evidence/CASE-001`}
             <li><strong>Elastic:</strong> Index into Elasticsearch</li>
             <li><strong>MITRE Navigator:</strong> ATT&CK framework mapping</li>
           </ul>
+        </>
+      )
+    },
+    pippin: {
+      title: 'Pippin',
+      content: (
+        <>
+          <h3>Threat Intelligence</h3>
+          <p>
+            Pippin holds the indicators Elrond matches cases against and Eru checks single values with, in the
+            ten columns of the Iran APT workbook: evidential element, threat group, procedure, technique,
+            tactic, context, references and source.
+          </p>
+
+          <h4>Sources</h4>
+          <ul>
+            <li><strong>Iran APT workbook</strong> (XLSX)</li>
+            <li><strong>STIX 2.1</strong> bundles (JSON) and <strong>TAXII 2.1</strong> collections</li>
+            <li><strong>MITRESaw</strong>'s procedures CSV, or Rivendell's own CSV</li>
+            <li>A <strong>.txt watchlist</strong>, one value per line</li>
+          </ul>
+
+          <h4>Matching a case</h4>
+          <p>
+            Tick Threat Intelligence on Elrond's page, or run Elrond with <code>--threatIntel</code>. Each host
+            gets <code>analysis/threat_intel_matches.csv</code>, and the case gets <code>threat_groups.csv</code>:
+            groups ranked by what matched, each with the basis for its rank (atomic indicators, specific
+            procedures, common tooling, or technique overlap only). Built-ins, ordinary words and elements many
+            groups share don't count as attribution.
+          </p>
+          <pre className="code-block">
+{`python3 src/analysis/elrond.py CASE-001 /evidence/CASE-001 /cases/CASE-001 \
+  --Gandalf --Process --Analysis --threatIntel iran_apt.xlsx mitre_procedures.csv`}
+          </pre>
+
+          <h4>Checking one value</h4>
+          <p>
+            Paste a process name, command line, path, IP, domain or hash into Check a value: Pippin lists the
+            indicators it matches and how many groups share each one.
+          </p>
         </>
       )
     },
@@ -487,6 +529,26 @@ python3 -m rivendell.mitre.mapper /path/to/artifacts
 
 # Generate Dashboard
 python3 -m rivendell.mitre.dashboard -o /output`}
+          </pre>
+
+          <h4>Working a Case Together</h4>
+          <p>
+            Browse Case on a completed job opens its cooked artefacts and analysis, read-only. Flag rows as
+            findings (lead, confirmed or benign), keep notes, assign hosts and follow the activity feed. A row
+            someone already flagged can't be flagged twice, and a finding changed by a colleague since you
+            loaded it isn't silently overwritten. Report and Navigator layer are built from confirmed findings
+            only.
+          </p>
+
+          <h4>Container Forensics</h4>
+          <p>
+            Gandalf and Elrond collect a Docker host's containers (configuration, mounts, logs, a hashed
+            listing of each writable layer and copies of the executables in it) and a Kubernetes node's static pods, pod logs and audit log.
+            Containers are tagged for what they can reach, such as the host's root or the Docker socket.
+          </p>
+          <pre className="code-block">
+{`# Audit logs exported from EKS, AKS or GKE
+python3 -m src.analysis.rivendell.cloud.cli k8s analyze-logs --log-file audit.json --output ./analysis`}
           </pre>
 
           <h4>Cloud Forensics</h4>
@@ -751,7 +813,7 @@ python3 -m rivendell.analysis.engine`}
         </p>
       </header>
 
-      <div className="card">
+      <div data-guide="about.docs" className="card">
         {/* Tab Navigation */}
         <div style={{
           display: 'flex',

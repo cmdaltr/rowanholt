@@ -7,8 +7,10 @@ FROM ${BASE}
 COPY setup.sh /lab/setup.sh
 RUN sh /lab/setup.sh
 
+# SEED=0 builds a clean host, with nothing planted: the stacking targets
+ARG SEED=1
 COPY seed/ /lab/seed/
-RUN sh /lab/seed/seed-artefacts.sh
+RUN if [ "$SEED" = 1 ]; then sh /lab/seed/seed-artefacts.sh; fi
 
 COPY entrypoint.sh /lab/entrypoint.sh
 EXPOSE 22

@@ -14,7 +14,9 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$LabUser = "gandalf"
+    [string]$LabUser = "gandalf",
+    # A clean host for stacking: the lab user and remoting, nothing seeded
+    [switch]$Clean
 )
 $ErrorActionPreference = "Stop"
 
@@ -47,6 +49,11 @@ Set-Item WSMan:\localhost\Client\TrustedHosts -Value "localhost,127.0.0.1,lab-*"
 # Local accounts get a filtered token over remoting unless this is set.
 New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name LocalAccountTokenFilterPolicy -Value 1 -PropertyType DWord -Force | Out-Null
 Write-Host "  WinRM enabled; TrustedHosts = localhost, lab-*"
+
+if ($Clean) {
+    Write-Host "`nProvisioned $env:COMPUTERNAME as a clean Gandalf target (nothing seeded)." -ForegroundColor Green
+    return
+}
 
 Write-Step "Seeding artefacts"
 $lab = "C:\ProgramData\RivendellLab"

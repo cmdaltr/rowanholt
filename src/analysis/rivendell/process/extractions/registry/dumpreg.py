@@ -1,9 +1,10 @@
 #!/usr/bin/env python3 -tt
+import json
 import re
 import subprocess
 
 from rivendell.process.extractions.registry.profile import use_profile_plugins
-from rivendell.process.extractions.registry.system import use_system_plugins
+from rivendell.process.extractions.registry.system import cleaned, records_of, use_system_plugins
 
 
 def extract_dumpreg_system(
@@ -36,37 +37,7 @@ def extract_dumpreg_system(
                 artefact, jsondict, jsonlist, regjsonlist, rgrplistj, [], []
             )
         if len(regjsonlist) > 0:
-            regjson.write(
-                str(regjsonlist)
-                .replace(
-                    "\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\",
-                    "/",
-                )
-                .replace("\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\", "/")
-                .replace("\\\\\\\\\\\\\\\\", "/")
-                .replace("\\\\\\\\", "/")
-                .replace("\\\\", "/")
-                .replace("\\", "/")
-                .replace('/"', '"')
-                .replace(
-                    "                                                                ",
-                    " ",
-                )
-                .replace("                                ", " ")
-                .replace("                ", " ")
-                .replace("        ", " ")
-                .replace("    ", " ")
-                .replace("  ", " ")
-                .replace("  ", "")
-                .replace('" ', '"')
-                .replace(' "', '"')
-                .replace("//'", "'")
-                .replace('":"', '": "')
-                .replace('","', '", "')
-                .replace('"}"\', \'"{"', '"}, {"')
-                .replace('[\'"{"', '[{"')
-                .replace('"}"\']', '"}]')
-            )
+            json.dump([cleaned(record) for record in records_of(regjsonlist)], regjson)
         regjsonlist.clear()
         jsonlist.clear()
 
@@ -110,37 +81,7 @@ def extract_dumpreg_profile(
                 "UNKNOWN (dumpreg)",
             )
             if len(regjsonlist) > 0:
-                regjson.write(
-                    str(regjsonlist)
-                    .replace(
-                        "\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\",
-                        "/",
-                    )
-                    .replace("\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\", "/")
-                    .replace("\\\\\\\\\\\\\\\\", "/")
-                    .replace("\\\\\\\\", "/")
-                    .replace("\\\\", "/")
-                    .replace("\\", "/")
-                    .replace('/"', '"')
-                    .replace(
-                        "                                                                ",
-                        " ",
-                    )
-                    .replace("                                ", " ")
-                    .replace("                ", " ")
-                    .replace("        ", " ")
-                    .replace("    ", " ")
-                    .replace("  ", " ")
-                    .replace("  ", "")
-                    .replace('" ', '"')
-                    .replace(' "', '"')
-                    .replace("//'", "'")
-                    .replace('":"', '": "')
-                    .replace('","', '", "')
-                    .replace('"}"\', \'"{"', '"}, {"')
-                    .replace('[\'"{"', '[{"')
-                    .replace('"}"\']', '"}]')
-                )
+                json.dump([cleaned(record) for record in records_of(regjsonlist)], regjson)
             regjsonlist.clear()
             jsonlist.clear()
 
@@ -228,37 +169,7 @@ def extract_dumpreg_guess(
                 else:
                     guessed_hive = ""
                 if len(regjsonlist) > 0:
-                    regjson.write(
-                        str(regjsonlist)
-                        .replace(
-                            "\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\",
-                            "/",
-                        )
-                        .replace("\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\", "/")
-                        .replace("\\\\\\\\\\\\\\\\", "/")
-                        .replace("\\\\\\\\", "/")
-                        .replace("\\\\", "/")
-                        .replace("\\", "/")
-                        .replace('/"', '"')
-                        .replace(
-                            "                                                                ",
-                            " ",
-                        )
-                        .replace("                                ", " ")
-                        .replace("                ", " ")
-                        .replace("        ", " ")
-                        .replace("    ", " ")
-                        .replace("  ", " ")
-                        .replace("  ", "")
-                        .replace('" ', '"')
-                        .replace(' "', '"')
-                        .replace("//'", "'")
-                        .replace('":"', '": "')
-                        .replace('","', '", "')
-                        .replace('"}"\', \'"{"', '"}, {"')
-                        .replace('[\'"{"', '[{"')
-                        .replace('"}"\']', '"}]')
-                    )
+                    json.dump([cleaned(record) for record in records_of(regjsonlist)], regjson)
                 else:
                     guessed_hive = ""
                 regjsonlist.clear()

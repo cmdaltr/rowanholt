@@ -5,7 +5,22 @@ import subprocess
 
 from rivendell.process.extractions.mitre_tagger import tag_mitre_technique
 
-from rivendell.process.extractions.registry.system import run_key_records
+from rivendell.process.extractions.registry.system import cleaned, records_of, run_key_records
+
+
+LAST_WRITE_TIME = re.compile(r"^[\d-]{10} [\d:]{8}Z?$")
+
+
+def last_write_moved(record):
+    """Some profile plugins leave "LastWrite Time" as one field's value and the time as the next's:
+    blank both and give the time its own LastWriteTime field (the first field is never one)."""
+    keys = list(record)
+    moved = dict(record)
+    for key, after in zip(keys[1:], keys[2:]):
+        if record[key] in ("LastWrite Time", "LastWriteTime") and LAST_WRITE_TIME.match(str(record[after])):
+            moved[key] = moved[after] = "-"
+            moved["LastWriteTime"] = record[after]
+    return moved
 
 
 def use_profile_plugins(
@@ -1402,42 +1417,6 @@ def extract_registry_profile(
         if any('"Plugin": "run"' in record for record in jsonlist):
             tag_mitre_technique(output_directory, img, "registry", "T1547.001")
         if len(regjsonlist) > 0:
-            regdata = (
-                str(regjsonlist)
-                .replace(
-                    "\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\",
-                    "/",
-                )
-                .replace("\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\", "/")
-                .replace("\\\\\\\\\\\\\\\\", "/")
-                .replace("\\\\\\\\", "/")
-                .replace("\\\\", "/")
-                .replace("\\", "/")
-                .replace('/"', '"')
-                .replace(
-                    "                                                                ",
-                    " ",
-                )
-                .replace("                                ", " ")
-                .replace("                ", " ")
-                .replace("        ", " ")
-                .replace("    ", " ")
-                .replace("  ", " ")
-                .replace("  ", "")
-                .replace('" ', '"')
-                .replace(' "', '"')
-                .replace("//'", "'")
-                .replace('":"', '": "')
-                .replace('","', '", "')
-                .replace('"}"\', \'"{"', '"}, {"')
-                .replace('[\'"{"', '[{"')
-                .replace('"}"\']', '"}]')
-            )
-            regdata = re.sub(
-                r'(", "[^"]+": ")(LastWrite) ?(Time)(", ")([^"]+": ")([\d-]{10} [\d:]{8}Z?")',
-                r'\1-\4\5-", "\2\3": "\6',
-                regdata,
-            )
-            regjson.write(regdata)
+            json.dump([last_write_moved(cleaned(record)) for record in records_of(regjsonlist)], regjson)
         regjsonlist.clear()
         jsonlist.clear()

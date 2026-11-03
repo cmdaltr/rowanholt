@@ -4,8 +4,9 @@ Files in raw/macos/ are named after their path on the host with '/' as '+'
 (private+var+db+SystemPolicyConfiguration+ExecPolicy), as Gandalf (gandalf.sh,
 gandalf.py) and Elrond's image collection both write them; SQLite write-ahead
 logs sit beside their database as <name>-wal. Gandalf's live unified-log export
-is gandalf+unifiedlog.ndjson. Each parser writes a cooked/*.csv. Plists with no
-parser here go on to Elrond's generic plist processing.
+is gandalf+unifiedlog.ndjson; the unified-log store itself (tracev3, with uuidtext/
+and timesync/) is under raw/unified_log_store/, its layout kept. Each parser writes a
+cooked/*.csv. Plists with no parser here go on to Elrond's generic plist processing.
 """
 
 import csv
@@ -18,13 +19,24 @@ import sqlite3
 import struct
 import tempfile
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from typing import Dict, Iterable, List, Optional, Tuple
 
+from rivendell.process.extractions import spotlight, tracev3
 from rivendell.process.linux_artefacts import SUSPICIOUS_COMMAND, _append_rows, _audit, _cooked, _techniques, epoch
 
 logger = logging.getLogger(__name__)
 
-MACOS_RAW = re.compile(r"/artefacts/raw/macos/")
+MACOS_RAW = re.compile(r"/artefacts/raw/(?:macos|unified_log_store|spotlight)/")
+LOG_STORE = re.compile(r"^(.*/artefacts/raw/unified_log_store)/")
+# Gandalf flattens each Spotlight store's path: spotlight/Store-V2+<UUID>+store.db beside its dbStr maps
+SPOTLIGHT = re.compile(r"^(.*/artefacts/raw/spotlight)/(.*)\+([^+]+)$")
+# What's kept from the store: the processes and subsystems of Gandalf's live export
+# (MACOS_UNIFIED_LOG_PREDICATE in gandalf.py's collector and gandalf.sh); keep them in step
+UNIFIED_LOG_PROCESSES = frozenset({"sudo", "su", "sshd", "sshd-session", "loginwindow", "screensharingd", "syspolicyd",
+                                   "XprotectService", "backgroundtaskmanagementd", "authd"})
+UNIFIED_LOG_SUBSYSTEMS = frozenset({"com.apple.TCC", "com.apple.xprotect", "com.apple.syspolicy.exec",
+                                    "com.apple.backgroundtaskmanagement"})
 MAC_EPOCH = datetime(2001, 1, 1, tzinfo=timezone.utc)
 UNIFIED_LOG_FIELDS = ("timestamp", "processImagePath", "processID", "subsystem", "category", "messageType", "eventMessage")
 APPLE_TEAMS = {"", "apple", "Apple", "APPLECOMPUTER"}
@@ -38,6 +50,8 @@ HEADERS = {
     "emond_rules.csv": ["Source", "Name", "Enabled", "EventTypes", "Actions", "Flag"],
     "periodic.csv": ["Source", "LineNumber", "Line", "Flag"],
     "unified_log.csv": ["LastWriteTime", "Process", "PID", "Subsystem", "Category", "Type", "Message"],
+    "unified_log_store.csv": ["LastWriteTime", "Process", "PID", "Subsystem", "Category", "Type", "Message"],
+    "spotlight.csv": spotlight.COLUMNS,
 }
 
 
@@ -304,6 +318,39 @@ def unified_log_rows(path: str) -> List[Dict[str, str]]:
     return rows
 
 
+@lru_cache(maxsize=1)
+def _log_store(root: str) -> tracev3.Store:
+    """One store's format strings and timesync, read once for all its tracev3 files."""
+    return tracev3.Store(root)
+
+
+def _kept(process: str, subsystem: str) -> bool:
+    return process in UNIFIED_LOG_PROCESSES or subsystem in UNIFIED_LOG_SUBSYSTEMS
+
+
+def unified_log_store_rows(path: str) -> List[Dict[str, str]]:
+    """The log messages in one tracev3 file of the store that the live export's predicate would keep."""
+    match = LOG_STORE.match(path)
+    if not match:
+        return []
+    return list(tracev3.Reader(_log_store(match.group(1)), path).messages(_kept))
+
+
+def spotlight_rows(path: str) -> List[Dict[str, str]]:
+    """One collected Spotlight store's items, read from its store.db and the dbStr maps beside it."""
+    match = SPOTLIGHT.match(path)
+    if not match:
+        return []
+    folder, store, _ = match.groups()
+    prefix = f"{store}+"
+    files = {name[len(prefix):]: os.path.join(folder, name) for name in os.listdir(folder) if name.startswith(prefix)}
+    try:
+        return spotlight.rows(spotlight.Store(files), store.replace("+", "/"))
+    except (spotlight.SpotlightError, OSError) as exc:
+        logger.warning(f"Spotlight store {store}: {exc}")
+        return []
+
+
 def _append_table(path: str, rows: List[Dict]) -> int:
     """Append rows whose columns come from the database, keeping an existing file's header."""
     if not rows:
@@ -320,6 +367,14 @@ def _append_table(path: str, rows: List[Dict]) -> int:
 def _route(artefact: str):
     """(csv name or None, rows or {csv: rows}, description, techniques); csv None: not ours."""
     name = os.path.basename(artefact)
+    if LOG_STORE.match(artefact):
+        if name.endswith(".tracev3"):
+            return "unified_log_store.csv", unified_log_store_rows(artefact), "unified log store", []
+        return "", [], "", []  # uuidtext and timesync: read with the tracev3 files
+    if SPOTLIGHT.match(artefact):
+        if name.endswith("+store.db"):
+            return "spotlight.csv", spotlight_rows(artefact), "Spotlight index", []
+        return "", [], "", []  # .store.db, the dbStr maps, VolumeConfiguration.plist: read with store.db
     path = host_path(name)
     lower = path.lower()
     if name.endswith(SQLITE_SIDECARS):

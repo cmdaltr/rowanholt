@@ -1,20 +1,35 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { API_BASE_URL } from '../apiBase';
+import { flagFinding } from '../api';
 
 const heroImage = `${process.env.PUBLIC_URL}/images/rivendell.png`;
 
 // API base URL - adjust based on environment
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5688';
+const API_BASE = API_BASE_URL;
+const CASE_HOST = '(case)'; // the case's own summaries (stacking.csv): a finding rests on a host's row, as in the case browser
+const rowKey = (row) => `${row.host}|${row.file}|${row.row_ref}`;
+// One entry per job (two jobs can share a case number), or per case folder with no job behind it
+const caseKey = (c) => c.job_id || c.case_id;
+// Eru reads that job's output, not the first visible job with the same case number
+const caseUrl = (c, action) =>
+  `${API_BASE}/api/ai/cases/${encodeURIComponent(c.case_id)}/${action}${c.job_id ? `?job_id=${c.job_id}` : ''}`;
+// The rows an answer cited, which can be flagged on its job's case
+const citedRows = (data) => (data.job_id ? { jobId: data.job_id, rows: (data.rows || []).filter((r) => r.host !== CASE_HOST) } : {});
 
 function AIAssistant() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [cases, setCases] = useState([]);
-  const [selectedCase, setSelectedCase] = useState('');
+  const [selectedCase, setSelectedCase] = useState('');  // a caseKey
+  const current = cases.find((c) => caseKey(c) === selectedCase);  // the selected case, with its job
   const [llmStatus, setLlmStatus] = useState({ available: false, model: null, reason: '', checked: false });
   const [offlineQuestions, setOfflineQuestions] = useState([]);
   const [loadingCases, setLoadingCases] = useState(true);
   const [showHelp, setShowHelp] = useState(true);
+  const [flagging, setFlagging] = useState(null); // {message, row, title, technique, status}
+  const [flagged, setFlagged] = useState({}); // `${message}|${rowKey}` -> {id} or {error}
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -49,7 +64,7 @@ function AIAssistant() {
         setCases(data.cases || []);
         // Auto-select first case if available
         if (data.cases && data.cases.length > 0) {
-          setSelectedCase(data.cases[0].case_id);
+          setSelectedCase(caseKey(data.cases[0]));
         }
       }
     } catch (error) {
@@ -102,18 +117,35 @@ function AIAssistant() {
       const response = await fetch(`${API_BASE}/api/ai/offline/answer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question_id: q.id, case_id: selectedCase || null }),
+        body: JSON.stringify({ question_id: q.id, case_id: current ? current.case_id : null,
+                               job_id: current ? current.job_id || null : null }),
       });
       const data = await response.json();
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: response.ok ? data.answer : (data.detail || 'No answer.'),
-        offline: true
+        offline: true,
+        ...(response.ok ? citedRows(data) : {})
       }]);
     } catch (error) {
       setMessages(prev => [...prev, { role: 'assistant', content: `Couldn't reach the backend: ${error.message}` }]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const submitFlag = async (event) => {
+    event.preventDefault();
+    const { message, row, title, technique, status } = flagging;
+    const key = `${message}|${rowKey(row)}`;
+    try {
+      const finding = await flagFinding(messages[message].jobId, { host: row.host, artefact: row.file, row_ref: row.row_ref,
+        title, technique, status });
+      setFlagged((prev) => ({ ...prev, [key]: { id: finding.id } }));
+      setFlagging(null);
+    } catch (err) {
+      // 409: someone flagged that row already, and the message says who
+      setFlagged((prev) => ({ ...prev, [key]: { error: err.response?.data?.detail || err.message } }));
     }
   };
 
@@ -131,8 +163,8 @@ function AIAssistant() {
 
     try {
       // If a case is selected, query case-specific data
-      if (selectedCase) {
-        const response = await fetch(`${API_BASE}/api/ai/cases/${selectedCase}/query`, {
+      if (current) {
+        const response = await fetch(caseUrl(current, 'query'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -147,7 +179,8 @@ function AIAssistant() {
             content: data.answer,
             sources: data.sources || [],
             confidence: data.confidence,
-            processing_time: data.processing_time
+            processing_time: data.processing_time,
+            ...citedRows(data)
           };
           setMessages(prev => [...prev, assistantMessage]);
         } else {
@@ -191,11 +224,11 @@ function AIAssistant() {
   };
 
   const handleGetSuggestions = async () => {
-    if (!selectedCase) return;
+    if (!current) return;
 
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/ai/cases/${selectedCase}/suggestions`, {
+      const response = await fetch(caseUrl(current, 'suggestions'), {
         method: 'POST',
       });
 
@@ -207,7 +240,8 @@ function AIAssistant() {
 
         setMessages(prev => [...prev, {
           role: 'assistant',
-          content: `**Investigation Path Suggestions for ${selectedCase}:**\n\n${suggestionsText}`
+          content: `**Investigation Path Suggestions for ${current.case_id}:**\n\n${suggestionsText}`,
+          ...citedRows(data)
         }]);
       }
     } catch (error) {
@@ -218,11 +252,11 @@ function AIAssistant() {
   };
 
   const handleGetSummary = async () => {
-    if (!selectedCase) return;
+    if (!current) return;
 
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/ai/cases/${selectedCase}/summary`, {
+      const response = await fetch(caseUrl(current, 'summary'), {
         method: 'POST',
       });
 
@@ -230,7 +264,8 @@ function AIAssistant() {
         const data = await response.json();
         setMessages(prev => [...prev, {
           role: 'assistant',
-          content: `**Case Summary for ${selectedCase}:**\n\n${data.executive_summary || 'No summary available.'}`
+          content: `**Case Summary for ${current.case_id}:**\n\n${data.executive_summary || 'No summary available.'}`,
+          ...citedRows(data)
         }]);
       }
     } catch (error) {
@@ -294,7 +329,7 @@ function AIAssistant() {
 
       <div className="card ai-chat-container">
         {/* Collapsible Help Section */}
-        <div style={{ marginBottom: '1rem' }}>
+        <div data-guide="eru.help" style={{ marginBottom: '1rem' }}>
           <button
             onClick={() => setShowHelp(!showHelp)}
             style={{
@@ -362,7 +397,7 @@ function AIAssistant() {
         </div>
 
         {/* Case Selection and Status */}
-        <div style={{
+        <div data-guide="eru.case" style={{
           display: 'flex',
           gap: '1rem',
           marginBottom: '1.5rem',
@@ -397,8 +432,10 @@ function AIAssistant() {
             >
               <option value="">-- General Assistant (No Case) --</option>
               {cases.map((c) => (
-                <option key={c.case_id} value={c.case_id}>
-                  {c.case_id} {c.indexed ? '(Indexed)' : ''}
+                <option key={caseKey(c)} value={caseKey(c)}>
+                  {c.case_id}
+                  {c.job_id && cases.filter((o) => o.case_id === c.case_id).length > 1 ? ` (job ${c.job_id.slice(0, 8)})` : ''}
+                  {c.indexed ? ' (Indexed)' : ''}
                 </option>
               ))}
             </select>
@@ -445,7 +482,7 @@ function AIAssistant() {
         </div>
 
         {/* Chat Messages */}
-        <div className="chat-messages" style={{ minHeight: messages.length > 0 ? '200px' : '60px', maxHeight: '500px', overflowY: 'auto' }}>
+        <div data-guide="eru.chat" className="chat-messages" style={{ minHeight: messages.length > 0 ? '200px' : '60px', maxHeight: '500px', overflowY: 'auto' }}>
           {messages.length === 0 && (
             <div style={{
               textAlign: 'center',
@@ -454,7 +491,7 @@ function AIAssistant() {
               opacity: 0.6
             }}>
               {selectedCase
-                ? `Ask questions about case "${selectedCase}" or use the quick actions below.`
+                ? `Ask questions about case "${current ? current.case_id : selectedCase}" or use the quick actions below.`
                 : 'Select a case to query case-specific data, or ask general forensics questions.'}
             </div>
           )}
@@ -503,6 +540,42 @@ function AIAssistant() {
                   {formatContent(message.content)}
                 </div>
 
+                {message.rows && message.rows.length > 0 && message.jobId && (
+                  <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(240, 219, 165, 0.2)', fontSize: '0.8rem' }}>
+                    <strong>Rows this answer came from</strong>{' '}
+                    <Link to={`/jobs/${message.jobId}/case`} style={{ color: '#66d9ef' }}>open the case</Link>
+                    {message.rows.map((row) => {
+                      const state = flagged[`${index}|${rowKey(row)}`];
+                      const open = flagging && flagging.message === index && rowKey(flagging.row) === rowKey(row);
+                      return (
+                        <div key={rowKey(row)} style={{ marginTop: '0.35rem' }}>
+                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'baseline' }}>
+                            {state?.id ? <span title={`Finding #${state.id}`}>⚑ #{state.id}</span> : (
+                              <button type="button" title="Flag as finding" style={{ padding: '0.1rem 0.4rem' }}
+                                onClick={() => setFlagging({ message: index, row, title: row.line.slice(0, 200), technique: '', status: 'lead' })}>⚑</button>
+                            )}
+                            <span style={{ opacity: 0.7 }} title={`sha256 ${row.hash}`}>{row.tag ? `[${row.tag}] ` : ''}{row.host}: {row.file} row {row.row_ref}</span>
+                          </div>
+                          {state?.error && <div style={{ color: '#ed5565' }}>{state.error}</div>}
+                          {open && (
+                            <form onSubmit={submitFlag} style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.35rem' }}>
+                              <input type="text" required autoFocus placeholder="What it is" value={flagging.title} style={{ flex: 2, minWidth: '12rem' }}
+                                onChange={(e) => setFlagging({ ...flagging, title: e.target.value })} />
+                              <input type="text" placeholder="T1053.003" value={flagging.technique} style={{ width: '8rem' }}
+                                onChange={(e) => setFlagging({ ...flagging, technique: e.target.value })} />
+                              <select value={flagging.status} onChange={(e) => setFlagging({ ...flagging, status: e.target.value })}>
+                                <option value="lead">lead</option><option value="confirmed">confirmed</option>
+                              </select>
+                              <button type="submit">Flag</button>
+                              <button type="button" className="secondary" onClick={() => setFlagging(null)}>Cancel</button>
+                            </form>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {/* Show sources if available */}
                 {message.sources && message.sources.length > 0 && (
                   <div style={{
@@ -549,7 +622,7 @@ function AIAssistant() {
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="quick-actions" style={{
+        <div data-guide="eru.quick" className="quick-actions" style={{
           marginTop: '1rem',
           position: 'relative'
         }}>
@@ -642,7 +715,7 @@ function AIAssistant() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} style={{
+        <form data-guide="eru.ask" onSubmit={handleSubmit} style={{
           marginTop: '1.5rem',
           display: 'flex',
           gap: '0.75rem'
@@ -654,7 +727,7 @@ function AIAssistant() {
             placeholder={!llmStatus.available && llmStatus.checked
               ? 'Free-text questions need the language model: pick a question above'
               : selectedCase
-                ? `Ask about case "${selectedCase}"...`
+                ? `Ask about case "${current ? current.case_id : selectedCase}"...`
                 : "Ask me anything about forensic analysis..."}
             disabled={loading || (llmStatus.checked && !llmStatus.available)}
             style={{

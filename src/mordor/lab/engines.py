@@ -13,6 +13,9 @@ installed. Names are validated by the caller (machines) before they reach here. 
 
 import json
 import re
+import subprocess
+import sys
+import time
 from typing import Dict, List
 
 from .runner import LabError, run, run_ok, spawn
@@ -233,6 +236,36 @@ def parse_utm_list(out: str) -> List[Dict]:
     return machines
 
 
+def utm_up() -> None:
+    """Open UTM in the background and out of the Dock when Rivendell is what launches it
+    (lab/lib/common.sh's utm_up). UTM reads HideDockIcon as it starts, so the setting is put
+    back once it's running: opening UTM yourself later shows its icon as usual."""
+    if sys.platform != "darwin" or subprocess.run(["pgrep", "-xq", "UTM"]).returncode == 0:
+        return
+    domain = ["defaults", "write", "com.utmapp.UTM", "HideDockIcon", "-bool"]
+    previous = subprocess.run(["defaults", "read", "com.utmapp.UTM", "HideDockIcon"],
+                              capture_output=True, text=True)
+    subprocess.run(domain + ["true"], capture_output=True)
+    subprocess.run(["open", "-g", "-j", "-a", "UTM"], capture_output=True)
+    for _ in range(30):
+        if subprocess.run(["pgrep", "-xq", "UTM"]).returncode == 0:
+            break
+        time.sleep(1)
+    time.sleep(3)  # past its launch, where the setting is read
+    if previous.returncode != 0:
+        subprocess.run(["defaults", "delete", "com.utmapp.UTM", "HideDockIcon"], capture_output=True)
+    else:
+        subprocess.run(domain + ["true" if previous.stdout.strip() == "1" else "false"], capture_output=True)
+
+
+def utmctl(*args: str, timeout: int = 120, check: bool = True) -> str:
+    """utmctl with UTM opened hidden first, and its window kept hidden (--hide) by every
+    subcommand that takes it; snapshot doesn't."""
+    utm_up()
+    hide = [] if args[0] == "snapshot" else ["--hide"]
+    return run(["utmctl", args[0], *hide, *args[1:]], timeout=timeout, check=check)
+
+
 class UTM:
     """UTM/QEMU VMs on macOS, driven through utmctl. utmctl can't create a VM from an image (the
     lab's own Windows VM is built by ./lab.sh windows-vm create) — but it starts, snapshots, restores,
@@ -242,7 +275,7 @@ class UTM:
     key = "utm"
 
     def list(self) -> List[Dict]:
-        return parse_utm_list(run(["utmctl", "list", "--hide"], timeout=30))
+        return parse_utm_list(utmctl("list", timeout=30))
 
     def create(self, name: str, image: str):
         raise LabError("Build this VM in UTM first",
@@ -251,24 +284,24 @@ class UTM:
                        "here for Rivendell to manage.")
 
     def start(self, name: str):
-        run(["utmctl", "start", "--hide", name], timeout=180)
+        utmctl("start", name, timeout=180)
 
     def stop(self, name: str):
-        run(["utmctl", "stop", "--hide", name], timeout=120, check=False)
+        utmctl("stop", name, timeout=120, check=False)
 
     def snapshot(self, name: str, snap: str):
-        run(["utmctl", "snapshot", "create", name, "--name", snap], timeout=600)
+        utmctl("snapshot", "create", name, "--name", snap, timeout=600)
 
     def revert(self, name: str, snap: str):
-        run(["utmctl", "snapshot", "restore", name, "--snapshot", snap], timeout=600)
+        utmctl("snapshot", "restore", name, "--snapshot", snap, timeout=600)
 
     def clone(self, name: str, new_name: str):
         # Copies the disk, so it's slow for a Windows VM — run it as a job. UTM registers the
         # clone itself; it inherits the source's drives, snapshots and guest tools.
-        run(["utmctl", "clone", name, "--name", new_name], timeout=1800)
+        utmctl("clone", name, "--name", new_name, timeout=1800)
 
     def delete(self, name: str):
-        run(["utmctl", "delete", "--hide", name], timeout=60, check=False)
+        utmctl("delete", name, timeout=60, check=False)
 
     def status(self, name: str) -> Dict:
         found = [m for m in self.list() if m["name"] == name]
@@ -277,12 +310,13 @@ class UTM:
         return found[0]
 
     def logs(self, name: str, tail: int) -> str:
-        ip = run(["utmctl", "ip-address", "--hide", name], check=False).strip()
+        ip = utmctl("ip-address", name, check=False).strip()
         return (f"UTM keeps no console log. The VM's address is {ip}.\n" if ip
                 else "UTM keeps no console log, and the VM has no address yet "
                      "(it may be booting, or missing the guest agent / SPICE tools).\n")
 
     def exec(self, name: str, argv: List[str], timeout: int, input_text=None) -> str:
+        utm_up()
         cmd = ["utmctl", "exec", "--hide", name]
         if input_text is not None:
             cmd.append("--input")

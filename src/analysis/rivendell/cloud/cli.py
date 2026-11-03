@@ -19,6 +19,7 @@ from .aws import AWSForensics, CloudTrailAnalyzer, S3Forensics
 from .azure import AzureForensics, ActivityLogAnalyzer
 from .gcp import GCPForensics, CloudLoggingAnalyzer
 from .base import CloudForensicsException
+from .k8s import analyse_audit_log
 
 
 def load_credentials(provider: str, cred_file: Optional[str] = None) -> dict:
@@ -207,6 +208,12 @@ def acquire_logs_command(args):
 
 def analyze_logs_command(args):
     """Analyze cloud audit logs."""
+    if args.provider == "k8s":
+        summary = analyse_audit_log(args.log_file, args.output or os.path.dirname(os.path.abspath(args.log_file)))
+        print(f"\nKubernetes audit log: {summary['total_events']} events, {summary['flagged_events']} flagged")
+        for technique, flagged in sorted(summary["techniques"].items()):
+            print(f"    - {technique}: {len(flagged)} events")
+        return 0
     credentials = load_credentials(args.provider, args.credentials)
     output_dir = args.output or os.path.dirname(args.log_file)
 
@@ -283,10 +290,14 @@ Examples:
 
   # Analyze existing logs
   %(prog)s aws analyze-logs --log-file cloudtrail_logs.json
+
+  # Analyze a Kubernetes API server audit log (EKS, AKS, GKE or self-managed)
+  %(prog)s k8s analyze-logs --log-file audit.log --output ./case
         """,
     )
 
-    parser.add_argument("provider", choices=["aws", "azure", "gcp"], help="Cloud provider")
+    parser.add_argument("provider", choices=["aws", "azure", "gcp", "k8s"],
+                        help="Cloud provider, or k8s for an exported Kubernetes audit log")
 
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
 

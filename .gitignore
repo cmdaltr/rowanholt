@@ -85,6 +85,9 @@ docker-compose.override.yml
 
 # Database
 *.db
+# containerd's metadata for the lab seed, made by containerd itself (make-meta-db.sh beside it)
+!lab/linux-targets/seed/containerd/meta.db
+!lab/linux-targets/seed/podman/bolt_state.db
 *.sqlite
 *.sqlite3
 
@@ -159,3 +162,16 @@ symbols/mac/*.json*
 
 # Third-party Windows tools (RawCopy, Sleuth Kit): only a fallback for the raw volume reader
 src/acquisition/tools/disk_tools.zip
+
+# Desktop app: evidence mounts from setup, and the version markers of an app-installed copy
+docker-compose.local.yml
+.rivendell-version
+.rivendell-built
+
+# A server's own TLS certificate and key (deploy/server/certs/README)
+deploy/server/certs/*
+!deploy/server/certs/README
+
+# The YouTube walkthrough: kept locally, not committed, except its README
+scripts/docs/video/*
+!scripts/docs/video/README.md

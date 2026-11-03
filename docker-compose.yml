@@ -8,7 +8,7 @@ services:
     environment:
       - POSTGRES_DB=rivendell
       - POSTGRES_USER=rivendell
-      - POSTGRES_PASSWORD=rivendell
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-rivendell}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -55,13 +55,19 @@ services:
       - REDIS_PORT=6379
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - DATABASE_URL=postgresql://rivendell:rivendell@postgres:5432/rivendell
+      - DATABASE_URL=postgresql://rivendell:${POSTGRES_PASSWORD:-rivendell}@postgres:5432/rivendell
+      - RIVENDELL_EVIDENCE_PATHS=${RIVENDELL_EVIDENCE_PATHS:-}
       # JWT signing key. Docker administration stays disabled until this is changed.
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
       - ANDURIL_URL=http://anduril:5690
+      # Eru's model (docs/ERU.md): set these in .env or the environment to change them
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+      - RIVENDELL_MODEL_NAME=${RIVENDELL_MODEL_NAME:-llama3.2:3b}
+      - RIVENDELL_NUM_CTX=${RIVENDELL_NUM_CTX:-8192}
     volumes:
       - ./src/web/backend:/app
       - ./src/mordor:/opt/rivendell/src/mordor # Mordor: recorded attack telemetry (/api/mordor/telemetry)
+      - ./src/analysis/rivendell/threat_intel:/opt/elrond-src/rivendell/threat_intel:ro # threat intelligence parsing (/api/threat-intel)
       - anduril_token:/run/anduril:ro # Written by anduril
       # Platform-specific mounts - uncomment for your OS:
       # - /mnt:/mnt:ro              # Linux: Mount points (read-only)
@@ -136,15 +142,16 @@ services:
       - REDIS_PORT=6379
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - DATABASE_URL=postgresql://rivendell:rivendell@postgres:5432/rivendell
+      - DATABASE_URL=postgresql://rivendell:${POSTGRES_PASSWORD:-rivendell}@postgres:5432/rivendell
+      - RIVENDELL_EVIDENCE_PATHS=${RIVENDELL_EVIDENCE_PATHS:-}
       - SPLUNK_HOST=splunk
       - SPLUNK_PORT=8089
       - SPLUNK_USERNAME=admin
-      - SPLUNK_PASSWORD=rivendell
+      - SPLUNK_PASSWORD=${SPLUNK_PASSWORD:-rivendell}
       - ELASTICSEARCH_HOST=elastic
       - ELASTICSEARCH_PORT=9200
       - ELASTIC_USERNAME=elastic
-      - ELASTIC_PASSWORD=rivendell
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-rivendell}
       # Set to 'true' to exclude cache directories from user profile copies (faster but less complete)
       - RIVENDELL_EXCLUDE_PROFILE_CACHE=true
     volumes:
@@ -224,7 +231,7 @@ services:
     environment:
       - SPLUNK_START_ARGS=--accept-license
       - SPLUNK_GENERAL_TERMS=--accept-sgt-current-at-splunk-com
-      - SPLUNK_PASSWORD=rivendell
+      - SPLUNK_PASSWORD=${SPLUNK_PASSWORD:-rivendell}
     volumes:
       - splunk_etc:/opt/splunk/etc
       - splunk_var:/opt/splunk/var
@@ -266,7 +273,7 @@ services:
       - xpack.security.enabled=true
       - xpack.security.http.ssl.enabled=false
       - xpack.security.transport.ssl.enabled=false
-      - ELASTIC_PASSWORD=rivendell
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-rivendell}
       - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
     volumes:
       - elastic_data:/usr/share/elasticsearch/data
@@ -277,7 +284,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          'curl -s -u elastic:rivendell http://localhost:9200/_cluster/health | grep -q ''"status"''',
+          'curl -s -u elastic:$$ELASTIC_PASSWORD http://localhost:9200/_cluster/health | grep -q ''"status"''',
         ]
       interval: 30s
       timeout: 10s
@@ -301,21 +308,22 @@ services:
     networks:
       - rivendell-network
     environment:
-      - ELASTIC_PASSWORD=rivendell
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-rivendell}
+      - KIBANA_PASSWORD=${KIBANA_PASSWORD:-rivendell}
     command: >
       bash -c '
         echo "Waiting for Elasticsearch to be ready...";
-        until curl -s -u elastic:rivendell http://elastic:9200/_cluster/health | grep -q "status"; do
+        until curl -s -u elastic:$$ELASTIC_PASSWORD http://elastic:9200/_cluster/health | grep -q "status"; do
           sleep 5;
         done;
         echo "Setting kibana_system password...";
-        curl -s -X POST -u elastic:rivendell -H "Content-Type: application/json" \
+        curl -s -X POST -u elastic:$$ELASTIC_PASSWORD -H "Content-Type: application/json" \
           http://elastic:9200/_security/user/kibana_system/_password \
-          -d "{\"password\": \"rivendell\"}" || true;
+          -d "{\"password\": \"$$KIBANA_PASSWORD\"}" || true;
         echo "Creating admin user with superuser role...";
-        curl -s -X POST -u elastic:rivendell -H "Content-Type: application/json" \
+        curl -s -X POST -u elastic:$$ELASTIC_PASSWORD -H "Content-Type: application/json" \
           http://elastic:9200/_security/user/admin \
-          -d "{\"password\": \"rivendell\", \"roles\": [\"superuser\"], \"full_name\": \"Admin User\"}" || true;
+          -d "{\"password\": \"$$ELASTIC_PASSWORD\", \"roles\": [\"superuser\"], \"full_name\": \"Admin User\"}" || true;
         echo "Elasticsearch setup complete!";
       '
     restart: "no"
@@ -331,7 +339,7 @@ services:
     environment:
       - ELASTICSEARCH_HOSTS=http://elastic:9200
       - ELASTICSEARCH_USERNAME=kibana_system
-      - ELASTICSEARCH_PASSWORD=rivendell
+      - ELASTICSEARCH_PASSWORD=${KIBANA_PASSWORD:-rivendell}
       - SERVER_NAME=rivendell-kibana
       - XPACK_SECURITY_ENABLED=true
     depends_on:
@@ -368,7 +376,7 @@ services:
     environment:
       - KIBANA_URL=http://kibana:5601
       - ELASTIC_USER=elastic
-      - ELASTIC_PASSWORD=rivendell
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-rivendell}
     volumes:
       - ./src/web/kibana:/dashboards:ro
     command: >
@@ -378,7 +386,7 @@ services:
 
         echo "Importing Rivendell dashboards...";
         response=$$(curl -s -X POST \
-          -u "elastic:rivendell" \
+          -u "elastic:$$ELASTIC_PASSWORD" \
           "http://kibana:5601/api/saved_objects/_import?overwrite=true" \
           -H "kbn-xsrf: true" \
           --form file=@/dashboards/dashboards.ndjson);
@@ -391,7 +399,7 @@ services:
 
         echo "Setting default index pattern...";
         curl -s -X POST \
-          -u "elastic:rivendell" \
+          -u "elastic:$$ELASTIC_PASSWORD" \
           "http://kibana:5601/api/kibana/settings" \
           -H "kbn-xsrf: true" \
           -H "Content-Type: application/json" \

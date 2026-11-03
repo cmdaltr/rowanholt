@@ -36,6 +36,7 @@ The same steps exist as single commands:
 ./lab.sh install                    # Homebrew/apt/dnf packages for this profile
 ./lab.sh configure                  # data location, VM directory, VM sizes, password
 ./lab.sh linux-targets up           # lab-ubuntu, lab-rocky
+./lab.sh linux-targets stacking     # and two clean Ubuntu hosts, for stacking
 ./lab.sh gandalf-collect bash       # every running target; or name them:
 ./lab.sh gandalf-collect python "lab-ubuntu lab-rocky"
 ./lab.sh mordor-download apt29/day1 apt29/day2
@@ -66,6 +67,21 @@ The agent is a small Python service (standard library only) on loopback port 569
 ## Gandalf Targets
 
 The two **Linux containers**, Ubuntu 24.04 (Debian family, apt) and Rocky 9 (RHEL family, dnf), listen for SSH on `127.0.0.1:2221–2222`. They are quick to rebuild (`linux-targets reset`), but there's no real kernel, so memory acquisition can't be tested against them.
+
+For stacking, `linux-targets stacking` adds two clean Ubuntu hosts, `lab-ubuntu-clean1` and `-clean2` (`127.0.0.1:2223–2224`), built from the same image with nothing planted. With `lab-ubuntu` that's three hosts of one OS with the plants on one, which is what stacking needs to call anything rare. Collect all four, run Elrond with `--Analysis` over them as one case, and score `stacking.csv` against the planted values with `precision_at_k` (`rivendell/analysis/stacking.py`):
+
+```bash
+./lab.sh gandalf-collect python
+```
+
+Stacking compares Linux hosts within their distribution family, so `lab-rocky` (RHEL, one host) is only compared with itself and nothing on it is called rare; the three Ubuntu hosts are compared with each other. On 29 October 2026 that gave four rows, all planted on `lab-ubuntu` (`lab-sync.service`, `lab-agent.service` system and user, the `lab updater` autostart): precision@3 of 1.0, where before distro grouping the same case gave twenty rows of Rocky's own units. The clean hosts have no `expected.json`.
+
+`./lab.sh stacking-eval` does all of that in one go: it starts the four targets, collects them with `gandalf.py` into a folder of its own under `<data>/stacking-eval/STACKEVAL-<date>/`, runs Elrond in Rivendell's worker with `--Gandalf --Process --Analysis`, and scores `stacking.csv` against the `stacking` values in each target's `expected.json` (`lib/stacking_eval.py`). It prints precision at 4, 8 and 20 and each plant's rank, adds a row to the table below, and exits 1 if a plant isn't in `stacking.csv` at all. Run it every release; the Windows evaluation (clean siblings, below) at least once per major release.
+
+| Date | Hosts | Rows | P@4 | P@8 | P@20 | Plant ranks |
+|---|---|---|---|---|---|---|
+| 2026-11-03 | Linux containers (python collector) | 4 | 1.00 | 1.00 | 1.00 | 1, 2, 4 |
+<!-- stacking-eval: rows above -->
 
 The **Linux VM** (`linux-vm create`) is Ubuntu with a real kernel (`bento/ubuntu-24.04` under Vagrant, Cirrus Labs `ubuntu:latest` under Tart), on SSH port 2230. The **macOS VM** (`macos-vm create`, Apple silicon only) is a Cirrus Labs Sequoia image on port 2231, provisioned without prompts: a `gandalf` user, a LaunchAgent, zsh history with a download, and a hidden staging folder in `/Users/Shared`. Both collectors work against it. `gandalf.sh` runs with sudo and also gets the root-only TCC and KnowledgeC databases; `gandalf.py` collects as the SSH user, so it skips what that user can't read. On the reference run (USB HDD), first boot took about an hour, then provisioning took 2.5 minutes, the bash and Python collections about 3 and 2 minutes, and Elrond 1.5–4 minutes.
 
@@ -100,6 +116,15 @@ Two UTM details shape how this works. The system disk is VirtIO, not NVMe, becau
 
 To watch an install, set `WINDOWS_VM_VNC=1` before `create`: QEMU then also serves the VM's screen over VNC on `127.0.0.1:5959` (loopback only, no password), which any VNC client can open (`open vnc://127.0.0.1:5959`). Automatic updates are turned off in the answer file; a first-boot update run on a slow disk otherwise adds hours. `WINDOWS_INSTALL_WAIT` sets how many minutes `create` waits (default 90), and running `create` again on an existing VM just resumes waiting. `WINDOWS_BOOT_WAIT` (default 30) is the wait for SSH after `start` or a reboot; on a USB HDD, Windows took about 15 minutes to answer.
 
+**Clean siblings, for stacking.** `WINDOWS_CLEAN=<n>` before any `windows-vm` action, or before `windows/utm-vm.sh collect`, works on `rivendell-lab-win11-clean<n>` instead: computer name `LAB-WINCLEAN<n>`, SSH on `127.0.0.1:2232+n`, provisioned with the `gandalf` user and remoting but nothing seeded (`Provision-GandalfTarget.ps1 -Clean`). It doesn't change which VM the lab drives by default. Two of them with `rivendell-lab-win11` make three Windows hosts, one seeded; run them one at a time on a 16 GB Mac:
+
+```bash
+WINDOWS_CLEAN=1 ./lab.sh windows-vm create
+WINDOWS_CLEAN=1 ./windows/utm-vm.sh collect
+```
+
+On 29 October 2026 the two took 43 and 57 minutes to build and about 25 minutes each to collect (USB HDD). Stacked with the seeded VM, all four planted persistence values were rare on `LAB-WIN11` alone: the `LabUpdater` Run key, the `LabSync` task, the `LabHelper` service and the `LabUpdaterConsumer` WMI consumer. Four more persistence rows are ones the seeded VM gained from use (OneDrive's per-user tasks, a Defender driver service), and 66 programs from Prefetch and Amcache are rare only because that VM has run for four days (Gandalf, RawCopy, Atomic Red Team, Defender updates) and the clean ones for an hour. At the same score, persistence ranks above programs, so the plants came 1, 2, 6 and 8 of 74: all four in the top eight.
+
 **Bringing your own (`windows-vm adopt`).** Put an installed Windows 11 ARM `.utm` in `$LAB_VM_DIR/utm/`, open it in place rather than dragging it into UTM (UTM keeps a separate copy of anything imported into its library, and the lab can't reach that copy), and run:
 
 ```bash
@@ -108,7 +133,7 @@ To watch an install, set `WINDOWS_VM_VNC=1` before `create`: QEMU then also serv
 
 `adopt` registers the bundle, adds the port forward and boots it. It logs in as `vagrant`/`vagrant` (set `ADOPT_USER` and `ADOPT_PASSWORD` for another account); if the VM has WinRM but no SSH, as Vagrant boxes do, it installs Win32-OpenSSH over WinRM first. Then it runs the same provisioning as `create`. The VM's name is saved as `WINDOWS_UTM_VM`. An adopted VM is never deleted by the lab: `windows-vm delete` and teardown refuse anything not named `rivendell-lab-*`. An NVMe system disk on an adopted VM can still hit the QEMU crash above.
 
-**Collecting.** `./lab.sh gandalf-collect powershell` runs `Run-GandalfLocal.ps1` in the VM and copies the archive to `$ACQ_ROOT/powershell_collection/acquisitions/<COMPUTERNAME>/`. DumpIt is x64-only, so Windows memory acquisition can't be tested on ARM. Gandalf's raw-copy artefacts (`$MFT`, `Amcache.hve`, `setupapi.dev.log`, `SRUDB.dat`) need `tools/disk_tools.zip`, which isn't in the repository; without it they are reported as FAILURE and everything else is collected (G21). On the reference run (Windows 11 ARM on a USB HDD) a collection took about 3 minutes and produced a 38 MB archive. The old manual walkthrough is still in the `windows-vm` menu.
+**Collecting.** `./lab.sh gandalf-collect powershell` runs `Run-GandalfLocal.ps1` in the VM and copies the archive to `$ACQ_ROOT/powershell_collection/acquisitions/<COMPUTERNAME>/`. DumpIt is x64-only, so Windows memory acquisition can't be tested on ARM. Gandalf's raw-copy artefacts (`$MFT`, `Amcache.hve`, `setupapi.dev.log`, `SRUDB.dat`) need `tools/disk_tools.zip`, which isn't in the repository; without it they are reported as FAILURE and everything else is collected (G21). After the copy, `collect` lists the VM's folder and fetches again any file that didn't arrive, and warns if one is still missing (G36). On the reference run (Windows 11 ARM on a USB HDD) a collection took about 3 minutes and produced a 38 MB archive. The old manual walkthrough is still in the `windows-vm` menu.
 
 ## Mordor Datasets
 

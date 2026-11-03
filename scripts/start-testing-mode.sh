@@ -29,7 +29,7 @@ if ! docker info &> /dev/null; then
     echo "⚠️  Docker is not running!"
     echo ""
     echo "Starting Docker Desktop..."
-    open -a Docker
+    open -g -j -a Docker  # in the background: no window, nothing new in the Dock
 
     echo "Waiting for Docker to start..."
     for i in {1..60}; do

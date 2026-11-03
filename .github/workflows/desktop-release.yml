@@ -1,0 +1,167 @@
+# Builds the desktop app for macOS (.dmg), Windows (setup .exe) and Linux (.deb), each
+# carrying the source tree at this commit. A v* tag attaches them to a draft release;
+# a manual run leaves them as workflow artifacts.
+#
+# Signing is optional and switches on with these secrets:
+#   macOS:   MACOS_CERTIFICATE_P12 (base64 Developer ID Application .p12), MACOS_CERTIFICATE_PASSWORD,
+#            MACOS_SIGN_IDENTITY ("Developer ID Application: Name (TEAMID)");
+#            notarisation also needs APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD (app-specific)
+#   Windows: WINDOWS_CERTIFICATE_PFX (base64 code-signing .pfx), WINDOWS_CERTIFICATE_PASSWORD
+name: Desktop app
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        name: Version
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="$(sed -n 's/^version *= *"\(.*\)"/\1/p' pyproject.toml | head -1)-dev.$GITHUB_RUN_NUMBER"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Source tarball
+        run: app/source-tarball.sh rivendell-src.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source
+          path: rivendell-src.tar.gz
+
+  macos:
+    needs: source
+    runs-on: macos-14
+    env:
+      VERSION: ${{ needs.source.outputs.version }}
+      HAS_CERT: ${{ secrets.MACOS_CERTIFICATE_P12 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: source
+      - name: Import the signing certificate
+        if: env.HAS_CERT == 'true'
+        env:
+          P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          P12_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password="$(uuidgen)"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          echo "$P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/cert.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+      - name: Package
+        env:
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_CERTIFICATE_P12 != '' && secrets.MACOS_SIGN_IDENTITY || '' }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: app/macos/package.sh --version "$VERSION" --source rivendell-src.tar.gz dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rivendell-macos
+          path: dist/*.dmg
+
+  linux:
+    needs: source
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.source.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: source
+      - name: Package
+        run: app/linux/package-deb.sh --version "$VERSION" --source rivendell-src.tar.gz dist
+      - name: Check the package
+        run: |
+          dpkg-deb --info dist/*.deb
+          dpkg-deb --contents dist/*.deb | grep -E 'opt/rivendell/|applications/rivendell.desktop'
+          dpkg-deb --fsys-tarfile dist/*.deb | tar -xO ./usr/share/applications/rivendell.desktop | desktop-file-validate /dev/stdin || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rivendell-linux
+          path: dist/*.deb
+
+  windows:
+    needs: source
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.source.outputs.version }}
+      HAS_CERT: ${{ secrets.WINDOWS_CERTIFICATE_PFX != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: source
+      - name: Unpack the source
+        shell: bash
+        run: mkdir stage && tar -xzf rivendell-src.tar.gz -C stage
+      - name: Build the installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y | Out-Null }
+          & $iscc "/DAppVersion=$env:VERSION" "/DSourceDir=$PWD\stage\rivendell" "/DOutputDir=$PWD\dist" app\windows\rivendell.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Sign the installer
+        if: env.HAS_CERT == 'true'
+        shell: pwsh
+        env:
+          PFX: ${{ secrets.WINDOWS_CERTIFICATE_PFX }}
+          PFX_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP 'cert.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:PFX))
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName | Select-Object -Last 1
+          try {
+            & $signtool.FullName sign /f $pfx /p $env:PFX_PASSWORD /fd sha256 /tr http://timestamp.digicert.com /td sha256 (Get-ChildItem dist\*.exe).FullName
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } finally {
+            Remove-Item $pfx
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rivendell-windows
+          path: dist/*.exe
+
+  release:
+    if: github.ref_type == 'tag'
+    needs: [source, macos, linux, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.source.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: rivendell-*
+          merge-multiple: true
+          path: dist
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS
+      - name: Attach to a draft release
+        run: |
+          gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
+            gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --draft --generate-notes --title "Rivendell $VERSION"
+          gh release upload "$GITHUB_REF_NAME" dist/* -R "$GITHUB_REPOSITORY" --clobber

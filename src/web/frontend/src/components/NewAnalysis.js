@@ -5,6 +5,7 @@ import GandalfJobBrowser from './GandalfJobBrowser';
 import OptionsPanel from './OptionsPanel';
 import { createJob, getLocalMordorDatasets } from '../api';
 import axios from 'axios';
+import { API_BASE_URL } from '../apiBase';
 
 // File requirements for certain options
 const FILE_REQUIREMENTS = {
@@ -54,7 +55,7 @@ function NewAnalysis() {
       if (caseNumber.length >= 6) {  // Only check if case number is valid length
         setCheckingCaseId(true);
         try {
-          const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5688'}/api/validate/case-id/${encodeURIComponent(caseNumber)}`);
+          const response = await axios.get(`${API_BASE_URL}/api/validate/case-id/${encodeURIComponent(caseNumber)}`);
           setCaseIdExists(response.data.exists);
         } catch (err) {
           console.error('Error checking case ID:', err);
@@ -217,7 +218,7 @@ function NewAnalysis() {
       // Check which files exist on the server
       try {
         const response = await axios.post(
-          `${process.env.REACT_APP_API_URL || 'http://localhost:5688'}/api/check-required-files`,
+          `${API_BASE_URL}/api/check-required-files`,
           { options: requiredOptions }
         );
 
@@ -270,7 +271,7 @@ function NewAnalysis() {
       });
 
       await axios.post(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:5688'}/api/upload-required-files`,
+        `${API_BASE_URL}/api/upload-required-files`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' } }
       );
@@ -345,6 +346,7 @@ function NewAnalysis() {
             collect: opts.local !== false,  // Default to true unless explicitly false
             analysis: opts.analysis || false,
             extractiocs: opts.extract_iocs || opts.extractiocs || false,
+            threat_intel: opts.threat_intel || false,
             timeline: opts.timeline || false,
             memory: opts.memory || false,
             memory_timeline: opts.memory_timeline || false,
@@ -910,7 +912,7 @@ function NewAnalysis() {
 
         <form onSubmit={handleSubmit}>
           <div className="form-row">
-            <div className="form-group">
+            <div data-guide="elrond.case" className="form-group">
               <label htmlFor="caseNumber">
                 Case Number / Investigation ID *
               </label>
@@ -935,7 +937,7 @@ function NewAnalysis() {
               )}
             </div>
 
-            <div className="form-group">
+            <div data-guide="elrond.source" className="form-group">
               <label>Evidence Source *</label>
               {!isCaseNumberValid && (
                 <div className="info-message">
@@ -1039,7 +1041,7 @@ function NewAnalysis() {
 
           {/* Evidence Source Selector - Only show when a source is selected */}
           {analysisMode && analysisMode !== 'json' && (
-            <div className="form-group">
+            <div data-guide="elrond.browse" className="form-group">
               <label>
                 {analysisMode === 'gandalf' && 'Select Gandalf Acquisitions *'}
                 {analysisMode === 'local' && 'Select Disk/Memory Images *'}
@@ -1198,7 +1200,7 @@ function NewAnalysis() {
             </div>
           )}
 
-          <div className="form-group">
+          <div data-guide="elrond.options" className="form-group">
             <label>Processing Options</label>
             {!isCaseNumberValid && (
               <div className="info-message">
