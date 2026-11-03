@@ -60,6 +60,10 @@ services:
       # JWT signing key. Docker administration stays disabled until this is changed.
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
       - ANDURIL_URL=http://anduril:5690
+      # Eru's model (docs/ERU.md): set these in .env or the environment to change them
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+      - RIVENDELL_MODEL_NAME=${RIVENDELL_MODEL_NAME:-llama3.2:3b}
+      - RIVENDELL_NUM_CTX=${RIVENDELL_NUM_CTX:-8192}
     volumes:
       - ./src/web/backend:/app
       - ./src/mordor:/opt/rivendell/src/mordor # Mordor: recorded attack telemetry (/api/mordor/telemetry)
