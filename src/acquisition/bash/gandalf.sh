@@ -33,6 +33,7 @@ OUTPUT_DIR="/tmp/gandalf/acquisitions"
 MEMORY_DUMP=false
 ACCESS_TIMES=false
 COLLECT_FILES=false
+LIVE_CONTAINERS=false
 HOSTS_FILE=""
 REMOTE_USER=""
 REMOTE_HOST=""
@@ -96,6 +97,8 @@ usage() {
     echo "  -m        Acquire memory dump"
     echo "  -a        Collect file access times"
     echo "  -c        Collect specific files from files.list"
+    echo "  -l        Live containers: ask Docker and Podman about their running containers"
+    echo "            (inspect, processes, filesystem export); opt-in, every command audited"
     echo "  -h HOST   Remote hostname (for Remote mode)"
     echo "  -u USER   Remote username (for Remote mode)"
     echo "  -f FILE   Hosts file (for Remote mode batch)"
@@ -170,12 +173,13 @@ parse_args() {
     esac
 
     # Parse options
-    while getopts "o:mach:u:f:" opt; do
+    while getopts "o:machlu:f:" opt; do
         case $opt in
             o) OUTPUT_DIR="$OPTARG" ;;
             m) MEMORY_DUMP=true ;;
             a) ACCESS_TIMES=true ;;
             c) COLLECT_FILES=true ;;
+            l) LIVE_CONTAINERS=true ;;
             h) REMOTE_HOST="$OPTARG" ;;
             u) REMOTE_USER="$OPTARG" ;;
             f) HOSTS_FILE="$OPTARG" ;;
@@ -276,6 +280,47 @@ collect_volatile() {
     is_macos && platform="macOS"
     { echo "${hostname}::${platform}"; uname -a; } > "${acq_dir}/artefacts/host.info" 2>/dev/null || true
     log_audit "$audit_log" "$hostname" "host.info"
+}
+
+# A command run on the target, not a file taken from it: audited as "ran"
+log_live() {
+    local timestamp
+    timestamp=$(date -u +"%Y-%m-%dT%H:%M:%S.%6NZ")
+    case "$timestamp" in *N*) timestamp=$(date -u +"%Y-%m-%dT%H:%M:%S.000000Z") ;; esac
+    echo "${timestamp},$2,$3,ran" >> "$1"
+}
+
+# -l: what Docker and Podman say about their running containers, which the files on disk
+# don't hold: the processes running in each, and its filesystem as it is now. Asking the
+# runtime touches the live host (its daemon logs the calls; export reads the whole
+# filesystem), so it's opt-in and every command is audited. export never pauses or stops
+# the container. Each export is cut at GANDALF_CONTAINER_EXPORT_MAX bytes (default 2 GB;
+# 0 leaves exports out), and the audit says when it was cut.
+collect_live_containers() {
+    local acq_dir="$1" hostname="$2" audit_log="$3"
+    local max="${GANDALF_CONTAINER_EXPORT_MAX:-2147483648}" runtime id dir size
+    for runtime in docker podman; do
+        command -v "$runtime" &> /dev/null || continue
+        for id in $("$runtime" ps -q --no-trunc 2>/dev/null); do
+            case "$id" in *[!0-9a-f]*) continue ;; esac
+            dir="${acq_dir}/artefacts/live_containers/${runtime}/${id:0:12}"
+            mkdir -p "$dir"
+            "$runtime" inspect "$id" > "$dir/inspect.json" 2>/dev/null && log_live "$audit_log" "$hostname" "$runtime inspect $id"
+            if [ "$runtime" = docker ]; then
+                docker top "$id" -eo pid,ppid,user,etime,args > "$dir/top.txt" 2>/dev/null
+            else
+                podman top "$id" pid ppid user etime args > "$dir/top.txt" 2>/dev/null
+            fi && log_live "$audit_log" "$hostname" "$runtime top $id"
+            [ "$max" -gt 0 ] 2>/dev/null || continue
+            "$runtime" export "$id" 2>/dev/null | head -c "$max" > "$dir/export.tar"
+            size=$(wc -c < "$dir/export.tar" | tr -d ' ')
+            if [ "$size" -ge "$max" ]; then
+                log_live "$audit_log" "$hostname" "$runtime export $id (cut at $max bytes)"
+            else
+                log_live "$audit_log" "$hostname" "$runtime export $id"
+            fi
+        done
+    done
 }
 
 # Collect memory dump
@@ -1054,6 +1099,7 @@ acquire_local() {
 
     # Collect
     collect_volatile "$acq_dir" "$hostname" "$audit_log"
+    [ "$LIVE_CONTAINERS" = true ] && ! is_macos && collect_live_containers "$acq_dir" "$hostname" "$audit_log"
     collect_memory "$acq_dir" "$hostname" "$audit_log"
     collect_artifacts "$acq_dir" "$hostname" "$audit_log" "$meta_log"
     write_manifest "$acq_dir" "$hostname" "$audit_log" "$meta_log"
@@ -1127,7 +1173,7 @@ acquire_remote() {
         }
 
         # Execute remotely
-        if ! ssh "${REMOTE_USER}@${host}" "sudo bash ${remote_script} ${remote_encryption} Local -o /tmp/gandalf/acquisitions $([ "$MEMORY_DUMP" = true ] && echo -m)"; then
+        if ! ssh "${REMOTE_USER}@${host}" "sudo bash ${remote_script} ${remote_encryption} Local -o /tmp/gandalf/acquisitions $([ "$MEMORY_DUMP" = true ] && echo -m) $([ "$LIVE_CONTAINERS" = true ] && echo -l)"; then
             echo -e "${RED}[ERROR]${NC} Remote execution failed on $host"
             ssh "${REMOTE_USER}@${host}" "sudo rm -rf /tmp/gandalf ${remote_script}" || true
             failed=$((failed + 1))

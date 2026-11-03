@@ -101,6 +101,7 @@ sudo python3 src/acquisition/python/gandalf.py ENCRYPTION ACQUISITION [OPTIONS]
 | `-M, --Memory` | Acquire live memory (AVML on Linux, osxpmem on macOS) |
 | `-A, --AccessTimes` | Record last-access times for every file |
 | `-F, --CollectFiles` | Collect files whose names match entries in `lists/files.list` |
+| `-L, --LiveContainers` | Linux: ask Docker and Podman about their running containers (see below) |
 
 Remote mode reads target hosts from `src/acquisition/lists/hosts.list` (lines starting `#` are skipped) and prompts for each host's IP address, username and password over SSH. Run it from `src/acquisition/`, because the script opens `lists/` and `tools/` relative to the current directory.
 
@@ -130,8 +131,11 @@ sudo ./src/acquisition/bash/gandalf.sh ENCRYPTION MODE [OPTIONS]
 | `-m` | Acquire memory |
 | `-a` | Collect access times |
 | `-c` | Collect files listed in `files.list` |
+| `-l` | Linux: ask Docker and Podman about their running containers (see below) |
 | `-h HOST`, `-u USER` | Remote host and user |
 | `-f FILE` | Hosts file for batch remote acquisition |
+
+**Live containers (`-l`, `gandalf.py -L`).** Off by default, because it asks the runtime rather than reading its files: Docker's and Podman's daemons log the calls, and an export reads the container's whole filesystem. Neither pauses nor stops a container. For each running container (rootful; `podman` as root sees only root's) it saves `docker|podman inspect`, `top` (PID, PPID, user, elapsed time, command) and `export`, cut at `GANDALF_CONTAINER_EXPORT_MAX` bytes (2 GB by default; `0` leaves exports out), into `live_containers/<runtime>/<id>/`. Every command goes in `log.audit` with the status `ran` instead of `collected`, an export that was cut saying so. Elrond reads the processes into `container_processes.csv` (`suspicious command` flagged as for start-up scripts) and keeps `inspect.json` and `export.tar` in `raw/` for the analyst. Not in `Invoke-Gandalf.ps1` or the web app's acquisition page yet. CRIU checkpoints (process memory) stay out: they need Docker's experimental mode and can stop the container.
 
 ```bash
 sudo ./src/acquisition/bash/gandalf.sh None Local

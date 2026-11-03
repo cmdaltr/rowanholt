@@ -87,6 +87,16 @@ parser.add_argument(
     default=False,
 )
 
+parser.add_argument(
+    "-L",
+    "--LiveContainers",
+    help="Ask Docker and Podman about their running containers (inspect, processes, filesystem "
+    "export): opt-in, as it touches the live host; every command is audited",
+    action="store_const",
+    const=True,
+    default=False,
+)
+
 args = parser.parse_args()
 encryption_method = args.EncryptionMethod
 acquisition = args.Acquisition
@@ -94,6 +104,7 @@ output_dir = args.OutputDirectory
 mem = args.Memory
 access_times = args.AccessTimes
 files = args.CollectFiles
+live_containers = args.LiveContainers
 
 system_artefacts = {
     # macOS artifacts
@@ -319,6 +330,8 @@ def configure_acquisition(
 ):
     shutil.copy2(ACQUIRE_TEMPLATE, ACQUIRE_SCRIPT)
     with open(ACQUIRE_SCRIPT, "a") as acquire_artefacts:
+        if live_containers:
+            acquire_artefacts.write("\n\nLIVE_CONTAINERS = True\n")
         acquire_artefacts.write(
             '\n\nacquire_artefacts(\n    "{}",\n    {},\n    "{}",\n    "{}",\n    "{}",\n    "{}",\n    {!r},\n    "{}",\n    "{}",\n)\n'.format(
                 encryption_method,

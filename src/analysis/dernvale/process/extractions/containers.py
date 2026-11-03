@@ -13,6 +13,8 @@ routes them here).
   into the same docker_containers.csv rows, Runtime "containerd"
 - /var/lib/containers/storage/db.sql (Podman 4.8 on, SQLite) or libpod/bolt_state.db (bbolt, before):
   Podman's record of its containers, with the same OCI spec inside, Runtime "podman"
+- raw/live_containers/<runtime>/<id>/top.txt (Gandalf -l/-L only, with inspect.json and export.tar
+  beside it): the processes running in each container when it was collected
 
 Every function returns rows; techniques are decided from the rows by the *_techniques functions,
 only where a row justifies one.
@@ -61,6 +63,8 @@ HEADERS = {
     "container_logs.csv": ["Runtime", "Container", "Pod", "Namespace", "Stream", "LastWriteTime", "Message"],
     "container_changes.csv": ["Container", "Path", "Size", "Mode", "Kind", "SHA256", "LastWriteTime", "Flag"],
     "static_pods.csv": ["Source", "Name", "Namespace", "Images", "Command", "Flag"],
+    "container_processes.csv": ["Runtime", "Container", "Name", "Image", "PID", "PPID", "User", "Elapsed", "Command",
+                                "Flag"],
 }
 
 
@@ -346,6 +350,35 @@ def docker_log_rows(path: str, container: str) -> List[Dict[str, str]]:
 
 
 CRI_LINE = re.compile(r"^(\S+) (stdout|stderr) [FP] ?(.*)$")
+
+
+def live_process_rows(path: str, runtime: str, container: str, suspicious: "re.Pattern") -> List[Dict[str, str]]:
+    """Gandalf's `<runtime> top` of one running container (PID PPID USER ELAPSED COMMAND), named from
+    the inspect.json beside it; a command `suspicious` matches is flagged."""
+    name = image = ""
+    try:
+        with open(os.path.join(os.path.dirname(path), "inspect.json"), encoding="utf-8", errors="replace") as fh:
+            inspected = json.load(fh)
+        first = inspected[0] if isinstance(inspected, list) and inspected else {}
+        name = str(first.get("Name") or "").lstrip("/")
+        image = str((first.get("Config") or {}).get("Image") or first.get("ImageName") or "")
+    except (OSError, ValueError, AttributeError):
+        pass
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        lines = [line.rstrip("\n") for line in fh if line.strip()]
+    if not lines:
+        return []
+    columns = len(lines[0].split())
+    rows = []
+    for line in lines[1:]:
+        fields = line.split(None, columns - 1)
+        if len(fields) < columns or columns < 5:
+            continue
+        pid, ppid, user, elapsed, command = fields[:5]
+        rows.append({"Runtime": runtime, "Container": container, "Name": name, "Image": image, "PID": pid,
+                     "PPID": ppid, "User": user, "Elapsed": elapsed, "Command": command,
+                     "Flag": "suspicious command" if suspicious.search(command) else ""})
+    return rows
 
 
 def cri_log_rows(path: str, pod_dir: str, container: str) -> List[Dict[str, str]]:

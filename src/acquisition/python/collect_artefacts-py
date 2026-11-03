@@ -22,6 +22,13 @@ def audit_log(gandalf_host, artefact):
         )
 
 
+def audit_ran(gandalf_host, command):
+    """A command run on the target, not a file taken from it: audited as "ran"."""
+    now_time = "{}Z".format(str(datetime.now()).replace(" ", "T"))
+    with open(os.path.join(gandalf_host, "log.audit"), "a") as gandalf_audit:
+        gandalf_audit.write("{},{},{},ran\n".format(now_time, gandalf_host.split("/")[-1], command))
+
+
 def write_manifest(gandalf_host):
     """SHA-256 of every collected file, by its path in the archive, into log.meta. Run
     once everything is copied, so hashing doesn't widen the window in which the live
@@ -699,6 +706,9 @@ LINUX_EXTRA_DIRS = (
 )
 CONTAINER_MAX_FILES = 5000  # per container, in its writable-layer listing
 CONTAINER_COPY_MAX_FILES = 500  # executables copied per container, into container_layer/<id>/
+# gandalf.py -L sets it True (the line it appends below this template)
+LIVE_CONTAINERS = False
+LIVE_TOP = {"docker": ["-eo", "pid,ppid,user,etime,args"], "podman": ["pid", "ppid", "user", "etime", "args"]}
 CONTAINER_COPY_MAX_BYTES = 64 << 20
 LINUX_WEB_ROOTS = ("/var/www", "/srv/www", "/srv/http", "/usr/share/nginx/html")
 LINUX_WEB_SCRIPTS = (".php", ".phtml", ".php3", ".php4", ".php5", ".php7", ".phar", ".inc", ".jsp", ".jspx",
@@ -853,6 +863,54 @@ def collect_container_layers(gandalf_artefact_destination, gandalf_host):
                                        source[len(upper):].lstrip("/").replace("/", "+"))
             if _collect_one(source, destination, gandalf_host):
                 taken += 1
+
+
+def collect_live_containers(gandalf_artefact_destination, gandalf_host):
+    """-L: what Docker and Podman say about their running containers, which their files don't
+    hold: inspect, the processes in each (top) and its filesystem now (export), into
+    live_containers/<runtime>/<id>/, as gandalf.sh -l does. Asking the runtime touches the live
+    host, so it's opt-in and every command is audited; export never pauses the container. Each
+    export is cut at GANDALF_CONTAINER_EXPORT_MAX bytes (default 2 GB; 0 leaves exports out)."""
+    limit = int(os.environ.get("GANDALF_CONTAINER_EXPORT_MAX", 2 << 30))
+    for runtime in ("docker", "podman"):
+        if not shutil.which(runtime):
+            continue
+        try:
+            listed = subprocess.run([runtime, "ps", "-q", "--no-trunc"], stdout=subprocess.PIPE,
+                                    stderr=subprocess.DEVNULL, timeout=60).stdout.decode().split()
+        except (OSError, subprocess.SubprocessError):
+            continue
+        for cid in listed:
+            if not re.fullmatch(r"[0-9a-f]+", cid):
+                continue
+            folder = os.path.join(gandalf_artefact_destination, "live_containers", runtime, cid[:12])
+            os.makedirs(folder, exist_ok=True)
+            for name, command in (("inspect.json", [runtime, "inspect", cid]),
+                                  ("top.txt", [runtime, "top", cid] + LIVE_TOP[runtime])):
+                try:
+                    with open(os.path.join(folder, name), "wb") as out:
+                        if subprocess.run(command, stdout=out, stderr=subprocess.DEVNULL, timeout=120).returncode == 0:
+                            audit_ran(gandalf_host, " ".join(command[:3]))
+                except (OSError, subprocess.SubprocessError):
+                    pass
+            if limit <= 0:
+                continue
+            taken = 0
+            try:
+                export = subprocess.Popen([runtime, "export", cid], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                with open(os.path.join(folder, "export.tar"), "wb") as out:
+                    while taken < limit:
+                        chunk = export.stdout.read(min(1 << 20, limit - taken))
+                        if not chunk:
+                            break
+                        out.write(chunk)
+                        taken += len(chunk)
+                export.kill()
+                export.wait()
+            except OSError:
+                continue
+            audit_ran(gandalf_host, "{} export {}{}".format(
+                runtime, cid, " (cut at {} bytes)".format(limit) if taken >= limit else ""))
 
 
 def collect_linux_volatile_files(gandalf_artefact_destination, gandalf_host):
@@ -1053,6 +1111,8 @@ def acquire_artefacts(
     collect_volatile_data(gandalf_artefact_destination)
     if platform.system() == "Linux":
         collect_linux_volatile_files(gandalf_artefact_destination, gandalf_host)
+        if LIVE_CONTAINERS:
+            collect_live_containers(gandalf_artefact_destination, gandalf_host)
     if memory != "None":
         print(
             "      Acquiring memory dump from '{}'".format(
