@@ -53,6 +53,21 @@ const AccountPage = () => {
     navigate('/login');
   };
 
+  // Hooks before the redirect below: React needs the same hooks on every render
+  const loadTokens = async () => {
+    try {
+      setApiTokens(await listApiTokens());
+    } catch (error) {
+      // 400 on an analyst's own machine: the API needs no token there
+      if (error.response?.status === 400) setTokensAvailable(false);
+      setTokenMessage({ type: 'error', text: error.response?.data?.detail || 'Could not list your tokens.' });
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated) loadTokens();
+  }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
     navigate('/login');
@@ -154,20 +169,6 @@ const AccountPage = () => {
       }
     }
   };
-
-  const loadTokens = async () => {
-    try {
-      setApiTokens(await listApiTokens());
-    } catch (error) {
-      // 400 on an analyst's own machine: the API needs no token there
-      if (error.response?.status === 400) setTokensAvailable(false);
-      setTokenMessage({ type: 'error', text: error.response?.data?.detail || 'Could not list your tokens.' });
-    }
-  };
-
-  useEffect(() => {
-    if (isAuthenticated) loadTokens();
-  }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleGenerateToken = async (e) => {
     e.preventDefault();
