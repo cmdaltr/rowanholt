@@ -250,6 +250,17 @@ class ServerAccessTest(BackendCase):
         resp = self.client.post("/api/auth/login", data={"username": "locktest", "password": "wrong"})
         self.assertEqual(resp.status_code, 429)
 
+    def test_username_and_email_share_a_lockout(self):
+        resp = self.client.post("/api/auth/users", headers=self.admin, json={
+            "username": "lockpair", "email": "lockpair@example.org", "password": "lockpair-password-1"})
+        assert resp.status_code == 200 or "already taken" in resp.text, resp.text
+        names = ("lockpair", "lockpair@example.org")
+        for n in range(self.settings.max_login_attempts):
+            self.client.post("/api/auth/login", data={"username": names[n % 2], "password": "wrong"})
+        for name in names:
+            resp = self.client.post("/api/auth/login", data={"username": name, "password": "wrong"})
+            self.assertEqual(resp.status_code, 429, name)
+
     def test_lockout_is_per_address_until_it_is_everywhere(self):
         from auth.throttle import EVERYWHERE, SignInThrottle
         throttle = SignInThrottle("redis://127.0.0.1:1/0")

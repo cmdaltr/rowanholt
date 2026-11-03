@@ -35,8 +35,10 @@ ERU_WRITES = re.compile(r"^/api/jobs/[0-9a-fA-F-]{36}/case/(findings|notes)$")
 # case_summary and suggestions
 ERU_QUESTIONS = re.compile(r"^/api/ai/(offline/answer|cases/[^/]+/(query|summary|suggestions))$")
 READ_METHODS = ("GET", "HEAD", "OPTIONS")
-# Never through a token: making or revoking tokens, and swapping one for a session
-SIGN_IN_ONLY = ("/api/auth/tokens", "/api/auth/session")
+# Never through a token: making or revoking tokens, swapping one for a session, or anything that
+# sets a password or makes an account (each would outlive the token, so revoking it wouldn't end
+# the access)
+SIGN_IN_ONLY = ("/api/auth/tokens", "/api/auth/session", "/api/auth/users", "/api/auth/change-password")
 
 
 def is_api_token(token: Optional[str]) -> bool:

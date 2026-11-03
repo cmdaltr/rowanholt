@@ -82,8 +82,20 @@ class ApiTokenTest(BackendCase):
 
     def test_tokens_are_managed_from_a_sign_in(self):
         token = bearer(self.make(self.alice)["token"])
-        for method, path in (("POST", "/api/auth/tokens"), ("GET", "/api/auth/tokens"), ("POST", "/api/auth/session")):
+        for method, path in (("POST", "/api/auth/tokens"), ("GET", "/api/auth/tokens"), ("POST", "/api/auth/session"),
+                             ("POST", "/api/auth/change-password")):
             resp = self.client.request(method, path, headers=token, json={"name": "more"})
+            self.assertEqual(resp.status_code, 403, f"{method} {path}: {resp.text}")
+
+    def test_an_admins_token_cant_set_passwords_or_make_accounts(self):
+        # Either would outlive the token: revoking it must end the access
+        token = bearer(self.make(self.admin)["token"])
+        alice = next(u for u in self.client.get("/api/auth/users", headers=self.admin).json() if u["username"] == "alice")
+        for method, path, body in (("PATCH", f"/api/auth/users/{alice['id']}", {"password": "taken-over-123456"}),
+                                   ("POST", "/api/auth/users", {"username": "backdoor", "email": "b@example.org",
+                                                                "password": "backdoor-password-1", "role": "admin"}),
+                                   ("GET", "/api/auth/users", None)):
+            resp = self.client.request(method, path, headers=token, json=body)
             self.assertEqual(resp.status_code, 403, f"{method} {path}: {resp.text}")
 
     def test_limits_on_making_and_revoking(self):

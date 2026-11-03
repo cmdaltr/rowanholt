@@ -125,7 +125,9 @@ async def login(
 ):
     """Login with username/email and password (OAuth2 form data)."""
     users = _users_or_503()
-    name = form_data.username
+    known = find_user(users, form_data.username)
+    # One account, one count: its username and its email share a lockout
+    name = known["username"] if known else form_data.username
     # Behind the server's proxy, uvicorn's --proxy-headers makes this the browser's address
     address = request.client.host if request.client else "unknown"
     wait = throttle.locked_for(name, address)
@@ -135,7 +137,7 @@ async def login(
             detail=f"Too many failed sign-ins; try again in {wait // 60 + 1} minutes",
         )
 
-    user = find_user(users, name)
+    user = known
     if not user or not user.get("hashed_password") or not verify_password(form_data.password, user["hashed_password"]):
         throttle.failed(name, address)
         raise HTTPException(
