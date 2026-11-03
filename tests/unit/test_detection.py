@@ -1,5 +1,5 @@
 """Detection fixes from the lab runs: IOC extraction (E30), event-log technique
-tagging (E29) and RegRipper Run-key parsing (E28)."""
+tagging (E29), RegRipper Run-key parsing (E28) and registry JSON that stays valid."""
 
 import json
 import sys
@@ -10,7 +10,8 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
 from rivendell.analysis.iocs import extract_line_iocs  # noqa: E402
 from rivendell.process.extractions.artemis import eventlog_techniques  # noqa: E402
-from rivendell.process.extractions.registry.system import run_key_records  # noqa: E402
+from rivendell.process.extractions.registry.profile import last_write_moved  # noqa: E402
+from rivendell.process.extractions.registry.system import cleaned, run_key_records  # noqa: E402
 
 
 class IocExtractionTest(unittest.TestCase):
@@ -112,6 +113,26 @@ class RunKeyRecordsTest(unittest.TestCase):
     def test_profile_records_carry_the_account(self) -> None:
         records = [json.loads(r) for r in run_key_records(self.SECTION, "NTUSER.DAT", "gandalf")]
         self.assertEqual({r["AccountProfile"] for r in records}, {"gandalf"})
+
+    def test_quoted_values_stay_valid_json(self) -> None:
+        # Edge's Run value quotes its path: the old text clean-up turned the \" escape into /"
+        section = self.SECTION.replace(
+            "x.exe", 'x.exe\\n  MicrosoftEdgeAutoLaunch - \"C:\\\\Program Files\\\\msedge.exe\" --no-startup-window  --win-session-start')
+        written = json.dumps([cleaned(json.loads(r)) for r in run_key_records(section, "NTUSER.DAT", "gandalf")])
+        edge = json.loads(written)[-1]
+        self.assertEqual(edge["AppName"], "MicrosoftEdgeAutoLaunch")
+        self.assertEqual(edge["AppLocation"], '"C:/Program Files/msedge.exe" --no-startup-window --win-session-start')
+        self.assertEqual(edge["RegistryKey"], "Microsoft/Windows/CurrentVersion/Run")
+
+    def test_cleaned_values(self) -> None:
+        self.assertEqual(cleaned({"a": "it\\'s  C:\\\\x ", "n": 3, "l": ["y\\\\z"]}),
+                         {"a": "it's C:/x", "n": 3, "l": ["y/z"]})
+
+    def test_last_write_time_gets_its_own_field(self) -> None:
+        record = {"Plugin": "recentdocs", "Key": "LastWrite Time", "Value": "2026-10-25 20:56:20Z", "Name": "x"}
+        self.assertEqual(last_write_moved(record), {"Plugin": "recentdocs", "Key": "-", "Value": "-", "Name": "x",
+                                                    "LastWriteTime": "2026-10-25 20:56:20Z"})
+        self.assertEqual(last_write_moved({"LastWrite Time": "a", "b": "c"}), {"LastWrite Time": "a", "b": "c"})
 
 
 if __name__ == "__main__":

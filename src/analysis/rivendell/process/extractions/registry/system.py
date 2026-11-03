@@ -6,6 +6,20 @@ import subprocess
 from rivendell.process.extractions.mitre_tagger import tag_mitre_technique
 
 
+def cleaned(value):
+    """A record's values as written to registry/<hive>.json: backslashes (doubled, as rip.pl's
+    output is str(bytes)) as one '/', escaped quotes as quotes, runs of spaces as one. Done on
+    the values, not the JSON text, so a value with quotes in it (Edge's Run key) stays valid JSON."""
+    if isinstance(value, dict):
+        return {key: cleaned(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [cleaned(item) for item in value]
+    if isinstance(value, str):
+        value = re.sub(r"\\+", "/", value.replace("\\'", "'"))
+        return re.sub(r" {2,}", " ", value).strip()
+    return value
+
+
 def run_key_records(profile, hive, account=None):
     """One record per autostart value in RegRipper's run (formerly soft_run /
     user_run) output. profile is the plugin's section of rip.pl output, with
@@ -1523,36 +1537,6 @@ def extract_registry_system(
         if any('"Plugin": "run"' in record for record in jsonlist):
             tag_mitre_technique(output_directory, img, "registry", "T1547.001")
         if len(regjsonlist) > 0:
-            regjson.write(
-                str(regjsonlist)
-                .replace(
-                    "\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\",
-                    "/",
-                )
-                .replace("\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\", "/")
-                .replace("\\\\\\\\\\\\\\\\", "/")
-                .replace("\\\\\\\\", "/")
-                .replace("\\\\", "/")
-                .replace("\\", "/")
-                .replace('/"', '"')
-                .replace(
-                    "                                                                ",
-                    " ",
-                )
-                .replace("                                ", " ")
-                .replace("                ", " ")
-                .replace("        ", " ")
-                .replace("    ", " ")
-                .replace("  ", " ")
-                .replace("  ", "")
-                .replace('" ', '"')
-                .replace(' "', '"')
-                .replace("//'", "'")
-                .replace('":"', '": "')
-                .replace('","', '", "')
-                .replace('"}"\', \'"{"', '"}, {"')
-                .replace('[\'"{"', '[{"')
-                .replace('"}"\']', '"}]')
-            )
+            json.dump([cleaned(json.loads(record)) for record in regjsonlist], regjson)
         regjsonlist.clear()
         jsonlist.clear()

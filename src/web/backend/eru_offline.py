@@ -182,6 +182,15 @@ def persistence(case_path: str) -> str:
                     text = (f"WMI subscription: {sub.get('filter_name')} -> {sub.get('consumer_class')} "
                             f"'{sub.get('consumer_name')}'" + (f": {action}" if action else ""))
                     lines.append(_cited(text, *_where(host, path), f"#{index}", case_files.json_row(sub)))
+        # Run keys: RegRipper's run plugin over SOFTWARE and each NTUSER.DAT (Elrond tags them T1547.001)
+        for path in _cooked(host, "registry/*.json"):
+            for index, record in enumerate(_json_records(path, keep_index=True)):
+                if isinstance(record, dict) and record.get("Plugin") == "run" and record.get("AppName"):
+                    hive = record.get("RegistryHive") or path.stem
+                    if record.get("AccountProfile"):
+                        hive += f" ({record['AccountProfile']})"
+                    text = f"Run key: {hive} {record.get('RegistryKey', '')}: {record['AppName']} -> {record.get('AppLocation', '')}"
+                    lines.append(_cited(text, *_where(host, path), f"#{index}", case_files.json_row(record)))
         if lines:
             sections.append(f"**{host.name}**\n" + _bullets(lines))
     if not sections:

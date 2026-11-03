@@ -80,6 +80,13 @@ def test_reading_never_reaches_raw(tmp_path):
     assert case_files.resolve(case, "(case)", "threat_groups.csv").name == "threat_groups.csv"
 
 
+def test_broken_json_is_a_400(client):
+    api, case = client
+    (case / "LAB-UBUNTU" / "artefacts" / "cooked" / "broken.json").write_text('[{"AppLocation": "/"C:/x.exe/"}]')
+    broken = api.get(f"/api/jobs/{JOB}/case/rows", params={"host": "LAB-UBUNTU", "path": "artefacts/cooked/broken.json"})
+    assert broken.status_code == 400 and "isn't valid JSON" in broken.json()["detail"]
+
+
 def test_rows_are_paged_and_filtered(client):
     api, _ = client
     rows = api.get(f"/api/jobs/{JOB}/case/rows", params={"host": "LAB-UBUNTU", "path": "artefacts/cooked/linux/cron.csv",

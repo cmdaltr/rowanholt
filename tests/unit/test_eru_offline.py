@@ -56,6 +56,26 @@ def test_wmi_subscriptions(tmp_path):
     assert "SCM Event Log" not in persistence
 
 
+
+def test_run_keys(tmp_path):
+    import case_files
+    host = tmp_path / "CASE04" / "LAB-WIN11"
+    registry = host / "artefacts" / "cooked" / "registry"
+    registry.mkdir(parents=True)
+    (registry / "SOFTWARE.json").write_text(json.dumps([
+        {"RegistryHive": "SOFTWARE", "Plugin": "uac", "Value": "1"},
+        {"RegistryHive": "SOFTWARE", "Plugin": "run", "RegistryKey": "Microsoft/Windows/CurrentVersion/Run",
+         "AppName": "LabUpdater", "AppLocation": "powershell.exe -w hidden -enc VwBy"},
+    ]))
+    (registry / "S-1-5-21-1-1000+NTUSER.DAT.json").write_text('[{"AppLocation": "/"C:/x.exe/"}]')  # an old, broken file
+    path = str(tmp_path / "CASE04")
+    result = eru_offline.answer_with_rows("persistence", path)
+    assert "Run key: SOFTWARE Microsoft/Windows/CurrentVersion/Run: LabUpdater -> powershell.exe -w hidden" in result["answer"]
+    [row] = result["rows"]
+    assert (row["file"], row["row_ref"]) == ("artefacts/cooked/registry/SOFTWARE.json", "#1")
+    page = case_files.page(case_files.resolve(Path(path), "LAB-WIN11", row["file"]))
+    assert row["hash"] == next(r["hash"] for r in page["rows"] if r["ref"] == "#1")
+
 def test_threat_intel(tmp_path):
     root = tmp_path / "CASE03"
     analysis = root / "LAB-WIN11" / "analysis"

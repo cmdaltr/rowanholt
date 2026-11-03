@@ -112,10 +112,13 @@ def records(path: Path) -> Iterator[Tuple[str, Dict[str, str]]]:
     with open(path, encoding="utf-8", errors="replace") as fh:
         try:
             data = json.load(fh)
-        except ValueError:
+        except ValueError as whole:
             # JSON lines
             fh.seek(0)
-            data = [json.loads(line) for line in fh if line.strip()]
+            try:
+                data = [json.loads(line) for line in fh if line.strip()]
+            except ValueError:
+                raise CaseFileError(f"{path.name} isn't valid JSON ({whole}): re-run its processing") from None
     if isinstance(data, dict):
         data = data.get("items") or data.get("records") or [data]
     for number, record in enumerate(data):
