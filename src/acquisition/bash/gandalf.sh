@@ -1112,6 +1112,7 @@ acquire_remote() {
         unset confirm
     fi
 
+    local failed=0
     for host in "${hosts[@]}"; do
         echo -e "${GREEN}[+]${NC} Acquiring from remote host: $host"
 
@@ -1119,6 +1120,7 @@ acquire_remote() {
         local remote_script="/tmp/gandalf_collect.sh"
         scp "$0" "${REMOTE_USER}@${host}:${remote_script}" || {
             echo -e "${RED}[ERROR]${NC} Failed to copy script to $host"
+            failed=$((failed + 1))
             continue
         }
 
@@ -1126,6 +1128,7 @@ acquire_remote() {
         if ! ssh "${REMOTE_USER}@${host}" "sudo bash ${remote_script} ${remote_encryption} Local -o /tmp/gandalf/acquisitions $([ "$MEMORY_DUMP" = true ] && echo -m)"; then
             echo -e "${RED}[ERROR]${NC} Remote execution failed on $host"
             ssh "${REMOTE_USER}@${host}" "sudo rm -rf /tmp/gandalf ${remote_script}" || true
+            failed=$((failed + 1))
             continue
         fi
 
@@ -1145,15 +1148,21 @@ acquire_remote() {
                 echo -e "${GREEN}[+]${NC} Successfully acquired from $host"
             else
                 echo -e "${RED}[ERROR]${NC} Failed to retrieve archive from $host"
+                failed=$((failed + 1))
             fi
         else
             echo -e "${RED}[ERROR]${NC} No archive found on $host"
+            failed=$((failed + 1))
         fi
 
         # Leave nothing of Gandalf's on the target
         ssh "${REMOTE_USER}@${host}" "sudo rm -rf /tmp/gandalf ${remote_script}" || true
     done
     unset GANDALF_PASSWORD
+    if [ "$failed" -gt 0 ]; then
+        echo -e "${RED}[ERROR]${NC} $failed of ${#hosts[@]} host(s) not acquired"
+        return 1
+    fi
 }
 
 # Main function
