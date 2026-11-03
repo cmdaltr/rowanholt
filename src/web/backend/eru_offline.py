@@ -40,7 +40,7 @@ FLAGGED_CSVS = ("pam.csv", "sudoers.csv", "autostart.csv", "udev_rules.csv", "pr
 PERSISTENCE_LISTS = ("startup_items.csv", "generators.csv")
 # stacking.py's PERSISTENCE (the backend doesn't import the analysis package; a test keeps them equal)
 STACKING_PERSISTENCE = {"scheduled task", "wmi consumer", "service (Windows)", "autorun (Windows)", "service (systemd)",
-                        "autorun (Linux)", "kernel module", "autorun (macOS)"}
+                        "autorun (Linux)", "kernel module", "autorun (macOS)", "driver (Windows)"}
 RARE_ROWS = 8
 # The rows the lines shown so far came from, while answer_with_rows() runs
 _citing: ContextVar[Optional[List[Dict[str, str]]]] = ContextVar("eru_offline_citing", default=None)
