@@ -51,10 +51,11 @@ let background = CGGradient(colorsSpace: sRGB,
                             locations: [0, 1])!
 ctx.drawLinearGradient(background, start: CGPoint(x: 0, y: tile.maxY), end: CGPoint(x: 0, y: tile.minY), options: [])
 
-// The dome stops above the lettering; the flourish is cropped about its centre (x 785)
-// and its arms faded before they meet the R and L swashes
-let dome = faded(CGRect(x: 334, y: 86, width: 884, height: 458), bottom: 0.14)
-let flourish = faded(CGRect(x: 425, y: 752, width: 720, height: 198), left: 0.22, right: 0.22)
+// The dome stops above the lettering (the D's top reaches into its lower left, so that
+// corner fades); the flourish is cropped about its gem (x 770) and its arms faded before
+// they meet the R and L swashes
+let dome = faded(CGRect(x: 296, y: 24, width: 964, height: 512), left: 0.14, bottom: 0.22)
+let flourish = faded(CGRect(x: 410, y: 770, width: 720, height: 205), left: 0.22, right: 0.22)
 
 let scale: CGFloat = 0.8
 let domeSize = CGSize(width: CGFloat(dome.width) * scale, height: CGFloat(dome.height) * scale)
