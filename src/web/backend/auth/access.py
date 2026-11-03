@@ -22,6 +22,7 @@ from urllib.parse import unquote
 
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
+from starlette.requests import HTTPConnection
 
 try:
     from ..config import settings
@@ -73,7 +74,7 @@ def server_mode() -> bool:
     return settings.dernvale_server_mode
 
 
-def user_from_request(request: Request) -> Optional[dict]:
+def user_from_request(request: HTTPConnection) -> Optional[dict]:
     """The caller from the bearer token, else the session cookie (a stale or empty
     header mustn't hide a good cookie)."""
     header = request.headers.get("authorization", "")
@@ -153,6 +154,29 @@ async def middleware(request: Request, call_next):
         if match and not case_allowed(user, unquote(match.group(1))):
             return JSONResponse({"detail": "Case not found"}, status_code=404)
     return await call_next(request)
+
+
+def websocket_user(websocket: HTTPConnection) -> Optional[dict]:
+    """The caller of a websocket under /api, or None if refused. middleware() only sees HTTP
+    requests, so a websocket route asks this itself (at the handshake and again while open):
+    the same token, sign-in and job checks, read as a GET. Browsers send cookies with a
+    websocket to any site that opens one, so one from a page on another origin is refused
+    (an origin check is the only CSRF defence a websocket has)."""
+    origin = websocket.headers.get("origin")
+    if origin and origin.rstrip("/") not in [o.rstrip("/") for o in settings.cors_origins]:
+        return None
+    path = websocket.url.path
+    user = user_from_request(websocket)
+    if user and user.get("token") and tokens.refusal(user["token"], "GET", path, ADMIN_PREFIXES):
+        return None
+    if not server_mode():
+        return user or LOCAL_USER
+    if not user:
+        return None
+    match = JOB_PATH.match(path)
+    if match and not can_access_job(user, match.group(1)):
+        return None
+    return user
 
 
 def current_user(request: Request) -> dict:

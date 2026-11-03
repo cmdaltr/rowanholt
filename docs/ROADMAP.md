@@ -59,7 +59,7 @@ Container forensics goes first because half of it is written. ML goes last becau
 
 - **Case browser.** **Browse Case** on a completed job opens `/jobs/{id}/case`. It lists each host's cooked artefacts and analysis files, plus the case's own CSVs (`threat_groups.csv`), in paged tables you can filter on any field. It is read-only by construction (`case_files.py`): requests are resolved against `artefacts/cooked/`, `analysis/` and the case root, `raw/` is never reachable, and nothing opens a file for writing.
 - **Findings.** ⚑ on any row flags it as a lead or confirms it outright, with a title and an optional technique. The server reads the row itself and stores its file, row reference, SHA-256 and an excerpt. If a re-run or an edited file changes the row, the finding shows "row changed" rather than silently pointing at something else.
-- **Notes, assignment and activity.** Notes are Markdown, on the case or on a finding. Each host has an assignee and a status: to do, in progress or done. On a team server the assignee must be an active user (an email is stored as the username); on one machine it's free text. An append-only feed records who flagged, marked, assigned, noted or exported what. The page polls every 15 seconds.
+- **Notes, assignment and activity.** Notes are Markdown, on the case or on a finding. Each host has an assignee and a status: to do, in progress or done. On a team server the assignee must be an active user (an email is stored as the username); on one machine it's free text. An append-only feed records who flagged, marked, assigned, noted or exported what. The page reloads when anything changes, told by a websocket (`/case/live`, 3 November), and polls every 15 seconds only while that's down.
 - **Working at the same time.** Findings, notes and activity are separate rows, so simultaneous additions never collide.
   - A second flag on an already-flagged row is refused with the existing finding's number and author; the second analyst adds a note to it instead.
   - A status change carries the `updated_at` it was made against, and the server refuses it (409) if a colleague changed the finding first; the page then reloads it.
@@ -70,7 +70,7 @@ Container forensics goes first because half of it is written. ML goes last becau
 - **Tests.** `tests/unit/test_case_browser.py` covers the refusals around `raw/`, paging and filters, the finding lifecycle (including a changed row), notes, assignment (checked against the users on a server), activity, the report, the layer and Eru's answer.
 
 **Still to do.**
-- **Live updates.** Polling is enough at this size. Websockets can wait until someone asks.
+- **Live updates.** Built 3 November: a websocket that says when the activity feed or the job changes, the data still read through the ordinary routes. It checks Postgres every 2 seconds per open page, which is fine at a team's size; a pub/sub (Postgres `LISTEN`/`NOTIFY` or Redis) would replace that if it ever isn't.
 
 ## ML-based anomaly detection
 

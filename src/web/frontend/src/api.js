@@ -420,6 +420,13 @@ export const assignHost = async (jobId, host, changes) =>
 export const getCaseActivity = async (jobId, since = 0) =>
   (await api.get(`${caseBase(jobId)}/activity`, { params: { since } })).data;
 
+// The case's live socket (case_routes.live). Browsers can't put a header on a websocket, so it
+// goes by the session cookie, never a token in the URL
+export const caseLiveUrl = (jobId) => {
+  const base = new URL(API_BASE_URL || window.location.origin, window.location.href);
+  return `${base.origin.replace(/^http/, 'ws')}/api/jobs/${jobId}/case/live`; // https → wss
+};
+
 export const getCaseReport = async (jobId) =>
   (await api.get(`${caseBase(jobId)}/report`, { responseType: 'text' })).data;
 

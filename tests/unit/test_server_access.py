@@ -183,6 +183,36 @@ class ServerAccessTest(BackendCase):
         resp = self.client.post("/api/jobs/bulk/cancel", headers=self.bob, json=[job])
         self.assertEqual(resp.json()["results"][0]["error"], "Job not found")
 
+    def test_live_case_updates_follow_job_access(self):
+        import case_routes
+        from starlette.websockets import WebSocketDisconnect
+        job = self.create_job(self.alice, "CASE-LIVE-1")
+        path = f"/api/jobs/{job}/case/live"
+        with mock.patch.object(case_routes, "LIVE_EVERY", 0.05):
+            with self.client.websocket_connect(path, headers=self.alice) as ws:
+                first = ws.receive_json()
+                self.assertEqual((first["activity"], first["status"]), (0, "pending"))
+                resp = self.client.post(f"/api/jobs/{job}/case/notes", headers=self.alice, json={"body": "seen"})
+                self.assertEqual(resp.status_code, 200, resp.text)
+                self.assertGreater(ws.receive_json()["activity"], 0)
+            # Not signed in, not shared, or opened by a page on another site: refused at the handshake
+            origin = {**self.alice, "Origin": "https://evil.example"}
+            for headers in ({}, self.bob, origin):
+                with self.assertRaises(WebSocketDisconnect) as refused:
+                    with self.client.websocket_connect(path, headers=headers) as ws:
+                        ws.receive_json()
+                self.assertEqual(refused.exception.code, 1008)
+            with self.client.websocket_connect(path, headers={**self.alice, "Origin": self.settings.cors_origins[0]}) as ws:
+                ws.receive_json()
+            # Sharing taken away closes a socket already open
+            self.client.put(f"/api/jobs/{job}/sharing", headers=self.alice, json={"usernames": ["bob"]})
+            with self.client.websocket_connect(path, headers=self.bob) as ws:
+                ws.receive_json()
+                self.client.put(f"/api/jobs/{job}/sharing", headers=self.alice, json={"usernames": []})
+                with self.assertRaises(WebSocketDisconnect):
+                    while True:
+                        ws.receive_json()
+
     def test_restart_with_findings_needs_confirm(self):
         import case_routes
         from models.job import JobStatus

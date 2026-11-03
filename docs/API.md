@@ -1138,6 +1138,7 @@ A job's output, read-only, and the team's findings, notes, host assignments and 
 | `GET` `POST` | `/api/jobs/{job_id}/case/notes` | Notes, Markdown: `{"body", "finding_id"}`, `finding_id` null for the case |
 | `PUT` | `/api/jobs/{job_id}/case/hosts/{host}` | `{"assignee", "status"}`; status is `to do`, `in progress` or `done`. In server mode the assignee must be an active user (username or email, stored as the username), otherwise `400`; `""` unassigns |
 | `GET` | `/api/jobs/{job_id}/case/activity?since=` | Who did what, newest first; `since` (the highest `id` seen) for polling |
+| `WS` | `/api/jobs/{job_id}/case/live` | Sends `{activity, status, progress}` when any of them changes (checked every 2 seconds): the newest activity id and the job's state, so a page knows when to reload; no case data. Authenticated like the routes above, by the session cookie or a bearer header (never a token in the URL), and checked again before each check, so signing out or losing the share closes it (code 1008); refused from a page on an origin the backend doesn't serve |
 | `GET` | `/api/jobs/{job_id}/case/report` | Markdown: case notes, then confirmed findings by host with their notes |
 | `GET` | `/api/jobs/{job_id}/case/layer` | An ATT&CK Navigator layer of confirmed findings' techniques only |
 
