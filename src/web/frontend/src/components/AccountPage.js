@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { issueSessionToken } from '../api';
+import { listApiTokens, createApiToken, revokeApiToken } from '../api';
 
 const heroImage = `${process.env.PUBLIC_URL}/images/rivendell.png`;
 
@@ -25,8 +25,13 @@ const AccountPage = () => {
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [showMfaSetup, setShowMfaSetup] = useState(false);
 
-  // A token for scripts and Eru's MCP server (the sign-in's own kind; there are no long-lived ones)
+  // Long-lived tokens for scripts and Eru's MCP server (auth/tokens.py)
   const [generatedToken, setGeneratedToken] = useState('');
+  const [apiTokens, setApiTokens] = useState([]);
+  const [tokensAvailable, setTokensAvailable] = useState(true);
+  const [tokenName, setTokenName] = useState('');
+  const [tokenScope, setTokenScope] = useState('eru-mcp');
+  const [tokenDays, setTokenDays] = useState(90);
 
   // Messages
   const [profileMessage, setProfileMessage] = useState({ type: '', text: '' });
@@ -150,13 +155,49 @@ const AccountPage = () => {
     }
   };
 
-  const handleGenerateToken = async () => {
+  const loadTokens = async () => {
+    try {
+      setApiTokens(await listApiTokens());
+    } catch (error) {
+      // 400 on an analyst's own machine: the API needs no token there
+      if (error.response?.status === 400) setTokensAvailable(false);
+      setTokenMessage({ type: 'error', text: error.response?.data?.detail || 'Could not list your tokens.' });
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated) loadTokens();
+  }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleGenerateToken = async (e) => {
+    e.preventDefault();
     setTokenMessage({ type: '', text: '' });
     try {
-      setGeneratedToken((await issueSessionToken()).access_token);
+      const made = await createApiToken(tokenName.trim(), tokenScope, Number(tokenDays));
+      setGeneratedToken(made.token);
+      setTokenName('');
+      setTokenMessage({ type: 'success', text: 'Copy it now: it is not shown again.' });
+      loadTokens();
     } catch (error) {
-      setTokenMessage({ type: 'error', text: error.response?.data?.detail || 'Could not issue a token.' });
+      setTokenMessage({ type: 'error', text: error.response?.data?.detail || 'Could not make a token.' });
     }
+  };
+
+  const handleRevokeToken = async (token) => {
+    setTokenMessage({ type: '', text: '' });
+    try {
+      await revokeApiToken(token.id);
+      setTokenMessage({ type: 'success', text: `Revoked ${token.name}.` });
+      loadTokens();
+    } catch (error) {
+      setTokenMessage({ type: 'error', text: error.response?.data?.detail || 'Could not revoke the token.' });
+    }
+  };
+
+  const shortDate = (value) => (value ? new Date(value).toLocaleDateString() : '–');
+  const tokenState = (token) => {
+    if (token.revoked_at) return 'revoked';
+    return new Date(token.expires_at) < new Date() ? 'expired' : 'active';
   };
 
   const copyToken = async () => {
@@ -314,14 +355,15 @@ const AccountPage = () => {
                 </form>
               </div>
 
-              {/* A token for scripts and Eru's MCP server */}
+              {/* Tokens for scripts and Eru's MCP server */}
               <div style={{ paddingTop: '2rem', borderTop: '1px solid #3f4b2a' }}>
-                <h3 style={{ marginBottom: '1.5rem' }}>Token for scripts and Eru's MCP server</h3>
+                <h3 style={{ marginBottom: '1.5rem' }}>Tokens for scripts and Eru's MCP server</h3>
 
                 <p style={{ marginBottom: '1rem', color: '#a09580' }}>
-                  A bearer token for your account, whichever way you signed in. It lasts as long as a sign-in does
-                  (24 hours unless the server is set otherwise) and does what you can do, so keep it like a password.
-                  For <code>rivendell mcp</code>, set it as <code>RIVENDELL_TOKEN</code> (docs/ERU.md).
+                  A token lasts until it expires or you revoke it, and is shown once, when it's made. An{' '}
+                  <code>eru-mcp</code> token can only read, flag leads and add notes, recorded as Eru acting for you;
+                  a <code>full</code> token does what you can do, so keep it like a password. For{' '}
+                  <code>rivendell mcp</code>, set it as <code>RIVENDELL_TOKEN</code> (docs/ERU.md).
                 </p>
 
                 {tokenMessage.text && (
@@ -336,7 +378,55 @@ const AccountPage = () => {
                   </div>
                 )}
 
-                <button type="button" onClick={handleGenerateToken}>{generatedToken ? 'Get another' : 'Get a token'}</button>
+                {tokensAvailable && (
+                  <>
+                    <form onSubmit={handleGenerateToken} style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '1.5rem' }}>
+                      <div style={{ flex: '2 1 12rem' }}>
+                        <label>Name</label>
+                        <input type="text" value={tokenName} onChange={(e) => setTokenName(e.target.value)}
+                          placeholder="e.g. Claude Desktop on my laptop" maxLength={100} required />
+                      </div>
+                      <div style={{ flex: '1 1 8rem' }}>
+                        <label>Scope</label>
+                        <select value={tokenScope} onChange={(e) => setTokenScope(e.target.value)}>
+                          <option value="eru-mcp">eru-mcp</option>
+                          <option value="full">full</option>
+                        </select>
+                      </div>
+                      <div style={{ flex: '1 1 6rem' }}>
+                        <label>Days</label>
+                        <input type="number" min={1} max={365} value={tokenDays} onChange={(e) => setTokenDays(e.target.value)} />
+                      </div>
+                      <button type="submit" style={{ height: '42px' }}>Make a token</button>
+                    </form>
+
+                    {apiTokens.length > 0 && (
+                      <table style={{ width: '100%', fontSize: '0.9rem' }}>
+                        <thead>
+                          <tr><th>Name</th><th>Token</th><th>Scope</th><th>Made</th><th>Expires</th><th>Last used</th><th>State</th><th /></tr>
+                        </thead>
+                        <tbody>
+                          {apiTokens.map((token) => (
+                            <tr key={token.id}>
+                              <td>{token.name}</td>
+                              <td><code>{token.prefix}…</code></td>
+                              <td>{token.scope}</td>
+                              <td>{shortDate(token.created_at)}</td>
+                              <td>{shortDate(token.expires_at)}</td>
+                              <td>{shortDate(token.last_used_at)}</td>
+                              <td>{tokenState(token)}</td>
+                              <td>
+                                {tokenState(token) === 'active' && (
+                                  <button type="button" className="secondary" onClick={() => handleRevokeToken(token)}>Revoke</button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </>
+                )}
               </div>
 
             </>

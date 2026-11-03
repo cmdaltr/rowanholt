@@ -6,6 +6,7 @@ Lightweight authentication without database dependencies: users live in a JSON f
 in server mode, user administration for admins in place of open sign-up.
 """
 
+import logging
 from datetime import datetime, timedelta
 from typing import Optional
 from urllib.parse import quote
@@ -20,17 +21,18 @@ try:
     from .security import hash_password, verify_password, create_access_token
     from .users import (AdminPasswordMissing, find_user, init_default_admin, load_users,  # noqa: F401
                         new_user, public, save_users)
-    from . import access, oidc
+    from . import access, oidc, tokens
     from .throttle import throttle
 except ImportError:
     from config import settings
     from auth.security import hash_password, verify_password, create_access_token
     from auth.users import (AdminPasswordMissing, find_user, init_default_admin, load_users,  # noqa: F401
                             new_user, public, save_users)
-    from auth import access, oidc
+    from auth import access, oidc, tokens
     from auth.throttle import throttle
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
+logger = logging.getLogger(__name__)
 
 MIN_PASSWORD = 12
 
@@ -282,6 +284,57 @@ async def change_password(body: PasswordChange, user: dict = Depends(access.curr
     record["hashed_password"] = hash_password(body.new_password)
     save_users(users)
     return {"message": "Password changed"}
+
+
+# ── API tokens (auth/tokens.py) ──────────────────────────────────────────────
+
+class TokenRequest(BaseModel):
+    name: str
+    scope: str = "full"
+    days: int = tokens.DEFAULT_DAYS
+
+
+def _token_storage():
+    if not settings.rivendell_server_mode:
+        raise HTTPException(status_code=400, detail="Tokens are for a team server: on your own machine the API needs none")
+    if access._storage is None:
+        raise HTTPException(status_code=503, detail="Token storage isn't available")
+    return access._storage
+
+
+@router.get("/tokens")
+async def list_tokens(all: bool = False, user: dict = Depends(access.current_user)):
+    """The caller's tokens; with all=true, everyone's (admins)."""
+    if all and not access.is_admin(user):
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    return {"tokens": _token_storage().list_tokens(None if all else user["id"])}
+
+
+@router.post("/tokens")
+async def create_token(body: TokenRequest, user: dict = Depends(access.current_user)):
+    """A new token for the caller, returned once: only its hash is kept."""
+    storage = _token_storage()
+    name = body.name.strip()
+    if not name or len(name) > 100:
+        raise HTTPException(status_code=400, detail="Give the token a name of up to 100 characters")
+    if body.scope not in tokens.SCOPES:
+        raise HTTPException(status_code=400, detail=f"Scope is one of: {', '.join(tokens.SCOPES)}")
+    if not 1 <= body.days <= tokens.MAX_DAYS:
+        raise HTTPException(status_code=400, detail=f"A token lasts 1 to {tokens.MAX_DAYS} days")
+    token, record = tokens.new_token(user, name, body.scope, body.days)
+    stored = storage.add_token(record)
+    logger.info(f"{user['username']} made {body.scope} token {stored['prefix']}… ({name}, {body.days} days)")
+    return {"token": token, **stored}
+
+
+@router.delete("/tokens/{token_id}")
+async def revoke_token(token_id: str, user: dict = Depends(access.current_user)):
+    """Revoke one of the caller's tokens (admins: anyone's)."""
+    revoked = _token_storage().revoke_token(token_id, None if access.is_admin(user) else user["id"])
+    if not revoked:
+        raise HTTPException(status_code=404, detail="Token not found")
+    logger.info(f"{user['username']} revoked {revoked['username']}'s token {revoked['prefix']}…")
+    return revoked
 
 
 # ── Users: the directory for sharing, and administration ─────────────────────

@@ -15,6 +15,7 @@ owner, so only admins see it until one shares it.
 
 import logging
 import re
+from datetime import datetime
 from typing import Iterable, Optional
 from urllib.parse import unquote, urlsplit
 
@@ -25,10 +26,12 @@ try:
     from ..config import settings
     from .security import verify_token
     from .users import load_users, public
+    from . import tokens
 except ImportError:
     from config import settings
     from auth.security import verify_token
     from auth.users import load_users, public
+    from auth import tokens
 
 logger = logging.getLogger(__name__)
 
@@ -81,9 +84,12 @@ def user_from_request(request: Request) -> Optional[dict]:
 
 
 def user_from_token(token: Optional[str]) -> Optional[dict]:
-    """The active user a token belongs to, as returned by the API."""
+    """The active user a token belongs to, as returned by the API. For an API token
+    (auth/tokens.py) the user carries it as "token": its id, name and scope."""
     if not token:
         return None
+    if tokens.is_api_token(token):
+        return _user_from_api_token(token)
     payload = verify_token(token)
     if not payload:
         return None
@@ -91,6 +97,30 @@ def user_from_token(token: Optional[str]) -> Optional[dict]:
     if not user or not user.get("is_active", True):
         return None
     return public(user)
+
+
+def _user_from_api_token(token: str) -> Optional[dict]:
+    if _storage is None:
+        return None
+    now = datetime.now()
+    record = _storage.token_by_hash(tokens.hash_token(token))
+    if not tokens.usable(record, now):
+        return None
+    user = load_users().get(record["user_id"])
+    if not user or not user.get("is_active", True):
+        return None
+    if not record["last_used_at"] or now - record["last_used_at"] > tokens.TOUCH_EVERY:
+        try:
+            _storage.touch_token(record["id"], now)
+        except Exception as exc:  # a missed last-used time mustn't refuse the request
+            logger.warning(f"Could not record token {record['prefix']}… as used: {exc}")
+    return {**public(user), "token": {"id": record["id"], "name": record["name"], "scope": record["scope"]}}
+
+
+def token_scope(request: Request) -> Optional[str]:
+    """The scope of the API token behind this request, or None for a sign-in or no token."""
+    user = getattr(request.state, "user", None) or {}
+    return (user.get("token") or {}).get("scope")
 
 
 def is_admin(user: dict) -> bool:
@@ -103,6 +133,10 @@ async def middleware(request: Request, call_next):
     user = user_from_request(request)
     request.state.user = user or (None if server_mode() else LOCAL_USER)
 
+    if user and user.get("token") and path.startswith("/api"):
+        reason = tokens.refusal(user["token"], request.method, path, ADMIN_PREFIXES)
+        if reason:
+            return JSONResponse({"detail": reason}, status_code=403)
     if server_mode() and path.startswith("/api") and path not in PUBLIC_PATHS and request.method != "OPTIONS":
         if not user:
             return JSONResponse({"detail": "Sign in required"}, status_code=401, headers={"WWW-Authenticate": "Bearer"})

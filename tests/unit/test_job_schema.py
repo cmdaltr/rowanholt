@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "web" / "ba
 
 import storage  # noqa: E402
 
-HEAD = "9e3c5a7b1f42"  # the newest file in src/web/backend/alembic/versions
+HEAD = "a3f8c6e1d295"  # the newest file in src/web/backend/alembic/versions
 
 
 def heads(url: str) -> list:
@@ -35,7 +35,7 @@ class MigrationTest(unittest.TestCase):
         storage.JobStorage(url)
         tables = set(inspect(create_engine(url)).get_table_names())
         self.assertTrue({"jobs", "job_access", "threat_intel_indicators", "case_findings", "case_notes", "case_hosts",
-                         "case_activity", "threat_intel_validity", "alembic_version"} <= tables)
+                         "case_activity", "threat_intel_validity", "api_tokens", "alembic_version"} <= tables)
         self.assertEqual(heads(url), [HEAD])
 
     def test_database_from_before_migrations_keeps_its_jobs(self):

@@ -1,0 +1,79 @@
+"""
+API Tokens
+
+Long-lived, revocable tokens for scripts and Eru's MCP server, in place of a sign-in's
+24-hour JWT. A token is "rvt_" and 43 random characters; only its SHA-256 is stored
+(the api_tokens table), so it's shown once, when it's made. It stops working when it's
+revoked, when it expires (at most a year), or when its user is deactivated or removed.
+
+A token's scope says what it may do:
+- full: whatever its user may do, apart from making or revoking tokens and trading the
+  token for a sign-in's session (so revoking a token is the end of it)
+- eru-mcp: what Eru's MCP server needs and no more: reading, and flagging leads and adding
+  notes, recorded as "Eru (for <user>)" whether or not the caller says it's Eru. Admin areas
+  are refused even when the user is an admin.
+"""
+
+import hashlib
+import re
+import secrets
+import uuid
+from datetime import datetime, timedelta
+from typing import Optional
+
+PREFIX = "rvt_"
+SCOPES = ("full", "eru-mcp")
+ERU_SCOPE = "eru-mcp"
+DEFAULT_DAYS = 90
+MAX_DAYS = 365
+# last_used_at is written at most this often per token, not on every request
+TOUCH_EVERY = timedelta(minutes=1)
+
+# The only writes an eru-mcp token may make: Eru's flag_lead and add_note
+ERU_WRITES = re.compile(r"^/api/jobs/[0-9a-fA-F-]{36}/case/(findings|notes)$")
+READ_METHODS = ("GET", "HEAD", "OPTIONS")
+# Never through a token: making or revoking tokens, and swapping one for a session
+SIGN_IN_ONLY = ("/api/auth/tokens", "/api/auth/session")
+
+
+def is_api_token(token: Optional[str]) -> bool:
+    return bool(token) and token.startswith(PREFIX)
+
+
+def hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def new_token(user: dict, name: str, scope: str, days: int) -> tuple:
+    """A new token for `user`: (the token, to show once; the record to store)."""
+    token = PREFIX + secrets.token_urlsafe(32)
+    now = datetime.now()
+    record = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "username": user["username"],
+        "name": name,
+        "token_hash": hash_token(token),
+        "prefix": token[:len(PREFIX) + 6],
+        "scope": scope,
+        "created_at": now,
+        "expires_at": now + timedelta(days=days),
+    }
+    return token, record
+
+
+def usable(record: Optional[dict], now: datetime) -> bool:
+    return bool(record) and record["revoked_at"] is None and record["expires_at"] > now
+
+
+def refusal(token: dict, method: str, path: str, admin_prefixes: tuple) -> Optional[str]:
+    """Why a request made with this token is refused, or None if it's allowed."""
+    if path.startswith(SIGN_IN_ONLY):
+        return "Tokens are managed from a sign-in, not with a token"
+    if token["scope"] != ERU_SCOPE:
+        return None
+    if path.startswith(admin_prefixes):
+        return "An eru-mcp token can't use admin areas"
+    if method in READ_METHODS or (method == "POST" and ERU_WRITES.match(path)):
+        return None
+    return "An eru-mcp token can only read, flag leads and add notes"

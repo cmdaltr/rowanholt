@@ -219,7 +219,9 @@ def restart_refusal(job_id: str, confirm: bool) -> Optional[Dict]:
 
 
 def _by_eru(request: Request) -> bool:
-    return request.headers.get(AGENT_HEADER, "").strip().lower() == ERU_MCP
+    """Eru's MCP server says so in a header; an eru-mcp token is Eru whatever it says."""
+    return (request.headers.get(AGENT_HEADER, "").strip().lower() == ERU_MCP
+            or access.token_scope(request) == ERU_MCP)
 
 
 def _actor(request: Request) -> str:

@@ -91,6 +91,24 @@ class ThreatIntelValidityModel(Base):
     first_seen = Column(DateTime, nullable=True)
 
 
+class ApiTokenModel(Base):
+    """A long-lived token for scripts and Eru's MCP server (auth/tokens.py). Only the token's
+    SHA-256 is kept; the token itself is shown once, when it's made. Revision a3f8c6e1d295."""
+    __tablename__ = "api_tokens"
+
+    id = Column(String, primary_key=True)
+    user_id = Column(String, nullable=False, index=True)
+    username = Column(String, nullable=False)
+    name = Column(String, nullable=False)
+    token_hash = Column(String, nullable=False, unique=True)
+    prefix = Column(String, nullable=False)  # the first characters, so a token can be recognised
+    scope = Column(String, nullable=False, default="full")
+    created_at = Column(DateTime, default=datetime.now)
+    expires_at = Column(DateTime, nullable=False)
+    last_used_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+
+
 class CaseFindingModel(Base):
     """A row of a case's output an analyst flagged: a reference to the evidence, never a copy of it.
     row_hash pins the row, so a re-run that moves or changes it shows up instead of re-pointing."""
@@ -456,5 +474,79 @@ class JobStorage:
         session = self.Session()
         try:
             return {row.job_id: self._access_dict(row) for row in session.query(JobAccessModel).all()}
+        finally:
+            session.close()
+
+    # ── API tokens (auth/tokens.py) ───────────────────────────────────────────
+
+    @staticmethod
+    def _token_dict(row: ApiTokenModel) -> dict:
+        return {"id": row.id, "user_id": row.user_id, "username": row.username, "name": row.name,
+                "prefix": row.prefix, "scope": row.scope, "created_at": row.created_at,
+                "expires_at": row.expires_at, "last_used_at": row.last_used_at, "revoked_at": row.revoked_at}
+
+    def add_token(self, token: dict) -> dict:
+        """Store a new token (its hash, never the token)."""
+        session = self.Session()
+        try:
+            row = ApiTokenModel(**token)
+            session.add(row)
+            session.commit()
+            return self._token_dict(row)
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def token_by_hash(self, token_hash: str) -> Optional[dict]:
+        """The token with this hash, revoked and expired ones included (the caller decides)."""
+        session = self.Session()
+        try:
+            row = session.query(ApiTokenModel).filter_by(token_hash=token_hash).first()
+            return self._token_dict(row) if row else None
+        finally:
+            session.close()
+
+    def list_tokens(self, user_id: Optional[str] = None) -> List[dict]:
+        """One user's tokens, or everyone's, newest first."""
+        session = self.Session()
+        try:
+            query = session.query(ApiTokenModel)
+            if user_id is not None:
+                query = query.filter_by(user_id=user_id)
+            return [self._token_dict(row) for row in query.order_by(ApiTokenModel.created_at.desc()).all()]
+        finally:
+            session.close()
+
+    def revoke_token(self, token_id: str, user_id: Optional[str] = None) -> Optional[dict]:
+        """Revoke a token (one of `user_id`'s, unless None); None if there's no such token."""
+        session = self.Session()
+        try:
+            query = session.query(ApiTokenModel).filter_by(id=token_id)
+            if user_id is not None:
+                query = query.filter_by(user_id=user_id)
+            row = query.first()
+            if not row:
+                return None
+            if row.revoked_at is None:
+                row.revoked_at = datetime.now()
+                session.commit()
+            return self._token_dict(row)
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def touch_token(self, token_id: str, when: datetime) -> None:
+        """Record when a token was last used."""
+        session = self.Session()
+        try:
+            session.query(ApiTokenModel).filter_by(id=token_id).update({"last_used_at": when})
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
         finally:
             session.close()

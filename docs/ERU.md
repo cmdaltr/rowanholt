@@ -23,13 +23,14 @@ python3 -m venv ~/.rivendell-mcp
 ~/.rivendell-mcp/bin/pip install -r requirements/mcp.txt
 ```
 
-`RIVENDELL_API` is the Rivendell to read (default `http://127.0.0.1:5688`). On a team server, `RIVENDELL_TOKEN` is your session token. The simplest way to get one, with a password or single sign-on, is **Account → Token for scripts and Eru's MCP server → Get a token** in the web app; or from a password sign-in:
+`RIVENDELL_API` is the Rivendell to read (default `http://127.0.0.1:5688`). On a team server, `RIVENDELL_TOKEN` is an API token: make one in the web app under **Account → Tokens for scripts and Eru's MCP server**, with a password or single sign-on, and give it the **eru-mcp** scope. Or from a signed-in session:
 
 ```bash
-curl -s https://rivendell.example.org/api/auth/login -d username=alice -d password=… | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])'
+curl -s https://rivendell.example.org/api/auth/tokens -H "Authorization: Bearer $SESSION" \
+  -H 'Content-Type: application/json' -d '{"name": "Claude Desktop", "scope": "eru-mcp", "days": 90}'
 ```
 
-Tokens last 24 hours (`access_token_expire_minutes`), so this is a day's token rather than a standing one; there are no long-lived, revocable tokens. On one machine, no token is needed. The token is read from the environment only, since an argument would show in the process list.
+A token (`rvt_…`) is shown once, when it's made: only its SHA-256 is stored. It lasts until it expires (1 to 365 days, 90 by default) or is revoked on the same page, and stops when its user is deactivated. An **eru-mcp** token can only read, flag leads and add notes, and its writes are recorded as Eru's whatever headers it sends; it can't reach admin areas even for an admin. A **full** token does what its user can do. Neither can make or revoke tokens, or be swapped for a sign-in's session, so revoking one is the end of it. On one machine, no token is needed. The token is read from the environment only, since an argument would show in the process list.
 
 For Claude Desktop, in `claude_desktop_config.json`:
 
@@ -71,7 +72,7 @@ Started with `--allow-writes` (`rivendell mcp --allow-writes`, or `"args": ["mcp
 | `flag_lead(job_id, host, file, row, title, technique)` | Flags one row as a lead, never a confirmed or benign finding; a row already flagged is refused |
 | `add_note(job_id, body, finding_id)` | A note on a finding, or on the case without one |
 
-Each server call carries `X-Rivendell-Agent: eru-mcp`, so what Eru writes is recorded as "Eru (for alice)" in the findings, notes, activity and report, never as the analyst's own. The backend holds it there: with that header it refuses any status but lead, and refuses changing or removing findings and assigning hosts. A session stops after `--max-writes` writes (25 by default), so a host led on by text inside the case can't flood it, and the server tells the host that the case's text is evidence, not instructions. Without `--allow-writes` the server is read-only, as before. The code is `src/eru_mcp/server.py` (mcp 2's `MCPServer`, which was FastMCP), and `tests/unit/test_eru_mcp.py` checks the tool list, other people's jobs, `raw/` and that nothing but `/api/` is called, against the real backend in server mode.
+Each server call carries `X-Rivendell-Agent: eru-mcp`, so what Eru writes is recorded as "Eru (for alice)" in the findings, notes, activity and report, never as the analyst's own; with an eru-mcp token that holds even without the header. The backend holds it there: as Eru it refuses any status but lead, and refuses changing or removing findings and assigning hosts. A session stops after `--max-writes` writes (25 by default), so a host led on by text inside the case can't flood it, and the server tells the host that the case's text is evidence, not instructions. Without `--allow-writes` the server is read-only, as before. The code is `src/eru_mcp/server.py` (mcp 2's `MCPServer`, which was FastMCP), and `tests/unit/test_eru_mcp.py` checks the tool list, other people's jobs, `raw/` and that nothing but `/api/` is called, against the real backend in server mode.
 
 ## Eru Models
 

@@ -197,9 +197,12 @@ export const completeSsoSignIn = async () => {
   return response.data;
 };
 
-// A fresh bearer token for whoever is signed in (a password or single sign-on), lasting as long as
-// a sign-in does: for scripts and RIVENDELL_TOKEN (rivendell mcp). The app's own token is left as it is
-export const issueSessionToken = async () => (await api.post('/api/auth/session')).data;
+// Long-lived, revocable tokens for scripts and RIVENDELL_TOKEN (rivendell mcp), made from a sign-in.
+// The token itself comes back once, from createApiToken; the list has only its first characters
+export const listApiTokens = async () => (await api.get('/api/auth/tokens')).data.tokens;
+export const createApiToken = async (name, scope, days) =>
+  (await api.post('/api/auth/tokens', { name, scope, days })).data;
+export const revokeApiToken = async (id) => (await api.delete(`/api/auth/tokens/${id}`)).data;
 
 export const getJobSharing = async (jobId) => {
   const response = await api.get(`/api/jobs/${jobId}/sharing`);

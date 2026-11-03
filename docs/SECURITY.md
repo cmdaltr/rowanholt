@@ -44,6 +44,13 @@ Rivendell implements comprehensive security measures to protect sensitive forens
 - **Payload**: User ID, role, expiration, unique JTI
 - **Refresh**: Not implemented (users must re-login)
 
+#### API Tokens (team server)
+- **Purpose**: scripts and Eru's MCP server (`RIVENDELL_TOKEN`), made under Account in the web app
+- **Format**: `rvt_` and 43 random characters; only the SHA-256 is stored (`api_tokens` table), the token is shown once
+- **Lifetime**: 1 to 365 days (90 by default); revocable by its user or an admin; stops when the user is deactivated
+- **Scopes**: `eru-mcp` (read, flag leads, add notes, recorded as Eru; no admin areas) or `full` (the user's rights)
+- **Limits**: a token can't make or revoke tokens, or be exchanged for a session (`/api/auth/session`)
+
 #### Session Cookies
 - **httpOnly**: True (prevents XSS access)
 - **secure**: Should be True in production (HTTPS only)
