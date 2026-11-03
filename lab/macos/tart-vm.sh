@@ -24,6 +24,8 @@ SSH="$LAB_ROOT/lib/ssh.exp"
 
 vm_exists() { "$TART" list --quiet 2>/dev/null | grep -qx "$VM"; }
 vm_ip() { "$TART" ip "$VM" 2>/dev/null || true; }
+# tart ip keeps answering from the DHCP lease after a stop, so it can't say whether the VM runs
+vm_running() { "$TART" list 2>/dev/null | awk -v vm="$VM" '$2 == vm {print $NF}' | grep -qx running; }
 
 wait_ip() {
   local i ip
@@ -62,7 +64,7 @@ check_mac() {
 
 start_vm() {
   check_mac
-  if [ -z "$(vm_ip)" ]; then
+  if ! vm_running; then
     info "Starting $VM (headless)"
     nohup "$TART" run --no-graphics "$VM" >"$RUN_DIR/$VM.log" 2>&1 &
   fi
@@ -157,7 +159,7 @@ case "$action" in
     # Running without an IP is a boot still in progress (a first boot off a USB drive takes up to an hour)
     # tart ip still answers from the DHCP lease after a stop, so check the state first
     if ! vm_exists; then echo "$VM: not created"
-    elif ! "$TART" list 2>/dev/null | awk -v vm="$VM" '$2 == vm {print $NF}' | grep -qx running; then echo "$VM: stopped"
+    elif ! vm_running; then echo "$VM: stopped"
     elif [ -n "$(vm_ip)" ]; then echo "$VM: running at $(vm_ip), SSH 127.0.0.1:$PORT"
     else echo "$VM: booting (no IP yet)"; fi ;;
   *) die "unknown action $action" ;;
