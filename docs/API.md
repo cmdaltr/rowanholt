@@ -771,6 +771,7 @@ Paths are passed to the worker unchanged, except `/host/tmp/rivendell/…`, whic
 
 **Query Parameters:**
 - `confirm` (bool, default `false`): restart even though the job has findings
+- `fresh` (bool, default `true` for a completed job, `false` for a failed or cancelled one): remove the job's output first. Elrond skips any artefact whose cooked file is already there, so a completed job re-run into its old output comes out unchanged. The worker never removes an output directory that holds one of the job's sources
 
 **Response:** `200 OK`
 ```json
@@ -850,7 +851,7 @@ Paths are passed to the worker unchanged, except `/host/tmp/rivendell/…`, whic
 **Description:** Restart failed, cancelled or completed jobs. Takes a bare JSON array of job IDs and returns a result per job. Without `confirm=true`, a job with findings is skipped: its result has `success: false`, the reason in `error` and the count in `findings`.
 
 **Query Parameters:**
-- `fresh` (bool, default `false`): remove each job's previous output before it runs again
+- `fresh` (bool, default `true` for completed jobs, `false` for failed or cancelled ones): remove each job's previous output before it runs again
 - `confirm` (bool, default `false`): restart jobs that have findings too
 
 ---

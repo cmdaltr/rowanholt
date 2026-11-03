@@ -175,6 +175,20 @@ class ServerAccessTest(BackendCase):
         self.assertEqual(resp.status_code, 200, resp.text)
         self.assertEqual(resp.json()["status"], "pending")
 
+    def test_restart_of_a_completed_job_is_fresh(self):
+        # Elrond skips artefacts whose cooked file exists, so re-running a completed job into its
+        # old output changed nothing: by default its output is removed first; a failed one keeps it
+        from models.job import JobStatus
+        for status, query, fresh in ((JobStatus.COMPLETED, "", True), (JobStatus.FAILED, "", False),
+                                     (JobStatus.COMPLETED, "?fresh=false", False), (JobStatus.FAILED, "?fresh=true", True)):
+            job = self.create_job(self.alice, f"CASE-FRESH-{status.value}-{bool(query)}")
+            stored = self.main.job_storage.get_job(job)
+            stored.status = status
+            self.main.job_storage.save_job(stored)
+            resp = self.client.post(f"/api/jobs/{job}/restart{query}", headers=self.alice)
+            self.assertEqual(resp.status_code, 200, resp.text)
+            self.assertEqual(bool(self.main.job_storage.get_job(job).options.force_overwrite), fresh, (status, query))
+
     def test_case_clash_reported_without_listing_others_jobs(self):
         self.create_job(self.alice, "CASE-CLASH-1")
         body = self.client.get("/api/validate/case-id/CASE-CLASH-1", headers=self.bob).json()

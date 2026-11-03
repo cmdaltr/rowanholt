@@ -746,14 +746,15 @@ async def bulk_archive_jobs(job_ids: list[str], request: Request):
 
 
 @app.post("/api/jobs/bulk/restart")
-async def bulk_restart_jobs(job_ids: list[str], request: Request, fresh: bool = False, confirm: bool = False):
+async def bulk_restart_jobs(job_ids: list[str], request: Request, fresh: Optional[bool] = None,
+                           confirm: bool = False):
     """
     Restart multiple failed, cancelled, or completed jobs at once.
 
     Args:
         job_ids: List of job IDs to restart
         fresh: Remove each job's previous output before it runs again, so a failed
-            run's partial output doesn't mix with the new one
+            run's partial output doesn't mix with the new one (default: completed jobs only)
         confirm: Restart jobs that have findings too (without it they're skipped)
 
     Returns:
@@ -779,15 +780,16 @@ async def bulk_restart_jobs(job_ids: list[str], request: Request, fresh: bool = 
                                 "findings": refusal["findings"]})
                 continue
 
+            clean = _restarts_fresh(job, fresh)
             # Reset job state
             job.status = JobStatus.PENDING
             job.progress = 0
             job.error = None
             job.started_at = None
             job.completed_at = None
-            if fresh:
+            if clean:
                 job.options.force_overwrite = True
-            job.log.append(f"[{datetime.now().isoformat()}] Job restarted by user (bulk operation{', fresh output' if fresh else ''})")
+            job.log.append(f"[{datetime.now().isoformat()}] Job restarted by user (bulk operation{', fresh output' if clean else ''})")
             job_storage.save_job(job)
 
             # Start new analysis task
@@ -925,14 +927,23 @@ async def resume_job(job_id: str):
     return _signal_job(job_id, "resume", JobStatus.PAUSED, JobStatus.RUNNING)
 
 
+def _restarts_fresh(job, fresh: Optional[bool]) -> bool:
+    """Whether a restart removes the job's output first. A completed job's always would by default:
+    Elrond skips any artefact whose cooked file is already there (registry hives among them), so a
+    re-run into the old output would leave it as it was. A failed or cancelled one keeps its output
+    unless asked."""
+    return job.status == JobStatus.COMPLETED if fresh is None else fresh
+
+
 @app.post("/api/jobs/{job_id}/restart")
-async def restart_job(job_id: str, confirm: bool = False):
+async def restart_job(job_id: str, confirm: bool = False, fresh: Optional[bool] = None):
     """
-    Restart a failed or cancelled job.
+    Restart a failed, cancelled or completed job.
 
     Args:
         job_id: Job ID
         confirm: Restart even though the job has findings (409 without it)
+        fresh: Remove the job's output before it runs again (default: completed jobs only)
 
     Returns:
         Updated job
@@ -953,13 +964,16 @@ async def restart_job(job_id: str, confirm: bool = False):
         if refusal:
             raise HTTPException(status_code=409, detail=refusal)
 
+        clean = _restarts_fresh(job, fresh)
         # Reset job state
         job.status = JobStatus.PENDING
         job.progress = 0
         job.error = None
         job.started_at = None
         job.completed_at = None
-        job.log.append(f"[{datetime.now().isoformat()}] Job restarted by user")
+        if clean:
+            job.options.force_overwrite = True
+        job.log.append(f"[{datetime.now().isoformat()}] Job restarted by user{' (fresh output)' if clean else ''}")
 
         job_storage.save_job(job)
 

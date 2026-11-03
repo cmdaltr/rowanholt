@@ -12,6 +12,7 @@ import re
 import traceback
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from celery import Celery
 from celery.utils.log import get_task_logger
@@ -58,6 +59,18 @@ def _resolve_destination(job) -> Path:
         return Path(settings.output_dir) / output_name
 
     return Path(settings.output_dir) / job.case_number
+
+
+def _sources_inside(job, dest_dir: Path) -> Optional[str]:
+    """The first of the job's sources that is the output directory or lies inside it, if any:
+    a fresh restart removes the output directory, and must never take evidence with it."""
+    dest = Path(os.path.realpath(dest_dir))
+    for source in job.source_paths or []:
+        for candidate in {source, translate_path_for_worker(source)}:
+            resolved = Path(os.path.realpath(candidate))
+            if resolved == dest or dest in resolved.parents:
+                return source
+    return None
 
 
 def run_siem_export(job, output_dir: Path, logger):
@@ -343,7 +356,13 @@ def start_analysis(self, job_id: str):
 
         # Check if force_overwrite is set and directory exists
         if getattr(job.options, 'force_overwrite', False):
-            if dest_dir.exists():
+            evidence_inside = _sources_inside(job, dest_dir)
+            if evidence_inside:
+                logger.warning(f"Not removing {dest_dir_str}: it holds the job's source {evidence_inside}")
+                job.log.append(f"[{datetime.now().isoformat()}] -> not removing {dest_dir_str}: it holds this job's "
+                               f"source {evidence_inside}; re-running into the existing output")
+                job_storage.save_job(job)
+            elif dest_dir.exists():
                 logger.info(f"Force overwrite enabled, removing existing directory: {dest_dir_str}")
 
                 # Estimate directory size for ETA calculation
