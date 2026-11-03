@@ -114,15 +114,41 @@ class RunKeyRecordsTest(unittest.TestCase):
         records = [json.loads(r) for r in run_key_records(self.SECTION, "NTUSER.DAT", "gandalf")]
         self.assertEqual({r["AccountProfile"] for r in records}, {"gandalf"})
 
-    def test_quoted_values_stay_valid_json(self) -> None:
-        # Edge's Run value quotes its path: the old text clean-up turned the \" escape into /"
-        section = self.SECTION.replace(
-            "x.exe", 'x.exe\\n  MicrosoftEdgeAutoLaunch - \"C:\\\\Program Files\\\\msedge.exe\" --no-startup-window  --win-session-start')
-        written = json.dumps([cleaned(json.loads(r)) for r in run_key_records(section, "NTUSER.DAT", "gandalf")])
-        edge = json.loads(written)[-1]
-        self.assertEqual(edge["AppName"], "MicrosoftEdgeAutoLaunch")
-        self.assertEqual(edge["AppLocation"], '"C:/Program Files/msedge.exe" --no-startup-window --win-session-start')
-        self.assertEqual(edge["RegistryKey"], "Microsoft/Windows/CurrentVersion/Run")
+    def test_hives_with_quoted_values_are_valid_json(self) -> None:
+        # Through Elrond's own path: rip.pl's output as str(bytes), the plugin handlers (which store
+        # each record's JSON text JSON-encoded again) and the file write. Edge's Run value quotes its
+        # path, which the old text clean-up turned into /" and left the whole hive unreadable.
+        import os
+        import tempfile
+        from unittest import mock
+        from rivendell.process.extractions.registry.profile import extract_registry_profile
+        from rivendell.process.extractions.registry.system import extract_registry_system
+        rip = ("Launching run v.20200511\n----------------------------------------\n"
+               "run v.20200511\n(Software, NTUSER.DAT) [Autostart] Get autostart key contents from Software hive\n\n"
+               "Microsoft\\Windows\\CurrentVersion\\Run\nLastWrite Time 2026-10-25 20:56:20Z\n"
+               "  LabUpdater - powershell.exe -w hidden -enc VwBy\n"
+               '  MicrosoftEdgeAutoLaunch - "C:\\Program Files\\msedge.exe"  --no-startup-window\n')
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = Path(tmp) / "bin" / "rip.pl"
+            fake.parent.mkdir()
+            (Path(tmp) / "out.txt").write_text(rip)
+            # Perl: the profile writer runs it with perl, the system one directly
+            fake.write_text(f"#!/usr/bin/perl\nopen(my $f, '<', '{tmp}/out.txt'); print <$f>;\n")
+            fake.chmod(0o755)
+            out = tmp + "/"
+            (Path(out) / "HOST" / "artefacts" / "cooked" / "registry").mkdir(parents=True)
+            here = os.getcwd()
+            os.chdir(fake.parent)  # the profile writer looks for rip.pl in a few fixed places, ./rip.pl among them
+            self.addCleanup(os.chdir, here)
+            with mock.patch.dict(os.environ, {"PATH": f"{fake.parent}:{os.environ['PATH']}"}):
+                extract_registry_system(out, "HOST::Windows", "/", f"{tmp}/SOFTWARE", {}, [], [])
+                extract_registry_profile(out, "HOST::Windows", "/", f"{tmp}/S-1-5-21-1000+NTUSER.DAT", {}, [], [],
+                                         "S-1-5-21-1000", "NTUSER.DAT")
+            for name in ("SOFTWARE.json", "S-1-5-21-1000+NTUSER.DAT.json"):
+                records = json.loads((Path(out) / "HOST" / "artefacts" / "cooked" / "registry" / name).read_text())
+                self.assertEqual([r["AppName"] for r in records], ["LabUpdater", "MicrosoftEdgeAutoLaunch"], name)
+                self.assertEqual(records[1]["AppLocation"], '"C:/Program Files/msedge.exe" --no-startup-window')
+                self.assertEqual(records[1]["RegistryKey"], "Microsoft/Windows/CurrentVersion/Run")
 
     def test_cleaned_values(self) -> None:
         self.assertEqual(cleaned({"a": "it\\'s  C:\\\\x ", "n": 3, "l": ["y\\\\z"]}),

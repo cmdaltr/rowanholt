@@ -5,7 +5,7 @@ import subprocess
 
 from rivendell.process.extractions.mitre_tagger import tag_mitre_technique
 
-from rivendell.process.extractions.registry.system import cleaned, run_key_records
+from rivendell.process.extractions.registry.system import cleaned, records_of, run_key_records
 
 
 LAST_WRITE_TIME = re.compile(r"^[\d-]{10} [\d:]{8}Z?$")
@@ -1417,6 +1417,6 @@ def extract_registry_profile(
         if any('"Plugin": "run"' in record for record in jsonlist):
             tag_mitre_technique(output_directory, img, "registry", "T1547.001")
         if len(regjsonlist) > 0:
-            json.dump([last_write_moved(cleaned(json.loads(record))) for record in regjsonlist], regjson)
+            json.dump([last_write_moved(cleaned(record)) for record in records_of(regjsonlist)], regjson)
         regjsonlist.clear()
         jsonlist.clear()
