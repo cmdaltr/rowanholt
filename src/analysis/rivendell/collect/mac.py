@@ -1,6 +1,7 @@
 #!/usr/bin/env python3 -tt
 import glob
 import os
+import re
 import shutil
 from datetime import datetime
 
@@ -36,6 +37,10 @@ MACOS_BIOME_MAX_FILES = 2000
 # reads without it), then the newest files first, up to 2 GB, as gandalf.sh and gandalf.py take it
 MACOS_LOG_STORES = (("/private/var/db/uuidtext", "uuidtext"), ("/private/var/db/diagnostics", "diagnostics"))
 MACOS_LOG_STORE_MAX = 2 << 30
+# Spotlight's index stores, as Gandalf takes them: store.db with the dbStr maps it needs, flattened
+MACOS_SPOTLIGHT_ROOTS = ("/System/Volumes/Data/.Spotlight-V100", "/.Spotlight-V100")
+MACOS_SPOTLIGHT_FILES = re.compile(r"^(?:\.?store\.db|dbStr-\d+\.map\..+|VolumeConfiguration\.plist)$")
+MACOS_SPOTLIGHT_MAX = 1 << 30
 
 
 def collect_macos_log_store(mnt, dest):
@@ -63,11 +68,34 @@ def collect_macos_log_store(mnt, dest):
     return count
 
 
+def collect_macos_spotlight(mnt, dest):
+    """Copy Spotlight's index stores from a mounted image into raw/spotlight/, named as Gandalf names them
+    (Store-V2+<UUID>+store.db); returns the number of files taken."""
+    count = 0
+    for top in MACOS_SPOTLIGHT_ROOTS:
+        if not os.path.isdir(mnt + top):
+            continue
+        for source in _walk(mnt + top, 3):
+            try:
+                if not MACOS_SPOTLIGHT_FILES.match(os.path.basename(source)) or os.path.islink(source) or \
+                        os.path.getsize(source) > MACOS_SPOTLIGHT_MAX:
+                    continue
+                target = os.path.join(dest, "spotlight", os.path.relpath(source, mnt + top).replace(os.sep, "+"))
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                shutil.copy2(source, target)
+                count += 1
+            except OSError:
+                continue
+        break  # the Data volume's, else the root's: the same store under two paths
+    return count
+
+
 def collect_macos_extras(mnt, dest, img, output_directory, stage, verbosity):
     """
     BTM items, shared file lists, Notification Center, ExecPolicy, KextPolicy,
     XProtect, emond, periodic, InstallHistory, PowerLog and Biome from a mounted
-    macOS image, into raw/macos/; the unified-log store into raw/unified_log_store/.
+    macOS image, into raw/macos/; the unified-log store into raw/unified_log_store/, Spotlight's
+    index into raw/spotlight/.
     """
     macos = dest + "macos/"
     os.makedirs(macos, exist_ok=True)
@@ -106,9 +134,10 @@ def collect_macos_extras(mnt, dest, img, output_directory, stage, verbosity):
                 take(source, 10 << 20)
                 biome += 1
     count += collect_macos_log_store(mnt, dest)
+    count += collect_macos_spotlight(mnt, dest)
     entry, prnt = "{},{},{},macos background items and policy databases\n".format(
         datetime.now().isoformat(), img.split("::")[0], stage
-    ), " -> {} -> {} {} macOS background-item, policy-database, Biome and unified-log artefacts from '{}'".format(
+    ), " -> {} -> {} {} macOS background-item, policy-database, Biome, unified-log and Spotlight artefacts from '{}'".format(
         datetime.now().isoformat().replace("T", " "), stage, count, img.split("::")[0]
     )
     write_audit_log_entry(verbosity, output_directory, entry, prnt)

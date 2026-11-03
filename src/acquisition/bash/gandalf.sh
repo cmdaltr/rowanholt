@@ -583,8 +583,9 @@ collect_macos_stores() {
                 "$hostname" "$meta_log"; then
                 log_audit "$audit_log" "$hostname" "$source"
             fi
+        # store.db can't be read without the dbStr maps beside it (properties, categories)
         done < <(find "$top_spot" -maxdepth 3 -type f \( -name store.db -o -name .store.db \
-            -o -name VolumeConfiguration.plist \) -print0 2>/dev/null)
+            -o -name 'dbStr-*.map.*' -o -name VolumeConfiguration.plist \) -print0 2>/dev/null)
         break
     done
 }
