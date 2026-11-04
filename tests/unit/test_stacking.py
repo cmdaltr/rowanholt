@@ -247,9 +247,39 @@ def test_unsigned_no_team_id_and_outside_logon_hours(tmp_path):
     assert rows["c:\\tools\\daytime.exe"]["Reasons"] == "rare"
     assert rows["c:\\windows\\temp\\rk.sys"]["Reasons"] == "rare, user path, unsigned, outside logon hours"
     assert rows["c:\\windows\\temp\\rk.sys"]["Family"] == "driver (Windows)"
-    assert rows["lab_rk"]["Reasons"] == "rare, unsigned" and rows["lab_rk"]["Score"] == "3.5"
+    # Loaded from /tmp: a module's path is what it runs, so the user path counts as well
+    assert rows["lab_rk"]["Reasons"] == "rare, user path, unsigned" and rows["lab_rk"]["Score"] == "5.0"
     assert rows["/users/*/.x/helper"]["Reasons"] == "rare, no team ID"
     assert rows["/applications/signed.app/x"]["Reasons"] == "rare"
     # Common everywhere: no trait puts it on the list
     assert "c:\\windows\\system32\\drivers\\disk.sys" not in rows and "c:\\windows\\explorer.exe" not in rows
     assert int(rows["c:\\windows\\temp\\rk.sys"]["Rank"]) < int(rows["c:\\tools\\nightly.exe"]["Rank"])
+
+
+def test_persistence_scored_on_the_command_it_runs(tmp_path):
+    """A task or Run value is a name: the command behind it says whether it hides or fetches what it runs,
+    or runs from a user-writable folder. A rare one running a plain program gets neither."""
+    case = tmp_path / "CMD"
+    persistence_host(case, "WIN1", "S-1-5-21-1-2-3-1000", "25735260-67f1-4a1b-9c2d-0123456789ab",
+                     run=[("LabUpdater", "powershell.exe -w hidden -enc AAAA"),
+                          ("Sync", "powershell.exe -ep bypass -File C:\\ProgramData\\Lab\\sync.ps1"),
+                          ("Vendor", "C:\\Program Files\\Vendor\\agent.exe --tray"),
+                          ("Tidy", "powershell.exe -NoProfile -File \"C:\\Program Files\\Vendor\\tidy.ps1\"")])
+    for name, sid in (("WIN2", "S-1-5-21-4-5-6-1000"), ("WIN3", "S-1-5-21-7-8-9-1000")):
+        persistence_host(case, name, sid, "bb77e3eb-ce2c-4d5e-8f90-0123456789ab")
+    stack_case(str(case))
+    rows = {r["Value"]: r for r in read(case / "stacking.csv")}
+    assert rows["labupdater"]["Reasons"] == "rare, suspicious command" and rows["labupdater"]["Score"] == "3.5"
+    assert rows["sync"]["Reasons"] == "rare, user path, suspicious command"
+    assert rows["vendor"]["Reasons"] == "rare" and rows["tidy"]["Reasons"] == "rare"
+    assert next(iter(rows)) == "sync"
+
+
+def test_processes_are_not_scored_on_their_path_as_a_command(tmp_path):
+    # A program from Prefetch is valued by its name; a per-user install's path isn't a persistence command
+    case = tmp_path / "PROC"
+    windows_host(case, "A", extra=["archer.exe"], folder="\\USERS\\GANDALF\\APPDATA\\LOCAL\\PROGRAMS")
+    windows_host(case, "B")
+    windows_host(case, "C")
+    stack_case(str(case))
+    assert {r["Value"]: r["Reasons"] for r in read(case / "stacking.csv")}["archer.exe"] == "rare"

@@ -8,7 +8,12 @@ on few of the case's hosts is the long tail; <case>/stacking.csv lists it, ranke
 that is the sum of named features, so every row says why it's there:
 
     rare             on one host, or on at most a fifth of the hosts that have that family at all
-    user path        under a user-writable folder (Users, AppData, Temp, /tmp, /dev/shm, /home, ProgramData)
+    user path        under a user-writable folder (Users, AppData, Temp, /tmp, /dev/shm, /home, ProgramData);
+                     for persistence, the command it runs counts too, not only its name
+    suspicious command
+                     persistence whose command hides or fetches what it runs: encoded, hidden or
+                     policy-bypassing PowerShell, cmd /c, mshta, script-running rundll32 or regsvr32,
+                     certutil or bitsadmin downloads, a download piped to a shell, /dev/tcp, bash -i
     generated name   a name that looks machine-made: few vowels, a long consonant run, digits and
                      letters interleaved, or long hex
     not in baseline  absent from a clean baseline, when one is given (built with build_baseline)
@@ -67,8 +72,19 @@ USER_PATH = re.compile(r"(?i)(?:\\users\\|\\appdata\\|\\temp\\|\\programdata\\|^
 # Windows' own folders, where consonant-heavy names are Microsoft's (mscorsvw, comppkgsrv), not machine-made
 SYSTEM_PATH = re.compile(r"(?i)\\windows\\(?!temp\\)")
 MIN_HOSTS = 3  # hosts of an OS before a value on few of them counts as rare
-WEIGHTS = {"rare": 2.0, "user path": 1.5, "generated name": 1.0, "not in baseline": 1.0, "unsigned": 1.5,
-           "no team ID": 1.0, "outside logon hours": 1.0}
+WEIGHTS = {"rare": 2.0, "user path": 1.5, "generated name": 1.0, "not in baseline": 1.0,
+           "suspicious command": 1.5, "unsigned": 1.5, "no team ID": 1.0, "outside logon hours": 1.0}
+# Narrower than Eru's SUSPICIOUS_COMMAND (eru_offline.py): vendors' tasks run powershell and curl every
+# day, so only the forms that hide or fetch what runs count. cmd /c is how a service or WMI consumer
+# runs a one-liner (smbexec's %COMSPEC% /Q /c among them)
+SUSPICIOUS_COMMAND = re.compile(
+    r"(?i)(?:\b(?:powershell|pwsh)(?:\.exe)?\b.*?\s[-/](?:e|ec|enc\w*|w(?:indowstyle)?\s+h\w*"
+    r"|ep\s+bypass|exec\w*\s+bypass)\b"
+    r"|\b(?:iex|invoke-expression|downloadstring|downloadfile|frombase64string|net\.webclient)\b"
+    r"|(?:\bcmd(?:\.exe)?|%comspec%)[\"']?\s+(?:/\w\s+)*/[ck]\b"
+    r"|\bmshta(?:\.exe)?\b|\brundll32(?:\.exe)?\b.*(?:javascript:|https?://)|\bregsvr32(?:\.exe)?\b.*/i:"
+    r"|\bcertutil(?:\.exe)?\b.*-(?:urlcache|decode)|\bbitsadmin(?:\.exe)?\b.*/transfer"
+    r"|\b(?:curl|wget)\b[^|;]*\|\s*(?:ba|z|da)?sh\b|\bbase64\s+(?:-d|--decode)\b|/dev/tcp/|\bbash\s+-i\b)")
 LOGON_MIN = 10  # interactive logons on a host before its logon hours say anything
 LOGON_TYPES = {"2", "10", "11"}  # interactive, remote interactive (RDP), cached interactive
 # Windows' own type 2 logons at every boot (Window Manager, the font driver host): not people
@@ -413,13 +429,17 @@ def reasons(family: str, value: str, with_it: int, hosts: int, baseline: Optiona
     found = []
     if with_it <= max(1, hosts // 5):
         found.append("rare")
-    if USER_PATH.search(value):
+    # A persistence value is a name (a task, a Run value); what it runs is the example
+    command = example if family in PERSISTENCE else ""
+    if USER_PATH.search(value) or USER_PATH.search(command):
         found.append("user path")
     where = example if family == "process" and re.search(r"[\\/]", example) else value
     if looks_generated(_base(value.split(" > ")[-1].split(": ")[-1])) and not SYSTEM_PATH.search(where):
         found.append("generated name")
     if baseline is not None and (family, value) not in baseline:
         found.append("not in baseline")
+    if SUSPICIOUS_COMMAND.search(command):
+        found.append("suspicious command")
     return found + [t for t in WEIGHTS if t in set(traits) and t not in found]
 
 
