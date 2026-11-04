@@ -491,7 +491,12 @@ case "$action" in
     ;;
   adopt) require_password; mkdir -p "$UTM_DIR"; adopt_vm "${2:-}" ;;
   start) start_vm; wait_ready "${WINDOWS_BOOT_WAIT:-30}" "boot" ;;
-  stop) vm_registered && utmctl stop --hide "$VM" || true; ok "$VM stopped" ;;
+  stop)
+    # utmctl often reports OSStatus -10004 though the VM does stop: go by its state, not its exit
+    vm_registered || { ok "$VM isn't registered with UTM"; exit 0; }
+    utmctl stop --hide "$VM" >/dev/null 2>&1 || true
+    for _ in $(seq 1 30); do [ "$(vm_status)" = stopped ] && break; sleep 2; done
+    if [ "$(vm_status)" = stopped ]; then ok "$VM stopped"; else warn "$VM is still $(vm_status): stop it in UTM"; fi ;;
   delete)
     # Only ever delete a VM the lab built. An adopted VM is the user's own:
     # UTM's delete removes its files for good, so leave that to them.

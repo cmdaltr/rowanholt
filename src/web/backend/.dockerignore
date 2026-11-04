@@ -52,3 +52,8 @@ Dockerfile
 *.vmdk
 *.pst
 **/artefacts/
+
+# Accounts and the JWT signing key: the running backend reads them from the bind mount of
+# src/web/backend, never from the image, and an image shouldn't carry password hashes
+data/users.json
+data/.jwt_secret

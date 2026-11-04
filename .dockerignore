@@ -72,3 +72,7 @@ logs/
 Dockerfile
 !src/web/backend/Dockerfile
 !src/web/backend/Dockerfile.forensics
+
+# Accounts and the JWT signing key (src/web/backend/.dockerignore says why)
+src/web/backend/data/users.json
+src/web/backend/data/.jwt_secret
