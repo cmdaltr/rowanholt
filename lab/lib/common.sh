@@ -140,7 +140,7 @@ tart_bin() {
 load_config() {
   # Values exported in the environment win over lab.conf (CI, one-off runs).
   local _v _saved=""
-  for _v in LAB_DATA_DIR TEST_IMAGES_PATH LAB_VM_DIR WINDOWS_VM_MEMORY_MB WINDOWS_VM_CPUS LINUX_VM_MEMORY_MB WINDOWS_UTM_VM LAB_TART_HOME LAB_HIDDEN_MACHINES; do
+  for _v in LAB_DATA_DIR TEST_IMAGES_PATH LAB_VM_DIR WINDOWS_VM_MEMORY_MB WINDOWS_VM_CPUS LINUX_VM_MEMORY_MB WINDOWS_UTM_VM WINDOWS_CLEAN_PREFIX LAB_TART_HOME LAB_HIDDEN_MACHINES; do
     eval "if [ -n \"\${$_v:-}\" ]; then _saved=\"\$_saved $_v=\$(printf %q \"\${$_v}\")\"; fi"
   done
   # Defaults; lab.conf (written by `./lab.sh configure`) overrides them.
@@ -150,6 +150,7 @@ load_config() {
   WINDOWS_VM_CPUS="${WINDOWS_VM_CPUS:-2}"
   LINUX_VM_MEMORY_MB="${LINUX_VM_MEMORY_MB:-2048}"
   WINDOWS_UTM_VM="${WINDOWS_UTM_VM:-rowanholt-lab-win11}"  # Apple silicon: the UTM VM the lab drives
+  WINDOWS_CLEAN_PREFIX="${WINDOWS_CLEAN_PREFIX:-rowanholt-lab-win11-clean}"  # its clean siblings, <prefix><n>
   LAB_TART_HOME="${LAB_TART_HOME:-}"  # Tart VMs elsewhere than LAB_VM_DIR (e.g. the internal SSD)
   LAB_HIDDEN_MACHINES="${LAB_HIDDEN_MACHINES:-}"  # VMs on this host the web UI leaves out (yours, not the lab's)
   # shellcheck disable=SC1090
@@ -204,6 +205,7 @@ WINDOWS_VM_MEMORY_MB="$WINDOWS_VM_MEMORY_MB"
 WINDOWS_VM_CPUS="$WINDOWS_VM_CPUS"
 LINUX_VM_MEMORY_MB="$LINUX_VM_MEMORY_MB"
 WINDOWS_UTM_VM="$WINDOWS_UTM_VM"
+WINDOWS_CLEAN_PREFIX="$WINDOWS_CLEAN_PREFIX"
 LAB_TART_HOME="$LAB_TART_HOME"
 LAB_HIDDEN_MACHINES="$LAB_HIDDEN_MACHINES"
 EOF

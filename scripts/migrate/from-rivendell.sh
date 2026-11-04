@@ -152,6 +152,8 @@ done
 OLD_LAB="$HOME/.config/rivendell-lab"
 NEW_LAB="$HOME/.config/rowanholt-lab"
 utm_note=""
+# Running the new lab.sh before this creates the folder empty: that isn't a migrated lab
+[ -d "$NEW_LAB" ] && rmdir "$NEW_LAB" 2>/dev/null || true
 if [ -d "$OLD_LAB" ] && [ ! -e "$NEW_LAB" ]; then
     if [ -f "$OLD_LAB/run/agent.pid" ] && kill -0 "$(cat "$OLD_LAB/run/agent.pid")" 2>/dev/null; then
         kill "$(cat "$OLD_LAB/run/agent.pid")" && say "lab: agent stopped"
@@ -198,8 +200,11 @@ if [ -d "$OLD_LAB" ] && [ ! -e "$NEW_LAB" ]; then
     if [ -n "$utm" ]; then
         grep -q '^WINDOWS_UTM_VM=' "$NEW_LAB/lab.conf" 2>/dev/null \
             || echo 'WINDOWS_UTM_VM="rivendell-lab-win11"' >> "$NEW_LAB/lab.conf"
-        utm_note="The lab's UTM VMs keep their old names (lab.conf WINDOWS_UTM_VM): $(echo "$utm" | xargs -n1 basename | tr '\n' ' ')
-  Clean siblings (WINDOWS_CLEAN) are looked for as rowanholt-lab-win11-clean<n>: rename those in UTM to use them."
+        if echo "$utm" | grep -q 'rivendell-lab-win11-clean'; then
+            grep -q '^WINDOWS_CLEAN_PREFIX=' "$NEW_LAB/lab.conf" 2>/dev/null \
+                || echo 'WINDOWS_CLEAN_PREFIX="rivendell-lab-win11-clean"' >> "$NEW_LAB/lab.conf"
+        fi
+        utm_note="The lab's UTM VMs keep their old names (lab.conf WINDOWS_UTM_VM, WINDOWS_CLEAN_PREFIX): $(echo "$utm" | xargs -n1 basename | tr '\n' ' ')"
     fi
     move "$HOME/rivendell-lab-data" "$HOME/rowanholt-lab-data" "lab data"
     say "lab: start the agent again with: lab/lab.sh agent start"

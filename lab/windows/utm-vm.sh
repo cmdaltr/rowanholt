@@ -10,7 +10,7 @@
 # creates the VM through UTM's AppleScript API and keeps it under
 # $LAB_VM_DIR/utm. Windows installs itself, provisions the lab target on first
 # logon and starts an SSH server, forwarded to 127.0.0.1:2232.
-# WINDOWS_CLEAN=<n> works on clean sibling n instead (rowanholt-lab-win11-clean<n>,
+# WINDOWS_CLEAN=<n> works on clean sibling n instead (<WINDOWS_CLEAN_PREFIX><n>, rowanholt-lab-win11-clean<n>,
 # SSH on 2232+n, nothing seeded), for stacking one seeded host among clean ones.
 # The Windows 11 ARM64 ISO is the one manual download (Microsoft only hands out
 # links through its web form); put it in $LAB_DATA_DIR/isos/.
@@ -29,7 +29,7 @@ CLEAN="${WINDOWS_CLEAN:-}"
 if [ -n "$CLEAN" ]; then
   case "$CLEAN" in [1-9]) ;; *) die "WINDOWS_CLEAN is a number from 1 to 9" ;; esac
   # NetBIOS names stop at 15 characters
-  VM="rowanholt-lab-win11-clean$CLEAN"; PORT=$((2232 + CLEAN)); COMPUTERNAME="LAB-WINCLEAN$CLEAN"
+  VM="${WINDOWS_CLEAN_PREFIX:-rowanholt-lab-win11-clean}$CLEAN"; PORT=$((2232 + CLEAN)); COMPUTERNAME="LAB-WINCLEAN$CLEAN"
 fi
 UTM_DIR="$LAB_VM_DIR/utm"
 BUNDLE="$UTM_DIR/$VM.utm"
