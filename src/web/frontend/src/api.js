@@ -392,6 +392,11 @@ export const enrichValue = async (value) => {
   return response.data;
 };
 
+// Online lookups (VirusTotal), when .env turns them on: the value leaves Dernvale
+export const getLookupStatus = async () => (await api.get('/api/threat-intel/lookup')).data;
+
+export const lookupValue = async (value) => (await api.post('/api/threat-intel/lookup', { value })).data;
+
 // Case browser and collaboration API
 const caseBase = (jobId) => `/api/jobs/${jobId}/case`;
 

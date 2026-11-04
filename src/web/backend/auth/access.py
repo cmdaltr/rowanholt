@@ -57,6 +57,8 @@ PUBLIC_PATHS = {
     "/api/auth/oidc/callback",
     "/api/auth/verify",
 }
+# An online lookup is a POST (it sends the value out) that every analyst may make
+LOOKUP_PATH = "/api/threat-intel/lookup"
 ADMIN_PREFIXES = ("/api/lab", "/api/anduril", "/api/aragorn", "/api/auth/users")
 JOB_PATH = re.compile(r"^/api/jobs/([0-9a-fA-F-]{36})(?:/|$)")
 CASE_PATH = re.compile(r"^/api/ai/cases/([^/]+)/")
@@ -143,7 +145,8 @@ async def middleware(request: Request, call_next):
         if not user:
             return JSONResponse({"detail": "Sign in required"}, status_code=401, headers={"WWW-Authenticate": "Bearer"})
         admin_only = path.startswith(ADMIN_PREFIXES) or (
-            path.startswith(("/api/mordor", "/api/threat-intel")) and request.method != "GET")
+            path.startswith(("/api/mordor", "/api/threat-intel")) and request.method != "GET"
+            and path != LOOKUP_PATH)
         if admin_only and not is_admin(user):
             return JSONResponse({"detail": "Admin privileges required"}, status_code=403)
         match = JOB_PATH.match(path)

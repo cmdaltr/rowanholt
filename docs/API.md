@@ -1115,6 +1115,8 @@ The indicators in `threat_intel_indicators`, in the fixed ten-column schema (Evi
 | `POST` | `/api/threat-intel/taxii` | `{"url", "username", "password", "added_after"}`: every object in a TAXII 2.1 collection. `502` when the collection can't be read |
 | `PUT` | `/api/threat-intel/indicators/{id}/validity` | `{"valid_until": "2027-01-01"}` extends one indicator, `{"valid_until": null}` clears its expiry; admins only on a team server. `400` for a date that isn't ISO, `404` for no such indicator |
 | `DELETE` | `/api/threat-intel/sources/{source}` | Every indicator from one source |
+| `GET` | `/api/threat-intel/lookup` | `{"enabled", "provider"}`: whether online lookups are on (`DERNVALE_ONLINE_LOOKUPS=virustotal` and `VIRUSTOTAL_API_KEY` in `.env`) |
+| `POST` | `/api/threat-intel/lookup` | `{"value"}`: one IP, domain or MD5/SHA-1/SHA-256 sent to VirusTotal. Returns `kind`, `found`, `malicious`, `suspicious`, `harmless`, `undetected`, `reputation`, `last_analysis`, `tags`, `link` and `cached` (answers are kept an hour). Any signed-in analyst; `403` to an eru-mcp token or Eru's agent header, `400` for anything else or a value that mustn't leave (a private, reserved or documentation address, an internal-looking name such as `.local` or `.corp`), `404` when lookups are off, `429` when VirusTotal's quota is spent, `502` when it can't be reached. Each lookup is logged with who asked |
 | `GET` | `/api/threat-intel/enrich?value=` | What the indicators say about one process name, command line, path, IP, domain or hash: per element, its `kind`, `breadth` (groups using it), `common` (more than 15), `groups`, `techniques` and `sources` |
 
 `503` means the package isn't mounted in the backend (`docker compose up -d backend` after pulling).

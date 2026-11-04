@@ -67,6 +67,9 @@ services:
       - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
       - DERNVALE_MODEL_NAME=${DERNVALE_MODEL_NAME:-llama3.2:3b}
       - DERNVALE_NUM_CTX=${DERNVALE_NUM_CTX:-8192}
+      # Online lookups from the Pippin page (docs/API.md, threat intelligence): off unless both are set
+      - DERNVALE_ONLINE_LOOKUPS=${DERNVALE_ONLINE_LOOKUPS:-}
+      - VIRUSTOTAL_API_KEY=${VIRUSTOTAL_API_KEY:-}
     volumes:
       - ./src/web/backend:/app
       - ./src/mordor:/opt/dernvale/src/mordor # Mordor: recorded attack telemetry (/api/mordor/telemetry)

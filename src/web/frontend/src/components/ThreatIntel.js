@@ -8,6 +8,8 @@ import {
   deleteThreatIntelSource,
   setThreatIntelValidity,
   enrichValue,
+  getLookupStatus,
+  lookupValue,
 } from '../api';
 import { useAuth } from '../context/AuthContext';
 import PageHero from './PageHero';
@@ -39,6 +41,9 @@ function ThreatIntel() {
   const [results, setResults] = useState({ total: 0, indicators: [] });
   const [value, setValue] = useState('');
   const [enriched, setEnriched] = useState(null);
+  const [lookupOn, setLookupOn] = useState(null);
+  const [looked, setLooked] = useState(null);
+  const [looking, setLooking] = useState(false);
 
   useEffect(() => {
     getAuthConfig()
@@ -63,6 +68,7 @@ function ThreatIntel() {
   }, [query, source, offset]);
 
   useEffect(() => { loadSummary(); }, [loadSummary]);
+  useEffect(() => { getLookupStatus().then(setLookupOn).catch(() => setLookupOn(null)); }, []);
   useEffect(() => { loadIndicators(); }, [loadIndicators]);
 
   const refresh = async () => {
@@ -122,6 +128,19 @@ function ThreatIntel() {
       setEnriched(await enrichValue(value));
     } catch (err) {
       setError(detail(err, 'Enrichment failed'));
+    }
+  };
+
+  const lookUp = async () => {
+    setError('');
+    setLooked(null);
+    setLooking(true);
+    try {
+      setLooked(await lookupValue(value.trim()));
+    } catch (err) {
+      setError(detail(err, 'Lookup failed'));
+    } finally {
+      setLooking(false);
     }
   };
 
@@ -201,7 +220,31 @@ function ThreatIntel() {
           <input type="text" style={{ flex: 1 }} value={value} onChange={(e) => setValue(e.target.value)}
             placeholder="powershell.exe -nop -w hidden -enc ..." />
           <button type="submit" disabled={value.length < 3}>Check</button>
+          {lookupOn?.enabled && (
+            <button type="button" className="secondary" disabled={value.trim().length < 3 || looking} onClick={lookUp}
+              title="Sends this one value to VirusTotal">{looking ? 'Looking up…' : 'Look up on VirusTotal'}</button>
+          )}
         </form>
+        {lookupOn?.enabled && (
+          <p style={{ fontSize: '0.85rem', color: '#888' }}>
+            Looking up sends the value to VirusTotal: an IP, domain or hash only, never a private address or internal name.
+          </p>
+        )}
+        {looked && (
+          <div data-testid="lookup-result" style={{ marginTop: '1rem' }}>
+            {!looked.found ? <p>VirusTotal has nothing on <code>{looked.value}</code>.</p> : (
+              <p>
+                VirusTotal on <code>{looked.value}</code>: <strong style={{ color: looked.malicious ? '#e06c6c' : '#a7db6c' }}>
+                {looked.malicious} malicious</strong>, {looked.suspicious} suspicious, {looked.harmless} harmless,
+                {' '}{looked.undetected} undetected
+                {looked.last_analysis && ` (last analysed ${day(looked.last_analysis)})`}
+                {looked.tags?.length > 0 && `; tags: ${looked.tags.join(', ')}`}.
+              </p>
+            )}
+            <a href={looked.link} target="_blank" rel="noopener noreferrer">Open on VirusTotal</a>
+            {looked.cached && <span style={{ color: '#888' }}> · from the last hour's answer</span>}
+          </div>
+        )}
         {enriched && (enriched.matches.length === 0 ? <p>No indicators match.</p> : (
           <div className="table-container" style={{ marginTop: '1rem' }}>
             <table>

@@ -51,7 +51,7 @@ Container forensics goes first because half of it is written. ML goes last becau
 
 **Still to do.**
 - **Expiry** (done 2 November). STIX `valid_until` and confidence are kept beside the ten columns in `threat_intel_validity` (`threat_intel/validity.py`, Alembic `9e3c5a7b1f42`); other sources default to 90 days for IPs and domains, as Archer does. Expired indicators stay listed but are left out of Elrond's matching and Eru's value index.
-- **Online lookups** (VirusTotal and the like) stay out. They would be opt-in per case, after the threat model's review of Eru's outbound access.
+- **Online lookups** (4 November, awaiting the threat model's review). VirusTotal only, off unless `.env` sets `DERNVALE_ONLINE_LOOKUPS=virustotal` and `VIRUSTOTAL_API_KEY`: a **Look up on VirusTotal** button on Pippin's *Check a value*, one IP, domain or hash per click, refused to Eru, private addresses and internal names never sent, logged with who asked (`threat_intel_lookup.py`, `test_threat_intel_lookup.py`). Not per case and not in the case's audit log yet: the review decides whether they must be.
 
 ## Collaborative investigation
 
@@ -133,7 +133,7 @@ Each feature's "Still to do" above, as work to schedule, then the Eru MCP server
    - Matching skips expired indicators and says how many it skipped; Pippin shows the expiry and lets an admin extend or clear it.
    - Tests: an expired STIX indicator doesn't match; a refreshed import revives it.
    - Agreed (decision 3).
-2. **Online lookups** stay out until the threat model's review of Eru's outbound access. If that review approves them, the shape is: one provider interface, keys only in `.env`, off by default and switched on per case, every lookup in the case's audit log, and nothing sent from `raw/`.
+2. **Online lookups** (built 4 November, review pending in `.claude/threat-model.md`). Keys only in `.env`, off by default, one provider (VirusTotal), from the Pippin page only, so nothing is sent from `raw/` or by Elrond or Eru. Still open from the shape agreed here: switching them on per case and writing each lookup into the case's audit log, which need a case to look up from (the case browser) rather than Pippin.
 
 ### Collaborative investigation
 

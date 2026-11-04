@@ -1,7 +1,8 @@
 """Threat intelligence: importing indicators, browsing them, and what they say about one value.
 
 Reading is open to every signed-in user; importing, TAXII pulls, deleting a source and changing
-an indicator's expiry are admin-only on a team server (auth/access.py), as Mordor's are.
+an indicator's expiry are admin-only on a team server (auth/access.py), as Mordor's are. Online
+lookups (threat_intel_lookup.py) are for any analyst, never for Eru.
 """
 
 import logging
@@ -10,12 +11,16 @@ import tempfile
 import threading
 from typing import Optional
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
-from pydantic import BaseModel
+from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
+from pydantic import BaseModel, Field
 
 try:
+    from . import threat_intel_lookup as online
+    from .auth import access
     from .threat_intel_store import ThreatIntelUnavailable, store, threat_intel
 except ImportError:
+    import threat_intel_lookup as online
+    from auth import access
     from threat_intel_store import ThreatIntelUnavailable, store, threat_intel
 
 router = APIRouter(prefix="/api/threat-intel", tags=["Threat intelligence"])
@@ -49,6 +54,13 @@ def value_index():
 
 class ValidityRequest(BaseModel):
     valid_until: Optional[str] = None  # ISO date or time (UTC); null: no expiry
+
+
+class LookupRequest(BaseModel):
+    value: str = Field(..., min_length=3, max_length=300)
+
+
+AGENT_HEADERS = ("X-Dernvale-Agent", "X-Rivendell-Agent")
 
 
 class TaxiiRequest(BaseModel):
@@ -150,3 +162,25 @@ def enrich_value(value: str) -> Optional[list]:
         return threat_intel().enrich_artefact(value, value_index())
     except (ThreatIntelUnavailable, RuntimeError):
         return None
+
+
+@router.get("/lookup")
+async def lookup_status():
+    """Whether online lookups are on, and which provider they go to."""
+    name = online.provider()
+    return {"enabled": bool(name), "provider": name or None}
+
+
+@router.post("/lookup")
+async def lookup(request: LookupRequest, http: Request):
+    """What the online provider says about one IP, domain or hash. Sends the value outside Dernvale,
+    so it's an analyst's call only: refused to an eru-mcp token and to Eru's MCP server."""
+    if access.token_scope(http) == "eru-mcp" or any(http.headers.get(h) for h in AGENT_HEADERS):
+        raise HTTPException(status_code=403, detail="Online lookups are an analyst's, not Eru's")
+    user = getattr(http.state, "user", None) or {}
+    try:
+        return online.lookup(request.value, user.get("username", "unknown"))
+    except online.LookupRefused as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except online.LookupFailed as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc))

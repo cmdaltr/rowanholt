@@ -92,6 +92,9 @@ class Settings(BaseSettings):
     dernvale_admin_password: str = ""
     # The URL people open, e.g. https://dernvale.example.org (CORS, cookies, OIDC redirects)
     dernvale_public_url: str = ""
+    # Online lookups (threat_intel_lookup.py): off unless both are set. "virustotal" is the only provider
+    dernvale_online_lookups: str = ""
+    virustotal_api_key: str = ""
     # More places evidence may be read from and written to, separated by commas, as the
     # containers see them (a server's evidence share mounted at /srv/evidence, say)
     dernvale_evidence_paths: str = ""
