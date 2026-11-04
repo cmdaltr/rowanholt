@@ -131,6 +131,13 @@ parser.add_argument(
     default=False,
 )
 parser.add_argument(
+    "--ClamAV",
+    help="Scan the collected files and the image's user-writable folders with ClamAV (commodity malware and known tools); detections go to analysis.csv",
+    action="store_const",
+    const=True,
+    default=False,
+)
+parser.add_argument(
     "--masquerading",
     help="Detect masquerading techniques: Right-to-Left Override, double file extensions, trailing spaces, renamed utilities (MITRE ATT&CK T1036)",
     action="store_const",
@@ -268,6 +275,7 @@ threatintel = args.threatIntel or []
 stackbaseline = args.stackBaseline[0] if args.stackBaseline else ""
 misplaced_binaries = args.misplacedBinaries
 masquerading = args.masquerading
+clamav = args.ClamAV
 keywords = args.Keywords
 volatility = args.Memory
 metacollected = args.metacollected
@@ -635,6 +643,7 @@ if __name__ == "__main__":
                 system_artefacts,
                 quotes,
                 asciitext,
+                clamav=clamav,
                 skip_unmount=(idx > 0),  # Don't unmount after first image
                 phase="mount",
             )
@@ -717,6 +726,7 @@ if __name__ == "__main__":
             system_artefacts,
             quotes,
             asciitext,
+            clamav=clamav,
             skip_unmount=True,  # Don't unmount - images are still mounted
             phase="collect",
             mounted_imgs=data,
@@ -788,6 +798,7 @@ if __name__ == "__main__":
                 system_artefacts,
                 quotes,
                 asciitext,
+                clamav=clamav,
                 skip_unmount=True,  # Don't unmount between processing
                 phase="process",
                 mounted_imgs=data,
@@ -886,6 +897,7 @@ if __name__ == "__main__":
                 system_artefacts,
                 quotes,
                 asciitext,
+                clamav=clamav,
                 skip_unmount=True,
                 phase="analyse",
                 mounted_imgs=data,
@@ -1005,6 +1017,7 @@ if __name__ == "__main__":
                 system_artefacts,
                 quotes,
                 asciitext,
+                clamav=clamav,
                 skip_unmount=True,
                 phase="index",
                 mounted_imgs=data,

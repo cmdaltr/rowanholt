@@ -36,6 +36,7 @@ class AnalysisOptions(BaseModel):
     iocs_file: Optional[str] = None  # Optional IOC watchlist file
     misplaced_binaries: bool = False  # Find system binaries in unexpected locations (T1036.005)
     masquerading: bool = False  # Detect masquerading: RLO, double ext, spaces, renamed utils (T1036)
+    clamav: bool = False  # ClamAV over collected files and user-writable folders (post/clam.py)
     timeline: bool = False
     memory: bool = False
     memory_timeline: bool = False

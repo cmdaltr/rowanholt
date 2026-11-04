@@ -1,73 +1,87 @@
 #!/usr/bin/env python3 -tt
+"""ClamAV over what a host's malware most likely sits in: the files Elrond collected and the
+user-writable folders of the image (or the whole of a Gandalf collection, which is small).
+Commodity malware and known tools; YARA, Defender's own detections and stacking cover the rest.
+
+Detections go to analysis/analysis.csv as "ClamAV" rows, where the case browser and Eru's
+analysis answer read them. The signature database is the one built into the worker image:
+freshclam runs first only when ROWANHOLT_ONLINE_LOOKUPS lists "freshclam"."""
 import os
-import re
 import subprocess
-import time
 from datetime import datetime
+from typing import List, Tuple
 
 from rowanholt.audit import write_audit_log_entry
-from rowanholt.utils import safe_input
+
+# Under a mounted image's root: where users, installers and intruders write (Windows, Linux, macOS)
+USER_WRITABLE = ("Users", "ProgramData", "Windows/Temp", "$Recycle.Bin", "PerfLogs", "inetpub", "home", "root",
+                 "tmp", "var/tmp", "dev/shm", "var/www", "srv", "opt", "private/tmp", "Library/LaunchAgents",
+                 "Library/LaunchDaemons", "Library/Application Support")
+# What clamscan is asked to skip or cap: the image's symlinks point at the analysis host
+CLAMSCAN_OPTIONS = ["-r", "-i", "--no-summary", "--follow-dir-symlinks=0", "--follow-file-symlinks=0",
+                    "--max-filesize=100M", "--max-scansize=400M"]
+ANALYSIS_HEADER = "LastWriteTime,hostname,Filename,analysis_type,analysis_value\n"
 
 
-def run_clamscan(verbosity, output_directory, loc, img, collectfiles):
-    if collectfiles:
-        all_or_collected = safe_input("      Run ClamAV against all files or just those collected for '{}'?\n      [A]ll  [C]ollected\t[A]ll ".format(
-                img.split("::")[0]
-            )
-        )
-    else:
-        all_or_collected = "A"
-    if all_or_collected != "A":
-        clam_dir = output_directory + img.split("::")[0] + "/files"
-    else:
-        clam_dir = loc
-    print(
-        "      Scanning '{}' ({}/) with ClamAV, please stand by...".format(
-            img.split("::")[0], clam_dir
-        )
-    )
-    if not os.path.exists(output_directory + img.split("::")[0] + "/analysis"):
-        os.mkdir(output_directory + img.split("::")[0] + "/analysis")
-    if not os.path.exists(output_directory + img.split("::")[0] + "/analysis/ClamAV"):
-        os.mkdir(output_directory + img.split("::")[0] + "/analysis/ClamAV")
-    clam_results = subprocess.Popen(
-        [
-            "clamscan",
-            "-raio",
-            "--gen-json",
-            "--leave-temps",
-            "--tempdir={}/analysis/ClamAV".format(
-                os.path.join(output_directory, img.split("::")[0])
-            ),
-            "--no-summary",
-            "--log={}/analysis/ClamAVScan.log".format(
-                os.path.join(output_directory, img.split("::")[0])
-            ),
-            clam_dir,
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    ).communicate()[0]
-    with open(
-        "{}/analysis/ClamAVScan.log".format(
-            os.path.join(output_directory, img.split("::")[0])
-        )
-    ) as clam_results:
-        for count, _ in enumerate(clam_results):
-            pass
-        if count > 0:
-            message = "{} instances of malware identified on "
-        else:
-            message = "No evidence of malware identified on "
-    print("       {}'{}'".format(message, img.split("::")[0]))
-    entry = "{},{},clamAV,{}malware found\n".format(
-        datetime.now().isoformat(),
-        img.split("::")[0],
-        message.split("malware ")[0].lower(),
-    )
-    prnt = " -> {} -> ClamAV identified {}malware on '{}'".format(
-        datetime.now().isoformat().replace("T", " "),
-        message.split("malware ")[0].lower(),
-        img.split("::")[0],
-    )
-    write_audit_log_entry(verbosity, output_directory, entry, prnt)
+def freshclam_enabled() -> bool:
+    """Whether to refresh the signatures before scanning: ROWANHOLT_ONLINE_LOOKUPS includes "freshclam"."""
+    return "freshclam" in {n.strip() for n in os.environ.get("ROWANHOLT_ONLINE_LOOKUPS", "").lower().split(",")}
+
+
+def scan_targets(loc: str, collected: str) -> List[str]:
+    """The folders to scan: the collected files, and the user-writable folders under the image's
+    root; a root with none of them (a Gandalf collection) is scanned whole."""
+    found = [os.path.join(loc, d) for d in USER_WRITABLE if os.path.isdir(os.path.join(loc, d))]
+    targets = found or ([loc] if os.path.isdir(loc) else [])
+    return targets + ([collected] if os.path.isdir(collected) else [])
+
+
+def detections(stdout: str) -> List[Tuple[str, str]]:
+    """(file, signature) for each "path: Signature FOUND" line clamscan -i prints."""
+    found = []
+    for line in stdout.splitlines():
+        if line.endswith(" FOUND") and ": " in line:
+            path, signature = line[: -len(" FOUND")].rsplit(": ", 1)
+            found.append((path, signature))
+    return found
+
+
+def run_clamscan(verbosity: str, output_directory: str, loc: str, img: str) -> int:
+    """Scan one host with ClamAV; the number of detections, or -1 when clamscan couldn't run."""
+    host = img.split("::")[0]
+    analysis_dir = os.path.join(output_directory, host, "analysis")
+    os.makedirs(analysis_dir, exist_ok=True)
+    targets = scan_targets(loc, os.path.join(output_directory, host, "files"))
+    if not targets:
+        print(f"      Nothing to scan with ClamAV for '{host}'.")
+        return 0
+    if freshclam_enabled():
+        print("      Updating ClamAV's signatures (freshclam)...")
+        subprocess.run(["freshclam", "--quiet"], capture_output=True)
+    print(f"      Scanning '{host}' with ClamAV ({len(targets)} folders), please stand by...")
+    try:
+        result = subprocess.run(["clamscan"] + CLAMSCAN_OPTIONS + targets, capture_output=True)
+    except OSError as e:
+        print(f"      WARNING: ClamAV couldn't run for '{host}': {e}")
+        return -1
+    # 0: clean, 1: detections, 2: an error (some files unreadable): what it found still counts
+    found = detections(result.stdout.decode("utf-8", "replace"))
+    if result.returncode == 2 and not found:
+        error = result.stderr.decode("utf-8", "replace").strip().splitlines()
+        print(f"      WARNING: ClamAV reported errors for '{host}': {error[-1] if error else 'unknown'}")
+    analysis_csv = os.path.join(analysis_dir, "analysis.csv")
+    if found:
+        new = not os.path.exists(analysis_csv)
+        with open(analysis_csv, "a") as out:
+            if new:
+                out.write(ANALYSIS_HEADER)
+            for path, signature in found:
+                shown = "/" + os.path.relpath(path, loc) if path.startswith(loc.rstrip("/") + "/") else path
+                out.write("{},{},{},ClamAV,{}\n".format(datetime.now().isoformat(), host,
+                                                        shown.replace(",", "%2C"), signature.replace(",", "%2C")))
+                entry = "{},{},clamAV,'{}' found in '{}'\n".format(datetime.now().isoformat(), host, signature, shown)
+                prnt = " -> {} -> ClamAV found '{}' in '{}' for '{}'".format(
+                    datetime.now().isoformat().replace("T", " "), signature, shown, host)
+                write_audit_log_entry(verbosity, output_directory, entry, prnt)
+    print(f"       ClamAV: {len(found)} detection(s) on '{host}'.")
+    return len(found)

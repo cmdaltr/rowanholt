@@ -64,6 +64,9 @@ RUN apt-get update && apt-get install -y \
     zip \
     # YARA for signature scanning
     yara \
+    # ClamAV (--ClamAV, post/clam.py); its signatures are fetched below, at build time
+    clamav \
+    clamav-freshclam \
     bzip2 \
     # Network tools
     curl \
@@ -217,6 +220,11 @@ RUN pip3 install --no-cache-dir volatility3 && \
         > /usr/local/bin/vol.py && \
     chmod +x /usr/local/bin/vol.py && \
     echo "Volatility3 installed successfully"
+
+# 4g: ClamAV's signatures, fetched once here: analysis never goes online for them unless
+# ROWANHOLT_ONLINE_LOOKUPS lists freshclam. ClamAV's mirrors rate-limit, so a failed fetch
+# warns instead of failing the build; --ClamAV then says it has no signatures until a rebuild
+RUN freshclam --quiet --stdout || echo "WARNING: freshclam failed; rebuild the worker to give --ClamAV signatures"
 
 # =============================================================================
 # Step 5/5: Rowanholt source code configuration

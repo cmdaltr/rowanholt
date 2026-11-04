@@ -118,6 +118,7 @@ def main(
     skip_unmount=False,  # Skip unmounting previous images (for multi-image phased processing)
     phase=None,  # Phase control: "mount", "collect", "process", or None for full pipeline
     mounted_imgs=None,  # Pre-populated imgs dict from mount phase (for collect/process phases)
+    clamav=False,  # --ClamAV: scan collected files and user-writable folders (post/clam.py)
 ):
     partitions = []
     unmounted = []  # images found that no mount method could open (E9)
@@ -1089,6 +1090,22 @@ def main(
                 "  ----------------------------------------\n  -> Completed Yara Phase.\n"
             )
             time.sleep(1)
+        if clamav:
+            safe_print(
+                "\n\n  -> \033[1;36mCommencing ClamAV Phase...\033[1;m\n  ----------------------------------------"
+            )
+            from rowanholt.post.clam import run_clamscan
+            for loc, img in imgs.items():
+                if not auto:
+                    yes_clam = safe_input(
+                        "  Do you wish to scan '{}' with ClamAV? Y/n [Y] ".format(img.split("::")[0])
+                    )
+                if auto or yes_clam != "n":
+                    run_clamscan(verbosity, output_directory, loc, img)
+            flags.append("08clamav")
+            print(
+                "  ----------------------------------------\n  -> Completed ClamAV Phase.\n"
+            )
 
         # Clean up small files (<10 bytes) and empty directories after processing
         cleanup_small_files_and_empty_dirs(output_directory)

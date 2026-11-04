@@ -1285,6 +1285,8 @@ def build_elrond_command(job):
         cmd.append("--misplacedBinaries")
     if opts.masquerading:
         cmd.append("--masquerading")
+    if opts.clamav:
+        cmd.append("--ClamAV")
     if opts.keywords_file:
         cmd.extend(["--Keywords", opts.keywords_file])
     if opts.yara_dir:

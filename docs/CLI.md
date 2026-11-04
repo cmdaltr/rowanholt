@@ -358,6 +358,7 @@ Memory analysis reads memory images from `SOURCE_DIR` alongside the disk images;
 | `--Yara DIR` | Scan with YARA rules, against the whole mounted image or only collected files. Symbolic links are not followed (`yara -N`). A rule whose `meta` has `attack = "T1059.001, T1105"` (or `mitre`, `technique`) tags those techniques when it matches; any match on a web-root script tags **T1505.003** |
 | `--misplacedBinaries` | Find Windows system binaries in unexpected locations (**T1036.005**) |
 | `--masquerading` | RLO characters, double extensions, trailing spaces, renamed utilities (**T1036**) |
+| `--ClamAV` | ClamAV over the collected files and the image's user-writable folders (all of a Gandalf collection); detections are `ClamAV` rows in `analysis.csv`. Signatures are the worker image's, refreshed first only if `ROWANHOLT_ONLINE_LOOKUPS` lists `freshclam` |
 | `--magicBytes` | Verify file signatures |
 
 **Hashing**
