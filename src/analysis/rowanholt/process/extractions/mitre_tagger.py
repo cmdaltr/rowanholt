@@ -10,8 +10,10 @@ Usage:
     tag_mitre_technique(output_directory, img, "plist", "T1543.001")
 """
 
+import json
 import os
-from typing import List, Optional
+import re
+from typing import Iterable, List, Optional
 
 
 # Artefact type to MITRE technique mappings for macOS and Linux
@@ -214,6 +216,48 @@ PRESENCE_TECHNIQUES = ("T1053", "T1059", "T1543", "T1546.003", "T1547.015")
 def presence_technique(technique_id: str) -> bool:
     """Whether an artefact merely being there may tag this technique."""
     return technique_id.split(".")[0] in ("T1053", "T1059", "T1543") or technique_id in PRESENCE_TECHNIQUES
+
+
+# Linux and macOS: every host has shell history, systemd units and launchd plists, so they tag
+# T1059.004, T1543.002 and T1543.001/.004 only for what isn't the OS's own or an everyday command
+SUSPICIOUS_SHELL = re.compile(
+    r"(?i)\b(?:curl|wget)\b[^\n]*\bhttps?://|\bbase64\s+(?:-d|--decode)\b|/dev/tcp/|\bbash\s+-i\b"
+    r"|\b(?:nc|ncat|netcat)\b[^\n]*\s-[ec]\b|\bsocat\b|\bpython[23]?\s+-c\b|\bperl\s+-e\b"
+    r"|\bhistory\s+-c\b|\bunset\s+histfile\b|\bchmod\s+\+x\s+/(?:tmp|var/tmp|dev/shm)/")
+USER_WRITABLE_EXEC = re.compile(r"(?:^|[\s=;'\"])/(?:tmp|var/tmp|dev/shm|home|root|run/user)/")
+APPLE_PROGRAM = re.compile(r"^/(?:System|usr/libexec|usr/bin|usr/sbin|bin|sbin|Library/Apple)/")
+
+
+def suspicious_shell(commands: Iterable[str]) -> bool:
+    """Whether a shell history holds a download, decode, reverse shell, inline code or history clearing."""
+    return any(SUSPICIOUS_SHELL.search(str(c)) for c in commands)
+
+
+def unusual_unit(unit_text: str) -> bool:
+    """Whether a systemd unit runs from a user-writable folder or runs a download or reverse shell.
+    Only what it runs counts (Exec lines; Elrond cooks ExecStart as Command), not its description:
+    systemd's own user-runtime-dir@ is "User Runtime Directory /run/user/%i"."""
+    try:
+        records = json.loads(unit_text)
+        runs = [str(v) for r in (records if isinstance(records, list) else [records]) if isinstance(r, dict)
+                for k, v in r.items() if k == "Command" or k.startswith("Exec")]
+    except ValueError:
+        runs = [line.split("=", 1)[-1] for line in unit_text.splitlines() if line.strip().startswith("Exec")]
+    return any(USER_WRITABLE_EXEC.search(r) or SUSPICIOUS_SHELL.search(r) for r in runs)
+
+
+def launchd_technique(path: str, plist: dict) -> Optional[str]:
+    """T1543.001 or T1543.004 for a launch agent or daemon that isn't Apple's, else None."""
+    where = path.replace("+", "/").lower()
+    technique = "T1543.004" if "launchdaemons" in where else "T1543.001" if "launchagents" in where else None
+    if not technique or not isinstance(plist, dict):
+        return None
+    label = str(plist.get("Label") or os.path.basename(where))
+    arguments = plist.get("ProgramArguments") or [plist.get("Program") or ""]
+    program = str(plist.get("Program") or (arguments[0] if isinstance(arguments, list) and arguments else ""))
+    if label.lower().startswith("com.apple.") and (not program or APPLE_PROGRAM.match(program)):
+        return None
+    return technique
 
 
 def get_mitre_techniques(artefact_type: str) -> List[str]:

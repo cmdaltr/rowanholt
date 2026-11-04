@@ -9,7 +9,7 @@ from rowanholt.audit import write_audit_log_entry
 from rowanholt.process.extractions.mail import (
     extract_email_artefacts,
 )
-from rowanholt.process.extractions.mitre_tagger import tag_mitre_technique
+from rowanholt.process.extractions.mitre_tagger import suspicious_shell, tag_mitre_technique, unusual_unit
 
 
 def repair_malformed_service(service_json):
@@ -165,8 +165,10 @@ def process_bash_history(
         ) as bashcsv:
             for bashline in bashcontent:
                 bashcsv.write(bashline)
-    # Tag MITRE technique for bash_history
-    tag_mitre_technique(output_directory, img, "bash_history")
+    # Every host has a shell history: only what it holds tags T1059.004
+    with open(artefact, encoding="utf-8", errors="ignore") as history:
+        if suspicious_shell(history):
+            tag_mitre_technique(output_directory, img, "bash_history")
 
 
 ZSH_EXTENDED = re.compile(r"^: (\d+):\d+;(.*)$", re.S)
@@ -230,8 +232,9 @@ def process_zsh_history(
         if new:
             writer.writerow(["LastWriteTime", "Command"])
         writer.writerows(entries)
-    # Shell history is the same technique whichever shell wrote it
-    tag_mitre_technique(output_directory, img, "bash_history")
+    # Shell history is the same technique whichever shell wrote it, when it holds something to see
+    if suspicious_shell(command for _, command in entries):
+        tag_mitre_technique(output_directory, img, "bash_history")
 
 
 def process_email(
@@ -988,5 +991,7 @@ def process_service(
                 )
                 service_json = repair_malformed_service(service_json)
                 servicejson.write(service_json)
-            # Tag MITRE technique for systemd service
-            tag_mitre_technique(output_directory, img, "service")
+            # Every host has its distribution's units: a unit tags T1543.002 when it runs from a
+            # user-writable folder or runs a download or reverse shell
+            if unusual_unit(service_json):
+                tag_mitre_technique(output_directory, img, "service")

@@ -5,7 +5,7 @@ import plistlib
 from datetime import datetime
 
 from rowanholt.audit import write_audit_log_entry
-from rowanholt.process.extractions.mitre_tagger import tag_mitre_technique
+from rowanholt.process.extractions.mitre_tagger import launchd_technique, tag_mitre_technique
 
 
 def _plist_value(value):
@@ -84,7 +84,9 @@ def process_plist(
                 )
                 write_audit_log_entry(verbosity, output_directory, entry, prnt)
                 plistjson.write(json.dumps([plist_record(plistdata)]))
-                # Tag MITRE technique for plist processing
-                tag_mitre_technique(output_directory, img, "plist")
+                # A launch agent or daemon that isn't Apple's; not every plist on a Mac
+                technique = launchd_technique(artefact, plistdata)
+                if technique:
+                    tag_mitre_technique(output_directory, img, "plist", technique)
             except (plistlib.InvalidFileException, ValueError, OSError):
                 pass  # not a parseable plist; the empty output is cleaned up later
