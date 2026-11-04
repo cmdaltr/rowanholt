@@ -5,15 +5,38 @@ import re
 import subprocess
 from datetime import datetime
 from functools import lru_cache
+from urllib.parse import urlsplit
 
 from rowanholt.audit import write_audit_log_entry
 
 
-def load_ioc_watchlist(watchlist_file):
-    """Load IOCs from a watchlist file (one IOC per line).
+# How reports defang an indicator (evil[.]com, hxxps://, 10[:]...)
+DEFANG = [("[.]", "."), ("(.)", "."), ("{.}", "."), ("[dot]", "."), ("(dot)", "."), ("[:]", ":"),
+          ("hxxp", "http"), ("fxp", "ftp")]
 
-    Returns a set of lowercase IOCs for fast lookup.
-    """
+
+def refang(ioc):
+    """An indicator as it would appear in evidence: lowercase, refanged, and a URL's host
+    (extraction finds domains and addresses, never whole URLs)."""
+    ioc = ioc.strip().lower()
+    for defanged, plain in DEFANG:
+        ioc = ioc.replace(defanged, plain)
+    if "://" in ioc:
+        ioc = urlsplit(ioc).hostname or ioc
+    return ioc.rstrip(".")
+
+
+def watchlist_match(value, watchlist):
+    """The value, or for a domain any parent of it (watchlisted evil.com matches cdn.evil.com)."""
+    value = value.lower()
+    if value in watchlist:
+        return True
+    labels = value.split(".")
+    return any(".".join(labels[i:]) in watchlist for i in range(1, len(labels) - 1))
+
+
+def load_ioc_watchlist(watchlist_file):
+    """Load IOCs from a watchlist file (one IOC per line), refanged and lowercase."""
     from utils.file_limits import safe_open
 
     watchlist = set()
@@ -21,10 +44,9 @@ def load_ioc_watchlist(watchlist_file):
         try:
             with safe_open(watchlist_file, "r") as f:
                 for line in f:
-                    ioc = line.strip().lower()
                     # Skip empty lines and comments
-                    if ioc and not ioc.startswith("#"):
-                        watchlist.add(ioc)
+                    if line.strip() and not line.strip().startswith("#"):
+                        watchlist.add(refang(line))
             if watchlist:
                 print(f"      Loaded {len(watchlist)} IOCs from watchlist: {watchlist_file}")
         except Exception as e:
@@ -43,6 +65,7 @@ FILE_EXTENSION_TLDS = {"sh", "py", "pl", "ps", "rs", "so", "js", "ts", "rb", "cs
 # First labels of reverse-DNS identifiers (com.apple.foo, org.mozilla.firefox)
 REVERSE_DNS_PREFIXES = {"com", "org", "net", "edu", "gov", "io", "de", "uk", "fr", "jp", "us"}
 RFC1918 = [ipaddress.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")]
+UNIQUE_LOCAL = ipaddress.ip_network("fc00::/7")
 # Longer TLDs seen in phishing and C2; other long TLDs (.data, .software, .apple)
 # mostly turn up as the last word of dotted identifiers, so need a URL to count
 ABUSED_LONG_TLDS = {"info", "online", "site", "shop", "live", "cloud", "tech", "space", "website", "club", "life", "world", "today", "digital", "email", "link", "click", "monster", "rest", "quest", "buzz", "mobi", "asia", "work", "host", "network", "support", "group", "finance"}
@@ -139,7 +162,10 @@ def extract_line_iocs(line):
                 address = ipaddress.IPv6Address(value)
             except ValueError:
                 continue
-            if not (address.is_loopback or address.is_unspecified):
+            # As for IPv4: not loopback, link-local, multicast or unique local (fc00::/7)
+            mapped = address.ipv4_mapped
+            if not (address.is_loopback or address.is_unspecified or address.is_link_local or address.is_multicast
+                    or address in UNIQUE_LOCAL or (mapped is not None and not _public_ipv4(str(mapped)))):
                 found.append((m.start(), value, "IPv6 address"))
     for m in HOSTNAME.finditer(line):
         value = m.group(1)
@@ -164,9 +190,18 @@ def extract_line_iocs(line):
     return result
 
 
+def dns_lookups_enabled():
+    """Whether Elrond may ask DNS about the IOCs it extracts: ROWANHOLT_ONLINE_LOOKUPS includes "dns".
+    Off by default: each lookup tells whoever runs the domain's nameserver that someone is looking."""
+    return "dns" in {n.strip() for n in os.environ.get("ROWANHOLT_ONLINE_LOOKUPS", "").lower().split(",")}
+
+
 @lru_cache(maxsize=4096)
 def _resolvable(value):
-    """'resolvable' when DNS answers for a domain or IPv4 address, else 'N/A'."""
+    """'resolvable' when DNS answers for a domain or IPv4 address, 'N/A' when it doesn't, and
+    'not checked' when DNS lookups are off."""
+    if not dns_lookups_enabled():
+        return "not checked"
     try:
         out = subprocess.run(["host", "-W", "4", value], capture_output=True, text=True, timeout=10).stdout
     except (OSError, subprocess.SubprocessError):
@@ -233,7 +268,7 @@ def compare_iocs(
                         kind,
                         lineno,
                         resolve,
-                        "YES" if value.lower() in watchlist else "",
+                        "YES" if watchlist_match(value, watchlist) else "",
                     )
                 )
                 if value.lower() not in reported:

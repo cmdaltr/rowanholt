@@ -67,7 +67,7 @@ services:
       - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
       - ROWANHOLT_MODEL_NAME=${ROWANHOLT_MODEL_NAME:-llama3.2:3b}
       - ROWANHOLT_NUM_CTX=${ROWANHOLT_NUM_CTX:-8192}
-      # Online lookups from the Pippin page (docs/API.md, threat intelligence): off unless both are set
+      # Online lookups (.env.example): Pippin's VirusTotal button needs "virustotal" and the key
       - ROWANHOLT_ONLINE_LOOKUPS=${ROWANHOLT_ONLINE_LOOKUPS:-}
       - VIRUSTOTAL_API_KEY=${VIRUSTOTAL_API_KEY:-}
     volumes:
@@ -160,6 +160,8 @@ services:
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-rowanholt}
       # Set to 'true' to exclude cache directories from user profile copies (faster but less complete)
       - ROWANHOLT_EXCLUDE_PROFILE_CACHE=true
+      # Elrond's DNS lookups of extracted IOCs: only when the list includes "dns" (.env.example)
+      - ROWANHOLT_ONLINE_LOOKUPS=${ROWANHOLT_ONLINE_LOOKUPS:-}
     volumes:
       - ./src/web/backend:/app
       # NOTE: elrond source is now copied into the image during build (see Dockerfile.forensics)

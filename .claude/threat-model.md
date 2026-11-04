@@ -64,6 +64,10 @@ Tests: `tests/unit/test_threat_intel_lookup.py` (off by default, what's refused,
 
 Re-review if lookups are made automatic, offered to Eru or Elrond, sent to another provider, or given values other than IPs, domains and hashes.
 
+## Elrond's DNS lookups of extracted IOCs (4 November 2026, Ben)
+
+Found in the accuracy review: Elrond ran `host` on every domain and IPv4 address it extracted (`analysis/iocs.py`, the `resolvable` column of `iocs.csv`), always on. That is an automatic online lookup, and each one tells the domain's nameserver someone is asking. Ben chose to gate it: it runs only when `ROWANHOLT_ONLINE_LOOKUPS` lists `dns` (a comma list now, beside `virustotal`), and the column reads `not checked` otherwise. The worker is given the setting; Pippin's VirusTotal lookup still needs `virustotal` and its key.
+
 ## Chain of custody note
 
 Evidence packages are SHA256-hashed at acquisition time. Do not modify anything under `evidence/` or `cases/<CASE-ID>/raw/`. Processed output under `cases/<CASE-ID>/output/` is writable.

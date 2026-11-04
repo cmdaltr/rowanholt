@@ -53,9 +53,10 @@ class LookupFailed(RuntimeError):
 
 def provider() -> str:
     """The provider lookups go to, or "" when they're off (no provider, or no key for it)."""
-    name = settings.rowanholt_online_lookups.strip().lower()
-    if name == "virustotal" and settings.virustotal_api_key:
-        return name
+    # A comma list: "dns" is Elrond's, for the IOCs it extracts (analysis/iocs.py)
+    names = {n.strip() for n in settings.rowanholt_online_lookups.lower().split(",")}
+    if "virustotal" in names and settings.virustotal_api_key:
+        return "virustotal"
     return ""
 
 

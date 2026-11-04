@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from rowanholt.analysis.iocs import extract_line_iocs  # noqa: E402
+from rowanholt.analysis.iocs import extract_line_iocs, refang, watchlist_match  # noqa: E402
 from rowanholt.process.extractions.artemis import eventlog_techniques  # noqa: E402
 from rowanholt.process.extractions.registry.profile import last_write_moved  # noqa: E402
 from rowanholt.process.extractions.registry.system import cleaned, run_key_records  # noqa: E402
@@ -45,6 +45,30 @@ class IocExtractionTest(unittest.TestCase):
         self.assertEqual(extract_line_iocs("prnms003.cat"), [])
         path = "https://cdn.example.org/" + "/".join(["content", "downloads", "61", "45", "072-44426-A_16242I3TPF"] * 4)
         self.assertEqual([kind for _, kind in extract_line_iocs(path) if "base64" in kind], [])
+
+    def test_ipv6_like_ipv4_skips_non_public(self) -> None:
+        self.assertEqual(extract_line_iocs("fe80::1c2b:3a4d fd12:3456:789a::1 ff02::1 ::ffff:192.168.1.5"), [])
+        self.assertEqual(extract_line_iocs("2001:db8:85a3::8a2e:370:7334"), [("2001:db8:85a3::8a2e:370:7334", "IPv6 address")])
+
+    def test_dns_lookups_are_off_unless_listed(self) -> None:
+        from unittest import mock
+        from rowanholt.analysis import iocs
+        for setting, enabled in (("", False), ("virustotal", False), ("virustotal, DNS", True), ("dns", True)):
+            iocs._resolvable.cache_clear()
+            with mock.patch.dict("os.environ", {"ROWANHOLT_ONLINE_LOOKUPS": setting}), \
+                    mock.patch.object(iocs.subprocess, "run") as run:
+                run.return_value.stdout = "c2.example has address 198.51.100.23"
+                self.assertEqual(iocs._resolvable("c2.example"), "resolvable" if enabled else "not checked")
+                self.assertEqual(run.called, enabled, setting)
+        iocs._resolvable.cache_clear()
+
+    def test_watchlist_is_refanged_and_matches_subdomains(self) -> None:
+        watchlist = {refang(i) for i in ("Evil[.]com", "hxxps://c2.bad[.]net/gate.php", "198.51.100[.]23")}
+        self.assertEqual(watchlist, {"evil.com", "c2.bad.net", "198.51.100.23"})
+        self.assertTrue(watchlist_match("cdn.EVIL.com", watchlist))
+        self.assertTrue(watchlist_match("198.51.100.23", watchlist))
+        self.assertFalse(watchlist_match("notevil.com", watchlist))
+        self.assertFalse(watchlist_match("bad.net", watchlist))
 
 
 def _event(channel: str, event_id: int, **data) -> dict:

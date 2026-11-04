@@ -51,8 +51,12 @@ class OnlineLookupTest(BackendCase):
             self.assertEqual(self.client.get("/api/threat-intel/lookup", headers=self.alice).json(),
                              {"enabled": False, "provider": None})
             self.assertEqual(self.look("8.8.8.8").status_code, 404)
-        with mock.patch.object(self.settings, "rowanholt_online_lookups", ""):
-            self.assertEqual(self.look("8.8.8.8").status_code, 404)
+        for setting in ("", "dns"):  # Elrond's DNS lookups alone don't turn VirusTotal on
+            with mock.patch.object(self.settings, "rowanholt_online_lookups", setting):
+                self.assertEqual(self.look("8.8.8.8").status_code, 404)
+        with mock.patch.object(self.settings, "rowanholt_online_lookups", "dns, VirusTotal"):
+            self.assertEqual(self.client.get("/api/threat-intel/lookup", headers=self.alice).json()["provider"],
+                             "virustotal")
         self.assertEqual(self.asked, [])
         self.assertEqual(self.client.get("/api/threat-intel/lookup", headers=self.alice).json(),
                          {"enabled": True, "provider": "virustotal"})
