@@ -31,3 +31,12 @@ def test_linux_rows_survive_unicode() -> None:
     out = linux_vol3("3", "linux", "VolatilitySymbolTable", "linux.pslist.PsList",
                      as_extract_reads([{"PID": 1, "COMM": "systemd"}, {"PID": 2, "COMM": "café"}]), {}, [])
     assert [json.loads(r)["PID"] for r in out] == [1, 2]
+
+
+def test_an_unreadable_image_says_why() -> None:
+    from rowanholt.memory.extract import vol3_failure
+    stderr = ("Unsatisfied requirement plugins.PsList.kernel.layer_name: \n"
+              "Unsatisfied requirement plugins.PsList.kernel.symbol_table_name: \n\n"
+              "A translation layer requirement was not fulfilled.  Please verify that:\n")
+    assert "could not find the kernel" in vol3_failure(stderr)
+    assert vol3_failure("Progress:  100.00\t\tPDB scanning finished") == ""

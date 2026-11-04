@@ -26,6 +26,21 @@ except ImportError:
     macos_vol3 = None
     windows_vol3 = None
 
+# Images already warned about, so a failing image warns once and not for every plugin
+_VOL3_WARNED = set()
+
+
+def vol3_failure(stderr: str) -> str:
+    """Why Volatility 3 produced nothing, from its stderr: "" when it says nothing useful."""
+    if "Unsatisfied requirement" in stderr and ("kernel" in stderr or "symbol_table" in stderr):
+        return ("Volatility 3 could not find the kernel or its symbols in this image: it may not be "
+                "a supported memory format (a crash dump, hibernation file or raw capture of an "
+                "unsupported OS), or the symbol tables for this kernel are missing")
+    if "Unable to validate the plugin requirements" in stderr:
+        return "Volatility 3 could not satisfy this plugin's requirements for this image"
+    return ""
+
+
 
 def use_plugins(
     output_directory,
@@ -54,22 +69,24 @@ def use_plugins(
                 vol_cmd = "vol"  # Fallback to 'vol' command
             # Decoded, not str(bytes): its repr doubled every backslash in a path, and a
             # non-ASCII character or a quote of each kind made the whole plugin's JSON unreadable
-            plugoutlist = (
-                subprocess.Popen(
-                    [
-                        vol_cmd,
-                        "-f",
-                        artefact + memext,
-                        "-r",  # Specify renderer
-                        "json",  # Use JSON output format for easier parsing
-                        plugin,
-                    ],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                ).communicate()[0]
-                .decode("utf-8", "replace")
-                .split("\n")
-            )
+            plugout, plugerr = subprocess.Popen(
+                [
+                    vol_cmd,
+                    "-f",
+                    artefact + memext,
+                    "-r",  # Specify renderer
+                    "json",  # Use JSON output format for easier parsing
+                    plugin,
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            ).communicate()
+            plugoutlist = plugout.decode("utf-8", "replace").split("\n")
+            # A plugin that can't run leaves stdout empty and says why only on stderr
+            failure = "" if plugout.strip() else vol3_failure(plugerr.decode("utf-8", "replace"))
+            if failure and artefact + memext not in _VOL3_WARNED:
+                _VOL3_WARNED.add(artefact + memext)
+                print(f"     WARNING: {failure}; no memory artefacts from '{os.path.basename(artefact + memext)}'")
             if "Windows" in profile or profile.startswith("Win"):
                 jsonlist = windows_vol3(
                     output_directory,

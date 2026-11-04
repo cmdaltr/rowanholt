@@ -370,13 +370,11 @@ class MitreEnrichment:
             Enriched record with full MITRE metadata
         """
         all_technique_ids = set()
+        # Not the artefact type's techniques: every memory image has a DLL list and a module
+        # list, which isn't DLL hijacking or a rootkit. A record's techniques are what it shows
+        base_techniques = []
 
-        # 1. Get base techniques from artefact type
-        base_techniques = self.get_techniques_for_artefact(artefact_type)
-        for tech in base_techniques:
-            all_technique_ids.add(tech["technique_id"])
-
-        # 2. Use content-based pattern matching for additional techniques
+        # Content-based pattern matching
         if PATTERNS_AVAILABLE and scan_json_record:
             content_techniques = scan_json_record(record)
             all_technique_ids.update(content_techniques)
@@ -447,13 +445,9 @@ class MitreEnrichment:
             if not artefact_type:
                 artefact_type = self._detect_artefact_type(filepath)
 
-            # Get base techniques for this artefact type
+            # The artefact type's own techniques aren't recorded: its being there shows nothing
+            # (see enrich_json_record); only what the content matches is
             base_techniques = set()
-            if artefact_type:
-                for tech in self.get_techniques_for_artefact(artefact_type):
-                    tech_id = tech.get("technique_id")
-                    if tech_id:
-                        base_techniques.add(tech_id)
 
             # For large files (>10MB), use streaming content scanning
             if file_size > 10 * 1024 * 1024:  # > 10MB
