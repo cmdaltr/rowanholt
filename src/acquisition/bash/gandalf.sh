@@ -295,31 +295,67 @@ log_live() {
 # runtime touches the live host (its daemon logs the calls; export reads the whole
 # filesystem), so it's opt-in and every command is audited. export never pauses or stops
 # the container. Each export is cut at GANDALF_CONTAINER_EXPORT_MAX bytes (default 2 GB;
-# 0 leaves exports out), and the audit says when it was cut.
+# 0 leaves exports out), and the audit says when it was cut. Rootless Podman keeps each
+# user's containers to that user (root's podman doesn't list them), so each user with
+# rootless storage is asked as themselves too, and the audit names them.
 collect_live_containers() {
     local acq_dir="$1" hostname="$2" audit_log="$3"
-    local max="${GANDALF_CONTAINER_EXPORT_MAX:-2147483648}" runtime id dir size
-    for runtime in docker podman; do
-        command -v "$runtime" &> /dev/null || continue
-        for id in $("$runtime" ps -q --no-trunc 2>/dev/null); do
-            case "$id" in *[!0-9a-f]*) continue ;; esac
-            dir="${acq_dir}/artefacts/live_containers/${runtime}/${id:0:12}"
-            mkdir -p "$dir"
-            "$runtime" inspect "$id" > "$dir/inspect.json" 2>/dev/null && log_live "$audit_log" "$hostname" "$runtime inspect $id"
-            if [ "$runtime" = docker ]; then
-                docker top "$id" -eo pid,ppid,user,etime,args > "$dir/top.txt" 2>/dev/null
+    local name _x uid home source
+    local sources=()
+    command -v docker &> /dev/null && sources+=(docker)
+    if command -v podman &> /dev/null; then
+        sources+=(podman)
+        while IFS=: read -r name _x uid _x _x home _x; do
+            [ "$uid" -ge 1000 ] 2>/dev/null && [ "$uid" -lt 65534 ] || continue
+            [ -d "$home/.local/share/containers/storage" ] && sources+=("podman:$name")
+        done < /etc/passwd
+    fi
+    for source in "${sources[@]}"; do
+        live_from "$acq_dir" "$hostname" "$audit_log" "$source"
+    done
+}
+
+# docker, podman (root's), or podman:<user>, run as that user with their own runtime dir
+runtime_cmd() {
+    local source="$1"; shift
+    case "$source" in
+        podman:*)
+            local user="${source#podman:}" uid run=""
+            uid=$(id -u "$user" 2>/dev/null) || return 1
+            [ -d "/run/user/$uid" ] && run="XDG_RUNTIME_DIR=/run/user/$uid "
+            if command -v runuser &> /dev/null; then
+                runuser -l "$user" -c "${run}podman $*"
             else
-                podman top "$id" pid ppid user etime args > "$dir/top.txt" 2>/dev/null
-            fi && log_live "$audit_log" "$hostname" "$runtime top $id"
-            [ "$max" -gt 0 ] 2>/dev/null || continue
-            "$runtime" export "$id" 2>/dev/null | head -c "$max" > "$dir/export.tar"
-            size=$(wc -c < "$dir/export.tar" | tr -d ' ')
-            if [ "$size" -ge "$max" ]; then
-                log_live "$audit_log" "$hostname" "$runtime export $id (cut at $max bytes)"
-            else
-                log_live "$audit_log" "$hostname" "$runtime export $id"
-            fi
-        done
+                su -l "$user" -s /bin/sh -c "${run}podman $*"
+            fi ;;
+        *) "$source" "$@" ;;
+    esac
+}
+
+live_from() {
+    local acq_dir="$1" hostname="$2" audit_log="$3" source="$4"
+    local max="${GANDALF_CONTAINER_EXPORT_MAX:-2147483648}" runtime="${4%%:*}" label id dir size
+    label="$runtime"
+    [ "$source" != "$runtime" ] && label="$runtime (rootless, ${source#podman:})"
+    for id in $(runtime_cmd "$source" ps -q --no-trunc 2>/dev/null); do
+        case "$id" in *[!0-9a-f]*) continue ;; esac
+        dir="${acq_dir}/artefacts/live_containers/${runtime}/${id:0:12}"
+        mkdir -p "$dir"
+        runtime_cmd "$source" inspect "$id" > "$dir/inspect.json" 2>/dev/null && log_live "$audit_log" "$hostname" "$label inspect $id"
+        if [ "$runtime" = docker ]; then
+            docker top "$id" -eo pid,ppid,user,etime,args > "$dir/top.txt" 2>/dev/null
+        else
+            runtime_cmd "$source" top "$id" pid ppid user etime args > "$dir/top.txt" 2>/dev/null
+        fi && log_live "$audit_log" "$hostname" "$label top $id"
+        [ -s "$dir/top.txt" ] || rm -f "$dir/top.txt"
+        [ "$max" -gt 0 ] 2>/dev/null || continue
+        runtime_cmd "$source" export "$id" 2>/dev/null | head -c "$max" > "$dir/export.tar"
+        size=$(wc -c < "$dir/export.tar" | tr -d ' ')
+        if [ "$size" -ge "$max" ]; then
+            log_live "$audit_log" "$hostname" "$label export $id (cut at $max bytes)"
+        else
+            log_live "$audit_log" "$hostname" "$label export $id"
+        fi
     done
 }
 

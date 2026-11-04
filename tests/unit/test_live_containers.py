@@ -86,3 +86,22 @@ def test_off_by_default():
     source = (REPO / "src" / "acquisition" / "python" / "collect_artefacts-py").read_text()
     assert "\nLIVE_CONTAINERS = False\n" in source
     assert 'LIVE_CONTAINERS=false' in (REPO / "src" / "acquisition" / "bash" / "gandalf.sh").read_text()
+
+
+def test_rootless_podman_asked_as_its_user(tmp_path, monkeypatch):
+    """Root's podman doesn't list a rootless user's containers: each user with rootless storage is
+    asked as themselves (checked for real in quay.io/podman/stable on 4 November 2026)."""
+    import pwd
+    collector = types.ModuleType("collector")
+    source = (REPO / "src" / "acquisition" / "python" / "collect_artefacts-py").read_text()
+    exec(compile(source, "collect_artefacts-py", "exec"), collector.__dict__)
+    (tmp_path / "alice" / ".local" / "share" / "containers" / "storage").mkdir(parents=True)
+    (tmp_path / "bob").mkdir()
+    users = [types.SimpleNamespace(pw_name=n, pw_uid=u, pw_dir=str(tmp_path / n)) for n, u in
+             (("root", 0), ("alice", 1000), ("bob", 1001))]
+    monkeypatch.setattr(pwd, "getpwall", lambda: users)
+    monkeypatch.setattr(pwd, "getpwnam", lambda n: next(u for u in users if u.pw_name == n))
+    monkeypatch.setattr(collector.shutil, "which", lambda name: f"/usr/bin/{name}" if name != "docker" else None)
+    assert collector.live_sources() == [("podman", None), ("podman", "alice")]
+    assert collector.as_user(None, ["podman", "ps"]) == ["podman", "ps"]
+    assert collector.as_user("alice", ["podman", "top", CID]) == ["runuser", "-l", "alice", "-c", f"podman top {CID}"]

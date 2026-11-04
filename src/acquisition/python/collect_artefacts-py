@@ -865,6 +865,31 @@ def collect_container_layers(gandalf_artefact_destination, gandalf_host):
                 taken += 1
 
 
+def live_sources():
+    """(runtime, user) to ask: Docker, root's Podman, and each user with rootless Podman storage
+    (root's podman doesn't list a rootless user's containers), user None for root."""
+    sources = [(runtime, None) for runtime in ("docker", "podman") if shutil.which(runtime)]
+    if shutil.which("podman"):
+        import pwd
+        for entry in pwd.getpwall():
+            if 1000 <= entry.pw_uid < 65534 and os.path.isdir(
+                    os.path.join(entry.pw_dir, ".local", "share", "containers", "storage")):
+                sources.append(("podman", entry.pw_name))
+    return sources
+
+
+def as_user(user, command):
+    """The command as is, or run as a rootless Podman user with their own runtime dir."""
+    if not user:
+        return command
+    import pwd
+    run = "/run/user/{}".format(pwd.getpwnam(user).pw_uid)
+    line = ("XDG_RUNTIME_DIR={} ".format(run) if os.path.isdir(run) else "") + " ".join(command)
+    if shutil.which("runuser"):
+        return ["runuser", "-l", user, "-c", line]
+    return ["su", "-l", user, "-s", "/bin/sh", "-c", line]
+
+
 def collect_live_containers(gandalf_artefact_destination, gandalf_host):
     """-L: what Docker and Podman say about their running containers, which their files don't
     hold: inspect, the processes in each (top) and its filesystem now (export), into
@@ -872,11 +897,10 @@ def collect_live_containers(gandalf_artefact_destination, gandalf_host):
     host, so it's opt-in and every command is audited; export never pauses the container. Each
     export is cut at GANDALF_CONTAINER_EXPORT_MAX bytes (default 2 GB; 0 leaves exports out)."""
     limit = int(os.environ.get("GANDALF_CONTAINER_EXPORT_MAX", 2 << 30))
-    for runtime in ("docker", "podman"):
-        if not shutil.which(runtime):
-            continue
+    for runtime, user in live_sources():
+        label = runtime if not user else "{} (rootless, {})".format(runtime, user)
         try:
-            listed = subprocess.run([runtime, "ps", "-q", "--no-trunc"], stdout=subprocess.PIPE,
+            listed = subprocess.run(as_user(user, [runtime, "ps", "-q", "--no-trunc"]), stdout=subprocess.PIPE,
                                     stderr=subprocess.DEVNULL, timeout=60).stdout.decode().split()
         except (OSError, subprocess.SubprocessError):
             continue
@@ -887,17 +911,22 @@ def collect_live_containers(gandalf_artefact_destination, gandalf_host):
             os.makedirs(folder, exist_ok=True)
             for name, command in (("inspect.json", [runtime, "inspect", cid]),
                                   ("top.txt", [runtime, "top", cid] + LIVE_TOP[runtime])):
+                path = os.path.join(folder, name)
                 try:
-                    with open(os.path.join(folder, name), "wb") as out:
-                        if subprocess.run(command, stdout=out, stderr=subprocess.DEVNULL, timeout=120).returncode == 0:
-                            audit_ran(gandalf_host, " ".join(command[:3]))
+                    with open(path, "wb") as out:
+                        if subprocess.run(as_user(user, command), stdout=out, stderr=subprocess.DEVNULL,
+                                          timeout=120).returncode == 0:
+                            audit_ran(gandalf_host, " ".join([label] + command[1:3]))
+                    if not os.path.getsize(path):
+                        os.remove(path)
                 except (OSError, subprocess.SubprocessError):
                     pass
             if limit <= 0:
                 continue
             taken = 0
             try:
-                export = subprocess.Popen([runtime, "export", cid], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                export = subprocess.Popen(as_user(user, [runtime, "export", cid]), stdout=subprocess.PIPE,
+                                          stderr=subprocess.DEVNULL)
                 with open(os.path.join(folder, "export.tar"), "wb") as out:
                     while taken < limit:
                         chunk = export.stdout.read(min(1 << 20, limit - taken))
@@ -910,7 +939,7 @@ def collect_live_containers(gandalf_artefact_destination, gandalf_host):
             except OSError:
                 continue
             audit_ran(gandalf_host, "{} export {}{}".format(
-                runtime, cid, " (cut at {} bytes)".format(limit) if taken >= limit else ""))
+                label, cid, " (cut at {} bytes)".format(limit) if taken >= limit else ""))
 
 
 def collect_linux_volatile_files(gandalf_artefact_destination, gandalf_host):
