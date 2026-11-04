@@ -53,3 +53,14 @@ def test_status_log_without_an_mft_is_not_a_check(tmp_path) -> None:
     assert not _analyse_artemis_mft_from_status_log(str(tmp_path), "status.log", "", "", "", "", "",
                                                     lambda *a: seen.append(a))
     assert seen == []
+
+
+def test_by_design_mismatches_are_exempt() -> None:
+    from rowanholt.analysis.analysis import SIGNATURE_EXEMPT
+    for path in ("/hiberfil.sys", "/pagefile.sys", "/$Recycle.Bin/S-1-5-21-1-1105/$II3DF3L.zip",
+                 "/Windows/Installer/{397F4DE2-3C5A-415C-9A36-1D8C2B30B92D}/ARPPRODUCTICON.exe"):
+        assert SIGNATURE_EXEMPT.match(path)
+    for path in ("/$Recycle.Bin/S-1-5-21-1-1105/$RI3DF3L.zip", "/Users/a/hiberfil.sys", "/Users/a/Pictures/shield.jpg"):
+        assert not SIGNATURE_EXEMPT.match(path)
+    # A COM program has no header
+    assert not signature_mismatch("etfsboot.com", b"\xfa\x33\xc0\x8e\xd0\xbc\x00\x7c")

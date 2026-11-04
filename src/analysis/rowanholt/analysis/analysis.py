@@ -58,8 +58,14 @@ TIMESTOMP_TYPES = re.compile(
     r"\.(exe|dll|sys|scr|ps1|psm1|bat|cmd|vbs|vbe|js|jse|hta|wsf|lnk|msi|py|jar"
     r"|zip|7z|rar|cab|iso|img|vhd|vhdx)$", re.I)
 # Artemis's $STANDARD_INFORMATION times and the $FILE_NAME ones they're checked against.
-# Tools that backdate a file rewrite $SI; $FN keeps when the file really arrived.
-TIMESTOMP_PAIRS = (("created", "filename_created"), ("modified", "filename_modified"))
+# Tools that backdate a file rewrite $SI; $FN keeps when the file really arrived. Only the
+# created time: a copy or an extracted file keeps its modified time and gets a new $FN, so
+# $SI modified before $FN is every copied file (502 of 664 hits on a real Windows 7 image)
+TIMESTOMP_PAIRS = (("created", "filename_created"),)
+# Installers and archive tools set the same old times on everything they lay down; a backdated
+# implant is one file. This many in one folder with the same $SI created time is an installation
+BULK_TIMESTOMP = 3
+BULK_TIMESTOMP_NOTE = "likely benign: {} files in this folder carry the same times (installed or extracted together)"
 MFT_JSON_NAMES = ("mft.json", "mft.jsonl", "rawfiles.json", "rawfiles.jsonl", "journal_mft.json")
 # Keys only Artemis's MFT records have, to know an unnamed .jsonl for one (prefetch and others
 # also have filename, created and modified)
@@ -76,7 +82,8 @@ _ZIP = (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08")
 _IMAGE = (b"\xff\xd8\xff", b"\x89PNG\r\n\x1a\n", b"GIF87a", b"GIF89a", b"BM", b"RIFF", b"\x00\x00\x01\x00",
           b"DCH\x01")
 SIGNATURES = {
-    **dict.fromkeys(("exe", "dll", "sys", "com"), _PE),
+    # Not .com: a COM program is raw code with no header (Windows' own etfsboot.com)
+    **dict.fromkeys(("exe", "dll", "sys"), _PE),
     **dict.fromkeys(("docx", "xlsx", "pptx", "odt", "odp", "ott", "zip", "jar"), _ZIP),
     **dict.fromkeys(("doc", "xls", "ppt"), (b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1",)),
     **dict.fromkeys(("jpg", "jpeg", "png", "gif"), _IMAGE),
@@ -84,6 +91,12 @@ SIGNATURES = {
     "chm": (b"ITSF",),
 }
 HEADER_BYTES = 1024  # a PDF's %PDF- may come anywhere in its first 1024 bytes
+# Files whose extension isn't their format by design: the paging and hibernation files, the
+# Recycle Bin's $I records (named for what was deleted) and the Windows Installer's cached
+# product icons (ICO files called ARPPRODUCTICON.exe)
+SIGNATURE_EXEMPT = re.compile(
+    r"^/(pagefile|hiberfil|swapfile)\.sys$|^/\$recycle\.bin/[^/]+/\$i[^/]*$"
+    r"|^/windows/installer/[^/]+/arpproducticon\.exe$", re.I)
 
 
 def signature_mismatch(name, header):
@@ -157,7 +170,8 @@ def mft_findings(record):
     for stream in record.get("ads_info") or []:
         findings.append(("AlternateDataStream", stream.get("name", "unknown") if isinstance(stream, dict) else str(stream)))
     path = str(record.get("full_path") or record.get("filename") or "")
-    if TIMESTOMP_LOCATIONS.match(path) and TIMESTOMP_TYPES.search(path):
+    # Artemis writes a record per $FILE_NAME: a file's 8.3 name ("Dos") is the same file again
+    if record.get("namespace") != "Dos" and TIMESTOMP_LOCATIONS.match(path) and TIMESTOMP_TYPES.search(path):
         # Artemis writes fixed-width ISO 8601 UTC, so the strings order as the times do
         earlier = [(si, fn) for si, fn in ((record.get(s), record.get(f)) for s, f in TIMESTOMP_PAIRS)
                    if si and fn and type(si) is type(fn) and si < fn]
@@ -167,6 +181,16 @@ def mft_findings(record):
                 value += "|" + SETUP_COPIED_NOTE
             findings.append(("Timestomp", value))
     return findings
+
+
+def bulk_timestomps(candidates):
+    """{index: size of its group} for the timestomp candidates, (path, $SI created) pairs, that
+    share their folder and $SI created time with BULK_TIMESTOMP or more others."""
+    groups = {}
+    for index, (path, created) in enumerate(candidates):
+        folder = str(path).replace("\\", "/").rsplit("/", 1)[0].lower()
+        groups.setdefault((folder, created), []).append(index)
+    return {i: len(members) for members in groups.values() if len(members) >= BULK_TIMESTOMP for i in members}
 
 
 def volume_artefact_dirs(artefacts_dir, mnt, vssimage):
@@ -195,13 +219,32 @@ def analyse_artefacts(
             datetime.now().isoformat().replace("T", " ")
         ))
         counts = {"ExtendedAttributes": 0, "AlternateDataStream": 0, "Timestomp": 0}
+        benign = {SETUP_COPIED_NOTE: 0, BULK_TIMESTOMP_NOTE: 0}
         records_processed = 0
-        setup_copied = 0
         audit_text = {
             "ExtendedAttributes": "extended attribute",
             "AlternateDataStream": "alternate data stream",
             "Timestomp": "evidence of timestomping",
         }
+
+        def write_findings(filename, findings):
+            short = filename.replace("\\", "/").split("/")[-1]
+            with open(anysd + "/analysis.csv", "a") as analysisfile:
+                for kind, value in findings:
+                    counts[kind] += 1
+                    analysisfile.write("{},{},{},{},{}\n".format(
+                        datetime.now().isoformat(), vssimage.replace("'", ""),
+                        filename.replace(",", "%2C"), kind, value.replace(",", "%2C"),
+                    ))
+                    entry, prnt = "{},{},{},{} found in '{}'\n".format(
+                        datetime.now().isoformat(), vssimage, stage, audit_text[kind], short
+                    ), " -> {} -> {} found in '{}' for {}".format(
+                        datetime.now().isoformat().replace("T", " "), audit_text[kind], short, vssimage
+                    )
+                    write_audit_log_entry(verbosity, output_directory, entry, prnt)
+
+        # Timestomp findings wait for the whole MFT, to know which files came in a batch
+        timestomps = []
         try:
             with open(filepath, "r", encoding="utf-8", errors="replace") as f:
                 for record in iter_json_records(f):
@@ -210,35 +253,33 @@ def analyse_artefacts(
                     if not findings:
                         continue
                     filename = str(record.get("full_path") or record.get("filename") or "unknown")
-                    short = filename.replace("\\", "/").split("/")[-1]
-                    with open(anysd + "/analysis.csv", "a") as analysisfile:
-                        for kind, value in findings:
-                            counts[kind] += 1
-                            if value.endswith(SETUP_COPIED_NOTE):
-                                setup_copied += 1
-                            analysisfile.write("{},{},{},{},{}\n".format(
-                                datetime.now().isoformat(), vssimage.replace("'", ""),
-                                filename.replace(",", "%2C"), kind, value.replace(",", "%2C"),
-                            ))
-                            entry, prnt = "{},{},{},{} found in '{}'\n".format(
-                                datetime.now().isoformat(), vssimage, stage, audit_text[kind], short
-                            ), " -> {} -> {} found in '{}' for {}".format(
-                                datetime.now().isoformat().replace("T", " "), audit_text[kind], short, vssimage
-                            )
-                            write_audit_log_entry(verbosity, output_directory, entry, prnt)
+                    timestomps.extend((filename, v, record.get("created")) for k, v in findings if k == "Timestomp")
+                    others = [(k, v) for k, v in findings if k != "Timestomp"]
+                    if others:
+                        write_findings(filename, others)
+            batches = bulk_timestomps([(path, created) for path, _, created in timestomps])
+            for index, (filename, value, _) in enumerate(timestomps):
+                if value.endswith(SETUP_COPIED_NOTE):
+                    benign[SETUP_COPIED_NOTE] += 1
+                elif index in batches:
+                    value += "|" + BULK_TIMESTOMP_NOTE.format(batches[index])
+                    benign[BULK_TIMESTOMP_NOTE] += 1
+                write_findings(filename, [("Timestomp", value)])
         except (OSError, ValueError) as e:
             print(" -> {} -> warning: could not analyse MFT JSON: {}".format(
                 datetime.now().isoformat().replace("T", " "), str(e)[:100]
             ))
         # The technique comes from what was found, not from the MFT having been parsed
-        if counts["Timestomp"] > setup_copied:
+        if counts["Timestomp"] > sum(benign.values()):
             _record_techniques(os.path.join(output_directory, "mitre_techniques.txt"), ["T1070.006"])
         now = datetime.now().isoformat().replace("T", " ")
         print(" -> {} -> MFT analysis complete: {} records processed".format(now, records_processed))
         print(" -> {} ->   Extended Attributes (not Windows' own): {} files".format(now, counts["ExtendedAttributes"]))
-        print(" -> {} ->   Timestomping indicators ($SI created or modified before $FN; executables, scripts and archives in user-writable paths): {} files".format(now, counts["Timestomp"]))
-        if setup_copied:
-            print(" -> {} ->     of which {} under Users\\Default or ProgramData\\Microsoft ({})".format(now, setup_copied, SETUP_COPIED_NOTE))
+        print(" -> {} ->   Timestomping indicators ($SI created before $FN; executables, scripts and archives in user-writable paths): {} files".format(now, counts["Timestomp"]))
+        if benign[SETUP_COPIED_NOTE]:
+            print(" -> {} ->     of which {} under Users\\Default or ProgramData\\Microsoft ({})".format(now, benign[SETUP_COPIED_NOTE], SETUP_COPIED_NOTE))
+        if benign[BULK_TIMESTOMP_NOTE]:
+            print(" -> {} ->     of which {} installed or extracted {} or more to a folder with the same times".format(now, benign[BULK_TIMESTOMP_NOTE], BULK_TIMESTOMP))
         if counts["AlternateDataStream"]:
             print(" -> {} ->   Alternate Data Streams: {} files".format(now, counts["AlternateDataStream"]))
 
@@ -348,9 +389,9 @@ def analyse_artefacts(
                             file_hdr = magic_file.read(HEADER_BYTES)
                     except OSError:
                         continue
-                    if not signature_mismatch(f, file_hdr):
-                        continue
                     path = "/" + os.path.relpath(full, mnt)
+                    if not signature_mismatch(f, file_hdr) or SIGNATURE_EXEMPT.match(path):
+                        continue
                     with open(anysd + "/analysis.csv", "a") as analysisfile:
                         analysisfile.write(
                             "{},{},{},File-signature (magic-byte) Discrepency,{}\n".format(

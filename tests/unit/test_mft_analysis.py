@@ -7,7 +7,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from rowanholt.analysis.analysis import SETUP_COPIED_NOTE, iter_json_records, mft_findings  # noqa: E402
+from rowanholt.analysis.analysis import (  # noqa: E402
+    SETUP_COPIED_NOTE, bulk_timestomps, iter_json_records, mft_findings)
 
 
 SAME = "2025-01-01T00:00:00.000Z"
@@ -68,16 +69,31 @@ def test_seeded_timestomp_is_not_marked_benign() -> None:
     assert SETUP_COPIED_NOTE not in value
 
 
-def test_backdated_modified_time_alone_is_reported() -> None:
-    # Some tools set only the modified time, leaving $SI's created as it was
-    [(kind, value)] = mft_findings(record(".\\Users\\a\\AppData\\Local\\Temp\\x.dll", modified="2019-03-01T00:00:00.000Z"))
-    assert kind == "Timestomp" and value == "$SI: 2019-03-01T00:00:00.000Z|$FN: " + SAME
+def test_an_old_modified_time_alone_is_a_copy_not_timestomping() -> None:
+    # A copied or extracted file keeps its modified time and gets a new $FN: 502 of 664
+    # hits on a real Windows 7 image were taskbar shortcuts and installed programs
+    lnk = record(".\\Users\\a\\AppData\\Roaming\\Microsoft\\Internet Explorer\\Quick Launch\\Windows Explorer.lnk",
+                 modified="2009-07-14T04:49:38.000Z")
+    assert mft_findings(lnk) == []
 
 
-def test_both_backdated_times_are_in_one_finding() -> None:
+def test_a_backdated_created_time_is_one_finding() -> None:
     old = "2019-03-01T00:00:00.000Z"
     [(_, value)] = mft_findings(record(".\\Users\\a\\Downloads\\run.exe", created=old, modified=old))
-    assert value.count("$SI: " + old) == 2
+    assert value == "$SI: " + old + "|$FN: " + SAME
+
+
+def test_a_short_name_record_is_not_the_file_again() -> None:
+    short = dict(record(".\\Users\\a\\Downloads\\RUN~1.EXE", created="2019-03-01T00:00:00.000Z"), namespace="Dos")
+    assert mft_findings(short) == []
+
+
+def test_files_installed_together_are_a_batch() -> None:
+    old = "2011-08-18T21:58:58.000Z"
+    candidates = [(".\\ProgramData\\Skype\\js\\" + n, old) for n in ("a.js", "b.js", "c.js")]
+    candidates += [(".\\ProgramData\\Skype\\js\\d.js", "2011-08-18T21:59:00.000Z"),
+                   (".\\Users\\a\\x.exe", old)]
+    assert bulk_timestomps(candidates) == {0: 3, 1: 3, 2: 3}
 
 
 def test_archives_and_disk_images_are_checked() -> None:
