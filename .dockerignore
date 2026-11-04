@@ -51,11 +51,16 @@ src/analysis/web/frontend/node_modules
 dist
 build
 
-# Test data and output (don't include large forensic images)
-*.E01
-*.raw
-*.vmdk
-*.dd
+# Test data and output (don't include large forensic images). A pattern without **/ matches
+# only at the top: a case once written into src/web/backend went into the worker image
+**/*.E01
+**/*.e01
+**/*.Ex01
+**/*.raw
+**/*.mem
+**/*.vmdk
+**/*.dd
+**/*.pst
 test_data
 tests/fixtures
 
