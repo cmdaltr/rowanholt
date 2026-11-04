@@ -3,6 +3,8 @@ uvicorn[standard]==0.24.0
 pydantic==2.5.0
 pydantic-settings==2.1.0
 celery==5.3.4
+# celery 5.3.4 takes any kombu; kombu 5.7 refuses redis-py below 6.1 and stops the worker
+kombu==5.6.2
 redis==5.0.1
 python-multipart==0.0.6
 passlib[bcrypt]==1.7.4
