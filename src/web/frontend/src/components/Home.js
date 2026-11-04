@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/dernvale.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt.png`;
 const gandalfImage = `${process.env.PUBLIC_URL}/images/gandalf.png`;
 const elrondImage = `${process.env.PUBLIC_URL}/images/elrond.png`;
 const pippinImage = `${process.env.PUBLIC_URL}/images/pippin.png`;
@@ -110,7 +110,7 @@ const Home = ({ onScrollProgress }) => {
       <section data-guide="home.hero" className="hero-section">
         <img
           src={heroImage}
-          alt="Dernvale"
+          alt="Rowanholt"
           className="hero-image"
           style={{
             transform: `scale(${heroScale})`,
@@ -152,7 +152,7 @@ const Home = ({ onScrollProgress }) => {
           <div className="journey-card__image"><img src={aragornImage} alt="Aragorn Administration" /></div>
           <div className="journey-card__content">
             <h2>Aragorn Administration</h2>
-            <p>Keep the realm: Dernvale's containers, users, settings and the test lab.</p>
+            <p>Keep the realm: Rowanholt's containers, users, settings and the test lab.</p>
           </div>
         </Link>
       </section>

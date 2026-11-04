@@ -27,7 +27,7 @@ function App() {
 
         <footer className="App-footer">
           <p>
-            Dernvale v1.0.0 - Digital Forensics Acceleration Suite
+            Rowanholt v1.0.0 - Digital Forensics Acceleration Suite
           </p>
         </footer>
       </div>

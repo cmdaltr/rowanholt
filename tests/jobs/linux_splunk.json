@@ -1,9 +1,9 @@
 {
   "case_number": "TEST_linux_splunk",
   "source_paths": [
-    "/Volumes/Media5TB/dernvale_imgs/Linux_mail.vmdk.raw"
+    "/Volumes/Media5TB/rowanholt_imgs/Linux_mail.vmdk.raw"
   ],
-  "destination_path": "/Volumes/Media5TB/dernvale_imgs/tests/linux_splunk",
+  "destination_path": "/Volumes/Media5TB/rowanholt_imgs/tests/linux_splunk",
   "options": {
     "local": true,
     "gandalf": false,

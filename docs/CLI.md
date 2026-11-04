@@ -1,14 +1,14 @@
-# Dernvale CLI Reference
+# Rowanholt CLI Reference
 
 **Version:** 2.1.0
 
-Every command below can be run through the `dernvale` command from any directory (see [The `dernvale` command](#the-dernvale-command)); called directly, they run from the repository root. The Python modules are run with `python3 -m src.analysis.…`. Don't run them from inside `src/analysis`: Elrond's `platform/` package shadows the standard library `platform` module there, so anything that imports numpy or pandas loads `elrond.py` and fails on its arguments.
+Every command below can be run through the `rowanholt` command from any directory (see [The `rowanholt` command](#the-rowanholt-command)); called directly, they run from the repository root. The Python modules are run with `python3 -m src.analysis.…`. Don't run them from inside `src/analysis`: Elrond's `platform/` package shadows the standard library `platform` module there, so anything that imports numpy or pandas loads `elrond.py` and fails on its arguments.
 
 ---
 
 ## Table of Contents
 
-1. [The `dernvale` command](#the-dernvale-command)
+1. [The `rowanholt` command](#the-rowanholt-command)
 2. [Overview](#overview)
 3. [Gandalf - Acquisition](#gandalf---acquisition)
 4. [Elrond - Analysis](#elrond---analysis)
@@ -23,38 +23,38 @@ Every command below can be run through the `dernvale` command from any directory
 
 ---
 
-## The `dernvale` command
+## The `rowanholt` command
 
-`dernvale` at the repository root runs everything: the Docker stack, Gandalf, Elrond, Mordor, Anduril, the lab, and every script under `scripts/`. Link it into a directory on your `PATH` once and it runs from anywhere:
+`rowanholt` at the repository root runs everything: the Docker stack, Gandalf, Elrond, Mordor, Anduril, the lab, and every script under `scripts/`. Link it into a directory on your `PATH` once and it runs from anywhere:
 
 ```bash
-./dernvale install            # links ~/.local/bin/dernvale; or: ./dernvale install /usr/local/bin
-dernvale help
+./rowanholt install            # links ~/.local/bin/rowanholt; or: ./rowanholt install /usr/local/bin
+rowanholt help
 ```
 
-It follows its own link back to the repository, so moving the clone means running `install` again. `dernvale uninstall` removes the link.
+It follows its own link back to the repository, so moving the clone means running `install` again. `rowanholt uninstall` removes the link.
 
 | Command | Runs |
 |---|---|
-| `dernvale start \| stop \| restart \| status [--testing] [--logs]` | The Docker stack (`--testing` leaves out Splunk and Elastic) |
-| `dernvale start --progress[=zenity]` | The same, reporting progress and an ETA learnt from earlier starts (what the desktop apps show) |
-| `dernvale server init <hostname> [--tls internal\|<email>\|files]` | Turns this install into a team server; `start`, `stop` and `status` then use the server profile (`--server` forces it). See `docs/SERVER.md` |
-| `dernvale server users <list\|add\|password\|role\|disable\|enable>` | A server's accounts |
-| `dernvale server ca` | Prints the root certificate clients trust when the server uses Caddy's own CA |
-| `dernvale gandalf [bash\|python] <args>` | `gandalf.sh` (the default) or `gandalf.py` |
-| `dernvale acquire <args>` | Gandalf through the Python CLI |
-| `dernvale analyse <args>` | Elrond (`analyze` works too) |
-| `dernvale mordor <command>` | Security datasets: `list`, `download`, `info`, `local`, `verify`, `refresh`, `stats` |
-| `dernvale anduril <command>` | Container administration (also `aragorn`) |
-| `dernvale web` | The web UI and API without Docker |
-| `dernvale lab <command>` | The test lab, `lab/lab.sh` |
-| `dernvale scripts` | Lists every script under `scripts/` |
-| `dernvale <group> <name> [args]` | One of them, e.g. `dernvale jobs status`, `dernvale siem splunk-restart`, `dernvale docker clean` |
-| `dernvale map [realm\|elrond\|gandalf\|journey]` | Opens an architecture page; `journey` (3D, also `machine`) is served on 127.0.0.1:5690 until Ctrl-C |
-| `dernvale app [install\|uninstall] [--dock]` | The desktop app: builds `Dernvale.app` on macOS (`--dock` pins it), a menu entry on Linux; see `app/README.md` |
-| `dernvale where` | Prints the repository path |
+| `rowanholt start \| stop \| restart \| status [--testing] [--logs]` | The Docker stack (`--testing` leaves out Splunk and Elastic) |
+| `rowanholt start --progress[=zenity]` | The same, reporting progress and an ETA learnt from earlier starts (what the desktop apps show) |
+| `rowanholt server init <hostname> [--tls internal\|<email>\|files]` | Turns this install into a team server; `start`, `stop` and `status` then use the server profile (`--server` forces it). See `docs/SERVER.md` |
+| `rowanholt server users <list\|add\|password\|role\|disable\|enable>` | A server's accounts |
+| `rowanholt server ca` | Prints the root certificate clients trust when the server uses Caddy's own CA |
+| `rowanholt gandalf [bash\|python] <args>` | `gandalf.sh` (the default) or `gandalf.py` |
+| `rowanholt acquire <args>` | Gandalf through the Python CLI |
+| `rowanholt analyse <args>` | Elrond (`analyze` works too) |
+| `rowanholt mordor <command>` | Security datasets: `list`, `download`, `info`, `local`, `verify`, `refresh`, `stats` |
+| `rowanholt anduril <command>` | Container administration (also `aragorn`) |
+| `rowanholt web` | The web UI and API without Docker |
+| `rowanholt lab <command>` | The test lab, `lab/lab.sh` |
+| `rowanholt scripts` | Lists every script under `scripts/` |
+| `rowanholt <group> <name> [args]` | One of them, e.g. `rowanholt jobs status`, `rowanholt siem splunk-restart`, `rowanholt docker clean` |
+| `rowanholt map [realm\|elrond\|gandalf\|journey]` | Opens an architecture page; `journey` (3D, also `machine`) is served on 127.0.0.1:5690 until Ctrl-C |
+| `rowanholt app [install\|uninstall] [--dock]` | The desktop app: builds `Rowanholt.app` on macOS (`--dock` pins it), a menu entry on Linux; see `app/README.md` |
+| `rowanholt where` | Prints the repository path |
 
-Forensic commands keep the directory you call them from, so relative evidence and output paths work as typed. Scripts under `scripts/` and the stack commands run from the repository root. Scripts are found when they're run (`scripts/<group>/<group>-<name>.sh`, `scripts/<group>/<name>.sh` or `.py`, or `scripts/<name>.sh`), so a new script needs no wiring. Python commands use `python3`; set `DERNVALE_PYTHON` to use a virtualenv with Dernvale's requirements installed instead. The Windows collector is PowerShell and runs on Windows: `Invoke-Gandalf.ps1` in `src/acquisition/windows`.
+Forensic commands keep the directory you call them from, so relative evidence and output paths work as typed. Scripts under `scripts/` and the stack commands run from the repository root. Scripts are found when they're run (`scripts/<group>/<group>-<name>.sh`, `scripts/<group>/<name>.sh` or `.py`, or `scripts/<name>.sh`), so a new script needs no wiring. Python commands use `python3`; set `ROWANHOLT_PYTHON` to use a virtualenv with Rowanholt's requirements installed instead. The Windows collector is PowerShell and runs on Windows: `Invoke-Gandalf.ps1` in `src/acquisition/windows`.
 
 ---
 
@@ -65,8 +65,8 @@ Forensic commands keep the directory you call them from, so relative evidence an
 | Gandalf | `src/acquisition/python/gandalf.py`, `src/acquisition/bash/gandalf.sh`, `src/acquisition/windows/Invoke-Gandalf.ps1` | Live acquisition, local or remote |
 | Elrond | `src/analysis/elrond.py` | Collection, processing and analysis of images and acquisitions |
 | MITRE tools | `src.analysis.mitre.cli`, `src.analysis.mitre.coverage_cli` | ATT&CK data, technique mapping, coverage |
-| Cloud tools | `src.analysis.dernvale.cloud.cli` | AWS, Azure and GCP acquisition and log analysis; Kubernetes audit logs |
-| AI tools (Eru) | `src.analysis.dernvale.ai.cli` | Natural-language queries over case output |
+| Cloud tools | `src.analysis.rowanholt.cloud.cli` | AWS, Azure and GCP acquisition and log analysis; Kubernetes audit logs |
+| AI tools (Eru) | `src.analysis.rowanholt.ai.cli` | Natural-language queries over case output |
 
 The web UI and API (see [API.md](API.md)) drive Elrond through the same command line.
 
@@ -338,7 +338,7 @@ Memory analysis reads memory images from `SOURCE_DIR` alongside the disk images;
 |---|---|
 | `--Process` | Parse collected artefacts (always runs) |
 | `--Analysis` | MFT analysis: extended attributes other than Windows' own, and timestomping ($SI created before $FN created) of executables and scripts in user-writable paths; hits under `Users\Default` and `ProgramData\Microsoft` are marked likely benign (Windows setup copies them with their original times). Alternate data streams from the raw `$MFT`; Mark of the Web, WOF compression and other Windows streams are marked likely benign. On a case of two or more hosts, also stacking: processes, parent and child pairs, services, scheduled tasks, autoruns, WMI consumers, drivers (Sysmon 6) and kernel modules found on few of the hosts of the same OS, Linux hosts within their distribution family (three or more of that OS or family before anything counts as rare; with fewer, only `--stackBaseline` finds anything), ranked in the case's `stacking.csv` with the reasons for each score (rare, user path, generated name, not in baseline, and the host's own: unsigned modules and drivers, BTM items with no Team ID, first seen outside the host's logon hours), and the host row each value was read from (`Host`, `Artefact`, `Row`, the case browser's reference; `Sources` lists it for every host with the value) so it can be flagged there. Nothing is tagged with a technique on a score |
-| `--stackBaseline FILE` | A baseline of clean hosts for stacking; values absent from it score higher. Build one with `python3 -m dernvale.analysis.stacking --baseline OUT CASE_DIR ...` (from `src/analysis`) |
+| `--stackBaseline FILE` | A baseline of clean hosts for stacking; values absent from it score higher. Build one with `python3 -m rowanholt.analysis.stacking --baseline OUT CASE_DIR ...` (from `src/analysis`) |
 | `--Memory` | Volatility 3 analysis of memory images |
 | `--Timeline` | Plaso timeline of the disk image. Very slow (105 min on a 12 GB E01) |
 | `--memorytimeline` | Volatility timeliner on memory images |
@@ -353,7 +353,7 @@ Memory analysis reads memory images from `SOURCE_DIR` alongside the disk images;
 | `--symlinks` | Follow symbolic links when copying folders. Slow |
 | `--extractIocs` | Extract IOCs from processed files. Slow |
 | `--iocsFile FILE` | Match extracted IOCs against a watchlist |
-| `--threatIntel FILE [FILE ...]` | Match the case against threat intelligence: the Iran APT workbook, STIX 2.1 bundles, MITRESaw procedures, Dernvale's CSV or a text watchlist. Writes `<host>/analysis/threat_intel_matches.csv`, fills `watchlist_match` in `iocs.csv`, and ranks groups in the case's `threat_groups.csv` with the basis for each rank. Runs after the analysis phase |
+| `--threatIntel FILE [FILE ...]` | Match the case against threat intelligence: the Iran APT workbook, STIX 2.1 bundles, MITRESaw procedures, Rowanholt's CSV or a text watchlist. Writes `<host>/analysis/threat_intel_matches.csv`, fills `watchlist_match` in `iocs.csv`, and ranks groups in the case's `threat_groups.csv` with the basis for each rank. Runs after the analysis phase |
 | `--Keywords FILE` | Search for keywords. Remove blank and `#` lines first: they match every line |
 | `--Yara DIR` | Scan with YARA rules, against the whole mounted image or only collected files. Symbolic links are not followed (`yara -N`). A rule whose `meta` has `attack = "T1059.001, T1105"` (or `mitre`, `technique`) tags those techniques when it matches; any match on a web-root script tags **T1505.003** |
 | `--misplacedBinaries` | Find Windows system binaries in unexpected locations (**T1036.005**) |
@@ -418,7 +418,7 @@ Elrond writes one directory per case, with one subdirectory per image. Taken fro
 
 ```
 <output>/<case>/
-├── dernvale_audit.log            # CSV: timestamp (UTC), image, stage, entry
+├── rowanholt_audit.log            # CSV: timestamp (UTC), image, stage, entry
 ├── mitre_techniques.txt           # ATT&CK techniques identified
 ├── <case>_navigator.json          # ATT&CK Navigator layer (if -N)
 ├── .memory_profiles.json          # memory jobs only
@@ -458,7 +458,7 @@ python3 -m src.analysis.mitre.cli [-v] COMMAND ...
 | `list-artifacts` | `[--detailed]` | List artefact types the mapper knows |
 | `info` | `TECHNIQUE_ID [-d DOMAIN] [-o FILE]` | Show a technique |
 | `stats` | `[-d DOMAIN] [--detailed]` | Framework statistics |
-| `dashboard` | `-i MAPPINGS.json [-o DIR] [-f splunk,elastic,navigator]` | Build dashboards from a mappings file (default output `/tmp/dernvale/dashboards`) |
+| `dashboard` | `-i MAPPINGS.json [-o DIR] [-f splunk,elastic,navigator]` | Build dashboards from a mappings file (default output `/tmp/rowanholt/dashboards`) |
 
 ```bash
 python3 -m src.analysis.mitre.cli update
@@ -494,7 +494,7 @@ The ATT&CK Navigator layer for a case comes from Elrond (`--Navigator`) or the A
 ## Cloud Forensics
 
 ```bash
-python3 -m src.analysis.dernvale.cloud.cli {aws|azure|gcp|k8s} COMMAND [OPTIONS]
+python3 -m src.analysis.rowanholt.cloud.cli {aws|azure|gcp|k8s} COMMAND [OPTIONS]
 ```
 
 | Command | Options | Does |
@@ -509,11 +509,11 @@ python3 -m src.analysis.dernvale.cloud.cli {aws|azure|gcp|k8s} COMMAND [OPTIONS]
 `k8s` takes only `analyze-logs`, with no credentials: an API server audit log exported from EKS, AKS, GKE or a self-managed cluster (JSON lines, a JSON array or an `EventList`), written as `k8s_audit.csv` and `k8s_audit_analysis.json` with the same flags and techniques as a node's collected audit log.
 
 ```bash
-python3 -m src.analysis.dernvale.cloud.cli aws list -c aws_creds.json --region eu-west-2
-python3 -m src.analysis.dernvale.cloud.cli aws acquire-disk -i i-1234567890abcdef0 -o ./snapshots/AWS-001 --wait
-python3 -m src.analysis.dernvale.cloud.cli azure acquire-logs --days 30 -o ./logs/AZURE-001 --analyze
-python3 -m src.analysis.dernvale.cloud.cli gcp acquire-disk -i myinstance --zone europe-west2-a -o ./snapshots/GCP-001
-python3 -m src.analysis.dernvale.cloud.cli k8s analyze-logs -f eks-audit.json -o ./logs/K8S-001
+python3 -m src.analysis.rowanholt.cloud.cli aws list -c aws_creds.json --region eu-west-2
+python3 -m src.analysis.rowanholt.cloud.cli aws acquire-disk -i i-1234567890abcdef0 -o ./snapshots/AWS-001 --wait
+python3 -m src.analysis.rowanholt.cloud.cli azure acquire-logs --days 30 -o ./logs/AZURE-001 --analyze
+python3 -m src.analysis.rowanholt.cloud.cli gcp acquire-disk -i myinstance --zone europe-west2-a -o ./snapshots/GCP-001
+python3 -m src.analysis.rowanholt.cloud.cli k8s analyze-logs -f eks-audit.json -o ./logs/K8S-001
 ```
 
 ---
@@ -523,7 +523,7 @@ python3 -m src.analysis.dernvale.cloud.cli k8s analyze-logs -f eks-audit.json -o
 In the web app this is **Ask Eru**; without Ollama it falls back to fixed questions answered from the case files ([ERU.md](ERU.md)). From the command line, Eru indexes case output into a vector store and answers questions over it with a local LLM (Ollama by default, or llama.cpp).
 
 ```bash
-python3 -m src.analysis.dernvale.ai.cli COMMAND ...
+python3 -m src.analysis.rowanholt.ai.cli COMMAND ...
 ```
 
 | Command | Arguments | Does |
@@ -535,21 +535,21 @@ python3 -m src.analysis.dernvale.ai.cli COMMAND ...
 | `search` | `CASE_ID "QUERY" [--top-k N]` | Similarity search without the LLM |
 | `info` | `CASE_ID` | Show what is indexed |
 
-All commands accept `--llm-type ollama|llamacpp`, `--model-name` (default `llama3`) and, except `index`, `--base-dir` and `--model-path` (llama.cpp). `index` also takes `--device cpu|cuda` for embeddings. Indexes are read from `--base-dir`, default `$DERNVALE_DATA_DIR` or `/opt/dernvale/data`.
+All commands accept `--llm-type ollama|llamacpp`, `--model-name` (default `llama3`) and, except `index`, `--base-dir` and `--model-path` (llama.cpp). `index` also takes `--device cpu|cuda` for embeddings. Indexes are read from `--base-dir`, default `$ROWANHOLT_DATA_DIR` or `/opt/rowanholt/data`.
 
 ```bash
-python3 -m src.analysis.dernvale.ai.cli index CASE-001 /output/CASE-001
-python3 -m src.analysis.dernvale.ai.cli query CASE-001 "What PowerShell commands were executed?"
-python3 -m src.analysis.dernvale.ai.cli summary CASE-001 --format markdown -o summary.md
+python3 -m src.analysis.rowanholt.ai.cli index CASE-001 /output/CASE-001
+python3 -m src.analysis.rowanholt.ai.cli query CASE-001 "What PowerShell commands were executed?"
+python3 -m src.analysis.rowanholt.ai.cli summary CASE-001 --format markdown -o summary.md
 ```
 
 ### Web Interface
 
 ```bash
-python3 -m src.analysis.dernvale.ai.web_interface
+python3 -m src.analysis.rowanholt.ai.web_interface
 ```
 
-It serves the chat UI at `http://localhost:5687/ai/chat/<case>` and JSON endpoints under `/ai/cases/`. Port 5687 is fixed (no option) and is also the frontend container's host port, so stop the frontend first or call `start_server(port=…)` from Python. Settings come from `DERNVALE_DATA_DIR`, `DERNVALE_LLM_TYPE` and `DERNVALE_MODEL_NAME`.
+It serves the chat UI at `http://localhost:5687/ai/chat/<case>` and JSON endpoints under `/ai/cases/`. Port 5687 is fixed (no option) and is also the frontend container's host port, so stop the frontend first or call `start_server(port=…)` from Python. Settings come from `ROWANHOLT_DATA_DIR`, `ROWANHOLT_LLM_TYPE` and `ROWANHOLT_MODEL_NAME`.
 
 ---
 
@@ -575,31 +575,31 @@ In Docker the worker gets `SPLUNK_HOST`, `SPLUNK_PASSWORD` and `ELASTICSEARCH_HO
 
 ## Docker Administration (Anduril)
 
-`dernvale anduril` manages Dernvale's own containers and images on Docker Desktop or OrbStack. It finds the engine running Dernvale, even when another Docker context is active. It only lists or touches containers labelled with the `dernvale` compose project and named `dernvale-*`, plus the images they use. Nothing else on the engine is visible to it. `dernvale aragorn` still works as an alias, from before Anduril had its own name.
+`rowanholt anduril` manages Rowanholt's own containers and images on Docker Desktop or OrbStack. It finds the engine running Rowanholt, even when another Docker context is active. It only lists or touches containers labelled with the `rowanholt` compose project and named `rowanholt-*`, plus the images they use. Nothing else on the engine is visible to it. `rowanholt aragorn` still works as an alias, from before Anduril had its own name.
 
 ```bash
-dernvale anduril status                    # containers, state, health, image
-dernvale anduril images                    # Dernvale images, size, built or pulled, users
-dernvale anduril logs celery-worker -n 200
-dernvale anduril stats backend
-dernvale anduril restart frontend
-dernvale anduril update redis              # pull the upstream image; recreate if newer
-dernvale anduril pull postgres:15-alpine
-dernvale anduril rebuild celery-worker     # docker compose build, then up -d --no-deps
-dernvale anduril rmi <image-id>            # unused Dernvale images only, never forced
-dernvale anduril prune                     # dangling images built for Dernvale
+rowanholt anduril status                    # containers, state, health, image
+rowanholt anduril images                    # Rowanholt images, size, built or pulled, users
+rowanholt anduril logs celery-worker -n 200
+rowanholt anduril stats backend
+rowanholt anduril restart frontend
+rowanholt anduril update redis              # pull the upstream image; recreate if newer
+rowanholt anduril pull postgres:15-alpine
+rowanholt anduril rebuild celery-worker     # docker compose build, then up -d --no-deps
+rowanholt anduril rmi <image-id>            # unused Rowanholt images only, never forced
+rowanholt anduril prune                     # dangling images built for Rowanholt
 ```
 
-Containers can be named by service (`celery-worker`) or container name (`dernvale-celery-worker`). Destructive commands ask first; `-y` answers yes. Stopping, restarting, updating or rebuilding `celery-worker`, `postgres` or `redis` while an analysis job is running is refused unless you pass `--force`, and that confirmation is never answered by `-y`. If Docker isn't running, or your user can't reach its socket, Anduril says so and offers to start Docker Desktop or OrbStack, or to add you to the `docker` group on Linux.
+Containers can be named by service (`celery-worker`) or container name (`rowanholt-celery-worker`). Destructive commands ask first; `-y` answers yes. Stopping, restarting, updating or rebuilding `celery-worker`, `postgres` or `redis` while an analysis job is running is refused unless you pass `--force`, and that confirmation is never answered by `-y`. If Docker isn't running, or your user can't reach its socket, Anduril says so and offers to start Docker Desktop or OrbStack, or to add you to the `docker` group on Linux.
 
 The web UI's **Aragorn → Settings** tab (admins only) needs the Anduril service, which is the only container that holds the Docker socket:
 
 ```bash
-dernvale anduril enable    # explains what it grants, asks, then starts the anduril service
-dernvale anduril disable   # stops it and removes its socket access
+rowanholt anduril enable    # explains what it grants, asks, then starts the anduril service
+rowanholt anduril disable   # stops it and removes its socket access
 ```
 
-`enable` reuses the compose files Dernvale was started with (read from the containers' labels), so overrides stay applied. If the backend still uses the default `SECRET_KEY`, `enable` warns you, and the web page stays disabled until it's set, since anyone could otherwise forge an admin login. The HTTP API is in [API.md](API.md#docker-administration-anduril).
+`enable` reuses the compose files Rowanholt was started with (read from the containers' labels), so overrides stay applied. If the backend still uses the default `SECRET_KEY`, `enable` warns you, and the web page stays disabled until it's set, since anyone could otherwise forge an admin login. The HTTP API is in [API.md](API.md#docker-administration-anduril).
 
 ---
 
@@ -607,23 +607,23 @@ dernvale anduril disable   # stops it and removes its socket access
 
 ### Dependencies and Installation
 
-`src/analysis/cli.py` (the `dernvale-analyze` entry point in `pyproject.toml`) is meant to provide `--check-dependencies`, `--install` and `--version`, but it imports the old `elrond.*` package and fails with `ModuleNotFoundError: No module named 'elrond'`. Until that is fixed, use the Docker worker image, which has every tool installed, or [CONFIG.md](CONFIG.md) for manual installation.
+`src/analysis/cli.py` (the `rowanholt-analyze` entry point in `pyproject.toml`) is meant to provide `--check-dependencies`, `--install` and `--version`, but it imports the old `elrond.*` package and fails with `ModuleNotFoundError: No module named 'elrond'`. Until that is fixed, use the Docker worker image, which has every tool installed, or [CONFIG.md](CONFIG.md) for manual installation.
 
 ### Database
 
 The web backend's Postgres schema is managed with Alembic (`src/web/backend/alembic/`):
 
 ```bash
-docker exec dernvale-backend alembic upgrade head
+docker exec rowanholt-backend alembic upgrade head
 ```
 
 ### Logs
 
-Each case writes `dernvale_audit.log` (CSV, UTC timestamps) to its output directory. In Docker:
+Each case writes `rowanholt_audit.log` (CSV, UTC timestamps) to its output directory. In Docker:
 
 ```bash
-docker logs dernvale-celery-worker --tail 100   # Elrond and task output
-docker logs dernvale-backend --tail 100          # API
+docker logs rowanholt-celery-worker --tail 100   # Elrond and task output
+docker logs rowanholt-backend --tail 100          # API
 ```
 
 ---
@@ -641,8 +641,8 @@ Elrond is configured by its command-line options; there is no config file. The D
 ```bash
 cd src/acquisition && sudo python3 python/gandalf.py None Local -M -O /evidence/CASE-001/acquisitions && cd -
 python3 src/analysis/elrond.py CASE-001 /evidence/CASE-001/acquisitions/ /output/CASE-001 --Gandalf --Process --Analysis --Memory
-python3 -m src.analysis.dernvale.ai.cli index CASE-001 /output/CASE-001
-python3 -m src.analysis.dernvale.ai.cli query CASE-001 "What was the initial access vector?"
+python3 -m src.analysis.rowanholt.ai.cli index CASE-001 /output/CASE-001
+python3 -m src.analysis.rowanholt.ai.cli query CASE-001 "What was the initial access vector?"
 ```
 
 ### Triage a Disk Image
@@ -656,8 +656,8 @@ Add `--extractIocs` only if you can wait: it added 43 minutes on a 12 GB Windows
 ### Cloud Logs
 
 ```bash
-python3 -m src.analysis.dernvale.cloud.cli aws acquire-logs --days 7 -o ./logs/AWS-001 --analyze
-python3 -m src.analysis.dernvale.ai.cli index AWS-001 ./logs/AWS-001 --cloud-logs ./logs/AWS-001/cloudtrail.json --cloud-provider aws
+python3 -m src.analysis.rowanholt.cloud.cli aws acquire-logs --days 7 -o ./logs/AWS-001 --analyze
+python3 -m src.analysis.rowanholt.ai.cli index AWS-001 ./logs/AWS-001 --cloud-logs ./logs/AWS-001/cloudtrail.json --cloud-provider aws
 ```
 
 ### Several Images
@@ -692,8 +692,8 @@ done
 ```bash
 python3 src/analysis/elrond.py --help
 python3 src/acquisition/python/gandalf.py --help
-python3 -m src.analysis.dernvale.ai.cli --help
-python3 -m src.analysis.dernvale.cloud.cli --help
+python3 -m src.analysis.rowanholt.ai.cli --help
+python3 -m src.analysis.rowanholt.cloud.cli --help
 python3 -m src.analysis.mitre.cli --help
 ```
 
@@ -701,7 +701,7 @@ python3 -m src.analysis.mitre.cli --help
 - [Usage Guide](USAGE.md)
 - [Quick Start](QUICKSTART.md)
 - [Security](SECURITY.md)
-- GitHub Issues: https://github.com/cmdaltr/dernvale/issues
+- GitHub Issues: https://github.com/cmdaltr/rowanholt/issues
 
 ---
 

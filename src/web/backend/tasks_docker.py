@@ -84,7 +84,7 @@ def _get_image_lock_key(image_path: str) -> str:
     # Normalize the path and create a hash for consistent key naming
     normalized = os.path.normpath(image_path).lower()
     path_hash = hashlib.md5(normalized.encode()).hexdigest()[:16]
-    return f"dernvale:image_lock:{path_hash}"
+    return f"rowanholt:image_lock:{path_hash}"
 
 
 def acquire_image_locks(job_id: str, image_paths: list, timeout: int = 3600, retry_interval: int = 10) -> bool:
@@ -203,7 +203,7 @@ def release_image_locks_for_job(job_id: str, source_paths: list):
 # are not in the group, so the mounts stay serviceable while it is stopped.
 #
 # The backend runs in a different container (separate PID namespace), so it
-# cannot signal Elrond itself. It broadcasts the dernvale_signal_job control
+# cannot signal Elrond itself. It broadcasts the rowanholt_signal_job control
 # command to the worker that owns the job; that runs in the worker's main
 # process, which shares Elrond's PID namespace.
 
@@ -216,12 +216,12 @@ _JOB_SIGNALS = {
 
 def _job_process_key(job_id: str) -> str:
     """Redis key holding the worker hostname and Elrond PGID for a job."""
-    return f"dernvale:job_process:{job_id}"
+    return f"rowanholt:job_process:{job_id}"
 
 
 def _job_events_key(job_id: str) -> str:
     """Redis list of pause/resume events waiting for the task to record."""
-    return f"dernvale:job_events:{job_id}"
+    return f"rowanholt:job_events:{job_id}"
 
 
 def _register_job_process(job_id: str, hostname: str, pgid: int) -> None:
@@ -262,7 +262,7 @@ def _drain_job_events(job) -> None:
     args=[("job_id", str), ("action", str)],
     signature="<job_id> <pause|resume|kill>",
 )
-def dernvale_signal_job(state, job_id: str, action: str) -> dict:
+def rowanholt_signal_job(state, job_id: str, action: str) -> dict:
     """Celery remote control command: signal a job's Elrond process group."""
     if action not in _JOB_SIGNALS:
         return {"ok": False, "error": f"unknown action '{action}'"}
@@ -306,7 +306,7 @@ def send_job_signal(job_id: str, action: str, timeout: float = 5.0) -> dict:
         return {"ok": False, "error": "job has no running Elrond process"}
 
     replies = celery_app.control.broadcast(
-        "dernvale_signal_job",
+        "rowanholt_signal_job",
         arguments={"job_id": job_id, "action": action},
         destination=[process["hostname"]],
         reply=True,
@@ -424,7 +424,7 @@ def translate_path_for_worker(path_str: str) -> str:
 
     Both containers mount:
       - elrond_uploads volume -> /tmp/elrond/uploads (SAME in both containers)
-      - /tmp/dernvale (host) -> /tmp/elrond/output (worker) or /host/tmp/dernvale (backend)
+      - /tmp/rowanholt (host) -> /tmp/elrond/output (worker) or /host/tmp/rowanholt (backend)
 
     Args:
         path_str: Path from backend perspective
@@ -438,9 +438,9 @@ def translate_path_for_worker(path_str: str) -> str:
     if path_str.startswith("/tmp/elrond/uploads/"):
         return path_str
 
-    # Backend uses /host/tmp/dernvale for output, worker uses /tmp/elrond/output
-    if path_str.startswith("/host/tmp/dernvale"):
-        return path_str.replace("/host/tmp/dernvale", "/tmp/elrond/output")
+    # Backend uses /host/tmp/rowanholt for output, worker uses /tmp/elrond/output
+    if path_str.startswith("/host/tmp/rowanholt"):
+        return path_str.replace("/host/tmp/rowanholt", "/tmp/elrond/output")
 
     # Backend uses /tmp/elrond/output, worker uses same
     if path_str.startswith("/tmp/elrond/output"):
@@ -612,7 +612,7 @@ def start_analysis(self, job_id: str):
         # Update job status
         job.status = JobStatus.RUNNING
         job.started_at = datetime.now()
-        job.log.append(f"[{datetime.now().isoformat().replace('T', ' ')}] -> Starting dernvale...")
+        job.log.append(f"[{datetime.now().isoformat().replace('T', ' ')}] -> Starting rowanholt...")
         job_storage.save_job(job)
 
         # Build elrond command
@@ -743,7 +743,7 @@ def start_analysis(self, job_id: str):
             start_new_session=True,
         )
         _register_job_process(job_id, self.request.hostname, process.pid)
-        spool = JobLogSpool(os.path.join(dest_dir_str, "dernvale_job.log"))
+        spool = JobLogSpool(os.path.join(dest_dir_str, "rowanholt_job.log"))
         last_save = time.monotonic()
 
         # Monitor progress
@@ -753,7 +753,7 @@ def start_analysis(self, job_id: str):
         seen_filepaths = set()  # Track seen filepaths to prevent duplicates
 
         # Phase-based progress tracking
-        # Dernvale processes ALL images through each phase before moving to the next:
+        # Rowanholt processes ALL images through each phase before moving to the next:
         # 1. Identification (mount all): 0-15%
         # 2. Collection (all images): 15-35%
         # 3. Processing (all artefacts): 35-70%
@@ -968,11 +968,11 @@ def start_analysis(self, job_id: str):
                 original_lower = original_line.lower()
 
                 # Phase-based progress calculation
-                # Dernvale phases: Identification (0-15%) -> Collection (15-35%) -> Processing (35-70%) -> Analysis (70-95%)
+                # Rowanholt phases: Identification (0-15%) -> Collection (15-35%) -> Processing (35-70%) -> Analysis (70-95%)
                 new_progress = job.progress  # Start with current progress
 
                 # Detect phase transitions
-                # Note: Dernvale outputs "Completed X Phase for 'image'" for EACH image
+                # Note: Rowanholt outputs "Completed X Phase for 'image'" for EACH image
                 # We only want to advance major progress on OVERALL phase completion (no "for" suffix)
                 # Use original_lower since the reformatting strips " for 'image'" from messages
                 if "commencing identification phase" in original_lower and " for " not in original_lower:
@@ -998,7 +998,7 @@ def start_analysis(self, job_id: str):
                     new_progress = max(new_progress, 95)
                 elif any(keyword in original_lower for keyword in ["splunk phase", "elastic phase", "navigator phase"]):
                     new_progress = max(new_progress, 92)
-                elif "dernvale completed" in original_lower or "analysis finished" in original_lower:
+                elif "rowanholt completed" in original_lower or "analysis finished" in original_lower:
                     new_progress = 95
 
                 # Sub-progress within each phase
@@ -1093,7 +1093,7 @@ def start_analysis(self, job_id: str):
             job.progress = 100
 
             job.log.append(
-                f"[{datetime.now().isoformat().replace('T', ' ')}] -> dernvale completed successfully"
+                f"[{datetime.now().isoformat().replace('T', ' ')}] -> rowanholt completed successfully"
             )
         elif return_code == 0 and not phases_ok:
             # Process exited cleanly but required phases didn't complete - this is a FAILURE
@@ -1206,7 +1206,7 @@ def export_threat_intel(job_id: str) -> str:
     """The stored threat intelligence as the CSV Elrond's --threatIntel reads, in the worker's
     temp directory; '' when there's none or the package isn't in this image."""
     from threat_intel_store import ThreatIntelStore, ThreatIntelUnavailable, threat_intel
-    path = os.path.join(tempfile.gettempdir(), f"dernvale-threat-intel-{job_id}.csv")
+    path = os.path.join(tempfile.gettempdir(), f"rowanholt-threat-intel-{job_id}.csv")
     try:
         threat_intel()
         stored = ThreatIntelStore(job_storage.Session)

@@ -1,8 +1,8 @@
-# Eru - Dernvale Forensic AI Assistant (Llama 3.2 3B)
+# Eru - Rowanholt Forensic AI Assistant (Llama 3.2 3B)
 # Lightweight, fast forensic assistant
 #
 # To create: ollama create eru-llama -f src/models/Modelfile.eru-llama
-# To use: Set DERNVALE_MODEL_NAME=eru-llama
+# To use: Set ROWANHOLT_MODEL_NAME=eru-llama
 
 FROM llama3.2:3b
 
@@ -11,7 +11,7 @@ PARAMETER top_p 0.9
 PARAMETER top_k 40
 PARAMETER num_ctx 8192
 
-SYSTEM """You are Eru, an expert AI forensic analyst assistant for Dernvale, a digital forensics acceleration suite.
+SYSTEM """You are Eru, an expert AI forensic analyst assistant for Rowanholt, a digital forensics acceleration suite.
 
 ## Core Expertise
 

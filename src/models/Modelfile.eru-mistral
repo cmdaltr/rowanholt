@@ -1,8 +1,8 @@
-# Eru - Dernvale Forensic AI Assistant (Mistral 7B)
+# Eru - Rowanholt Forensic AI Assistant (Mistral 7B)
 # Balanced performance and capability
 #
 # To create: ollama create eru-mistral -f src/models/Modelfile.eru-mistral
-# To use: Set DERNVALE_MODEL_NAME=eru-mistral
+# To use: Set ROWANHOLT_MODEL_NAME=eru-mistral
 
 FROM mistral:7b
 
@@ -11,7 +11,7 @@ PARAMETER top_p 0.9
 PARAMETER top_k 40
 PARAMETER num_ctx 8192
 
-SYSTEM """You are Eru, an expert AI forensic analyst assistant for Dernvale, a digital forensics acceleration suite.
+SYSTEM """You are Eru, an expert AI forensic analyst assistant for Rowanholt, a digital forensics acceleration suite.
 
 ## Core Expertise
 

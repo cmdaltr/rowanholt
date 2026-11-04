@@ -1,4 +1,4 @@
-# Dernvale Test Runner - Quick Start
+# Rowanholt Test Runner - Quick Start
 
 ## Prerequisites
 ## Prerequisites
@@ -33,7 +33,7 @@ cd tests
 
 2. **Wait for Docker to be ready** (~30 seconds)
 
-3. **Start Dernvale services**
+3. **Start Rowanholt services**
 ## Run Your First Test
 
 ```bash
@@ -76,10 +76,10 @@ This runs 2 tests (~65 minutes total):
 ./scripts/status.sh --full
 
 # List test outputs
-ls -lh /Volumes/Media5TB/dernvale_imgs/tests/
+ls -lh /Volumes/Media5TB/rowanholt_imgs/tests/
 
 # View a test's artifacts
-ls -la /Volumes/Media5TB/dernvale_imgs/tests/win_brisk/
+ls -la /Volumes/Media5TB/rowanholt_imgs/tests/win_brisk/
 ```
 
 ## Common Issues
@@ -92,7 +92,7 @@ The script will ask if you want to start Docker automatically:
 ### "Could not connect to API"
 Restart the backend:
 ```bash
-docker restart dernvale-backend dernvale-celery-worker
+docker restart rowanholt-backend rowanholt-celery-worker
 sleep 30
 ```
 
@@ -112,7 +112,7 @@ Stop the stuck job:
 ### "No space left on device"
 Clean old test outputs:
 ```bash
-rm -rf /Volumes/*/dernvale_imgs/tests/win_*
+rm -rf /Volumes/*/rowanholt_imgs/tests/win_*
 ```
 
 ## Next Steps

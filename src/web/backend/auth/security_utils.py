@@ -26,7 +26,7 @@ def _get_encryption_key() -> bytes:
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=32,
-        salt=b'dernvale_mfa_salt',  # In production, use unique salt per deployment
+        salt=b'rowanholt_mfa_salt',  # In production, use unique salt per deployment
         iterations=100000,
     )
     key = base64.urlsafe_b64encode(kdf.derive(key_material))
@@ -152,7 +152,7 @@ def generate_totp_secret() -> str:
     return pyotp.random_base32()
 
 
-def generate_totp_uri(secret: str, username: str, issuer: str = "Dernvale") -> str:
+def generate_totp_uri(secret: str, username: str, issuer: str = "Rowanholt") -> str:
     """Generate TOTP provisioning URI for QR code."""
     totp = pyotp.TOTP(secret)
     return totp.provisioning_uri(name=username, issuer_name=issuer)

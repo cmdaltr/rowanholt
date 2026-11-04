@@ -1,12 +1,12 @@
 """
-Builds Dernvale's architecture map: a self-contained HTML page (fonts and images
+Builds Rowanholt's architecture map: a self-contained HTML page (fonts and images
 embedded) in the style of a map of Middle-earth. Page 1 is the realm (Gandalf, the
 web UI, the worker, Elrond, Eru, Aragorn, Mordor); page 2 is Elrond's directed graph,
 branching by evidence type and operating system.
 
     python3 scripts/docs/architecture/build_map.py [out.html]
 
-Writes src/web/frontend/public/architecture/dernvale-architecture.html by default,
+Writes src/web/frontend/public/architecture/rowanholt-architecture.html by default,
 where the web app's About page links to it. Edit the text here, not the HTML.
 """
 import base64
@@ -18,14 +18,14 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 ASSETS = HERE / "assets"
 FONTS = REPO / "src" / "web" / "frontend" / "public" / "fonts"
-OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else REPO / "src" / "web" / "frontend" / "public" / "architecture" / "dernvale-architecture.html"
+OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else REPO / "src" / "web" / "frontend" / "public" / "architecture" / "rowanholt-architecture.html"
 
 
 def b64(path):
     return base64.b64encode(Path(path).read_bytes()).decode()
 
 
-# ---- palette (Dernvale UI) ----
+# ---- palette (Rowanholt UI) ----
 NAVY, NAVY2, NAVY3 = "#0f0f23", "#1a1a2e", "#2a2a5a"
 PARCH, PARCH_DIM = "#f0dba5", "#cdbb8a"
 TEAL, GREEN, GREEN2 = "#66d9ef", "#a7db6c", "#8abf4d"
@@ -44,7 +44,7 @@ def P(ix, iy):
 
 
 PLACES = {
-    "shire": P(300, 330), "bree": P(372, 322), "dernvale": P(468, 326), "moria": P(492, 442),
+    "shire": P(300, 330), "bree": P(372, 322), "rowanholt": P(468, 326), "moria": P(492, 442),
     "isengard": P(446, 560), "minas": P(612, 640), "mordor": P(850, 612), "erebor": P(690, 112),
     "havens": P(192, 332),
 }
@@ -108,10 +108,10 @@ def c(*pts):
 
 
 # ================= header =================
-parts.append(f'<img src="data:image/png;base64,{b64(ASSETS / "dernvale.png")}" alt="Dernvale" '
+parts.append(f'<img src="data:image/png;base64,{b64(ASSETS / "rowanholt.png")}" alt="Rowanholt" '
              f'style="position:absolute;left:52px;top:26px;height:108px;border-radius:8px;border:1px solid {PARCH_DIM}">')
 parts.append(f'<div style="position:absolute;left:{52 + 180}px;top:30px;width:720px">'
-             f'<div class="h1">Dernvale</div>'
+             f'<div class="h1">Rowanholt</div>'
              f'<div class="h2">A map of the realm: how a case travels from Gandalf to Elrond to Eru</div></div>')
 
 # Eru: beyond the circles of the world (top centre, above the map)
@@ -146,7 +146,7 @@ region(MX + 30, MY + 1010, "B E L E G A E R", 30, -8)
 region(MX + 60, MY + 1050, "<i style='font-size:18px;letter-spacing:0.12em'>the Great Sea</i>", 18, -8)
 
 for key, label, dx, dy in (("shire", "The Shire", -40, 14), ("bree", "Bree", -20, 14),
-                           ("dernvale", "Dernvale", -120, -30), ("moria", "Moria", -78, -10),
+                           ("rowanholt", "Rowanholt", -120, -30), ("moria", "Moria", -78, -10),
                            ("isengard", "Isengard", 14, -10), ("minas", "Minas Tirith", -70, 14),
                            ("mordor", "Barad-dûr", 14, -30), ("erebor", "Erebor", 14, -10),
                            ("havens", "Grey Havens", -60, -34)):
@@ -168,7 +168,7 @@ svg.append(f'<g transform="translate({cx},{cy})" opacity="0.8"><circle r="46" fi
            f'<text x="0" y="-74" text-anchor="middle" font-family="Cinzel" font-size="20" fill="{INK}">N</text></g>')
 
 # ================= realms (cards on the map) =================
-S, B, R, M, I, T, MO, E, GH = (PLACES[k] for k in ("shire", "bree", "dernvale", "moria", "isengard", "minas",
+S, B, R, M, I, T, MO, E, GH = (PLACES[k] for k in ("shire", "bree", "rowanholt", "moria", "isengard", "minas",
                                                    "mordor", "erebor", "havens"))
 
 box(MX + 20, MY + 440, 330, 286, "Gandalf <span class='sub'>acquisition</span>",
@@ -189,12 +189,12 @@ box(MX + 400, MY + 530, 330, 196, "Elrond worker <span class='sub'>Celery</span>
     TEAL, kicker="Delving in Moria")
 
 box(MX + 40, MY + 790, 330, 190, "SIEM <span class='sub'>Splunk · Elastic · Kibana</span>",
-    "<code>--Splunk</code> and <code>--Elastic</code> index the cooked artefacts, with Dernvale's own Splunk app "
+    "<code>--Splunk</code> and <code>--Elastic</code> index the cooked artefacts, with Rowanholt's own Splunk app "
     "and Kibana dashboards. Local containers or remote servers.",
     RUST, kicker="The palantír of Orthanc")
 
 box(MX + 760, MY + 1000, 420, 206, "Aragorn <span class='sub'>administration</span>",
-    "<b>Andúril</b>: Dernvale's own containers (status, logs, restart; won't stop the worker mid-job). "
+    "<b>Andúril</b>: Rowanholt's own containers (status, logs, restart; won't stop the worker mid-job). "
     "<b>The lab</b>: Linux targets, Tart and UTM VMs, test runs from the browser, Gandalf against seeded hosts, "
     "Mordor recordings.",
     "#c9cfdc", kicker="The King in Minas Tirith")
@@ -210,7 +210,7 @@ box(MX + 1270, MY + 70, 410, 170, "Case store <span class='sub'>the hoard</span>
     "<code>analysis/</code>, <code>mitre_techniques.txt</code>, timelines, archives.",
     GOLD, kicker="Under the Lonely Mountain")
 
-# Dernvale: Elrond's road, an inset
+# Rowanholt: Elrond's road, an inset
 rx, ry, rw, rh = MX + 870, MY + 300, 812, 560
 parts.append(f'<div class="inset" style="left:{rx}px;top:{ry}px;width:{rw}px;height:{rh}px"></div>')
 parts.append(f'<div class="inset-title" style="left:{rx + 24}px;top:{ry + 14}px">'
@@ -287,35 +287,35 @@ gx, gy = MX + 20 + 330, MY + 440 + 140
 for i in range(3):
     route(c((400, ys[i] + 103), (415, ys[i] + 103), (MX + 6, gy - 30 + i * 30), (MX + 20, gy - 30 + i * 30)),
           GREEN, 3)
-# cloud: Dernvale's cloud commands pull disks and logs for Elrond
+# cloud: Rowanholt's cloud commands pull disks and logs for Elrond
 route(c((400, ys[3] + 103), (MX - 10, ys[3] + 103), (MX + 360, MY + 700), (MX + 400, MY + 680)), GREEN, 3,
       dash="2 7", label="cloud: snapshots and logs", lx=MX + 210, ly=MY + 754, lw=170)
 # disk images: straight to the web UI / Elrond
 route(c((400, ys[4] + 103), (MX + 420, ys[4] + 90), (MX + 560, MY + 860), (MX + 580, MY + 726)),
       TEAL, 3, label="images go straight to Elrond", lx=MX + 400, ly=MY + 1004, lw=200)
 
-# the Great East Road: Gandalf -> Shire -> Bree -> Dernvale
+# the Great East Road: Gandalf -> Shire -> Bree -> Rowanholt
 route(c((MX + 200, MY + 440), S, B, (R[0] - 40, R[1] + 10), R), GOLD, 5, dash="14 9", arrow=False)
 route(c(R, (rx - 30, ry + 60), (rx, ry + 70)), GOLD, 5, dash="14 9",
       label="<b>The Great East Road</b>: encrypted per-host archives, <code>acquisitions/</code>, "
             "decrypted and checked on arrival", lx=MX + 390, ly=MY + 448, lw=300)
 
-# Bree (web UI) -> Moria (worker) via Redis; Moria -> Dernvale
+# Bree (web UI) -> Moria (worker) via Redis; Moria -> Rowanholt
 route(c((MX + 430, MY + 238), (MX + 520, MY + 400), (MX + 560, MY + 530)), TEAL, 3.5,
       label="jobs queued in Redis", lx=MX + 600, ly=MY + 300, lw=150)
 route(c((MX + 730, MY + 620), (MX + 820, MY + 620), (rx, ry + 330)), TEAL, 3.5, label="runs Elrond", lx=MX + 740,
       ly=MY + 650, lw=110)
 
-# Dernvale -> Isengard (SIEM)
+# Rowanholt -> Isengard (SIEM)
 route(c((rx + 300, ry + rh), (rx + 200, MY + 930), (MX + 380, MY + 900), (MX + 370, MY + 890)), RUST, 3.5,
       label="<code>--Splunk</code> · <code>--Elastic</code>", lx=MX + 520, ly=MY + 920, lw=200)
-# Dernvale -> Erebor (case store)
+# Rowanholt -> Erebor (case store)
 route(c((rx + 560, ry), (rx + 600, MY + 250), (MX + 1400, MY + 240)), GOLD, 3.5,
       label="case output, job state", lx=rx + 610, ly=MY + 250, lw=180)
 # Erebor -> Eru (read-only)
 route(c((MX + 1500, MY + 70), (MX + 1450, MY + 20), (1500, 140)), VIOLET, 3, dash="6 6",
       label="Eru reads the case", lx=1660, ly=MY + 8, lw=170)
-# Mordor -> Dernvale
+# Mordor -> Rowanholt
 route(c((MX + 1460, MY + 990), (MX + 1440, MY + 930), (rx + 560, ry + rh)), CRIMSON, 4,
       label="<code>--Mordor</code>: datasets as event logs", lx=MX + 1050, ly=MY + 900, lw=290)
 # Aragorn's lab -> Mordor (recordings) and -> Gandalf (seeded targets)
@@ -323,12 +323,12 @@ route(c((MX + 1180, MY + 1100), (MX + 1215, MY + 1095), (MX + 1250, MY + 1090)),
       label="lab recordings", lx=MX + 1185, ly=MY + 1160, lw=130)
 route(c((MX + 760, MY + 1150), (MX + 430, MY + 1150), (MX + 300, MY + 1040), (MX + 200, MY + 726)), "#9aa3b5", 3,
       dash="5 7", label="seeded lab targets test every collector", lx=MX + 470, ly=MY + 1160, lw=270)
-# Dernvale -> outputs
+# Rowanholt -> outputs
 for i, y in enumerate(oys):
     route(c((rx + rw, ry + 200 + i * 40), (rx + rw + 60, ry + 200 + i * 40), (2140, y + 103), (2160, y + 103)),
           GOLD if i < 3 else (RUST if i == 3 else VIOLET), 3, dash="6 6" if i == 4 else "")
 
-parts.append(f'<div class="footer">Dernvale · Gandalf collects · Elrond analyses · Eru answers · '
+parts.append(f'<div class="footer">Rowanholt · Gandalf collects · Elrond analyses · Eru answers · '
              f'Aragorn keeps the realm · page 1 of 2 · generated from the codebase, October 2026</div>')
 
 
@@ -343,17 +343,17 @@ def page(anchor, label):
     return html
 
 
-pages = [page("realm", "Dernvale, drawn as a map of Middle-earth")]
+pages = [page("realm", "Rowanholt, drawn as a map of Middle-earth")]
 
 # ================= page 2: Elrond's roads =================
 LANE_COLOURS = {"Windows": TEAL, "Linux": GOLD, "macOS": VIOLET}
 MEM = RUST
 
-parts.append(f'<img src="data:image/png;base64,{b64(ASSETS / "dernvale.png")}" alt="Dernvale" '
+parts.append(f'<img src="data:image/png;base64,{b64(ASSETS / "rowanholt.png")}" alt="Rowanholt" '
              f'style="position:absolute;left:52px;top:26px;height:108px;border-radius:8px;border:1px solid {PARCH_DIM}">')
 parts.append(f'<div style="position:absolute;left:{52 + 180}px;top:30px;width:1100px">'
              f'<div class="h1">Elrond</div>'
-             f'<div class="h2">The roads from Dernvale: one directed graph, branching by evidence type, operating '
+             f'<div class="h2">The roads from Rowanholt: one directed graph, branching by evidence type, operating '
              f'system and shadow copy</div></div>')
 
 # legend
@@ -474,7 +474,7 @@ stages = [
     ("ATT&amp;CK", "Techniques tagged from artefacts, event-log rules and Mordor datasets into "
      "<code>mitre_techniques.txt</code>; a Navigator layer."),
     ("Timeline", "<b>Plaso</b> (psteal) builds one super-timeline across every source of a host."),
-    ("Export", "<code>--Splunk</code>, <code>--Elastic</code> (Dernvale's app and dashboards), "
+    ("Export", "<code>--Splunk</code>, <code>--Elastic</code> (Rowanholt's app and dashboards), "
      "<code>--Navigator</code>, and the case archive with its audit log."),
 ]
 sy = []
@@ -494,7 +494,7 @@ route(c((400, ay[3] + 98), (412, ay[3] + 98), (412, py + ph + 120), (sx - 40, py
       label="event datasets: one host per computer, events into <code>cooked/evt/</code>", lx=1430,
       ly=py + ph + 104, lw=440)
 
-parts.append(f'<div class="footer">Dernvale · Elrond · the same stages for every host, whatever road it took · '
+parts.append(f'<div class="footer">Rowanholt · Elrond · the same stages for every host, whatever road it took · '
              f'page 2 of 2 · generated from the codebase, October 2026</div>')
 pages.append(page("elrond", "Elrond's directed graph, branching by evidence type and operating system"))
 
@@ -507,7 +507,7 @@ html = f"""<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=2560">
-<title>Dernvale — a map of the realm</title>
+<title>Rowanholt — a map of the realm</title>
 <style>
 {font_css}
 """ + f'''{font_css}

@@ -2,13 +2,13 @@
 Eru's MCP server: reading a case and, when it's started with --allow-writes, flagging leads and adding notes.
 
 Every Eru capability an MCP host can use is registered here, and nowhere else. The server is a
-thin client of Dernvale's API, not a second way into the case files:
+thin client of Rowanholt's API, not a second way into the case files:
 
-- every call carries the analyst's token (DERNVALE_TOKEN), so on a team server job sharing
+- every call carries the analyst's token (ROWANHOLT_TOKEN), so on a team server job sharing
   (auth/access.py) decides what it can see, exactly as for the web app;
 - what it reads comes through the case browser's routes, which are read-only over cooked/,
   analysis/ and the case root and never reach raw/;
-- it calls nothing but the Dernvale API at DERNVALE_API (DernvaleAPI refuses any other URL),
+- it calls nothing but the Rowanholt API at ROWANHOLT_API (RowanholtAPI refuses any other URL),
   so it adds no outbound access.
 
 Never exposed: starting, restarting or deleting jobs, Gandalf acquisition, importing or deleting
@@ -19,13 +19,13 @@ exist, and nothing else that writes: a lead is never a confirmed finding (the ba
 other status), every write is recorded as "Eru (for <user>)" (AGENT_HEADER), and a session stops after
 --max-writes writes, so a host misled by text inside the case can't flood it.
 
-Runs over stdio: `dernvale mcp`, or `python3 -m eru_mcp.server` with src/ on the path. Needs
+Runs over stdio: `rowanholt mcp`, or `python3 -m eru_mcp.server` with src/ on the path. Needs
 Python 3.10+ and requirements/mcp.txt. Nothing but the protocol may go to stdout.
 
 On a team server it can also run over streamable HTTP (--http), behind Caddy at /mcp, for analysts
-whose MCP host isn't on the server. Then there is no DERNVALE_TOKEN: each request carries its
-analyst's own eru-mcp API token as a bearer header, checked against Dernvale (DernvaleTokens), and
-every call it makes to Dernvale carries that token, so each analyst sees what their token lets them
+whose MCP host isn't on the server. Then there is no ROWANHOLT_TOKEN: each request carries its
+analyst's own eru-mcp API token as a bearer header, checked against Rowanholt (RowanholtTokens), and
+every call it makes to Rowanholt carries that token, so each analyst sees what their token lets them
 see. Full tokens and sign-ins' JWTs aren't accepted, and --max-writes counts per token until the
 server restarts.
 """
@@ -56,10 +56,10 @@ DEFAULT_HTTP = "127.0.0.1:5690"
 CASE_HOST = "(case)"  # case_files.CASE_HOST: the case's own files, such as stacking.csv
 READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 WRITES = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
-AGENT_HEADER = ("X-Dernvale-Agent", "eru-mcp")  # case_routes.AGENT_HEADER, ERU_MCP
+AGENT_HEADER = ("X-Rowanholt-Agent", "eru-mcp")  # case_routes.AGENT_HEADER, ERU_MCP
 MAX_WRITES = 25
 ERU_TOKEN_SCOPE = "eru-mcp"  # auth/tokens.py in the backend
-INSTRUCTIONS = """Eru works one Dernvale case at a time, read-only.
+INSTRUCTIONS = """Eru works one Rowanholt case at a time, read-only.
 Start from a job id: list_cases, then case_overview to see the hosts and their files.
 Cite file and row for every claim (read_rows gives each row's reference); don't state what no row shows.
 A stacking row (rare_across_hosts) or a threat intelligence match (check_indicator) is a lead, not a verdict.
@@ -76,20 +76,20 @@ Transport = Callable[[str, str, Dict[str, Any], Optional[dict], str], Tuple[int,
 
 
 class ApiError(ToolError):
-    """Dernvale answered with an error (or couldn't be reached). A ToolError, so the host sees why."""
+    """Rowanholt answered with an error (or couldn't be reached). A ToolError, so the host sees why."""
 
     def __init__(self, status: int, detail: str):
-        super().__init__(f"Dernvale answered {status}: {detail}" if status else detail)
+        super().__init__(f"Rowanholt answered {status}: {detail}" if status else detail)
         self.status = status
         self.detail = detail
 
 
-class NotDernvale(ToolError, ValueError):
-    """A request for anything but an /api path on the configured Dernvale."""
+class NotRowanholt(ToolError, ValueError):
+    """A request for anything but an /api path on the configured Rowanholt."""
 
 
-class DernvaleAPI:
-    """Dernvale's API, and nothing else: paths must be under /api/ on the configured base URL."""
+class RowanholtAPI:
+    """Rowanholt's API, and nothing else: paths must be under /api/ on the configured base URL."""
 
     def __init__(self, base_url: str = DEFAULT_API, token: Union[str, Callable[[], str]] = "",
                  transport: Optional[Transport] = None):
@@ -98,9 +98,9 @@ class DernvaleAPI:
         self.given_transport = transport
         self.transport = transport or self._urllib
 
-    def with_token(self, token: str) -> "DernvaleAPI":
-        """The same Dernvale, called with this token."""
-        return DernvaleAPI(self.base_url, token, self.given_transport)
+    def with_token(self, token: str) -> "RowanholtAPI":
+        """The same Rowanholt, called with this token."""
+        return RowanholtAPI(self.base_url, token, self.given_transport)
 
     def current_token(self) -> str:
         return (self.token() if callable(self.token) else self.token) or ""
@@ -126,11 +126,11 @@ class DernvaleAPI:
         except urllib.error.HTTPError as exc:
             return exc.code, _decode(exc.read(), exc.headers.get("Content-Type", ""))
         except urllib.error.URLError as exc:
-            raise ApiError(0, f"Dernvale isn't reachable at {self.base_url} ({exc.reason}). Is it running?")
+            raise ApiError(0, f"Rowanholt isn't reachable at {self.base_url} ({exc.reason}). Is it running?")
 
     def call(self, method: str, path: str, params: Optional[Dict[str, Any]] = None, body: Optional[dict] = None) -> Any:
         if not path.startswith("/api/") or "://" in path or ".." in path.split("?")[0].split("/"):
-            raise NotDernvale(f"Not a Dernvale API path: {path!r}")
+            raise NotRowanholt(f"Not a Rowanholt API path: {path!r}")
         status, payload = self.transport(method, path, {k: v for k, v in (params or {}).items() if v not in (None, "")},
                                          body, self.current_token())
         if status >= 400:
@@ -165,13 +165,13 @@ def request_token() -> str:
     return access.token if access else ""
 
 
-class DernvaleTokens:
-    """The HTTP transport's token check: a bearer token is good if Dernvale takes it as an eru-mcp API
+class RowanholtTokens:
+    """The HTTP transport's token check: a bearer token is good if Rowanholt takes it as an eru-mcp API
     token (/api/auth/me shows one). A full token or a sign-in's JWT is refused, reads included: left in
     an MCP host's configuration, either carries its user's whole rights against the API if it leaks,
     where an eru-mcp token can only read, flag leads and add notes (threat model, 4 November 2026)."""
 
-    def __init__(self, api_for: Callable[[str], DernvaleAPI]):
+    def __init__(self, api_for: Callable[[str], RowanholtAPI]):
         self.api_for = api_for
 
     async def verify_token(self, token: str) -> Optional[AccessToken]:
@@ -186,20 +186,20 @@ class DernvaleTokens:
                            subject=str(me.get("id") or ""), claims={"token_id": record["id"]})
 
 
-def build_server(api: DernvaleAPI, writes: bool = False, max_writes: int = MAX_WRITES,
+def build_server(api: RowanholtAPI, writes: bool = False, max_writes: int = MAX_WRITES,
                  http_url: str = "") -> MCPServer:
-    """The MCP server, its tools bound to one Dernvale API client; flag_lead and add_note only with writes.
+    """The MCP server, its tools bound to one Rowanholt API client; flag_lead and add_note only with writes.
     With http_url (its public URL, ending /mcp) it's for streamable HTTP: each request's bearer token is
-    checked against Dernvale and used for that request's calls, so `api` should take request_token."""
+    checked against Rowanholt and used for that request's calls, so `api` should take request_token."""
     auth = {}
     if http_url:
-        # The issuer clients are pointed to after a 401 is Dernvale as analysts reach it, never the
+        # The issuer clients are pointed to after a 401 is Rowanholt as analysts reach it, never the
         # backend's own address inside the stack
         public = http_url[:-len("/mcp")] if http_url.endswith("/mcp") else http_url
         auth = {"auth": AuthSettings(issuer_url=public, resource_server_url=http_url,
                                      validate_token_resource=False),
-                "token_verifier": DernvaleTokens(api.with_token)}
-    server = MCPServer("dernvale-eru", title="Eru (Dernvale)",
+                "token_verifier": RowanholtTokens(api.with_token)}
+    server = MCPServer("rowanholt-eru", title="Eru (Rowanholt)",
                        instructions=INSTRUCTIONS + (WRITE_INSTRUCTIONS if writes else ""), **auth)
 
     def job(job_id: str) -> Dict[str, Any]:
@@ -218,7 +218,7 @@ def build_server(api: DernvaleAPI, writes: bool = False, max_writes: int = MAX_W
 
     @server.tool(annotations=READ_ONLY)
     def list_cases() -> List[Dict[str, Any]]:
-        """The Dernvale jobs (cases) you can see, newest first: id, case number, status, owner and dates.
+        """The Rowanholt jobs (cases) you can see, newest first: id, case number, status, owner and dates.
         Every other tool takes one of these ids."""
         listing = api.get(api.path("jobs"))
         return [{k: j.get(k) for k in JOB_FIELDS} for j in listing.get("jobs", [])]
@@ -295,7 +295,7 @@ def build_server(api: DernvaleAPI, writes: bool = False, max_writes: int = MAX_W
 
     @server.tool(annotations=READ_ONLY)
     def check_indicator(value: str) -> Dict[str, Any]:
-        """What Dernvale's imported threat intelligence says about one value: a process name, command line,
+        """What Rowanholt's imported threat intelligence says about one value: a process name, command line,
         path, IP, domain or hash. A match is a lead, not attribution."""
         return api.get(api.path("threat-intel", "enrich"), value=value)
 
@@ -337,7 +337,7 @@ def build_server(api: DernvaleAPI, writes: bool = False, max_writes: int = MAX_W
     def write(path: str, body: dict) -> Any:
         # Over stdio a session is the process; over HTTP, each token (until the server restarts)
         access = get_access_token()
-        if http_url and (not access or ERU_TOKEN_SCOPE not in access.scopes):  # DernvaleTokens already holds it
+        if http_url and (not access or ERU_TOKEN_SCOPE not in access.scopes):  # RowanholtTokens already holds it
             raise ToolError(f"Writing needs an {ERU_TOKEN_SCOPE} token: make one under Account in the web app.")
         key = (access.claims or {}).get("token_id") if access else None
         if written.get(key, 0) >= max_writes:
@@ -367,7 +367,7 @@ def build_server(api: DernvaleAPI, writes: bool = False, max_writes: int = MAX_W
     return server
 
 
-def write_refusal(api: DernvaleAPI) -> Optional[str]:
+def write_refusal(api: RowanholtAPI) -> Optional[str]:
     """Why --allow-writes won't start with this token, or None. On a team server the token must be an
     eru-mcp one (auth/tokens.py), so the backend itself holds Eru to reads, leads and notes rather than
     this server's code alone; on an analyst's own machine there is no token to check."""
@@ -383,25 +383,25 @@ def write_refusal(api: DernvaleAPI) -> Optional[str]:
     return None
 
 
-def http_refusal(api: DernvaleAPI, public_url: str) -> Optional[str]:
+def http_refusal(api: RowanholtAPI, public_url: str) -> Optional[str]:
     """Why --http won't start, or None: only for a team server, whose users have tokens to send."""
     if not public_url.startswith(("https://", "http://127.0.0.1", "http://localhost")):
-        return "--http needs the URL analysts will use (--public-url or DERNVALE_PUBLIC_URL), on https"
+        return "--http needs the URL analysts will use (--public-url or ROWANHOLT_PUBLIC_URL), on https"
     try:
         server_mode = api.get("/api/auth/config").get("server_mode")
     except ApiError as exc:
-        return f"can't reach Dernvale, so HTTP stays off: {exc}"
+        return f"can't reach Rowanholt, so HTTP stays off: {exc}"
     if not server_mode:
-        return "--http is for a team server; on your own machine use stdio (dernvale mcp)"
+        return "--http is for a team server; on your own machine use stdio (rowanholt mcp)"
     return None
 
 
 def serve_http(options: argparse.Namespace) -> int:
     """Streamable HTTP, behind the team server's Caddy (deploy/server): each request's own token."""
-    if os.environ.get("DERNVALE_TOKEN"):
-        logger.warning("DERNVALE_TOKEN is ignored over HTTP: each request sends its analyst's own token")
+    if os.environ.get("ROWANHOLT_TOKEN"):
+        logger.warning("ROWANHOLT_TOKEN is ignored over HTTP: each request sends its analyst's own token")
     public = options.public_url.rstrip("/")
-    api = DernvaleAPI(options.api, request_token)
+    api = RowanholtAPI(options.api, request_token)
     refusal = http_refusal(api, public)
     if refusal:
         logger.error(refusal)
@@ -411,7 +411,7 @@ def serve_http(options: argparse.Namespace) -> int:
     # Caddy passes the public Host and Origin through; nothing else may reach it (DNS rebinding)
     security = TransportSecuritySettings(allowed_hosts=[public_host, f"{host}:{port}"], allowed_origins=[public])
     mode = f"leads and notes for eru-mcp tokens, up to {options.max_writes} each" if options.allow_writes else "read-only"
-    logger.info(f"Serving Dernvale at {options.api} over HTTP on {options.http}, for {public}/mcp ({mode})")
+    logger.info(f"Serving Rowanholt at {options.api} over HTTP on {options.http}, for {public}/mcp ({mode})")
     server = build_server(api, writes=options.allow_writes, max_writes=max(options.max_writes, 0),
                           http_url=public + "/mcp")
     server.run("streamable-http", host=host or "127.0.0.1", port=int(port), transport_security=security)
@@ -419,14 +419,14 @@ def serve_http(options: argparse.Namespace) -> int:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    cli = argparse.ArgumentParser(prog="dernvale mcp", description="Eru's MCP server (stdio, or HTTP on a team server) over a Dernvale.")
-    cli.add_argument("--api", default=os.environ.get("DERNVALE_API", DEFAULT_API),
-                     help=f"Dernvale's API (DERNVALE_API, default {DEFAULT_API})")
+    cli = argparse.ArgumentParser(prog="rowanholt mcp", description="Eru's MCP server (stdio, or HTTP on a team server) over a Rowanholt.")
+    cli.add_argument("--api", default=os.environ.get("ROWANHOLT_API", DEFAULT_API),
+                     help=f"Rowanholt's API (ROWANHOLT_API, default {DEFAULT_API})")
     cli.add_argument("--http", nargs="?", const=DEFAULT_HTTP, metavar="HOST:PORT",
                      help=f"streamable HTTP on a team server instead of stdio (default {DEFAULT_HTTP}); "
                           "each request sends its analyst's API token")
-    cli.add_argument("--public-url", default=os.environ.get("DERNVALE_PUBLIC_URL", ""),
-                     help="with --http: the server's URL as analysts open it (DERNVALE_PUBLIC_URL)")
+    cli.add_argument("--public-url", default=os.environ.get("ROWANHOLT_PUBLIC_URL", ""),
+                     help="with --http: the server's URL as analysts open it (ROWANHOLT_PUBLIC_URL)")
     cli.add_argument("--allow-writes", action="store_true",
                      help="add flag_lead and add_note (leads and notes, recorded as Eru's); read-only without it")
     cli.add_argument("--max-writes", type=int, default=MAX_WRITES,
@@ -436,10 +436,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     if options.http:
         return serve_http(options)
     # The token comes from the environment only: an argument would show in the process list
-    token = os.environ.get("DERNVALE_TOKEN", "")
+    token = os.environ.get("ROWANHOLT_TOKEN", "")
     mode = f"leads and notes allowed, up to {options.max_writes}" if options.allow_writes else "read-only"
-    logger.info(f"Serving Dernvale at {options.api} over stdio ({'with' if token else 'without'} a token; {mode})")
-    api = DernvaleAPI(options.api, token)
+    logger.info(f"Serving Rowanholt at {options.api} over stdio ({'with' if token else 'without'} a token; {mode})")
+    api = RowanholtAPI(options.api, token)
     if options.allow_writes:
         refusal = write_refusal(api)
         if refusal:

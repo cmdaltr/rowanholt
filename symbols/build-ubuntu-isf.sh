@@ -12,7 +12,7 @@ set -euo pipefail
 kernel="${1:-5.8.0-44-generic}"
 version="${2:-5.8.0-44.50~20.04.1}"
 source_package="${3:-linux-hwe-5.8}"
-scratch="${4:-${TMPDIR:-/tmp}/dernvale-isf}"
+scratch="${4:-${TMPDIR:-/tmp}/rowanholt-isf}"
 here="$(cd "$(dirname "$0")" && pwd)"
 ddeb="linux-image-unsigned-${kernel}-dbgsym_${version}_amd64.ddeb"
 url="http://ddebs.ubuntu.com/pool/main/l/${source_package}/${ddeb}"

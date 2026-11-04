@@ -11,8 +11,8 @@ ROOT = Path(__file__).resolve().parents[2]
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(ROOT / "src" / "analysis"))
 
-from dernvale.collect import linux as collect  # noqa: E402
-from dernvale.process import extra_artefacts as ex  # noqa: E402
+from rowanholt.collect import linux as collect  # noqa: E402
+from rowanholt.process import extra_artefacts as ex  # noqa: E402
 
 CID = "4f1c9e2ab3d7" + "0" * 52
 

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Print the root certificate of the server's own CA (DERNVALE_TLS=internal), to trust on clients
+# Print the root certificate of the server's own CA (ROWANHOLT_TLS=internal), to trust on clients
 #
-#   dernvale server ca > dernvale-root.crt
+#   rowanholt server ca > rowanholt-root.crt
 #
 # Then trust it: macOS, double-click and set it to Always Trust in Keychain Access (or
-# deploy it by MDM); Windows, certutil -addstore Root dernvale-root.crt (or Group
+# deploy it by MDM); Windows, certutil -addstore Root rowanholt-root.crt (or Group
 # Policy); Ubuntu, copy it to /usr/local/share/ca-certificates/ and run
-# update-ca-certificates. Browsers and the Dernvale app then accept the server.
+# update-ca-certificates. Browsers and the Rowanholt app then accept the server.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"

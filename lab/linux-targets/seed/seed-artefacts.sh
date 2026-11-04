@@ -1,7 +1,7 @@
 #!/bin/sh
 # Plant known, inert artefacts on a Linux target so E2E tests have ground truth.
 # Nothing here executes anything malicious: the "payloads" are text that matches
-# Dernvale's sample YARA rules, keywords and IOC extraction. Network indicators
+# Rowanholt's sample YARA rules, keywords and IOC extraction. Network indicators
 # use the RFC 5737 / RFC 2606 documentation ranges (198.51.100.0/24, .test).
 set -eu
 

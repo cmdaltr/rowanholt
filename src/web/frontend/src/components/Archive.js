@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { listJobs } from '../api';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/dernvale.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt.png`;
 
 function Archive() {
   const [jobs, setJobs] = useState([]);
@@ -74,7 +74,7 @@ function Archive() {
       <section className="hero-section">
         <img
           src={heroImage}
-          alt="Dernvale"
+          alt="Rowanholt"
           className="hero-image"
           style={{
             transform: 'scale(0.2)',

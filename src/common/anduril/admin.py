@@ -1,6 +1,6 @@
-"""Administration operations on Dernvale containers and images.
+"""Administration operations on Rowanholt containers and images.
 
-Used by the Anduril service (for the web UI) and by `dernvale anduril` on the
+Used by the Anduril service (for the web UI) and by `rowanholt anduril` on the
 host, so both apply the same scope rules.
 """
 
@@ -28,7 +28,7 @@ from .scope import (
     split_image_ref,
 )
 
-logger = logging.getLogger("dernvale.anduril")
+logger = logging.getLogger("rowanholt.anduril")
 
 Progress = Callable[[str], None]
 
@@ -45,11 +45,11 @@ class DockerAdmin:
 
     @classmethod
     def locate(cls, preferred: Optional[str] = None, project: str = PROJECT) -> "DockerAdmin":
-        """Connect to the engine that hosts Dernvale.
+        """Connect to the engine that hosts Rowanholt.
 
         Docker Desktop and OrbStack can both be running, and starting OrbStack
         makes it the current context, so the first reachable socket is not
-        necessarily the one with Dernvale on it.
+        necessarily the one with Rowanholt on it.
         """
         if preferred:
             return cls(Engine(preferred), project)
@@ -74,12 +74,12 @@ class DockerAdmin:
         return [c for c in self._all_containers() if container_in_scope(c, self.project)]
 
     def resolve(self, name: str) -> dict:
-        """Find a Dernvale container by container name or compose service name."""
+        """Find a Rowanholt container by container name or compose service name."""
         name = name.strip().lstrip("/")
         for c in self._scoped_containers():
             if name in (container_name(c), container_service(c)):
                 return c
-        raise ScopeError(f"'{name}' is not a Dernvale container")
+        raise ScopeError(f"'{name}' is not a Rowanholt container")
 
     def _worker(self) -> Optional[dict]:
         for c in self._scoped_containers():
@@ -205,16 +205,16 @@ class DockerAdmin:
         return {r for r in refs if r and not r.startswith("sha256:")}
 
     def validate_pull(self, ref: str) -> str:
-        """Raise ScopeError unless ref is an upstream image Dernvale uses."""
+        """Raise ScopeError unless ref is an upstream image Rowanholt uses."""
         ref = ref.strip()
         if ref not in self._scoped_refs():
-            raise ScopeError(f"'{ref}' is not an image used by Dernvale")
+            raise ScopeError(f"'{ref}' is not an image used by Rowanholt")
         if any(ref in i["tags"] and i["built"] for i in self.list_images()):
-            raise ScopeError(f"'{ref}' is built locally; rebuild it from the host CLI (dernvale anduril rebuild)")
+            raise ScopeError(f"'{ref}' is built locally; rebuild it from the host CLI (rowanholt anduril rebuild)")
         return ref
 
     def pull(self, ref: str, progress: Optional[Progress] = None) -> str:
-        """Pull a new version of an image a Dernvale container uses."""
+        """Pull a new version of an image a Rowanholt container uses."""
         ref = self.validate_pull(ref)
         repo, tag = split_image_ref(ref)
         last = ""
@@ -237,7 +237,7 @@ class DockerAdmin:
         scoped_ids = {c.get("ImageID") for c in containers if container_in_scope(c, self.project)}
         matches = [i for i in self.engine.images() if len(bare) >= 12 and i["Id"].split(":")[-1].startswith(bare)]
         if len(matches) != 1:
-            raise ScopeError(f"No unique Dernvale image matches '{image_id}'")
+            raise ScopeError(f"No unique Rowanholt image matches '{image_id}'")
         img = matches[0]
         check_image_removable(img, containers, scoped_ids, self.project)
         return img
@@ -249,7 +249,7 @@ class DockerAdmin:
         return f"Removed {', '.join(img.get('RepoTags') or [img['Id'][:19]])}"
 
     def prune(self) -> dict:
-        """Remove dangling images that compose built for Dernvale."""
+        """Remove dangling images that compose built for Rowanholt."""
         removed, freed, skipped = [], 0, []
         containers = self._all_containers()
         for img in self.engine.dangling_images():
@@ -265,7 +265,7 @@ class DockerAdmin:
                 freed += img.get("Size", 0)
             except EngineError as exc:
                 skipped.append(f"{img['Id'][:19]} ({exc})")
-        logger.info("Pruned %d Dernvale images, %d bytes", len(removed), freed)
+        logger.info("Pruned %d Rowanholt images, %d bytes", len(removed), freed)
         return {"removed": removed, "freed_bytes": freed, "skipped": skipped}
 
     # --- update -------------------------------------------------------------

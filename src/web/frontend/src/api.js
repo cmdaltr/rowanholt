@@ -197,7 +197,7 @@ export const completeSsoSignIn = async () => {
   return response.data;
 };
 
-// Long-lived, revocable tokens for scripts and DERNVALE_TOKEN (dernvale mcp), made from a sign-in.
+// Long-lived, revocable tokens for scripts and ROWANHOLT_TOKEN (rowanholt mcp), made from a sign-in.
 // The token itself comes back once, from createApiToken; the list has only its first characters
 export const listApiTokens = async () => (await api.get('/api/auth/tokens')).data.tokens;
 export const createApiToken = async (name, scope, days) =>
@@ -392,7 +392,7 @@ export const enrichValue = async (value) => {
   return response.data;
 };
 
-// Online lookups (VirusTotal), when .env turns them on: the value leaves Dernvale
+// Online lookups (VirusTotal), when .env turns them on: the value leaves Rowanholt
 export const getLookupStatus = async () => (await api.get('/api/threat-intel/lookup')).data;
 
 export const lookupValue = async (value) => (await api.post('/api/threat-intel/lookup', { value })).data;

@@ -1,28 +1,28 @@
-# Dernvale's reverse proxy on a server (deploy/server/docker-compose.server.yml).
+# Rowanholt's reverse proxy on a server (deploy/server/docker-compose.server.yml).
 #
-# DERNVALE_TLS picks the certificate:
+# ROWANHOLT_TLS picks the certificate:
 #   internal                        Caddy's own CA (the default): trust its root on clients,
-#                                   dernvale server ca prints it
+#                                   rowanholt server ca prints it
 #   you@example.org                 Let's Encrypt, for a name reachable from the internet
-#   /certs/dernvale.crt /certs/dernvale.key
+#   /certs/rowanholt.crt /certs/rowanholt.key
 #                                   your organisation's certificate, in deploy/server/certs
 
 {
 	admin off
 }
 
-# Splunk, Kibana and the Navigator have no idea who Dernvale's users are, so the
+# Splunk, Kibana and the Navigator have no idea who Rowanholt's users are, so the
 # backend vouches for each request; anyone not signed in goes to the sign-in page, and
 # the Navigator's case layers follow job sharing
 (signed_in) {
 	forward_auth backend:5688 {
 		uri /api/auth/verify?login_redirect=1&service={args[0]}
-		copy_headers X-Dernvale-User
+		copy_headers X-Rowanholt-User
 	}
 }
 
 (hardened) {
-	tls {$DERNVALE_TLS}
+	tls {$ROWANHOLT_TLS}
 	encode gzip
 	header {
 		Strict-Transport-Security "max-age=31536000"
@@ -32,7 +32,7 @@
 	}
 }
 
-{$DERNVALE_HOSTNAME} {
+{$ROWANHOLT_HOSTNAME} {
 	import hardened
 	header X-Frame-Options SAMEORIGIN
 
@@ -58,19 +58,19 @@
 	}
 }
 
-{$DERNVALE_HOSTNAME}:7755 {
+{$ROWANHOLT_HOSTNAME}:7755 {
 	import hardened
 	import signed_in splunk
 	reverse_proxy splunk:8000
 }
 
-{$DERNVALE_HOSTNAME}:5601 {
+{$ROWANHOLT_HOSTNAME}:5601 {
 	import hardened
 	import signed_in kibana
 	reverse_proxy kibana:5601
 }
 
-{$DERNVALE_HOSTNAME}:5602 {
+{$ROWANHOLT_HOSTNAME}:5602 {
 	import hardened
 	import signed_in navigator
 	reverse_proxy navigator:4200

@@ -1,8 +1,8 @@
-# Dernvale Test Runner - Summary
+# Rowanholt Test Runner - Summary
 
 ## Overview
 
-Comprehensive test automation system for Dernvale forensic analysis with automatic Docker management and resource optimization.
+Comprehensive test automation system for Rowanholt forensic analysis with automatic Docker management and resource optimization.
 
 ## Key Features
 
@@ -151,9 +151,9 @@ cd tests/scripts/batch
 ## Test Output Locations
 
 ### Platform-Specific
-- **macOS:** `/Volumes/[Drive]/dernvale_imgs/tests/`
-- **Linux:** `/mnt/[mount]/dernvale_imgs/tests/` or `/media/[user]/[drive]/dernvale_imgs/tests/`
-- **Windows:** `[Drive]:/dernvale_imgs/tests/`
+- **macOS:** `/Volumes/[Drive]/rowanholt_imgs/tests/`
+- **Linux:** `/mnt/[mount]/rowanholt_imgs/tests/` or `/media/[user]/[drive]/rowanholt_imgs/tests/`
+- **Windows:** `[Drive]:/rowanholt_imgs/tests/`
 
 ### Structure
 ```
@@ -186,7 +186,7 @@ tests/
 | Test one | `./run_single_test.sh win_brisk` | ~10 min |
 | Quick batch | `./batch1a-archive-lnk.sh` | ~65 min |
 | All tests | `./RUN_ALL_TESTS.sh` | ~9-10 hrs |
-| Check results | `ls -lh /Volumes/*/dernvale_imgs/tests/` | - |
+| Check results | `ls -lh /Volumes/*/rowanholt_imgs/tests/` | - |
 | View logs | `ls -lt tests/logs/*.log \| head -5` | - |
 
 ## Documentation Files

@@ -38,7 +38,7 @@ class JourneyTest(unittest.TestCase):
         self.env.stop()
 
     def history(self, kind, *totals):
-        path = Path(self.tmp) / "dernvale" / "start-history.jsonl"
+        path = Path(self.tmp) / "rowanholt" / "start-history.jsonl"
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a") as f:
             for docker, images, containers, ui in totals:
@@ -100,7 +100,7 @@ class JourneyTest(unittest.TestCase):
     def test_places_along_the_road(self):
         self.assertEqual(sp.place(0.0), "the Shire")
         self.assertEqual(sp.place(0.4), "Weathertop")
-        self.assertEqual(sp.place(1.0), "Dernvale")
+        self.assertEqual(sp.place(1.0), "Rowanholt")
 
     def test_build_step_lines(self):
         match = sp.STEP.match("#14 [celery-worker  7/21] RUN pip install -r requirements.txt")

@@ -4,13 +4,13 @@ services:
   # Redis for Celery task queue
   redis:
     image: redis:7-alpine
-    container_name: dernvale-redis
+    container_name: rowanholt-redis
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
-      - dernvale-network
+      - rowanholt-network
     restart: unless-stopped
 
   # Backend API
@@ -18,7 +18,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: dernvale-backend
+    container_name: rowanholt-backend
     ports:
       - "5688:5688"
     environment:
@@ -30,14 +30,14 @@ services:
       - ./backend:/app
       # - /mnt:/mnt:ro  # Mount host /mnt for read-only access to images (Linux only)
       # - /media:/media:ro  # Mount host /media for read-only access (Linux only)
-      - /tmp/dernvale:/tmp/elrond/output  # Output directory (accessible at /tmp/dernvale on host)
-      - /tmp/dernvale:/host/tmp/dernvale  # Also mount at /host/tmp/dernvale for frontend compatibility
+      - /tmp/rowanholt:/tmp/elrond/output  # Output directory (accessible at /tmp/rowanholt on host)
+      - /tmp/rowanholt:/host/tmp/rowanholt  # Also mount at /host/tmp/rowanholt for frontend compatibility
       - /Volumes:/Volumes:ro  # Mount macOS /Volumes for external drives (macOS only)
-      - dernvale_uploads:/tmp/elrond/uploads  # Upload directory
+      - rowanholt_uploads:/tmp/elrond/uploads  # Upload directory
     depends_on:
       - redis
     networks:
-      - dernvale-network
+      - rowanholt-network
     restart: unless-stopped
     command: uvicorn main:app --host 0.0.0.0 --port 5688 --reload
 
@@ -46,7 +46,7 @@ services:
     build:
       context: ../..
       dockerfile: src/web/backend/Dockerfile.forensics
-    container_name: dernvale-celery-worker
+    container_name: rowanholt-celery-worker
     privileged: true  # Required for mounting forensic images
     devices:
       - /dev/fuse:/dev/fuse  # Required for FUSE mounts
@@ -60,11 +60,11 @@ services:
       - SPLUNK_HOST=splunk
       - SPLUNK_PORT=8089
       - SPLUNK_USERNAME=admin
-      - SPLUNK_PASSWORD=dernvale
+      - SPLUNK_PASSWORD=rowanholt
       - ELASTICSEARCH_HOST=elasticsearch
       - ELASTICSEARCH_PORT=9200
       - ELASTIC_USERNAME=elastic
-      - ELASTIC_PASSWORD=dernvale
+      - ELASTIC_PASSWORD=rowanholt
       - KIBANA_HOST=kibana
       - KIBANA_PORT=5601
     volumes:
@@ -72,8 +72,8 @@ services:
       - ../analysis:/opt/elrond-src  # Mount elrond source code (renamed to avoid PATH conflicts)
       # - /mnt:/mnt:ro  # Linux only
       # - /media:/media:ro  # Linux only
-      - /tmp/dernvale:/tmp/elrond/output  # Output directory (accessible at /tmp/dernvale on host)
-      - dernvale_uploads:/tmp/elrond/uploads  # For uploaded forensic images
+      - /tmp/rowanholt:/tmp/elrond/output  # Output directory (accessible at /tmp/rowanholt on host)
+      - rowanholt_uploads:/tmp/elrond/uploads  # For uploaded forensic images
       - splunk_etc:/opt/splunk/etc
       - splunk_var:/opt/splunk/var
     depends_on:
@@ -82,7 +82,7 @@ services:
       - splunk
       - elasticsearch
     networks:
-      - dernvale-network
+      - rowanholt-network
     restart: unless-stopped
     # Override PYTHONPATH to prioritize /app over /opt/elrond-src to avoid module conflicts
     command: sh -c 'cd /app && PYTHONPATH=/app exec /usr/bin/python3 -m celery -A tasks_docker.celery_app worker --loglevel=info'
@@ -92,7 +92,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: dernvale-frontend
+    container_name: rowanholt-frontend
     ports:
       - "5687:3000"
     environment:
@@ -103,13 +103,13 @@ services:
     depends_on:
       - backend
     networks:
-      - dernvale-network
+      - rowanholt-network
     restart: unless-stopped
 
   # Splunk Enterprise
   splunk:
     image: splunk/splunk:latest
-    container_name: dernvale-splunk
+    container_name: rowanholt-splunk
     hostname: splunk
     ports:
       - "8089:8089"  # Splunk API
@@ -118,19 +118,19 @@ services:
     environment:
       - SPLUNK_START_ARGS=--accept-license
       - SPLUNK_GENERAL_TERMS=--accept-sgt-current-at-splunk-com
-      - SPLUNK_PASSWORD=dernvale
+      - SPLUNK_PASSWORD=rowanholt
     volumes:
       - splunk_etc:/opt/splunk/etc
       - splunk_var:/opt/splunk/var
-      - /tmp/dernvale:/tmp/elrond/output:ro  # Mount output directory for monitoring
+      - /tmp/rowanholt:/tmp/elrond/output:ro  # Mount output directory for monitoring
     networks:
-      - dernvale-network
+      - rowanholt-network
     restart: unless-stopped
 
   # Elasticsearch
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
-    container_name: dernvale-elasticsearch
+    container_name: rowanholt-elasticsearch
     hostname: elasticsearch
     ports:
       - "9200:9200"
@@ -138,36 +138,36 @@ services:
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=true
-      - ELASTIC_PASSWORD=dernvale
+      - ELASTIC_PASSWORD=rowanholt
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
     networks:
-      - dernvale-network
+      - rowanholt-network
     restart: unless-stopped
 
   # Kibana
   kibana:
     image: docker.elastic.co/kibana/kibana:8.11.0
-    container_name: dernvale-kibana
+    container_name: rowanholt-kibana
     hostname: kibana
     ports:
       - "5601:5601"
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
       - ELASTICSEARCH_USERNAME=kibana_system
-      - ELASTICSEARCH_PASSWORD=dernvale
+      - ELASTICSEARCH_PASSWORD=rowanholt
       - ELASTICSEARCH_SERVICEACCOUNTTOKEN=${KIBANA_SERVICE_TOKEN:-}
     depends_on:
       - elasticsearch
     networks:
-      - dernvale-network
+      - rowanholt-network
     restart: unless-stopped
 
   # ATT&CK Navigator
   navigator:
     image: node:18-alpine
-    container_name: dernvale-navigator
+    container_name: rowanholt-navigator
     hostname: navigator
     ports:
       - "5602:4200"
@@ -175,7 +175,7 @@ services:
     volumes:
       - navigator_data:/navigator
     networks:
-      - dernvale-network
+      - rowanholt-network
     restart: unless-stopped
     command: >
       sh -c "
@@ -192,13 +192,13 @@ services:
 
 volumes:
   redis_data:
-  dernvale_output:
-  dernvale_uploads:
+  rowanholt_output:
+  rowanholt_uploads:
   splunk_etc:
   splunk_var:
   elasticsearch_data:
   navigator_data:
 
 networks:
-  dernvale-network:
+  rowanholt-network:
     driver: bridge

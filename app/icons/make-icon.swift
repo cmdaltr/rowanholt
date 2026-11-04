@@ -1,4 +1,4 @@
-// Renders the 1024px app icon: the Dernvale logo without its lettering (the valley in
+// Renders the 1024px app icon: the Rowanholt logo without its lettering (the valley in
 // its dome over the flourish) on a dark rounded square.
 // Usage: swift make-icon.swift <logo.png> <out.png>
 import AppKit

@@ -1,4 +1,4 @@
-# Dernvale Web Interface - Quick Start
+# Rowanholt Web Interface - Quick Start
 
 ## Prerequisites
 
@@ -16,7 +16,7 @@ docker compose up -d
 This starts the core stack: postgres, redis, backend (FastAPI), celery-worker, and frontend (React).
 
 Access points:
-- **Web Interface**: http://localhost:5688 (or http://dernvale.lab via FlightDeck local proxy)
+- **Web Interface**: http://localhost:5688 (or http://rowanholt.lab via FlightDeck local proxy)
 - **API docs**: http://localhost:5688/docs
 - **Frontend (React)**: http://localhost:5687
 
@@ -29,8 +29,8 @@ docker compose --profile siem up -d
 ```
 
 SIEM access points once running:
-- **Splunk Web**: http://localhost:7755 (admin / dernvale)
-- **Kibana**: http://localhost:5601 (elastic / dernvale)
+- **Splunk Web**: http://localhost:7755 (admin / rowanholt)
+- **Kibana**: http://localhost:5601 (elastic / rowanholt)
 - **Elasticsearch**: http://localhost:9200
 - **ATT&CK Navigator**: http://localhost:5602
 
@@ -45,10 +45,10 @@ docker compose stop splunk elastic elastic-setup kibana kibana-setup navigator
 If you use [FlightDeck](https://github.com/cmdaltr/FlightDeck):
 
 ```bash
-fd start dernvale        # start core stack
-fd start dernvale-siem   # start SIEM stack (core must be running)
-fd stop  dernvale-siem   # stop SIEM stack only
-fd stop  dernvale        # stop core stack
+fd start rowanholt        # start core stack
+fd start rowanholt-siem   # start SIEM stack (core must be running)
+fd stop  rowanholt-siem   # stop SIEM stack only
+fd stop  rowanholt        # stop core stack
 ```
 
 ## Common Commands
@@ -104,8 +104,8 @@ ports:
 
 ## File Locations
 
-- **Job output**: `/tmp/dernvale/` (on host)
-- **Uploaded images**: managed via `dernvale_uploads` Docker volume
+- **Job output**: `/tmp/rowanholt/` (on host)
+- **Uploaded images**: managed via `rowanholt_uploads` Docker volume
 - **Backend config**: `src/web/backend/.env`
 
 ## Manual Installation (Without Docker)

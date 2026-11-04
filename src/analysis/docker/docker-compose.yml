@@ -130,13 +130,13 @@ services:
     networks:
       - elrond-network
 
-  # Dernvale Forensics Engine (CLI)
-  dernvale-cli:
+  # Rowanholt Forensics Engine (CLI)
+  rowanholt-cli:
     build:
       context: ../../..
       dockerfile: src/analysis/Dockerfile
-    image: dernvale-cli:dev
-    container_name: dernvale-cli
+    image: rowanholt-cli:dev
+    container_name: rowanholt-cli
     privileged: true  # Required for mounting disk images
     cap_add:
       - SYS_ADMIN

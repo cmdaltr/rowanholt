@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Dernvale lab agent: lets the Dernvale web UI drive ./lab.sh on this machine.
+"""Rowanholt lab agent: lets the Rowanholt web UI drive ./lab.sh on this machine.
 
 The lab's containers and VMs live on the host (Vagrant, VirtualBox, Tart and the
-Keychain can't be reached from inside Dernvale's containers), so the backend
+Keychain can't be reached from inside Rowanholt's containers), so the backend
 calls this small HTTP service instead. It accepts only the lab commands in
 COMMANDS, with validated arguments, and runs them one at a time through lab.sh
 with no terminal attached.
 
-Authentication: a random token, written to TOKEN_FILE (inside /tmp/dernvale,
+Authentication: a random token, written to TOKEN_FILE (inside /tmp/rowanholt,
 which the backend already mounts read-only) and required in X-Lab-Token. The
 agent binds to the address lab.sh passes (loopback on macOS), so only this
 machine and its containers can reach it.
@@ -37,8 +37,8 @@ import mordor_api  # the Mordor page's lab (src/mordor/lab, ported from Archer)
 
 LAB_ROOT = Path(__file__).resolve().parent.parent
 LAB_SH = LAB_ROOT / "lab.sh"
-DEFAULT_TOKEN_FILE = Path("/tmp/dernvale/.lab-agent/token")
-RUN_DIR = Path.home() / ".config" / "dernvale-lab" / "run" / "agent-runs"
+DEFAULT_TOKEN_FILE = Path("/tmp/rowanholt/.lab-agent/token")
+RUN_DIR = Path.home() / ".config" / "rowanholt-lab" / "run" / "agent-runs"
 KEEP_RUNS = 30
 VERSION = "1"
 
@@ -109,7 +109,7 @@ VM_ACTIONS = ("create", "start", "stop", "delete", "status")
 COMMANDS = {
     "check": (_none, False),
     "status": (_none, False),
-    "dernvale-env": (_none, False),
+    "rowanholt-env": (_none, False),
     "linux-targets": (_one_of("up", "down", "reset", "status"), True),
     "linux-vm": (_one_of(*VM_ACTIONS), True),
     "macos-vm": (_one_of(*VM_ACTIONS), True),
@@ -278,7 +278,7 @@ def parse_state(text: str) -> dict[str, str]:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "DernvaleLabAgent/" + VERSION
+    server_version = "RowanholtLabAgent/" + VERSION
     token: str = ""
     runner: Runner
 

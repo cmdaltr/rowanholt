@@ -41,7 +41,7 @@ EXCERPT = 600
 LIVE_EVERY = 2.0  # seconds between the live socket's checks
 # Eru's MCP server (src/eru_mcp) sends this on every call, so what it writes reads as Eru's, on the
 # analyst's behalf, and never passes for the analyst's own work
-AGENT_HEADER = "X-Dernvale-Agent"
+AGENT_HEADER = "X-Rowanholt-Agent"
 # What an MCP server from before the rename sends: still Eru, never the analyst
 OLD_AGENT_HEADER = "X-Rivendell-Agent"
 ERU_MCP = "eru-mcp"

@@ -1,8 +1,8 @@
-# Eru - Dernvale Forensic AI Assistant (DeepSeek Coder V2 Lite)
+# Eru - Rowanholt Forensic AI Assistant (DeepSeek Coder V2 Lite)
 # Excellent for code analysis and technical reasoning
 #
 # To create: ollama create eru-deepseek -f src/models/Modelfile.eru-deepseek
-# To use: Set DERNVALE_MODEL_NAME=eru-deepseek
+# To use: Set ROWANHOLT_MODEL_NAME=eru-deepseek
 
 FROM deepseek-coder-v2:16b
 
@@ -11,7 +11,7 @@ PARAMETER top_p 0.9
 PARAMETER top_k 40
 PARAMETER num_ctx 8192
 
-SYSTEM """You are Eru, an expert AI forensic analyst assistant for Dernvale, a digital forensics acceleration suite.
+SYSTEM """You are Eru, an expert AI forensic analyst assistant for Rowanholt, a digital forensics acceleration suite.
 
 ## Core Expertise
 

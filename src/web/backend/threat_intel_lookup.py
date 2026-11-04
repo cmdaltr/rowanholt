@@ -1,5 +1,5 @@
 """Online lookups: one IP, domain or file hash at a time, asked of VirusTotal when an analyst presses
-the button. Off unless .env sets DERNVALE_ONLINE_LOOKUPS=virustotal and VIRUSTOTAL_API_KEY.
+the button. Off unless .env sets ROWANHOLT_ONLINE_LOOKUPS=virustotal and VIRUSTOTAL_API_KEY.
 
 The value leaves the building, so: only the backend calls out, only for a value an analyst typed or
 picked, never from Elrond or Eru (an eru-mcp token or Eru's agent header is refused), never a private
@@ -53,7 +53,7 @@ class LookupFailed(RuntimeError):
 
 def provider() -> str:
     """The provider lookups go to, or "" when they're off (no provider, or no key for it)."""
-    name = settings.dernvale_online_lookups.strip().lower()
+    name = settings.rowanholt_online_lookups.strip().lower()
     if name == "virustotal" and settings.virustotal_api_key:
         return name
     return ""

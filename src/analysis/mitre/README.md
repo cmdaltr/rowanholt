@@ -5,7 +5,7 @@
 
 ## Overview
 
-The MITRE ATT&CK Integration Module provides comprehensive content-based technique detection and dashboard generation for forensic artifact analysis in Dernvale. This module features pattern matching across all artifact content, multi-tactic technique support, and automatic ATT&CK Navigator layer generation.
+The MITRE ATT&CK Integration Module provides comprehensive content-based technique detection and dashboard generation for forensic artifact analysis in Rowanholt. This module features pattern matching across all artifact content, multi-tactic technique support, and automatic ATT&CK Navigator layer generation.
 
 ## Features
 
@@ -228,11 +228,11 @@ python -m analysis.mitre.cli list-artifacts
 The module integrates seamlessly with the existing Elrond analysis pipeline:
 
 ```python
-from analysis.dernvale.post.mitre.mitre_integration import ElrondMitreIntegration
+from analysis.rowanholt.post.mitre.mitre_integration import ElrondMitreIntegration
 
 # Initialize integration
 integration = ElrondMitreIntegration(
-    output_dir='/tmp/dernvale/mitre',
+    output_dir='/tmp/rowanholt/mitre',
     auto_update=True
 )
 
@@ -276,7 +276,7 @@ Configuration is stored in `config/mitre.yml`:
 ```yaml
 # Cache configuration
 cache:
-  directory: "/tmp/dernvale/mitre_cache"
+  directory: "/tmp/rowanholt/mitre_cache"
   max_age_days: 7
   auto_update: true
 
@@ -288,7 +288,7 @@ mapping:
 
 # Dashboard configuration
 dashboards:
-  output_dir: "/tmp/dernvale/dashboards"
+  output_dir: "/tmp/rowanholt/dashboards"
   default_formats:
     - splunk
     - elastic
@@ -513,11 +513,11 @@ techniques = mapper.map_artifact_to_techniques(
 - [MITRE ATT&CK Framework](https://attack.mitre.org/)
 - [ATT&CK STIX Data](https://github.com/mitre/cti)
 - [ATT&CK Navigator](https://mitre-attack.github.io/attack-navigator/)
-- [Dernvale DF Acceleration Suite](https://github.com/cmdaltr/dernvale)
+- [Rowanholt DF Acceleration Suite](https://github.com/cmdaltr/rowanholt)
 
 ## License
 
-Part of Dernvale DF Acceleration Suite - See LICENSE file
+Part of Rowanholt DF Acceleration Suite - See LICENSE file
 
 ## Support
 
@@ -525,7 +525,7 @@ For issues or questions:
 - Check this README
 - Review module docstrings
 - Open issue on GitHub
-- Contact Dernvale development team
+- Contact Rowanholt development team
 
 ---
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import NewAnalysis from './NewAnalysis';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/dernvale.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt.png`;
 
 const ElrondLanding = () => {
   return (
@@ -9,7 +9,7 @@ const ElrondLanding = () => {
       <section className="hero-section">
         <img
           src={heroImage}
-          alt="Dernvale"
+          alt="Rowanholt"
           className="hero-image"
           style={{
             transform: 'scale(0.2)',

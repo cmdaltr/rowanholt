@@ -411,13 +411,13 @@ def build_tactic_html_and_xml_py(
 ):
     if not os.path.exists(
         os.path.join(
-            "/opt/elrond/elrond/dernvale/post/splunk/app/views/html",
+            "/opt/elrond/elrond/rowanholt/post/splunk/app/views/html",
             "{}.py".format(tactic_page),
         )
     ):
         with open(
             os.path.join(
-                "/opt/elrond/elrond/dernvale/post/splunk/app/views/html",
+                "/opt/elrond/elrond/rowanholt/post/splunk/app/views/html",
                 "{}.py".format(tactic_page),
             ),
             "w",
@@ -429,13 +429,13 @@ def build_tactic_html_and_xml_py(
             )
     if not os.path.exists(
         os.path.join(
-            "/opt/elrond/elrond/dernvale/post/splunk/app/views/xml",
+            "/opt/elrond/elrond/rowanholt/post/splunk/app/views/xml",
             "{}.py".format(tactic_page),
         )
     ):
         with open(
             os.path.join(
-                "/opt/elrond/elrond/dernvale/post/splunk/app/views/xml",
+                "/opt/elrond/elrond/rowanholt/post/splunk/app/views/xml",
                 "{}.py".format(tactic_page),
             ),
             "w",
@@ -451,7 +451,7 @@ def build_tactic_html_and_xml_py(
     if evidence == [] or evidence == "[]":
         with open(
             os.path.join(
-                "/opt/elrond/elrond/dernvale/post/splunk/app/views/html",
+                "/opt/elrond/elrond/rowanholt/post/splunk/app/views/html",
                 "{}.py".format(tactic_page),
             ),
             "a",
@@ -476,7 +476,7 @@ def build_tactic_html_and_xml_py(
             )
         with open(
             os.path.join(
-                "/opt/elrond/elrond/dernvale/post/splunk/app/views/xml",
+                "/opt/elrond/elrond/rowanholt/post/splunk/app/views/xml",
                 "{}.py".format(tactic_page),
             ),
             "a",
@@ -489,7 +489,7 @@ def build_tactic_html_and_xml_py(
         log_sources = []
         with open(
             os.path.join(
-                "/opt/elrond/elrond/dernvale/post/splunk/app/views/html",
+                "/opt/elrond/elrond/rowanholt/post/splunk/app/views/html",
                 "{}.py".format(tactic_page),
             ),
             "a",
@@ -565,12 +565,12 @@ def build_tactic_html_and_xml_py(
             )
         # collecting transform assignments
         with open(
-            "/opt/elrond/elrond/dernvale/post/splunk/app/transforms.py"
+            "/opt/elrond/elrond/rowanholt/post/splunk/app/transforms.py"
         ) as transformspy:
             transform_lines = transformspy.readlines()
         with open(
             os.path.join(
-                "/opt/elrond/elrond/dernvale/post/splunk/app/views/xml",
+                "/opt/elrond/elrond/rowanholt/post/splunk/app/views/xml",
                 "{}.py".format(tactic_page),
             ),
             "a",
@@ -883,10 +883,10 @@ def main():
         )
         html_pages_content.append(html_page)
     # creating necessary directories
-    if not os.path.exists("/opt/elrond/elrond/dernvale/post/splunk/app/views/html"):
-        os.makedirs("/opt/elrond/elrond/dernvale/post/splunk/app/views/html")
-    if not os.path.exists("/opt/elrond/elrond/dernvale/post/splunk/app/views/xml"):
-        os.makedirs("/opt/elrond/elrond/dernvale/post/splunk/app/views/xml")
+    if not os.path.exists("/opt/elrond/elrond/rowanholt/post/splunk/app/views/html"):
+        os.makedirs("/opt/elrond/elrond/rowanholt/post/splunk/app/views/html")
+    if not os.path.exists("/opt/elrond/elrond/rowanholt/post/splunk/app/views/xml"):
+        os.makedirs("/opt/elrond/elrond/rowanholt/post/splunk/app/views/xml")
     # outputting the results into respective tactic pages for splunk app
     for html_page_content in html_pages_content:
         tid, name, desc, link, tactics, platform, evidence = html_page_content.split(

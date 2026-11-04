@@ -1,10 +1,10 @@
-// First run and updates for Dernvale.app: either connect to a team's Dernvale server,
-// or run Dernvale here: find or install a container runtime (OrbStack), put Dernvale's
+// First run and updates for Rowanholt.app: either connect to a team's Rowanholt server,
+// or run Rowanholt here: find or install a container runtime (OrbStack), put Rowanholt's
 // files somewhere (the copy a release build carries, or a checkout the user already
 // has), and mount evidence folders through docker-compose.local.yml.
 import AppKit
 
-let localComposeHeader = "# Written by Dernvale.app's setup"
+let localComposeHeader = "# Written by Rowanholt.app's setup"
 
 struct SetupError: LocalizedError {
     let message: String
@@ -30,7 +30,7 @@ final class SetupState {
     var busy: String?
     var error: String?
 
-    var installTarget: URL { installParent.appendingPathComponent("Dernvale") }
+    var installTarget: URL { installParent.appendingPathComponent("Rowanholt") }
 }
 
 /// A server address as typed, as the URL to open: https unless it's this machine,
@@ -49,15 +49,15 @@ func parseServerAddress(_ text: String) -> URL? {
     return clean.url
 }
 
-/// A folder Dernvale can run from: the launcher and the compose file
-func isDernvaleCopy(_ path: String) -> Bool {
-    FileManager.default.isExecutableFile(atPath: "\(path)/dernvale")
+/// A folder Rowanholt can run from: the launcher and the compose file
+func isRowanholtCopy(_ path: String) -> Bool {
+    FileManager.default.isExecutableFile(atPath: "\(path)/rowanholt")
         && FileManager.default.fileExists(atPath: "\(path)/docker-compose.yml")
 }
 
 /// A copy setup unpacked (and may update), as opposed to a git clone the user manages
 func isAppCopy(_ path: String) -> Bool {
-    FileManager.default.fileExists(atPath: "\(path)/.dernvale-version")
+    FileManager.default.fileExists(atPath: "\(path)/.rowanholt-version")
         && !FileManager.default.fileExists(atPath: "\(path)/.git")
 }
 
@@ -111,7 +111,7 @@ extension AppDelegate {
             }
         }
         loadEvidence()
-        window.title = "Set Up Dernvale"
+        window.title = "Set Up Rowanholt"
         let page = Bundle.main.url(forResource: "setup", withExtension: "html")!
         webView.loadFileURL(page, allowingReadAccessTo: Bundle.main.resourceURL!)
         checkRuntime()
@@ -155,14 +155,14 @@ extension AppDelegate {
     /// The copy the evidence list belongs to, when it exists yet
     var setupRoot: String? {
         let path = setup.mode == "bundled" ? setup.installTarget.path : setup.existingPath
-        return path.flatMap { isDernvaleCopy($0) ? $0 : nil }
+        return path.flatMap { isRowanholtCopy($0) ? $0 : nil }
     }
 
     func installNote() -> String {
         let target = setup.installTarget.path
         guard FileManager.default.fileExists(atPath: target) else { return "" }
         if isAppCopy(target) { return "updates the copy already there" }
-        if isDernvaleCopy(target) { return "a git checkout is already there: use it with the option below" }
+        if isRowanholtCopy(target) { return "a git checkout is already there: use it with the option below" }
         let contents = (try? FileManager.default.contentsOfDirectory(atPath: target)) ?? []
         return contents.isEmpty ? "" : "that folder already exists and isn't empty: choose another"
     }
@@ -221,7 +221,7 @@ extension AppDelegate {
         let arch = "amd64"
         #endif
         let url = URL(string: "https://orbstack.dev/download/stable/latest/\(arch)")!
-        let work = FileManager.default.temporaryDirectory.appendingPathComponent("dernvale-orbstack-\(UUID().uuidString)")
+        let work = FileManager.default.temporaryDirectory.appendingPathComponent("rowanholt-orbstack-\(UUID().uuidString)")
         let dmg = work.appendingPathComponent("OrbStack.dmg")
         try? FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
 
@@ -313,7 +313,7 @@ extension AppDelegate {
         DispatchQueue.global().asyncAfter(deadline: .now() + 2) { try? FileManager.default.removeItem(at: work) }
     }
 
-    // MARK: Dernvale's files
+    // MARK: Rowanholt's files
 
     func chooseInstallFolder() {
         let panel = NSOpenPanel()
@@ -321,11 +321,11 @@ extension AppDelegate {
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
         panel.prompt = "Install Here"
-        panel.message = "Dernvale's files go into a Dernvale folder inside the folder you choose."
+        panel.message = "Rowanholt's files go into a Rowanholt folder inside the folder you choose."
         panel.directoryURL = setup.installParent
         panel.beginSheetModal(for: window) { response in
             guard response == .OK, var url = panel.url else { return }
-            if url.lastPathComponent == "Dernvale" { url.deleteLastPathComponent() }
+            if url.lastPathComponent == "Rowanholt" { url.deleteLastPathComponent() }
             self.setup.installParent = url
             self.setup.mode = "bundled"
             self.setup.error = nil
@@ -339,16 +339,16 @@ extension AppDelegate {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.prompt = "Use This Copy"
-        panel.message = "Choose the folder with Dernvale's dernvale launcher and docker-compose.yml."
+        panel.message = "Choose the folder with Rowanholt's rowanholt launcher and docker-compose.yml."
         panel.beginSheetModal(for: window) { response in
             guard response == .OK, let url = panel.url else { return }
-            if isDernvaleCopy(url.path) {
+            if isRowanholtCopy(url.path) {
                 self.setup.existingPath = url.path
                 self.setup.mode = "existing"
                 self.setup.error = nil
                 self.loadEvidence()
             } else {
-                self.setup.error = "\(url.path) doesn't look like Dernvale: there's no dernvale launcher and docker-compose.yml in it."
+                self.setup.error = "\(url.path) doesn't look like Rowanholt: there's no rowanholt launcher and docker-compose.yml in it."
             }
             self.renderSetup()
         }
@@ -357,23 +357,23 @@ extension AppDelegate {
     /// Unpacks the source tree this build carries into `target`, over an earlier copy
     /// if there is one (.env, docker-compose.local.yml and other untracked files stay).
     func installBundledCopy(to target: URL) throws {
-        guard let source = bundledSource else { throw SetupError(message: "This build of Dernvale.app doesn't carry Dernvale's files.") }
+        guard let source = bundledSource else { throw SetupError(message: "This build of Rowanholt.app doesn't carry Rowanholt's files.") }
         try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
         let unpack = run("/usr/bin/tar", ["-xzf", source.path, "-C", target.path, "--strip-components", "1"])
-        guard unpack.status == 0 else { throw SetupError(message: "Couldn't unpack Dernvale into \(target.path): \(unpack.output)") }
-        try appVersion.write(to: target.appendingPathComponent(".dernvale-version"), atomically: true, encoding: .utf8)
+        guard unpack.status == 0 else { throw SetupError(message: "Couldn't unpack Rowanholt into \(target.path): \(unpack.output)") }
+        try appVersion.write(to: target.appendingPathComponent(".rowanholt-version"), atomically: true, encoding: .utf8)
     }
 
     func needsUpdate(_ root: String) -> Bool {
         guard bundledSource != nil, isAppCopy(root),
-              let installed = try? String(contentsOfFile: "\(root)/.dernvale-version", encoding: .utf8) else { return false }
+              let installed = try? String(contentsOfFile: "\(root)/.rowanholt-version", encoding: .utf8) else { return false }
         return installed.trimmingCharacters(in: .whitespacesAndNewlines) != appVersion
     }
 
     func askToUpdate(_ root: String) {
         let alert = NSAlert()
-        alert.messageText = "Update Dernvale to \(appVersion)?"
-        alert.informativeText = "This replaces Dernvale's files in \(root). Your .env, evidence folders and cases are kept. The images are rebuilt on this start, which takes a while."
+        alert.messageText = "Update Rowanholt to \(appVersion)?"
+        alert.informativeText = "This replaces Rowanholt's files in \(root). Your .env, evidence folders and cases are kept. The images are rebuilt on this start, which takes a while."
         alert.addButton(withTitle: "Update")
         alert.addButton(withTitle: "Not Now")
         alert.beginSheetModal(for: window) { response in
@@ -382,7 +382,7 @@ extension AppDelegate {
                 return
             }
             self.showSplash()
-            self.splashStatus("Updating Dernvale's files…")
+            self.splashStatus("Updating Rowanholt's files…")
             DispatchQueue.global().async {
                 do {
                     try self.installBundledCopy(to: URL(fileURLWithPath: root))
@@ -402,7 +402,7 @@ extension AppDelegate {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = true
         panel.prompt = "Add"
-        panel.message = "Choose folders of evidence to make visible inside Dernvale."
+        panel.message = "Choose folders of evidence to make visible inside Rowanholt."
         panel.beginSheetModal(for: window) { response in
             guard response == .OK else { return }
             for url in panel.urls where !self.setup.evidence.contains(url.path) {
@@ -448,7 +448,7 @@ extension AppDelegate {
             return String(data: data, encoding: .utf8)!
         }
         var yaml = "\(localComposeHeader): evidence folders, mounted at the same path inside the containers.\n"
-        yaml += "# Change them in Dernvale › Set Up Dernvale…\nservices:\n"
+        yaml += "# Change them in Rowanholt › Set Up Rowanholt…\nservices:\n"
         for (service, readOnly) in [("backend", true), ("celery-worker", false)] {
             yaml += "  \(service):\n    volumes:\n"
             for folder in folders {
@@ -464,12 +464,12 @@ extension AppDelegate {
     func finishSetup() {
         if setup.mode == "server" {
             guard let server = parseServerAddress(setup.serverAddress) else {
-                setup.error = "Enter the server's address, e.g. dernvale.example.org (https only)."
+                setup.error = "Enter the server's address, e.g. rowanholt.example.org (https only)."
                 renderSetup()
                 return
             }
-            UserDefaults.standard.set(server.absoluteString, forKey: "DernvaleServer")
-            window.title = "Dernvale"
+            UserDefaults.standard.set(server.absoluteString, forKey: "RowanholtServer")
+            window.title = "Rowanholt"
             launch()
             return
         }
@@ -479,7 +479,7 @@ extension AppDelegate {
         let folders = setup.evidence
         let locked = setup.evidenceLocked
         setup.error = nil
-        setup.busy = mode == "bundled" ? "Copying Dernvale into \(target.path)…" : "Saving…"
+        setup.busy = mode == "bundled" ? "Copying Rowanholt into \(target.path)…" : "Saving…"
         renderSetup()
 
         DispatchQueue.global().async {
@@ -495,17 +495,17 @@ extension AppDelegate {
                     }
                     root = target.path
                 } else {
-                    guard let path = existing, isDernvaleCopy(path) else {
-                        throw SetupError(message: "Choose the Dernvale folder to use.")
+                    guard let path = existing, isRowanholtCopy(path) else {
+                        throw SetupError(message: "Choose the Rowanholt folder to use.")
                     }
                     root = path
                 }
                 if !locked { try self.writeEvidenceCompose(root: root, folders: folders) }
                 DispatchQueue.main.async {
-                    UserDefaults.standard.set(root, forKey: "DernvaleRoot")
-                    UserDefaults.standard.removeObject(forKey: "DernvaleServer")
+                    UserDefaults.standard.set(root, forKey: "RowanholtRoot")
+                    UserDefaults.standard.removeObject(forKey: "RowanholtServer")
                     self.setup.busy = nil
-                    self.window.title = "Dernvale"
+                    self.window.title = "Rowanholt"
                     self.launch()
                 }
             } catch {

@@ -9,12 +9,12 @@ from datetime import datetime
 if 'TERM' not in os.environ:
     os.environ['TERM'] = 'xterm'
 
-from dernvale.main import main
-from dernvale.core.identify import process_deferred_memory, load_memory_profiles
-from dernvale.mount import unmount_images, cleanup_stale_mounts
-from dernvale.audit import write_audit_log_entry
-from dernvale.post.clean import archive_artefacts
-from dernvale.post.siem import SIEMUnavailableError, ensure_remote_siem_reachable
+from rowanholt.main import main
+from rowanholt.core.identify import process_deferred_memory, load_memory_profiles
+from rowanholt.mount import unmount_images, cleanup_stale_mounts
+from rowanholt.audit import write_audit_log_entry
+from rowanholt.post.clean import archive_artefacts
+from rowanholt.post.siem import SIEMUnavailableError, ensure_remote_siem_reachable
 
 
 parser = argparse.ArgumentParser()
@@ -113,7 +113,7 @@ parser.add_argument(
     nargs="+",
     metavar="FILE",
     help="Match the case against threat intelligence: the Iran APT workbook (XLSX), STIX 2.1 bundles "
-    "(JSON), MITRESaw's mitre_procedures.csv, Dernvale's indicator CSV or a text watchlist; writes "
+    "(JSON), MITRESaw's mitre_procedures.csv, Rowanholt's indicator CSV or a text watchlist; writes "
     "<host>/analysis/threat_intel_matches.csv and threat_groups.csv. Example: --threatIntel iran_apt.xlsx feed.json",
 )
 parser.add_argument(
@@ -121,7 +121,7 @@ parser.add_argument(
     nargs=1,
     metavar="FILE",
     help="A baseline of clean hosts for stacking (Analysis on a case of two or more hosts writes stacking.csv; rarity needs three of an OS); "
-    "values absent from it score higher. Build one with python3 -m dernvale.analysis.stacking --baseline OUT CASE...",
+    "values absent from it score higher. Build one with python3 -m rowanholt.analysis.stacking --baseline OUT CASE...",
 )
 parser.add_argument(
     "--misplacedBinaries",
@@ -903,8 +903,8 @@ if __name__ == "__main__":
     if threatintel and mounted_data:
         print("\n  -> \033[1;36mCommencing Threat Intelligence Phase...\033[1;m\n  ----------------------------------------", flush=True)
         try:
-            from dernvale.threat_intel import load_all
-            from dernvale.threat_intel.match import match_case
+            from rowanholt.threat_intel import load_all
+            from rowanholt.threat_intel.match import match_case
 
             indicators = load_all(threatintel)
             print(f"     Loaded {len(indicators)} indicators from {len(threatintel)} file(s)", flush=True)
@@ -923,7 +923,7 @@ if __name__ == "__main__":
     # ========== PHASE 4c: STACKING (least frequency of occurrence across hosts) ==========
     if analysis and mounted_data:
         try:
-            from dernvale.analysis.stacking import stack_case
+            from rowanholt.analysis.stacking import stack_case
 
             stacked = stack_case(output_directory, stackbaseline)
             if stacked is None:

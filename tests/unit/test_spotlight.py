@@ -10,8 +10,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from dernvale.process import mac_artefacts as ma  # noqa: E402
-from dernvale.process.extractions import spotlight as sp  # noqa: E402
+from rowanholt.process import mac_artefacts as ma  # noqa: E402
+from rowanholt.process.extractions import spotlight as sp  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
 PROPERTIES = [  # (value type, property flags, name): index 1 onwards
@@ -205,7 +205,7 @@ def test_router_warns_when_the_maps_werent_collected(tmp_path, caplog):
 
 
 def test_collectors_take_the_maps(tmp_path):
-    from dernvale.collect import mac as collect_mac
+    from rowanholt.collect import mac as collect_mac
 
     bash = (REPO / "src" / "acquisition" / "bash" / "gandalf.sh").read_text()
     assert "-name 'dbStr-*.map.*'" in bash

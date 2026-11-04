@@ -1,6 +1,6 @@
-# Dernvale Installation Guide
+# Rowanholt Installation Guide
 
-Complete installation and setup guide for the Dernvale Digital Forensics Suite.
+Complete installation and setup guide for the Rowanholt Digital Forensics Suite.
 
 ---
 
@@ -9,7 +9,7 @@ Complete installation and setup guide for the Dernvale Digital Forensics Suite.
 1. [Prerequisites](#prerequisites)
 2. [Installation](#installation)
 3. [First-Time Setup](#first-time-setup)
-4. [Starting Dernvale](#starting-dernvale)
+4. [Starting Rowanholt](#starting-rowanholt)
 5. [Running Your First Test](#running-your-first-test)
 6. [Verification](#verification)
 7. [Troubleshooting](#troubleshooting)
@@ -19,13 +19,13 @@ Complete installation and setup guide for the Dernvale Digital Forensics Suite.
 
 ## Prerequisites
 
-Before installing Dernvale, ensure you have:
+Before installing Rowanholt, ensure you have:
 
 ### Required
 
 - **Git** - For cloning the repository
 - **Python 3.8+** - For running the installer and test scripts
-- **Docker** or **OrbStack** - For running Dernvale containers
+- **Docker** or **OrbStack** - For running Rowanholt containers
 - **At least 10GB free disk space** - For Docker images and containers
 - **At least 12GB RAM** - Recommended 16GB for full stack, 10GB minimum for testing mode
 
@@ -60,8 +60,8 @@ Before installing Dernvale, ensure you have:
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/cmdaltr/dernvale.git
-cd dernvale
+git clone https://github.com/cmdaltr/rowanholt.git
+cd rowanholt
 ```
 
 ### Step 2: Install Docker Container Runtime
@@ -91,7 +91,7 @@ brew install --cask orbstack
 For non-macOS platforms, use the installer:
 
 ```bash
-python3 scripts/install-dernvale.py
+python3 scripts/install-rowanholt.py
 ```
 
 The installer will:
@@ -181,7 +181,7 @@ docker ps
 
 **Note:** The installer automatically creates `.env` from `.env.example` during installation.
 
-Dernvale uses environment variables for configuration. Default settings work for most users.
+Rowanholt uses environment variables for configuration. Default settings work for most users.
 
 **To customize configuration**, edit the `.env` file:
 
@@ -211,7 +211,7 @@ API_PORT=5688
 FRONTEND_PORT=5687
 
 # Database settings (defaults work for most users)
-DATABASE_URL=postgresql://dernvale:dernvale@postgres:5432/dernvale
+DATABASE_URL=postgresql://rowanholt:rowanholt@postgres:5432/rowanholt
 
 # Security (IMPORTANT: Change these for production!)
 SECRET_KEY=change-this-to-a-random-secret-key
@@ -244,24 +244,24 @@ python3 scripts/image-paths.py
 #### Option 1: Use Default Paths (Recommended for Testing)
 
 The default configuration expects images at:
-- **macOS**: `/Volumes/Media5TB/dernvale_imgs/`
-- **Linux**: `/data/dernvale_imgs/`
-- **Windows**: `C:\data\dernvale_imgs\`
+- **macOS**: `/Volumes/Media5TB/rowanholt_imgs/`
+- **Linux**: `/data/rowanholt_imgs/`
+- **Windows**: `C:\data\rowanholt_imgs\`
 
 **Create the directory and add your E01 images:**
 
 ```bash
 # macOS
-mkdir -p /Volumes/Media5TB/dernvale_imgs
+mkdir -p /Volumes/Media5TB/rowanholt_imgs
 # Copy your E01 files here
 
 # Linux
-sudo mkdir -p /data/dernvale_imgs
-sudo chown $USER:$USER /data/dernvale_imgs
+sudo mkdir -p /data/rowanholt_imgs
+sudo chown $USER:$USER /data/rowanholt_imgs
 # Copy your E01 files here
 
 # Windows (PowerShell as Administrator)
-New-Item -ItemType Directory -Path "C:\data\dernvale_imgs"
+New-Item -ItemType Directory -Path "C:\data\rowanholt_imgs"
 # Copy your E01 files here
 ```
 
@@ -319,7 +319,7 @@ If you don't have forensic images, you can:
 ```
 
 **3. Skip Tests Initially:**
-You can start Dernvale without images to:
+You can start Rowanholt without images to:
 - Access the web interface
 - Configure settings
 - Add images later via the UI
@@ -340,9 +340,9 @@ docker run --rm -v C:/your/image/path:/data:ro alpine ls -lh /data
 
 ---
 
-## Starting Dernvale
+## Starting Rowanholt
 
-### Step 6: Start Dernvale in Testing Mode
+### Step 6: Start Rowanholt in Testing Mode
 
 For first-time users or systems with 16GB RAM or less, use **Testing Mode**:
 
@@ -388,11 +388,11 @@ docker compose ps
 
 ```
 NAME                STATUS          PORTS
-dernvale-backend   Up 30 seconds   0.0.0.0:5688->5688/tcp
-dernvale-celery    Up 30 seconds
-dernvale-frontend  Up 30 seconds   0.0.0.0:5687->5687/tcp
-dernvale-postgres  Up 45 seconds   5432/tcp
-dernvale-redis     Up 45 seconds   6379/tcp
+rowanholt-backend   Up 30 seconds   0.0.0.0:5688->5688/tcp
+rowanholt-celery    Up 30 seconds
+rowanholt-frontend  Up 30 seconds   0.0.0.0:5687->5687/tcp
+rowanholt-postgres  Up 45 seconds   5432/tcp
+rowanholt-redis     Up 45 seconds   6379/tcp
 ```
 
 ---
@@ -481,7 +481,7 @@ Check that test output was generated:
 
 ```bash
 # Navigate to test output directory
-ls -lh /Volumes/Media5TB/dernvale_imgs/tests/win_brisk/
+ls -lh /Volumes/Media5TB/rowanholt_imgs/tests/win_brisk/
 
 # Should see output files like:
 # - artifacts/
@@ -565,7 +565,7 @@ docker compose down
 # Check what's using the port
 lsof -i :5688
 
-# Kill the process or change Dernvale's port in .env
+# Kill the process or change Rowanholt's port in .env
 # Then restart
 docker compose down
 docker compose up -d
@@ -592,7 +592,7 @@ docker compose up -d
 **Solution:**
 This is a known bug in Docker Desktop 4.52.0+. Use the installer to downgrade:
 ```bash
-python3 scripts/install-dernvale.py
+python3 scripts/install-rowanholt.py
 # Select option 1 (Docker Desktop 4.51.0)
 ```
 
@@ -696,7 +696,7 @@ If running full stack:
 
 ---
 
-## Stopping Dernvale
+## Stopping Rowanholt
 
 ```bash
 # Stop all containers
@@ -711,7 +711,7 @@ docker compose stop backend
 
 ---
 
-## Updating Dernvale
+## Updating Rowanholt
 
 ```bash
 # Pull latest changes
@@ -735,8 +735,8 @@ docker compose down
 # Stop all containers
 docker compose down
 
-# Remove all Dernvale images
-docker rmi $(docker images | grep dernvale | awk '{print $3}')
+# Remove all Rowanholt images
+docker rmi $(docker images | grep rowanholt | awk '{print $3}')
 
 # Remove all unused volumes
 docker volume prune
@@ -772,8 +772,8 @@ brew uninstall --cask orbstack
 ## Getting Help
 
 - **Documentation:** Check `docs/` directory
-- **Issues:** https://github.com/cmdaltr/dernvale/issues
-- **Discussions:** https://github.com/cmdaltr/dernvale/discussions
+- **Issues:** https://github.com/cmdaltr/rowanholt/issues
+- **Discussions:** https://github.com/cmdaltr/rowanholt/discussions
 
 ---
 
@@ -782,7 +782,7 @@ brew uninstall --cask orbstack
 ### Essential Commands
 
 ```bash
-# Start Dernvale (testing mode)
+# Start Rowanholt (testing mode)
 ./scripts/start-testing-mode.sh
 
 # Check status
@@ -791,7 +791,7 @@ brew uninstall --cask orbstack
 # Run a test
 cd tests && ./scripts/run_single_test.sh win_brisk
 
-# Stop Dernvale
+# Stop Rowanholt
 docker compose down
 
 # View logs

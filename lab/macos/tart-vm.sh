@@ -17,7 +17,7 @@ case "$kind" in
   macos) IMAGE="${TART_MACOS_IMAGE:-ghcr.io/cirruslabs/macos-sequoia-base:latest}"; PORT=2231; MEM=4096; CPU=4 ;;
   *) die "kind must be linux or macos" ;;
 esac
-VM="dernvale-lab-$kind"
+VM="rowanholt-lab-$kind"
 mkdir -p "$TART_HOME"
 RUN_DIR="$LAB_CONFIG_DIR/run"; mkdir -p "$RUN_DIR"
 SSH="$LAB_ROOT/lib/ssh.exp"
@@ -131,7 +131,7 @@ case "$action" in
     confirm "Delete $VM and its disk?" n || exit 0
     "$TART" stop "$VM" 2>/dev/null || true; "$TART" delete "$VM"; ok "$VM deleted" ;;
   move)
-    dest="${3:?move needs a directory, e.g. $LAB_VM_DIR/tart or ~/.dernvale-lab/tart}"
+    dest="${3:?move needs a directory, e.g. $LAB_VM_DIR/tart or ~/.rowanholt-lab/tart}"
     mkdir -p "$dest/vms"; dest="$(cd "$dest" && pwd)"
     old_home="$(cd "$TART_HOME" && pwd)"
     [ "$dest" != "$old_home" ] || die "$VM is already in $dest"

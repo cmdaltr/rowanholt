@@ -1,7 +1,7 @@
 """Eru's MCP server (src/eru_mcp/server.py), driven through the MCP SDK's in-memory client against
 the real backend in server mode (test_server_access.BackendCase). These are the threat model's
 checks before it goes near a live case: the tool list against what's never exposed, no reaching a
-job that isn't yours or shared with you, no reaching raw/, and no calls but Dernvale's API.
+job that isn't yours or shared with you, no reaching raw/, and no calls but Rowanholt's API.
 
 Needs the backend's requirements and requirements/mcp.txt; skipped without them.
 """
@@ -49,12 +49,12 @@ class EruMcpTest(BackendCase):
     def server(self, headers, **options):
         def send(method, path, params, body, token):
             self.calls.append(path)
-            # DernvaleAPI._urllib sends the agent header (test_the_agent_header_is_sent)
+            # RowanholtAPI._urllib sends the agent header (test_the_agent_header_is_sent)
             resp = self.client.request(method, path, params=params, json=body,
                                        headers={**headers, eru_mcp.AGENT_HEADER[0]: eru_mcp.AGENT_HEADER[1]})
             is_json = "json" in resp.headers.get("content-type", "")
             return resp.status_code, resp.json() if is_json else resp.text
-        return eru_mcp.build_server(eru_mcp.DernvaleAPI("http://testserver", transport=send), **options)
+        return eru_mcp.build_server(eru_mcp.RowanholtAPI("http://testserver", transport=send), **options)
 
     def call(self, headers, name, server=None, **arguments):
         """(is_error, result): the tool's structured result, or its error text."""
@@ -177,7 +177,7 @@ class EruMcpTest(BackendCase):
             def send(method, path, params, body, token):
                 resp = self.client.request(method, path, params=params, json=body, headers=headers)
                 return resp.status_code, resp.json()
-            return eru_mcp.DernvaleAPI("http://testserver", transport=send)
+            return eru_mcp.RowanholtAPI("http://testserver", transport=send)
 
         def token(scope):
             made = self.client.post("/api/auth/tokens", headers=self.alice, json={"name": "mcp", "scope": scope})
@@ -188,15 +188,15 @@ class EruMcpTest(BackendCase):
         self.assertIn("not a sign-in token", eru_mcp.write_refusal(api(self.alice)))
         self.assertIn("can't check the token", eru_mcp.write_refusal(api({})))
         # On an analyst's own machine there's no token to check
-        self.settings.dernvale_server_mode = False
+        self.settings.rowanholt_server_mode = False
         try:
             self.assertIsNone(eru_mcp.write_refusal(api({})))
         finally:
-            self.settings.dernvale_server_mode = True
+            self.settings.rowanholt_server_mode = True
 
     def test_over_http_each_request_is_its_own_analyst(self):
         """Streamable HTTP (a team server's /mcp): no token of its own; each request's API token is checked
-        against Dernvale and used for its calls; only eru-mcp tokens are taken, reads included."""
+        against Rowanholt and used for its calls; only eru-mcp tokens are taken, reads included."""
         import socket
         import threading
         import time
@@ -218,14 +218,14 @@ class EruMcpTest(BackendCase):
             probe.bind(("127.0.0.1", 0))
             port = probe.getsockname()[1]
         url = f"http://127.0.0.1:{port}/mcp"
-        api = eru_mcp.DernvaleAPI("http://testserver", eru_mcp.request_token, transport=send)
-        self.assertIsNone(eru_mcp.http_refusal(api, "https://dernvale.example.org"))
-        self.assertIn("https", eru_mcp.http_refusal(api, "http://dernvale.example.org"))
-        self.settings.dernvale_server_mode = False
+        api = eru_mcp.RowanholtAPI("http://testserver", eru_mcp.request_token, transport=send)
+        self.assertIsNone(eru_mcp.http_refusal(api, "https://rowanholt.example.org"))
+        self.assertIn("https", eru_mcp.http_refusal(api, "http://rowanholt.example.org"))
+        self.settings.rowanholt_server_mode = False
         try:
-            self.assertIn("team server", eru_mcp.http_refusal(api, "https://dernvale.example.org"))
+            self.assertIn("team server", eru_mcp.http_refusal(api, "https://rowanholt.example.org"))
         finally:
-            self.settings.dernvale_server_mode = True
+            self.settings.rowanholt_server_mode = True
         server = eru_mcp.build_server(api, writes=True, max_writes=1, http_url=url)
         web = uvicorn.Server(uvicorn.Config(server.streamable_http_app(host="127.0.0.1"), host="127.0.0.1", port=port,
                                             log_level="warning"))
@@ -243,14 +243,14 @@ class EruMcpTest(BackendCase):
             return result.is_error, "".join(getattr(c, "text", "") for c in result.content)
 
         try:
-            # What a client reads after a 401 names Dernvale as analysts reach it, not the backend inside the stack
+            # What a client reads after a 401 names Rowanholt as analysts reach it, not the backend inside the stack
             meta = httpx2.get(f"http://127.0.0.1:{port}/.well-known/oauth-protected-resource/mcp").json()
             self.assertEqual([s.rstrip("/") for s in meta["authorization_servers"]], [url[:-len("/mcp")]])
             job = self.create_job(self.alice, "CASE-MCP-HTTP-1")
             alice, bob = token(self.alice, "eru-mcp"), token(self.bob, "eru-mcp")
             self.assertIn(job, asyncio.run(call(alice, "list_cases"))[1])
             self.assertNotIn(job, asyncio.run(call(bob, "list_cases"))[1])
-            # A full token, a sign-in's JWT, or nothing Dernvale knows: 401, before any tool
+            # A full token, a sign-in's JWT, or nothing Rowanholt knows: 401, before any tool
             for refused in (token(self.alice, "full"), self.alice["Authorization"][7:], "not-a-token"):
                 with self.assertRaises(Exception):
                     asyncio.run(call(refused, "list_cases"))
@@ -286,8 +286,8 @@ class EruMcpTest(BackendCase):
             return Response()
 
         with mock.patch.object(eru_mcp.urllib.request, "urlopen", urlopen):
-            eru_mcp.DernvaleAPI("http://testserver", "t0ken").get("/api/jobs")
-        self.assertEqual(sent[0].get("X-dernvale-agent"), "eru-mcp")
+            eru_mcp.RowanholtAPI("http://testserver", "t0ken").get("/api/jobs")
+        self.assertEqual(sent[0].get("X-rowanholt-agent"), "eru-mcp")
         self.assertEqual(sent[0].get("Authorization"), "Bearer t0ken")
 
     def test_reading_a_case(self):
@@ -404,7 +404,7 @@ class EruMcpTest(BackendCase):
         (data / "CASE-MCP-23" / "WS09" / "artefacts" / "cooked").mkdir(parents=True)
         bobs = self.create_job(self.bob, "CASE-MCP-23")
         (self.evidence / "out" / "CASE-MCP-23" / "WS01" / "artefacts" / "cooked").mkdir(parents=True)
-        with mock.patch.object(ai_routes, "DERNVALE_DATA_DIR", str(data)):
+        with mock.patch.object(ai_routes, "ROWANHOLT_DATA_DIR", str(data)):
             def hosts(headers):
                 resp = self.client.post("/api/ai/offline/answer", headers=headers,
                                         json={"question_id": "hosts", "case_id": "CASE-MCP-23"})
@@ -439,8 +439,8 @@ class EruMcpTest(BackendCase):
         error, text = self.call(self.alice, "case_overview", job_id="..")
         self.assertTrue(error, text)
 
-    def test_only_dernvales_api(self):
-        api = eru_mcp.DernvaleAPI("http://testserver", transport=lambda *a: (200, {}))
+    def test_only_rowanholts_api(self):
+        api = eru_mcp.RowanholtAPI("http://testserver", transport=lambda *a: (200, {}))
         for path in ("http://198.51.100.23/api/jobs", "/api/jobs/../../etc", "/healthz", "//198.51.100.23/api/"):
             with self.assertRaises(ValueError, msg=path):
                 api.get(path)

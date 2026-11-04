@@ -1,7 +1,7 @@
 """
-Dernvale Web Backend
+Rowanholt Web Backend
 
-FastAPI backend for the Dernvale web interface; drives Elrond analysis jobs.
+FastAPI backend for the Rowanholt web interface; drives Elrond analysis jobs.
 """
 
 import os
@@ -392,7 +392,7 @@ async def create_job(job_request: JobCreate, request: Request):
         # Set destination path - if not specified, use case number as directory name
         if not destination_path and sanitized_source_paths:
             first_source = Path(sanitized_source_paths[0])
-            # Create output directory using case number (e.g., /tmp/dernvale/mfttesting/)
+            # Create output directory using case number (e.g., /tmp/rowanholt/mfttesting/)
             if first_source.is_file():
                 destination_path = str(first_source.parent / case_number)
             else:
@@ -1318,9 +1318,9 @@ FILE_REQUIREMENTS = {
 # Default directory for required files (OS-aware)
 import platform
 if platform.system() == 'Darwin' or platform.system() == 'Linux':
-    REQUIRED_FILES_DIR = '/tmp/dernvale'
+    REQUIRED_FILES_DIR = '/tmp/rowanholt'
 else:
-    REQUIRED_FILES_DIR = os.path.join(os.environ.get('TEMP', 'C:\\Temp'), 'dernvale')
+    REQUIRED_FILES_DIR = os.path.join(os.environ.get('TEMP', 'C:\\Temp'), 'rowanholt')
 
 
 @app.get("/api/jobs/{job_id}/sharing")

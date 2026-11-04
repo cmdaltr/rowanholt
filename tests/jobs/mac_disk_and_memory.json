@@ -1,10 +1,10 @@
 {
   "case_number": "TEST_mac_disk_and_memory",
   "source_paths": [
-    "/Volumes/Media5TB/dernvale_imgs/MacintoshHD_disk5.E01",
-    "/Volumes/Media5TB/dernvale_imgs/macos-memory.raw"
+    "/Volumes/Media5TB/rowanholt_imgs/MacintoshHD_disk5.E01",
+    "/Volumes/Media5TB/rowanholt_imgs/macos-memory.raw"
   ],
-  "destination_path": "/Volumes/Media5TB/dernvale_imgs/tests/mac_disk_and_memory",
+  "destination_path": "/Volumes/Media5TB/rowanholt_imgs/tests/mac_disk_and_memory",
   "options": {
     "local": true,
     "gandalf": false,

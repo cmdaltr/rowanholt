@@ -2,9 +2,9 @@
 MITRE ATT&CK Framework Auto-Updater
 
 Automatically fetches and updates MITRE ATT&CK framework data from official sources.
-Ensures Dernvale always uses the latest techniques, tactics, and mappings.
+Ensures Rowanholt always uses the latest techniques, tactics, and mappings.
 
-Author: Dernvale DF Acceleration Suite
+Author: Rowanholt DF Acceleration Suite
 Version: 2.1.0
 """
 
@@ -53,7 +53,7 @@ class MitreAttackUpdater:
         Initialize MITRE ATT&CK updater.
 
         Args:
-            cache_dir: Directory to cache ATT&CK data (default: /opt/dernvale/data/mitre)
+            cache_dir: Directory to cache ATT&CK data (default: /opt/rowanholt/data/mitre)
         """
         self.cache_dir = Path(cache_dir) if cache_dir else Path(DEFAULT_TEMP_DIR) / "data" / "mitre"
         self.cache_dir.mkdir(parents=True, exist_ok=True)

@@ -37,7 +37,7 @@ class OnlineLookupTest(BackendCase):
                 raise self.answer
             return self.answer
         patches = [mock.patch.object(online, "fetch", fake),
-                   mock.patch.object(self.settings, "dernvale_online_lookups", "virustotal"),
+                   mock.patch.object(self.settings, "rowanholt_online_lookups", "virustotal"),
                    mock.patch.object(self.settings, "virustotal_api_key", "test-key")]
         for p in patches:
             p.start()
@@ -51,7 +51,7 @@ class OnlineLookupTest(BackendCase):
             self.assertEqual(self.client.get("/api/threat-intel/lookup", headers=self.alice).json(),
                              {"enabled": False, "provider": None})
             self.assertEqual(self.look("8.8.8.8").status_code, 404)
-        with mock.patch.object(self.settings, "dernvale_online_lookups", ""):
+        with mock.patch.object(self.settings, "rowanholt_online_lookups", ""):
             self.assertEqual(self.look("8.8.8.8").status_code, 404)
         self.assertEqual(self.asked, [])
         self.assertEqual(self.client.get("/api/threat-intel/lookup", headers=self.alice).json(),
@@ -88,7 +88,7 @@ class OnlineLookupTest(BackendCase):
         made = self.client.post("/api/auth/tokens", headers=self.alice,
                                 json={"name": "eru", "scope": "eru-mcp", "days": 30}).json()
         self.assertEqual(self.look("8.8.8.8", bearer(made["token"])).status_code, 403)
-        self.assertEqual(self.look("8.8.8.8", {**self.alice, "X-Dernvale-Agent": "eru-mcp"}).status_code, 403)
+        self.assertEqual(self.look("8.8.8.8", {**self.alice, "X-Rowanholt-Agent": "eru-mcp"}).status_code, 403)
         self.assertEqual(self.asked, [])
         full = self.client.post("/api/auth/tokens", headers=self.alice,
                                 json={"name": "script", "scope": "full", "days": 30}).json()

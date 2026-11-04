@@ -1,6 +1,6 @@
-# Dernvale Forensic Platform - Key Functionality
+# Rowanholt Forensic Platform - Key Functionality
 
-This document describes the critical architectural features and operational characteristics of the Dernvale forensic analysis platform.
+This document describes the critical architectural features and operational characteristics of the Rowanholt forensic analysis platform.
 
 **Contents:**
 - [Integration Summary](#integration-summary)
@@ -15,11 +15,11 @@ This document describes the critical architectural features and operational char
 
 ## ✅ File Descriptor Retry Logic Integration
 
-The retry-on-file-descriptor-limit logic has been integrated into the critical file processing paths of Dernvale.
+The retry-on-file-descriptor-limit logic has been integrated into the critical file processing paths of Rowanholt.
 
 ### Files Modified
 
-#### 1. **File Collection** (`dernvale/collect/files/compare.py`)
+#### 1. **File Collection** (`rowanholt/collect/files/compare.py`)
 
 **Changes:**
 - Added imports: `from analysis.utils import retry_on_fd_limit, safe_open`
@@ -31,7 +31,7 @@ The retry-on-file-descriptor-limit logic has been integrated into the critical f
 - 10 retries with 1-30 second waits (exponential backoff)
 - Critical for tests like `win_collect_files_*` that process thousands of files
 
-#### 2. **IOC Extraction** (`dernvale/analysis/iocs.py`)
+#### 2. **IOC Extraction** (`rowanholt/analysis/iocs.py`)
 
 **Changes:**
 - Added imports: `from analysis.utils import retry_on_fd_limit, safe_open`
@@ -185,7 +185,7 @@ Progress is tracked per-image and scaled to overall job progress:
 | **Commencing Analysis Phase** | **75%** |
 | **Completed Analysis Phase** | **95%** |
 | Splunk/Elastic/Navigator phases | 97% |
-| Dernvale completed | 95% (overall) |
+| Rowanholt completed | 95% (overall) |
 
 ## Collection Sub-Steps (Windows)
 
@@ -300,7 +300,7 @@ They only appear in the job log if the "Debug" option is enabled in the Web UI.
 
 ## Overview
 
-Dernvale/Elrond implements a **deferred memory processing** architecture that separates disk image collection from memory image processing. This ensures proper phase separation and prevents processing conflicts when both disk and memory images are provided together.
+Rowanholt/Elrond implements a **deferred memory processing** architecture that separates disk image collection from memory image processing. This ensures proper phase separation and prevents processing conflicts when both disk and memory images are provided together.
 
 ## Key Concept
 
@@ -322,9 +322,9 @@ filename::mount_point::type
 
 **Examples:**
 - `win7-64-disk.E01::/mnt/elrond_mount00::disk`
-- Linux: `win7-64-nfury-memory-raw.001::/mnt/external/dernvale_imgs/::memory`
-- macOS: `win7-64-nfury-memory-raw.001::/Volumes/ExternalDrive/dernvale_imgs/::memory`
-- Windows: `win7-64-nfury-memory-raw.001::D:/dernvale_imgs/::memory`
+- Linux: `win7-64-nfury-memory-raw.001::/mnt/external/rowanholt_imgs/::memory`
+- macOS: `win7-64-nfury-memory-raw.001::/Volumes/ExternalDrive/rowanholt_imgs/::memory`
+- Windows: `win7-64-nfury-memory-raw.001::D:/rowanholt_imgs/::memory`
 
 **Field Breakdown:**
 - **[0] filename**: The base image filename
@@ -343,7 +343,7 @@ When images are first identified:
    - Profile saved to `.memory_profiles.json` via `save_memory_profile()`
    - **NOT added to `imgs` dict** - they are "parked"
 
-**Location**: `src/analysis/dernvale/core/identify.py:186`
+**Location**: `src/analysis/rowanholt/core/identify.py:186`
 
 ```python
 # The actual memory processing (artefact extraction) is deferred to the
@@ -363,7 +363,7 @@ if img_type != "memory":
     # Process disk artifacts
 ```
 
-**Location**: `src/analysis/dernvale/collect/collect.py:161-405`
+**Location**: `src/analysis/rowanholt/collect/collect.py:161-405`
 
 ### Phase 3: Processing (select.py)
 
@@ -378,7 +378,7 @@ if img_basename not in str(processed_imgs) and img_type != "memory":
     # Process disk artifacts
 ```
 
-**Location**: `src/analysis/dernvale/process/select.py:113-117`
+**Location**: `src/analysis/rowanholt/process/select.py:113-117`
 
 ### Phase 3b: Deferred Memory Processing (elrond.py)
 
@@ -398,7 +398,7 @@ if volatility or has_deferred_memory:
 
 **Location**: `src/analysis/elrond.py:730-737`
 
-**Implementation**: `src/analysis/dernvale/core/identify.py:275-359`
+**Implementation**: `src/analysis/rowanholt/core/identify.py:275-359`
 
 The `process_deferred_memory()` function:
 1. Loads profiles from `.memory_profiles.json`
@@ -422,8 +422,8 @@ Profiles are saved to: `{output_directory}/.memory_profiles.json`
     "profile": "Windows",
     "platform": "Windows memory",
     "volchoice": "3",
-    "path": "/Volumes/ExternalDrive/dernvale_imgs/win7-64-nfury-memory-raw.001",
-    "mount_point": "/Volumes/ExternalDrive/dernvale_imgs/",
+    "path": "/Volumes/ExternalDrive/rowanholt_imgs/win7-64-nfury-memory-raw.001",
+    "mount_point": "/Volumes/ExternalDrive/rowanholt_imgs/",
     "vss": false,
     "vssmem": "",
     "memtimeline": ""
@@ -468,7 +468,7 @@ Tests were failing with `RecursionError: maximum recursion depth exceeded` at 38
 
 **Increased Python recursion limit during the Processing Phase** to handle Volatility's deep call stacks.
 
-**Implementation**: `src/analysis/dernvale/process/select.py`
+**Implementation**: `src/analysis/rowanholt/process/select.py`
 
 ```python
 def select_pre_process_artefacts(...):
@@ -554,11 +554,11 @@ The recursion issue is not architectural - it's simply that Volatility's deep pr
 | File | Purpose | Key Functions/Lines |
 |------|---------|-------------------|
 | `src/analysis/elrond.py` | Main orchestration | Lines 730-737: Deferred memory processing |
-| `src/analysis/dernvale/core/identify.py` | Memory identification & deferred processing | Lines 17-42: save/load profiles<br>Lines 186: Deferral comment<br>Lines 275-359: process_deferred_memory() |
-| `src/analysis/dernvale/core/core.py` | Phase orchestration | Lines 54-121: Phase control logic |
-| `src/analysis/dernvale/collect/collect.py` | Artifact collection | Lines 161-405: Collection loop<br>Lines 183-184: Memory filtering |
-| `src/analysis/dernvale/process/select.py` | Artifact processing | Lines 113-117: Memory filtering |
-| `src/analysis/dernvale/memory/memory.py` | Memory processing | Lines 131-322: process_memory() |
+| `src/analysis/rowanholt/core/identify.py` | Memory identification & deferred processing | Lines 17-42: save/load profiles<br>Lines 186: Deferral comment<br>Lines 275-359: process_deferred_memory() |
+| `src/analysis/rowanholt/core/core.py` | Phase orchestration | Lines 54-121: Phase control logic |
+| `src/analysis/rowanholt/collect/collect.py` | Artifact collection | Lines 161-405: Collection loop<br>Lines 183-184: Memory filtering |
+| `src/analysis/rowanholt/process/select.py` | Artifact processing | Lines 113-117: Memory filtering |
+| `src/analysis/rowanholt/memory/memory.py` | Memory processing | Lines 131-322: process_memory() |
 
 ---
 
@@ -566,7 +566,7 @@ The recursion issue is not architectural - it's simply that Volatility's deep pr
 
 ## Problem
 
-When processing large forensic images, Dernvale can hit the operating system's file descriptor limit, causing this error:
+When processing large forensic images, Rowanholt can hit the operating system's file descriptor limit, causing this error:
 
 ```
 OSError: [Errno 24] Too many open files: '/path/to/file'
@@ -722,7 +722,7 @@ Test result: success
 
 ## Problem
 
-OrbStack on macOS accumulates **~8,000 file handles per file collection test** from Docker volume mounts (`/Volumes/Media5TB/dernvale_imgs`). These handles are **not released** even after:
+OrbStack on macOS accumulates **~8,000 file handles per file collection test** from Docker volume mounts (`/Volumes/Media5TB/rowanholt_imgs`). These handles are **not released** even after:
 - Tests complete
 - Containers stop
 - Containers restart
@@ -743,19 +743,19 @@ This is a **known limitation** with Docker on macOS (both Docker Desktop and Orb
 
 ```bash
 # Before any tests
-$ lsof | grep "/Volumes/Media5TB/dernvale_imgs" | wc -l
+$ lsof | grep "/Volumes/Media5TB/rowanholt_imgs" | wc -l
 0
 
 # After win_collect_files_lnk (13m, collected 97 LNK files + 1.7GB artifacts)
-$ lsof | grep "/Volumes/Media5TB/dernvale_imgs" | wc -l
+$ lsof | grep "/Volumes/Media5TB/rowanholt_imgs" | wc -l
 4243
 
 # After win_collect_files_docs (also successful)
-$ lsof | grep "/Volumes/Media5TB/dernvale_imgs" | wc -l
+$ lsof | grep "/Volumes/Media5TB/rowanholt_imgs" | wc -l
 8008
 
 # After win_collect_files_mail (12m, successful)
-$ lsof | grep "/Volumes/Media5TB/dernvale_imgs" | wc -l
+$ lsof | grep "/Volumes/Media5TB/rowanholt_imgs" | wc -l
 7998
 ```
 
@@ -788,10 +788,10 @@ Every batch script now checks for and cleans up file handles from previous runs 
 
 ```bash
 # Pre-batch cleanup: Clear any existing file handles from previous runs
-HANDLE_COUNT=$(lsof 2>/dev/null | grep "/Volumes/Media5TB/dernvale_imgs" | wc -l | tr -d " \n" || echo "0")
+HANDLE_COUNT=$(lsof 2>/dev/null | grep "/Volumes/Media5TB/rowanholt_imgs" | wc -l | tr -d " \n" || echo "0")
 if [ "$HANDLE_COUNT" -gt 100 ]; then
     echo "⚠️  Found $HANDLE_COUNT file handles - cleaning up before starting batch..."
-    # Stop containers, restart OrbStack, restart Dernvale
+    # Stop containers, restart OrbStack, restart Rowanholt
     ...
     echo "✓ Pre-batch cleanup complete"
 fi
@@ -810,10 +810,10 @@ File collection batch scripts also clean up between tests when handle count exce
 **Cleanup logic:**
 ```bash
 # Check file handle count and cleanup if needed
-HANDLE_COUNT=$(lsof 2>/dev/null | grep "/Volumes/Media5TB/dernvale_imgs" | wc -l | tr -d " \n" || echo "0")
+HANDLE_COUNT=$(lsof 2>/dev/null | grep "/Volumes/Media5TB/rowanholt_imgs" | wc -l | tr -d " \n" || echo "0")
 if [ "$HANDLE_COUNT" -gt 1000 ]; then
     echo "⚠️  High file handle count ($HANDLE_COUNT) - cleaning up OrbStack..."
-    # Stop containers, restart OrbStack, restart Dernvale
+    # Stop containers, restart OrbStack, restart Rowanholt
     ...
     echo "✓ Cleanup complete - continuing tests..."
 fi
@@ -829,7 +829,7 @@ Created helper script for manual cleanup between test batches:
 
 **Usage:**
 ```bash
-cd /Users/ben/Library/CloudStorage/OneDrive-Personal/Projects/GitHub/dernvale
+cd /Users/ben/Library/CloudStorage/OneDrive-Personal/Projects/GitHub/rowanholt
 ./scripts/cleanup-orbstack-handles.sh
 
 # Or force cleanup even below threshold
@@ -861,14 +861,14 @@ Applied to all 20 batch scripts.
 
 Check current file handle usage:
 ```bash
-# Total dernvale-related handles
-lsof | grep "dernvale" | wc -l
+# Total rowanholt-related handles
+lsof | grep "rowanholt" | wc -l
 
 # Handles on test volume
-lsof | grep "/Volumes/Media5TB/dernvale_imgs" | wc -l
+lsof | grep "/Volumes/Media5TB/rowanholt_imgs" | wc -l
 
 # Detailed view
-lsof -p $(pgrep OrbStack | head -1) | grep "/Volumes/Media5TB/dernvale_imgs" | head -30
+lsof -p $(pgrep OrbStack | head -1) | grep "/Volumes/Media5TB/rowanholt_imgs" | head -30
 ```
 
 ## When to Run Cleanup

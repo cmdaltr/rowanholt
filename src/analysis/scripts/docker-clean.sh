@@ -1,5 +1,5 @@
 #!/bin/bash
-# Docker Clean-up Script for Dernvale
+# Docker Clean-up Script for Rowanholt
 # Clears Docker caches and resets build environment
 # Use this when experiencing Docker build issues
 
@@ -17,7 +17,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║         Docker Clean-up Script for Dernvale                ║${NC}"
+echo -e "${BLUE}║         Docker Clean-up Script for Rowanholt                ║${NC}"
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
 echo ""
 
@@ -39,7 +39,7 @@ kill_builds() {
 
 # Function to stop containers
 stop_containers() {
-    echo -e "${YELLOW}Stopping Dernvale containers...${NC}"
+    echo -e "${YELLOW}Stopping Rowanholt containers...${NC}"
     cd "$PROJECT_ROOT"
     docker-compose -f docker/docker-compose.yml down 2>/dev/null || true
     docker-compose down 2>/dev/null || true
@@ -95,17 +95,17 @@ clean_volumes() {
     echo ""
 }
 
-# Function to clean Dernvale-specific resources
-clean_dernvale_specific() {
-    echo -e "${YELLOW}Removing Dernvale-specific Docker resources...${NC}"
+# Function to clean Rowanholt-specific resources
+clean_rowanholt_specific() {
+    echo -e "${YELLOW}Removing Rowanholt-specific Docker resources...${NC}"
 
-    # Stop and remove Dernvale containers
+    # Stop and remove Rowanholt containers
     docker ps -a | grep elrond | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
 
-    # Remove Dernvale images
+    # Remove Rowanholt images
     docker images | grep elrond | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || true
 
-    echo -e "${GREEN}✓ Dernvale-specific resources removed${NC}"
+    echo -e "${GREEN}✓ Rowanholt-specific resources removed${NC}"
     echo ""
 }
 
@@ -128,7 +128,7 @@ show_menu() {
     echo "  2) Standard Clean (Build cache + images + containers)"
     echo "  3) Deep Clean (Everything except volumes)"
     echo "  4) Nuclear Clean (Everything including volumes)"
-    echo "  5) Dernvale Only (Only Dernvale-specific resources)"
+    echo "  5) Rowanholt Only (Only Rowanholt-specific resources)"
     echo "  6) Show Disk Usage"
     echo "  7) Exit"
     echo ""
@@ -156,8 +156,8 @@ while [[ $# -gt 0 ]]; do
             LEVEL="nuclear"
             shift
             ;;
-        --dernvale|-r)
-            LEVEL="dernvale"
+        --rowanholt|-r)
+            LEVEL="rowanholt"
             shift
             ;;
         --rebuild|-b)
@@ -172,7 +172,7 @@ while [[ $# -gt 0 ]]; do
             echo "  -s, --standard    Standard clean (+ containers)"
             echo "  -d, --deep        Deep clean (everything except volumes)"
             echo "  -n, --nuclear     Nuclear clean (everything including volumes)"
-            echo "  -r, --dernvale   Clean only Dernvale-specific resources"
+            echo "  -r, --rowanholt   Clean only Rowanholt-specific resources"
             echo "  -b, --rebuild     Automatically rebuild after cleaning"
             echo "  -h, --help        Show this help message"
             echo ""
@@ -207,7 +207,7 @@ if [ -z "$LEVEL" ]; then
             2) LEVEL="standard"; break;;
             3) LEVEL="deep"; break;;
             4) LEVEL="nuclear"; break;;
-            5) LEVEL="dernvale"; break;;
+            5) LEVEL="rowanholt"; break;;
             6) show_disk_usage; continue;;
             7) echo "Exiting..."; exit 0;;
             *) echo -e "${RED}Invalid choice. Please try again.${NC}"; continue;;
@@ -265,8 +265,8 @@ case $LEVEL in
             exit 0
         fi
         ;;
-    dernvale)
-        clean_dernvale_specific
+    rowanholt)
+        clean_rowanholt_specific
         clean_build_cache
         ;;
 esac
@@ -283,7 +283,7 @@ echo ""
 
 # Ask about rebuild
 if [ "$AUTO_REBUILD" = false ]; then
-    echo -e "${YELLOW}Do you want to rebuild Dernvale now? (yes/no)${NC}"
+    echo -e "${YELLOW}Do you want to rebuild Rowanholt now? (yes/no)${NC}"
     read -r rebuild
 else
     rebuild="yes"
@@ -298,7 +298,7 @@ if [[ "$rebuild" == "yes" ]]; then
 
     cd "$PROJECT_ROOT"
 
-    echo -e "${YELLOW}Building Dernvale (this may take 10-20 minutes)...${NC}"
+    echo -e "${YELLOW}Building Rowanholt (this may take 10-20 minutes)...${NC}"
     echo ""
 
     if docker-compose -f docker/docker-compose.yml build --no-cache; then

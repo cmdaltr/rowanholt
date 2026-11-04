@@ -1,13 +1,13 @@
-# Dernvale Quick Start Guide
+# Rowanholt Quick Start Guide
 
-Get up and running with Dernvale DF Acceleration Suite in minutes!
+Get up and running with Rowanholt DF Acceleration Suite in minutes!
 
 ## 🚀 Quick Start (Docker - Recommended)
 
 ```bash
 # Clone the repository
-git clone https://github.com/cmdaltr/dernvale.git
-cd dernvale
+git clone https://github.com/cmdaltr/rowanholt.git
+cd rowanholt
 
 # Start core services (postgres, redis, backend, celery-worker, frontend)
 docker compose up -d
@@ -25,7 +25,7 @@ docker compose ps
 docker compose logs -f backend
 ```
 
-**That's it!** The web interface is available at http://localhost:5687 and the API at http://localhost:5688 (or http://dernvale.lab if using FlightDeck with the local proxy).
+**That's it!** The web interface is available at http://localhost:5687 and the API at http://localhost:5688 (or http://rowanholt.lab if using FlightDeck with the local proxy).
 
 SIEM services (Splunk, Elasticsearch, Kibana, ATT&CK Navigator) are optional and gated behind the `siem` profile. Start them separately once the core stack is healthy:
 
@@ -41,7 +41,7 @@ Stop only the SIEM stack without touching the core services:
 docker compose stop splunk elastic elastic-setup kibana kibana-setup navigator
 ```
 
-If you use [FlightDeck](https://github.com/cmdaltr/FlightDeck) to manage your homelab, the equivalent commands are `fd start dernvale` and `fd start dernvale-siem`.
+If you use [FlightDeck](https://github.com/cmdaltr/FlightDeck) to manage your homelab, the equivalent commands are `fd start rowanholt` and `fd start rowanholt-siem`.
 
 ## 🔧 Quick Start (Local Installation)
 
@@ -50,8 +50,8 @@ Docker is the supported way to run the web stack: the worker image carries every
 ### 1. Install Dependencies
 
 ```bash
-git clone https://github.com/cmdaltr/dernvale.git
-cd dernvale
+git clone https://github.com/cmdaltr/rowanholt.git
+cd rowanholt
 
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
@@ -121,7 +121,7 @@ Each acquisition produces `<host>.zip` (or `<host>.zip.enc` when encrypted).
 
 ## 📁 Analysis Files (Keywords, YARA & IOC Watchlists)
 
-Keyword search, YARA scanning and IOC watchlist matching read their input from `fixtures/`, which Docker mounts read-only into the worker at `/tmp/dernvale/fixtures/`:
+Keyword search, YARA scanning and IOC watchlist matching read their input from `fixtures/`, which Docker mounts read-only into the worker at `/tmp/rowanholt/fixtures/`:
 
 ```
 fixtures/
@@ -134,9 +134,9 @@ Keep blank and `#` lines out of `keywords.txt`: Elrond treats them as keywords a
 
 When creating jobs, use these paths:
 
-- Keywords: `/tmp/dernvale/fixtures/keywords.txt`
-- YARA: `/tmp/dernvale/fixtures/yara_rules/`
-- IOCs: `/tmp/dernvale/fixtures/iocs.txt`
+- Keywords: `/tmp/rowanholt/fixtures/keywords.txt`
+- YARA: `/tmp/rowanholt/fixtures/yara_rules/`
+- IOCs: `/tmp/rowanholt/fixtures/iocs.txt`
 
 ## 🔍 Analyze Evidence
 
@@ -319,7 +319,7 @@ lsof -iTCP:5687 -iTCP:5688 -sTCP:LISTEN
 ### Analysis Output
 ```
 /output/CASE-001/
-├── dernvale_audit.log
+├── rowanholt_audit.log
 ├── mitre_techniques.txt
 └── <image>/
     ├── artefacts/
@@ -340,6 +340,6 @@ lsof -iTCP:5687 -iTCP:5688 -sTCP:LISTEN
 
 ---
 
-**Need Help?** Check the [full documentation](../README.md) or open an [issue](https://github.com/cmdaltr/dernvale/issues).
+**Need Help?** Check the [full documentation](../README.md) or open an [issue](https://github.com/cmdaltr/rowanholt/issues).
 
 Happy Investigating! 🔍🧙‍♂️

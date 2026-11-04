@@ -11,7 +11,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 sys.path.append(str(REPO / "src" / "analysis"))
 
-from dernvale.process import linux_artefacts as la  # noqa: E402
+from rowanholt.process import linux_artefacts as la  # noqa: E402
 
 CID = "4f1c9e2ab3d7" + "0" * 52
 FAKE_DOCKER = f"""#!/bin/sh

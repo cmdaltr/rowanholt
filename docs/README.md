@@ -1,6 +1,6 @@
-# Dernvale Documentation
+# Rowanholt Documentation
 
-**Dernvale DF Acceleration Suite - Complete Documentation Index**
+**Rowanholt DF Acceleration Suite - Complete Documentation Index**
 
 ---
 
@@ -23,7 +23,7 @@
 
 ### 📐 Architecture
 
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System design, components, data flow; the realm map, Elrond's roads, Gandalf's acquisition flow and the 3D journey (`dernvale map`)
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System design, components, data flow; the realm map, Elrond's roads, Gandalf's acquisition flow and the 3D journey (`rowanholt map`)
 - **[REQUIREMENTS.md](REQUIREMENTS.md)** - System requirements and dependencies
 - **[FUNCTIONALITY.md](FUNCTIONALITY.md)** - File-descriptor handling, retries and other operational behaviour
 - **[PROGRESS_TRACKING.md](PROGRESS_TRACKING.md)** - How a job's progress percentage is worked out
@@ -105,7 +105,7 @@ docs/
 http://localhost:5687
 
 # Default login
-Email: admin@dernvale.app
+Email: admin@rowanholt.app
 Password: IWasThere3000YearsAgo!
 ```
 
@@ -127,7 +127,7 @@ See [USAGE.md](USAGE.md) for more examples.
 ## Getting Help
 
 **Documentation Issues:**
-- Found an error? Open an issue at https://github.com/cmdaltr/dernvale/issues
+- Found an error? Open an issue at https://github.com/cmdaltr/rowanholt/issues
 
 **Technical Support:**
 1. Check [CONFIG.md](CONFIG.md) troubleshooting section

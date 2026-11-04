@@ -4,7 +4,7 @@ MITRE ATT&CK Coverage Analyzer
 Real-time coverage analysis during artifact processing.
 Tracks evidence, calculates coverage, generates standalone reports.
 
-Author: Dernvale DF Acceleration Suite
+Author: Rowanholt DF Acceleration Suite
 Version: 2.1.0
 """
 
@@ -665,7 +665,7 @@ class MitreCoverageAnalyzer:
                 for evidence in technique["evidence"]:
                     event = {
                         "time": evidence["timestamp"],
-                        "source": "dernvale:mitre",
+                        "source": "rowanholt:mitre",
                         "sourcetype": "mitre:coverage",
                         "event": {
                             "case_id": self.case_id,

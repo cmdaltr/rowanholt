@@ -18,7 +18,7 @@ from anduril.scope import (  # noqa: E402
 )
 
 
-def container(name, project="dernvale", service=None, image_id="sha256:aaa", state="running"):
+def container(name, project="rowanholt", service=None, image_id="sha256:aaa", state="running"):
     return {
         "Id": f"{name}-id-000000000000",
         "Names": [f"/{name}"],
@@ -65,13 +65,13 @@ ELROND_TOP = {"Titles": ["PID", "COMMAND"], "Processes": [["17", "python3 /opt/e
 
 class ScopeTests(unittest.TestCase):
     def test_container_needs_project_label_and_prefix(self):
-        self.assertTrue(container_in_scope(container("dernvale-backend")))
-        self.assertFalse(container_in_scope(container("dernvale-backend", project="other")))
-        self.assertFalse(container_in_scope(container("caddy-local", project="dernvale")))
-        self.assertFalse(container_in_scope({"Names": ["/dernvale-x"], "Labels": {}}))
+        self.assertTrue(container_in_scope(container("rowanholt-backend")))
+        self.assertFalse(container_in_scope(container("rowanholt-backend", project="other")))
+        self.assertFalse(container_in_scope(container("caddy-local", project="rowanholt")))
+        self.assertFalse(container_in_scope({"Names": ["/rowanholt-x"], "Labels": {}}))
 
     def test_inspect_shape_is_understood(self):
-        inspected = {"Name": "/dernvale-redis", "Config": {"Labels": {"com.docker.compose.project": "dernvale"}}}
+        inspected = {"Name": "/rowanholt-redis", "Config": {"Labels": {"com.docker.compose.project": "rowanholt"}}}
         self.assertTrue(container_in_scope(inspected))
 
     def test_sensitive_services_refuse_while_elrond_runs(self):
@@ -98,29 +98,29 @@ class ScopeTests(unittest.TestCase):
 class AdminTests(unittest.TestCase):
     def make(self, top=None):
         containers = [
-            container("dernvale-celery-worker", service="celery-worker", image_id="sha256:" + "1" * 64),
-            container("dernvale-postgres", service="postgres", image_id="sha256:" + "2" * 64),
+            container("rowanholt-celery-worker", service="celery-worker", image_id="sha256:" + "1" * 64),
+            container("rowanholt-postgres", service="postgres", image_id="sha256:" + "2" * 64),
             container("caddy-local", project="caddy", service="caddy", image_id="sha256:" + "3" * 64),
             container("other-app", project="other", service="web", image_id="sha256:" + "2" * 64),
         ]
         images = [
-            {"Id": "sha256:" + "1" * 64, "RepoTags": ["dernvale-celery-worker:latest"], "Labels": {"com.docker.compose.project": "dernvale"}, "Size": 1},
+            {"Id": "sha256:" + "1" * 64, "RepoTags": ["rowanholt-celery-worker:latest"], "Labels": {"com.docker.compose.project": "rowanholt"}, "Size": 1},
             {"Id": "sha256:" + "2" * 64, "RepoTags": ["postgres:16-alpine"], "Labels": {}, "Size": 1},
             {"Id": "sha256:" + "3" * 64, "RepoTags": ["caddy:2"], "Labels": {}, "Size": 1},
-            {"Id": "sha256:" + "4" * 64, "RepoTags": ["<none>:<none>"], "Labels": {"com.docker.compose.project": "dernvale"}, "Size": 5},
+            {"Id": "sha256:" + "4" * 64, "RepoTags": ["<none>:<none>"], "Labels": {"com.docker.compose.project": "rowanholt"}, "Size": 5},
         ]
         engine = FakeEngine(containers, images, top)
         return DockerAdmin(engine=engine), engine
 
-    def test_only_dernvale_containers_listed_and_resolvable(self):
+    def test_only_rowanholt_containers_listed_and_resolvable(self):
         admin, _ = self.make()
-        self.assertEqual([c["name"] for c in admin.list_containers()], ["dernvale-celery-worker", "dernvale-postgres"])
-        self.assertEqual(admin.resolve("postgres")["Names"], ["/dernvale-postgres"])
-        for name in ("caddy-local", "other-app", "web", "../dernvale-postgres"):
+        self.assertEqual([c["name"] for c in admin.list_containers()], ["rowanholt-celery-worker", "rowanholt-postgres"])
+        self.assertEqual(admin.resolve("postgres")["Names"], ["/rowanholt-postgres"])
+        for name in ("caddy-local", "other-app", "web", "../rowanholt-postgres"):
             with self.assertRaises(ScopeError):
                 admin.resolve(name)
 
-    def test_only_dernvale_images_listed(self):
+    def test_only_rowanholt_images_listed(self):
         admin, _ = self.make()
         tags = [t for i in admin.list_images() for t in i["tags"]]
         self.assertIn("postgres:16-alpine", tags)
@@ -150,7 +150,7 @@ class AdminTests(unittest.TestCase):
         with self.assertRaises(ScopeError):
             admin.validate_pull("caddy:2")
         with self.assertRaises(ScopeError):
-            admin.validate_pull("dernvale-celery-worker:latest")  # built locally
+            admin.validate_pull("rowanholt-celery-worker:latest")  # built locally
         self.assertEqual(admin.validate_pull("postgres:16-alpine"), "postgres:16-alpine")
 
     def test_clone_config_drops_image_defaults(self):
@@ -161,7 +161,7 @@ class AdminTests(unittest.TestCase):
                 "Image": "redis:7-alpine",
                 "Cmd": ["redis-server"],
                 "Env": ["PATH=/usr/bin", "FOO=bar"],
-                "Labels": {"com.docker.compose.image": "sha256:old", "img.label": "1", "com.docker.compose.project": "dernvale"},
+                "Labels": {"com.docker.compose.image": "sha256:old", "img.label": "1", "com.docker.compose.project": "rowanholt"},
                 "Volumes": {"/data": {}},
             },
             "HostConfig": {"Binds": ["/host:/named:ro"], "Memory": 1},

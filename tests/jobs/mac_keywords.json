@@ -1,9 +1,9 @@
 {
   "case_number": "TEST_mac_keywords",
   "source_paths": [
-    "/Volumes/Media5TB/dernvale_imgs/MacintoshHD_disk5.E01"
+    "/Volumes/Media5TB/rowanholt_imgs/MacintoshHD_disk5.E01"
   ],
-  "destination_path": "/Volumes/Media5TB/dernvale_imgs/tests/mac_keywords",
+  "destination_path": "/Volumes/Media5TB/rowanholt_imgs/tests/mac_keywords",
   "options": {
     "local": true,
     "gandalf": false,

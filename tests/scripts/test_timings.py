@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Extract per-test and per-stage timings from Dernvale test output.
+"""Extract per-test and per-stage timings from Rowanholt test output.
 
-Reads dernvale_audit.log from each test output directory, joins it with the
+Reads rowanholt_audit.log from each test output directory, joins it with the
 TestCase definitions in run_test.py and the image sizes, and writes JSON, CSV
 and Markdown summaries.
 
@@ -26,7 +26,7 @@ import run_test  # noqa: E402
 
 _RECORD_START = re.compile(r"\s*(?=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?,)")
 
-AUDIT_LOG = "dernvale_audit.log"
+AUDIT_LOG = "rowanholt_audit.log"
 
 
 FOLDED_STAGE_PREFIXES = ("indexing", "potential script obfuscation")

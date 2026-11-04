@@ -1,6 +1,6 @@
 """add_threat_intel_validity
 
-How long each threat intelligence indicator holds (dernvale/threat_intel/validity.py): a STIX
+How long each threat intelligence indicator holds (rowanholt/threat_intel/validity.py): a STIX
 indicator's valid_until and confidence, or a default lifetime by kind (90 days for IPs and
 domains), with when it was first seen. A side table keyed by threat_intel_indicators.id, so the
 fixed 10-column table stays as it is; no row means no expiry. Nothing is backfilled: indicators

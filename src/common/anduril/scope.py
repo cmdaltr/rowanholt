@@ -1,4 +1,4 @@
-"""What counts as a Dernvale container or image, and which actions are refused.
+"""What counts as a Rowanholt container or image, and which actions are refused.
 
 Every operation resolves its target from the engine and checks it here, so a
 name or ID supplied by a caller is never trusted on its own.
@@ -11,8 +11,8 @@ from typing import Iterable, Optional
 
 PROJECT_LABEL = "com.docker.compose.project"
 SERVICE_LABEL = "com.docker.compose.service"
-PROJECT = os.environ.get("DERNVALE_COMPOSE_PROJECT", "dernvale")
-NAME_PREFIX = "dernvale-"
+PROJECT = os.environ.get("ROWANHOLT_COMPOSE_PROJECT", "rowanholt")
+NAME_PREFIX = "rowanholt-"
 
 ANDURIL_SERVICE = "anduril"
 # Stopping these while Elrond runs orphans the job: the worker loses its
@@ -22,11 +22,11 @@ JOB_PROCESS_MARKERS = ("elrond.py",)
 
 
 class ScopeError(Exception):
-    """The target is not a Dernvale resource, or the action is not allowed on it."""
+    """The target is not a Rowanholt resource, or the action is not allowed on it."""
 
 
 class BusyError(Exception):
-    """The action would interrupt a running Dernvale job."""
+    """The action would interrupt a running Rowanholt job."""
 
 
 def _labels(container: dict) -> dict:
@@ -44,7 +44,7 @@ def container_service(container: dict) -> str:
 
 
 def container_in_scope(container: dict, project: str = PROJECT) -> bool:
-    """Both the compose project label and the dernvale- name prefix must match."""
+    """Both the compose project label and the rowanholt- name prefix must match."""
     return _labels(container).get(PROJECT_LABEL) == project and container_name(container).startswith(NAME_PREFIX)
 
 
@@ -59,7 +59,7 @@ def image_in_scope(image: dict, scoped_image_ids: Iterable[str], project: str = 
 
 
 def image_users(image_id: str, containers: Iterable[dict], project: str = PROJECT) -> tuple[list[str], list[str]]:
-    """(Dernvale container names, other container names) using an image."""
+    """(Rowanholt container names, other container names) using an image."""
     ours, others = [], []
     for c in containers:
         if c.get("ImageID") != image_id:
@@ -69,12 +69,12 @@ def image_users(image_id: str, containers: Iterable[dict], project: str = PROJEC
 
 
 def check_image_removable(image: dict, containers: Iterable[dict], scoped_image_ids: Iterable[str], project: str = PROJECT) -> None:
-    """Raise ScopeError unless the image is ours and nothing outside Dernvale uses it."""
+    """Raise ScopeError unless the image is ours and nothing outside Rowanholt uses it."""
     if not image_in_scope(image, scoped_image_ids, project):
-        raise ScopeError(f"Image {image.get('Id', '')[:19]} is not a Dernvale image")
+        raise ScopeError(f"Image {image.get('Id', '')[:19]} is not a Rowanholt image")
     ours, others = image_users(image["Id"], containers, project)
     if others:
-        raise ScopeError(f"Image is also used by non-Dernvale containers: {', '.join(others)}")
+        raise ScopeError(f"Image is also used by non-Rowanholt containers: {', '.join(others)}")
     if ours:
         raise ScopeError(f"Image is in use by {', '.join(ours)}; stop and update those first")
 
@@ -82,7 +82,7 @@ def check_image_removable(image: dict, containers: Iterable[dict], scoped_image_
 def check_action(service: str, action: str, job_processes: list[str], force: bool, allow_self: bool = False) -> None:
     """Refuse actions that would cut off administration or interrupt a job."""
     if service == ANDURIL_SERVICE and not allow_self:
-        raise ScopeError("Anduril can only be stopped or updated from the host CLI (dernvale anduril disable)")
+        raise ScopeError("Anduril can only be stopped or updated from the host CLI (rowanholt anduril disable)")
     if service in JOB_SENSITIVE_SERVICES and job_processes and not force:
         raise BusyError(
             f"Refusing to {action} {service}: Elrond is running in the worker "

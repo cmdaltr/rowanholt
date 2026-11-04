@@ -1,4 +1,4 @@
-# Eru's MCP server (src/eru_mcp, `dernvale mcp`): installed only where it runs, on the analyst's
+# Eru's MCP server (src/eru_mcp, `rowanholt mcp`): installed only where it runs, on the analyst's
 # machine; not in the worker or backend images. Needs Python 3.10+.
 # mcp 2 renamed FastMCP to MCPServer; the server is written against 2.x.
 mcp>=2.3.0,<3

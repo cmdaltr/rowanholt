@@ -1,12 +1,12 @@
-# Dernvale DF Acceleration Suite
+# Rowanholt DF Acceleration Suite
 
 <div align="center">
-  <img src="./docs/images/dernvale.png" alt="Dernvale" width="800"/>
+  <img src="./docs/images/rowanholt.png" alt="Rowanholt" width="800"/>
 
   **Digital Forensics Suite v2.1.0**
 </div>
 <div align="center">
-  <i>Old English dierne + vale: the hidden valley</i><br><br>
+  <i>rowan + Old English holt: the rowan wood</i><br><br>
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -19,26 +19,26 @@
 
 ### Installation
 
-The desktop app (macOS `.dmg`, Windows installer, Ubuntu/Debian `.deb`) from the [releases](https://github.com/cmdaltr/dernvale/releases) installs Dernvale without a terminal: its first launch checks for Docker (and installs OrbStack on a Mac), puts Dernvale's files in place and opens the UI. See [app/README.md](app/README.md). From source:
+The desktop app (macOS `.dmg`, Windows installer, Ubuntu/Debian `.deb`) from the [releases](https://github.com/cmdaltr/rowanholt/releases) installs Rowanholt without a terminal: its first launch checks for Docker (and installs OrbStack on a Mac), puts Rowanholt's files in place and opens the UI. See [app/README.md](app/README.md). From source:
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/cmdaltr/dernvale.git
-cd dernvale
-./dernvale install   # optional: run `dernvale` from anywhere
-./dernvale app install   # optional: Dernvale in the Dock/app menu (app/README.md; Windows: app\windows\install.ps1)
+git clone https://github.com/cmdaltr/rowanholt.git
+cd rowanholt
+./rowanholt install   # optional: run `rowanholt` from anywhere
+./rowanholt app install   # optional: Rowanholt in the Dock/app menu (app/README.md; Windows: app\windows\install.ps1)
 
 # 2. Install OrbStack (macOS - RECOMMENDED) or Docker Desktop
 # OrbStack: 2-3x faster, uses less RAM, no networking bugs
 brew install --cask orbstack
 
 # For other platforms, use the installer:
-# python3 scripts/install-dernvale.py
+# python3 scripts/install-rowanholt.py
 
 # 3. Configure forensic image paths
 python3 scripts/image-paths.py
 
-# 4. Start Dernvale in testing mode
+# 4. Start Rowanholt in testing mode
 ./scripts/start-testing-mode.sh
 
 # 5. Run your first test
@@ -50,24 +50,24 @@ cd tests
 
 ### Upgrading from Rivendell
 
-Dernvale was called Rivendell. An install from before the rename keeps its jobs, cases and settings if it's moved across once, before the first start (`dernvale start` refuses until then):
+Rowanholt was called Rivendell. An install from before the rename keeps its jobs, cases and settings if it's moved across once, before the first start (`rowanholt start` refuses until then):
 
 ```bash
 git pull
-./dernvale install                       # the old `rivendell` link no longer points at anything
-./dernvale migrate from-rivendell        # .env keys, Docker volumes, the database, /tmp/rivendell
-./dernvale start                         # builds the images under the new name: slow the first time
+./rowanholt install                       # the old `rivendell` link no longer points at anything
+./rowanholt migrate from-rivendell        # .env keys, Docker volumes, the database, /tmp/rivendell
+./rowanholt start                         # builds the images under the new name: slow the first time
 ```
 
-The old Docker volumes are left as they were; the script prints the command to remove them once the new stack looks right. The desktop app is a new app (new bundle ID): point its setup at your existing checkout. An Eru MCP client set up before the rename needs re-adding with `dernvale mcp` and `DERNVALE_*` variables.
+The old Docker volumes are left as they were; the script prints the command to remove them once the new stack looks right. The desktop app is a new app (new bundle ID): point its setup at your existing checkout. An Eru MCP client set up before the rename needs re-adding with `rowanholt mcp` and `ROWANHOLT_*` variables.
 
 **💡 Why OrbStack?** On macOS, OrbStack is 2-3x faster than Docker Desktop, uses ~4GB RAM instead of 8-12GB, and has no gVisor networking bugs that cause crashes with large forensic images. It's free for personal use.
 
-### Access Dernvale
+### Access Rowanholt
 
 - **Web Interface:** http://localhost:5687
 - **Backend API:** http://localhost:5688
-- **For a team:** one Dernvale on a central server, behind HTTPS and sign-in (optionally SSO), with each job visible to its owner and whoever they share it with: `dernvale server init <hostname>`, then [docs/SERVER.md](docs/SERVER.md)
+- **For a team:** one Rowanholt on a central server, behind HTTPS and sign-in (optionally SSO), with each job visible to its owner and whoever they share it with: `rowanholt server init <hostname>`, then [docs/SERVER.md](docs/SERVER.md)
 
 ### Quick Commands
 
@@ -144,13 +144,13 @@ _3. Additional optional features_
 &ensp;&ensp;&ensp;`python3 -m src.analysis.mitre.coverage_cli report CASE-001 /cases/CASE-001`
 
 &ensp;&ensp;&ensp;Index for AI analysis<br>
-&ensp;&ensp;&ensp;`python3 -m src.analysis.dernvale.ai.cli index CASE-001 /cases/CASE-001`
+&ensp;&ensp;&ensp;`python3 -m src.analysis.rowanholt.ai.cli index CASE-001 /cases/CASE-001`
 
 &ensp;&ensp;&ensp;Query with natural language<br>
-&ensp;&ensp;&ensp;`python3 -m src.analysis.dernvale.ai.cli query CASE-001 "What PowerShell commands were executed?"`
+&ensp;&ensp;&ensp;`python3 -m src.analysis.rowanholt.ai.cli query CASE-001 "What PowerShell commands were executed?"`
 
 &ensp;&ensp;&ensp;Generate report<br>
-&ensp;&ensp;&ensp;`python3 -m src.analysis.dernvale.ai.cli summary CASE-001 --format markdown --output report.md`
+&ensp;&ensp;&ensp;`python3 -m src.analysis.rowanholt.ai.cli summary CASE-001 --format markdown --output report.md`
 
 ---
 
@@ -169,16 +169,16 @@ _3. Additional optional features_
 
 ### 🎯 Architecture
 
-Gandalf acquires, Elrond analyses, Eru answers. Four pictures show how. In the web app they're under **About**; from a shell, `dernvale map realm|elrond|gandalf|journey` opens each one.
+Gandalf acquires, Elrond analyses, Eru answers. Four pictures show how. In the web app they're under **About**; from a shell, `rowanholt map realm|elrond|gandalf|journey` opens each one.
 
 <table>
   <tr>
     <td width="50%" valign="top">
-      <a href="./src/web/frontend/public/architecture/dernvale-architecture.html"><img src="./src/web/frontend/public/architecture/realm.jpg" alt="The realm: Gandalf to Elrond to Eru, drawn as a map of Middle-earth"/></a><br>
+      <a href="./src/web/frontend/public/architecture/rowanholt-architecture.html"><img src="./src/web/frontend/public/architecture/realm.jpg" alt="The realm: Gandalf to Elrond to Eru, drawn as a map of Middle-earth"/></a><br>
       <b>The realm.</b> The whole platform as a map of Middle-earth: hosts, images and cloud in; Gandalf, the web UI, the Celery worker and Elrond; the case store, SIEM, Navigator, Eru, Aragorn and Mordor.
     </td>
     <td width="50%" valign="top">
-      <a href="./src/web/frontend/public/architecture/dernvale-architecture.html"><img src="./src/web/frontend/public/architecture/elrond.jpg" alt="Elrond's roads: the directed graph branching by evidence type and OS"/></a><br>
+      <a href="./src/web/frontend/public/architecture/rowanholt-architecture.html"><img src="./src/web/frontend/public/architecture/elrond.jpg" alt="Elrond's roads: the directed graph branching by evidence type and OS"/></a><br>
       <b>Elrond's roads.</b> The directed graph: how each evidence type enters, and the Windows, Linux and macOS lanes from Collect through Process and Memory to the shared stages.
     </td>
   </tr>
@@ -188,8 +188,8 @@ Gandalf acquires, Elrond analyses, Eru answers. Four pictures show how. In the w
       <b>Gandalf's acquisition flow.</b> The three collectors, what each takes in order of volatility, how locked files are read, and how the hashed, encrypted archive reaches Elrond.
     </td>
     <td width="50%" valign="top">
-      <a href="./src/web/frontend/public/architecture/dernvale-journey.html"><img src="./src/web/frontend/public/architecture/journey.jpg" alt="The evidence's journey through Dernvale, an interactive 3D map of Middle-earth"/></a><br>
-      <b>There and back again (3D).</b> The evidence's journey across Middle-earth: Gandalf walks his archives from the Shire, eagles carry images and datasets, through Bree, Amon Sûl and Dernvale to the beacons and the palantír. Pick an evidence type to change the road; switch Ollama off to see Eru fall back to fixed answers. Open it with <code>dernvale map journey</code> or under About.
+      <a href="./src/web/frontend/public/architecture/rowanholt-journey.html"><img src="./src/web/frontend/public/architecture/journey.jpg" alt="The evidence's journey through Rowanholt, an interactive 3D map of Middle-earth"/></a><br>
+      <b>There and back again (3D).</b> The evidence's journey across Middle-earth: Gandalf walks his archives from the Shire, eagles carry images and datasets, through Bree, Amon Sûl and Rowanholt to the beacons and the palantír. Pick an evidence type to change the road; switch Ollama off to see Eru fall back to fixed answers. Open it with <code>rowanholt map journey</code> or under About.
     </td>
   </tr>
 </table>
@@ -349,16 +349,16 @@ Investigate cloud infrastructure across AWS, Azure, and GCP.
 **Usage:**
 ```bash
 # List AWS instances
-python3 -m src.analysis.dernvale.cloud.cli aws list --credentials aws_creds.json
+python3 -m src.analysis.rowanholt.cloud.cli aws list --credentials aws_creds.json
 
 # Acquire Azure VM disk
-python3 -m src.analysis.dernvale.cloud.cli azure acquire-disk \
+python3 -m src.analysis.rowanholt.cloud.cli azure acquire-disk \
   --instance-id myvm \
   --resource-group mygroup \
   --output ./output
 
 # Analyze CloudTrail logs
-python3 -m src.analysis.dernvale.cloud.cli aws analyze-logs \
+python3 -m src.analysis.rowanholt.cloud.cli aws analyze-logs \
   --log-file cloudtrail.json \
   --output ./analysis
 ```
@@ -389,19 +389,19 @@ Query investigation data using natural language with local AI. In the web app, *
 **Usage:**
 ```bash
 # Index case data
-python3 -m src.analysis.dernvale.ai.cli index CASE-001 /cases/CASE-001
+python3 -m src.analysis.rowanholt.ai.cli index CASE-001 /cases/CASE-001
 
 # Query the case
-python3 -m src.analysis.dernvale.ai.cli query CASE-001 "What PowerShell commands were executed?"
+python3 -m src.analysis.rowanholt.ai.cli query CASE-001 "What PowerShell commands were executed?"
 
 # Get investigation suggestions
-python3 -m src.analysis.dernvale.ai.cli suggest CASE-001
+python3 -m src.analysis.rowanholt.ai.cli suggest CASE-001
 
 # Generate case summary
-python3 -m src.analysis.dernvale.ai.cli summary CASE-001 --format markdown --output summary.md
+python3 -m src.analysis.rowanholt.ai.cli summary CASE-001 --format markdown --output summary.md
 
 # Start web interface (port 5687, same as the frontend container; stop that first)
-python3 -m src.analysis.dernvale.ai.web_interface
+python3 -m src.analysis.rowanholt.ai.web_interface
 # Access at http://localhost:5687/ai/chat/CASE-001
 ```
 
@@ -424,7 +424,7 @@ Docker hosts and Kubernetes nodes, from a disk image or a Gandalf collection.
 - Every Docker, containerd and Podman container's configuration, mounts, capabilities and log (`docker_containers.csv`, `container_logs.csv`)
 - The writable layer listed and hashed (`container_changes.csv`), with its executables and scripts copied and hashed: dropped executables, cron, SSH keys and `ld.so.preload` in a container
 - Static pod manifests, pod logs, and the API server's audit log (`static_pods.csv`, `k8s_audit.csv`)
-- Exported EKS, AKS or GKE audit logs: `python3 -m src.analysis.dernvale.cloud.cli k8s analyze-logs --log-file audit.json --output ./analysis`
+- Exported EKS, AKS or GKE audit logs: `python3 -m src.analysis.rowanholt.cloud.cli k8s analyze-logs --log-file audit.json --output ./analysis`
 
 **Detected Techniques:** **T1611** (escape to host), **T1610** (deploy container), **T1609** (container administration command), **T1552.007** (container API), **T1613** (container and resource discovery), **T1543.005** (container service) and more.
 
@@ -490,7 +490,7 @@ Work a case together from **Browse Case** on a completed job, on one machine or 
 - **[CLI Reference](docs/CLI.md)** - Every command, including common workflows
 - **[Requirements](docs/REQUIREMENTS.md)** - Installation requirements and dependencies
 - **[Performance](docs/PERFORMANCE.md)** - How long each option takes
-- **[How Dernvale compares](docs/COMPARISON.md)** - Against free and commercial DFIR tools, feature by feature
+- **[How Rowanholt compares](docs/COMPARISON.md)** - Against free and commercial DFIR tools, feature by feature
 
 ### User Documentation
 - **[Configuration](docs/CONFIG.md)** - Configuration options
@@ -517,8 +517,8 @@ Work a case together from **Browse Case** on a completed job, on one machine or 
 # Quick triage → Analysis → MITRE mapping → AI query → SIEM export
 (cd src/acquisition && sudo python3 python/gandalf.py Password Remote -O /evidence/IR-2024-001)
 python3 src/analysis/elrond.py IR-2024-001 /evidence/IR-2024-001 /cases/IR-2024-001 --Gandalf --Process --Analysis --Navigator --Splunk
-python3 -m src.analysis.dernvale.ai.cli index IR-2024-001 /cases/IR-2024-001
-python3 -m src.analysis.dernvale.ai.cli query IR-2024-001 "What lateral movement occurred?"
+python3 -m src.analysis.rowanholt.ai.cli index IR-2024-001 /cases/IR-2024-001
+python3 -m src.analysis.rowanholt.ai.cli query IR-2024-001 "What lateral movement occurred?"
 ```
 
 **Malware Analysis:**
@@ -526,17 +526,17 @@ python3 -m src.analysis.dernvale.ai.cli query IR-2024-001 "What lateral movement
 # Acquire → Memory analysis → IOC extraction → Report
 (cd src/acquisition && sudo python3 python/gandalf.py Password Local -M -O /evidence/MAL-001)
 python3 src/analysis/elrond.py MAL-001 /evidence/MAL-001 /output/MAL-001 --Gandalf --Process --Memory --extractIocs
-python3 -m src.analysis.dernvale.ai.cli index MAL-001 /output/MAL-001
-python3 -m src.analysis.dernvale.ai.cli summary MAL-001 --format markdown --output report.md
+python3 -m src.analysis.rowanholt.ai.cli index MAL-001 /output/MAL-001
+python3 -m src.analysis.rowanholt.ai.cli summary MAL-001 --format markdown --output report.md
 ```
 
 **Cloud Investigation:**
 ```bash
 # Acquire logs → Analyze → Query
-python3 -m src.analysis.dernvale.cloud.cli aws acquire-logs --days 30 --output ./logs
-python3 -m src.analysis.dernvale.cloud.cli aws analyze-logs --log-file ./logs/cloudtrail.json
-python3 -m src.analysis.dernvale.ai.cli index CLOUD-001 ./logs --cloud-logs ./logs/cloudtrail.json --cloud-provider aws
-python3 -m src.analysis.dernvale.ai.cli query CLOUD-001 "What suspicious AWS API calls were made?"
+python3 -m src.analysis.rowanholt.cloud.cli aws acquire-logs --days 30 --output ./logs
+python3 -m src.analysis.rowanholt.cloud.cli aws analyze-logs --log-file ./logs/cloudtrail.json
+python3 -m src.analysis.rowanholt.ai.cli index CLOUD-001 ./logs --cloud-logs ./logs/cloudtrail.json --cloud-provider aws
+python3 -m src.analysis.rowanholt.ai.cli query CLOUD-001 "What suspicious AWS API calls were made?"
 ```
 
 **For complete workflows, see:** [CLI.md](docs/CLI.md#common-workflows)
@@ -545,7 +545,7 @@ python3 -m src.analysis.dernvale.ai.cli query CLOUD-001 "What suspicious AWS API
 
 ## 🤝 Contributing
 
-We welcome contributions! Open an issue or pull request at https://github.com/cmdaltr/dernvale.
+We welcome contributions! Open an issue or pull request at https://github.com/cmdaltr/rowanholt.
 
 **Ways to Contribute:**
 - Report bugs and request features
@@ -564,7 +564,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-Dernvale integrates many excellent open-source forensic tools:
+Rowanholt integrates many excellent open-source forensic tools:
 
 - **Volatility 3** - Memory forensics framework
 - **Plaso/log2timeline** - Timeline generation
@@ -599,8 +599,8 @@ And 25+ additional tools. See [REQUIREMENTS.md](docs/REQUIREMENTS.md) for the co
 ## 📞 Support
 
 - **Documentation**: See [docs/](docs/)
-- **Issues**: [GitHub Issues](https://github.com/cmdaltr/dernvale/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/cmdaltr/dernvale/discussions)
+- **Issues**: [GitHub Issues](https://github.com/cmdaltr/rowanholt/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/cmdaltr/rowanholt/discussions)
 
 ---
 
@@ -636,4 +636,4 @@ And 25+ additional tools. See [REQUIREMENTS.md](docs/REQUIREMENTS.md) for the co
 
 **Built with ❤️ for the DFIR community**
 
-[⬆ Back to Top](#dernvale-dfir-suite)
+[⬆ Back to Top](#rowanholt-dfir-suite)

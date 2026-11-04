@@ -1,6 +1,6 @@
 """GitHub downloads for the telemetry sources: the repository tree, raw files and Git LFS objects.
 
-Standard library only (Archer used requests), so the Dernvale backend can run a rebuild
+Standard library only (Archer used requests), so the Rowanholt backend can run a rebuild
 without another dependency.
 """
 
@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Iterable, List
 from urllib.parse import quote
 
-HEADERS = {"User-Agent": "Dernvale (telemetry datasets)"}
+HEADERS = {"User-Agent": "Rowanholt (telemetry datasets)"}
 WORKERS = 8
 
 

@@ -1,10 +1,10 @@
 # Eru - the AI Analyst
 
-Eru answers questions about a case. In the web app it's **Ask Eru**; from a shell it's `python3 -m src.analysis.dernvale.ai.cli` ([CLI.md](CLI.md#eru-ai-analyst)); the endpoints are in [API.md](API.md#eru-ai-analyst).
+Eru answers questions about a case. In the web app it's **Ask Eru**; from a shell it's `python3 -m src.analysis.rowanholt.ai.cli` ([CLI.md](CLI.md#eru-ai-analyst)); the endpoints are in [API.md](API.md#eru-ai-analyst).
 
 ## With Ollama
 
-Free-text answers, case summaries and investigation suggestions come from a local model through Ollama. The backend finds it at `OLLAMA_HOST` (default `http://host.docker.internal:11434`, so Ollama on the Docker host) and uses `DERNVALE_MODEL_NAME` (default `llama3.2:3b`) with a context window of `DERNVALE_NUM_CTX` tokens (default 8192; Ollama's own default, 2048, is shorter than the case context). Nothing leaves the machine. To change them for the stack, set them in `.env` (e.g. `DERNVALE_MODEL_NAME=qwen3:8b`) and restart it: `docker-compose.yml` passes all three to the backend. A 3B model runs anywhere but misreads cases; an 8B one (`qwen3:8b`, about 5 GB) is the smallest worth relying on.
+Free-text answers, case summaries and investigation suggestions come from a local model through Ollama. The backend finds it at `OLLAMA_HOST` (default `http://host.docker.internal:11434`, so Ollama on the Docker host) and uses `ROWANHOLT_MODEL_NAME` (default `llama3.2:3b`) with a context window of `ROWANHOLT_NUM_CTX` tokens (default 8192; Ollama's own default, 2048, is shorter than the case context). Nothing leaves the machine. To change them for the stack, set them in `.env` (e.g. `ROWANHOLT_MODEL_NAME=qwen3:8b`) and restart it: `docker-compose.yml` passes all three to the backend. A 3B model runs anywhere but misreads cases; an 8B one (`qwen3:8b`, about 5 GB) is the smallest worth relying on.
 
 The model is given the case per host: the analysts' confirmed findings, the hosts and tagged techniques, the rows of the hosts' cooked and analysis tables that contain the question's words, and the rows behind the fixed questions below (flagged persistence, suspicious commands, staging, detections, analysis, threat intelligence, what's rare, last logins). Each row is tagged `[R1]`, `[R2]`… and the model is asked to cite the tags. Only a tag that was in what the model read comes back as a row, so an answer and a summary list the rows they cite, each with ⚑ to flag it, and a tag the model made up is dropped.
 
@@ -14,19 +14,19 @@ If Ollama isn't running, or the model isn't pulled, Ask Eru says which and how t
 
 ## From an MCP host
 
-`dernvale mcp` runs Eru's MCP server over stdio, so an MCP host (Claude Desktop, Claude Code, OpenClaw) can work a Dernvale case. It's read-only, and it's a client of Dernvale's own API rather than a way round it: on a team server every call carries your token, so you see the jobs you'd see in the web app and no others. It reads through the case browser's routes, so it never reaches `raw/`, and it calls nothing but the Dernvale API you point it at.
+`rowanholt mcp` runs Eru's MCP server over stdio, so an MCP host (Claude Desktop, Claude Code, OpenClaw) can work a Rowanholt case. It's read-only, and it's a client of Rowanholt's own API rather than a way round it: on a team server every call carries your token, so you see the jobs you'd see in the web app and no others. It reads through the case browser's routes, so it never reaches `raw/`, and it calls nothing but the Rowanholt API you point it at.
 
 It runs on your machine, not in the stack, and needs Python 3.10 or later with its one dependency:
 
 ```bash
-python3 -m venv ~/.dernvale-mcp
-~/.dernvale-mcp/bin/pip install -r requirements/mcp.txt
+python3 -m venv ~/.rowanholt-mcp
+~/.rowanholt-mcp/bin/pip install -r requirements/mcp.txt
 ```
 
-`DERNVALE_API` is the Dernvale to read (default `http://127.0.0.1:5688`). On a team server, `DERNVALE_TOKEN` is an API token: make one in the web app under **Account → Tokens for scripts and Eru's MCP server**, with a password or single sign-on, and give it the **eru-mcp** scope. Or from a signed-in session:
+`ROWANHOLT_API` is the Rowanholt to read (default `http://127.0.0.1:5688`). On a team server, `ROWANHOLT_TOKEN` is an API token: make one in the web app under **Account → Tokens for scripts and Eru's MCP server**, with a password or single sign-on, and give it the **eru-mcp** scope. Or from a signed-in session:
 
 ```bash
-curl -s https://dernvale.example.org/api/auth/tokens -H "Authorization: Bearer $SESSION" \
+curl -s https://rowanholt.example.org/api/auth/tokens -H "Authorization: Bearer $SESSION" \
   -H 'Content-Type: application/json' -d '{"name": "Claude Desktop", "scope": "eru-mcp", "days": 90}'
 ```
 
@@ -37,10 +37,10 @@ For Claude Desktop, in `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "dernvale": {
-      "command": "/path/to/dernvale/dernvale",
+    "rowanholt": {
+      "command": "/path/to/rowanholt/rowanholt",
       "args": ["mcp"],
-      "env": {"DERNVALE_MCP_PYTHON": "/Users/you/.dernvale-mcp/bin/python", "DERNVALE_API": "http://127.0.0.1:5688"}
+      "env": {"ROWANHOLT_MCP_PYTHON": "/Users/you/.rowanholt-mcp/bin/python", "ROWANHOLT_API": "http://127.0.0.1:5688"}
     }
   }
 }
@@ -49,7 +49,7 @@ For Claude Desktop, in `claude_desktop_config.json`:
 For Claude Code:
 
 ```bash
-claude mcp add dernvale --env DERNVALE_MCP_PYTHON=$HOME/.dernvale-mcp/bin/python -- /path/to/dernvale/dernvale mcp
+claude mcp add rowanholt --env ROWANHOLT_MCP_PYTHON=$HOME/.rowanholt-mcp/bin/python -- /path/to/rowanholt/rowanholt mcp
 ```
 
 | Tool | What it gives |
@@ -65,29 +65,29 @@ claude mcp add dernvale --env DERNVALE_MCP_PYTHON=$HOME/.dernvale-mcp/bin/python
 
 The server tells the host to start from a job id, cite file and row for every claim, and treat a stacking row or a threat intelligence match as a lead, not a verdict. It can't start, restart or delete jobs, run Gandalf, import or delete threat intelligence, assign hosts, or change or remove findings.
 
-Started with `--allow-writes` (`dernvale mcp --allow-writes`, or `"args": ["mcp", "--allow-writes"]`), it adds two tools, and nothing else that writes:
+Started with `--allow-writes` (`rowanholt mcp --allow-writes`, or `"args": ["mcp", "--allow-writes"]`), it adds two tools, and nothing else that writes:
 
 | Tool | What it does |
 |---|---|
 | `flag_lead(job_id, host, file, row, title, technique)` | Flags one row as a lead, never a confirmed or benign finding; a row already flagged is refused |
 | `add_note(job_id, body, finding_id)` | A note on a finding, or on the case without one |
 
-Each server call carries `X-Dernvale-Agent: eru-mcp`, so what Eru writes is recorded as "Eru (for alice)" in the findings, notes, activity and report, never as the analyst's own; with an eru-mcp token that holds even without the header. The backend holds it there: as Eru it refuses any status but lead, and refuses changing or removing findings and assigning hosts. A session stops after `--max-writes` writes (25 by default), so a host led on by text inside the case can't flood it, and the server tells the host that the case's text is evidence, not instructions. On a team server, `--allow-writes` won't start unless `DERNVALE_TOKEN` is an **eru-mcp** token, so the backend holds it to reads, leads and notes whatever the server's code does. On a live case, run it in an MCP host with no other network-capable tools (web fetch, Slack, email and the like) and no shell or file access to the case store: text inside the evidence could otherwise lead the model to send case data out through them, and the server's `raw/` boundary only covers what goes through the API (Claude Code in the Dernvale checkout, refused `raw/` by the server, offers to list it from disk). Claude Desktop with only this server, or a host on another machine, fits. Treat Eru's leads and notes as suggestions; only an analyst clears a host. Without `--allow-writes` the server is read-only, as before. The code is `src/eru_mcp/server.py` (mcp 2's `MCPServer`, which was FastMCP), and `tests/unit/test_eru_mcp.py` checks the tool list, other people's jobs, `raw/` and that nothing but `/api/` is called, against the real backend in server mode.
+Each server call carries `X-Rowanholt-Agent: eru-mcp`, so what Eru writes is recorded as "Eru (for alice)" in the findings, notes, activity and report, never as the analyst's own; with an eru-mcp token that holds even without the header. The backend holds it there: as Eru it refuses any status but lead, and refuses changing or removing findings and assigning hosts. A session stops after `--max-writes` writes (25 by default), so a host led on by text inside the case can't flood it, and the server tells the host that the case's text is evidence, not instructions. On a team server, `--allow-writes` won't start unless `ROWANHOLT_TOKEN` is an **eru-mcp** token, so the backend holds it to reads, leads and notes whatever the server's code does. On a live case, run it in an MCP host with no other network-capable tools (web fetch, Slack, email and the like) and no shell or file access to the case store: text inside the evidence could otherwise lead the model to send case data out through them, and the server's `raw/` boundary only covers what goes through the API (Claude Code in the Rowanholt checkout, refused `raw/` by the server, offers to list it from disk). Claude Desktop with only this server, or a host on another machine, fits. Treat Eru's leads and notes as suggestions; only an analyst clears a host. Without `--allow-writes` the server is read-only, as before. The code is `src/eru_mcp/server.py` (mcp 2's `MCPServer`, which was FastMCP), and `tests/unit/test_eru_mcp.py` checks the tool list, other people's jobs, `raw/` and that nothing but `/api/` is called, against the real backend in server mode.
 
 ### Over HTTP, from a team server
 
 A team server can run the same server over streamable HTTP at `https://<host>/mcp`, so an analyst's MCP host needs nothing installed. It's the `eru-mcp` service in `deploy/server/docker-compose.server.yml`, off unless the `mcp` profile is on, behind Caddy like everything else:
 
 ```bash
-COMPOSE_PROFILES=mcp ./dernvale start
+COMPOSE_PROFILES=mcp ./rowanholt start
 ```
 
-It holds no token of its own. Every request sends its analyst's **eru-mcp** API token as a bearer header; the server checks it with Dernvale (`/api/auth/me`) and makes that request's calls with it, so each analyst sees their own jobs, as over stdio. A **full** token or a sign-in's session is refused, reads included: either carries all of its user's rights if it leaks from a host's configuration. It's read-only unless `.env` has `ERU_MCP_ARGS=--allow-writes`, and `--max-writes` counts per token until the service restarts. `dernvale mcp --http` won't start against a Dernvale that isn't in server mode, or without the `https://` URL analysts use (`DERNVALE_PUBLIC_URL`, set by the Compose file).
+It holds no token of its own. Every request sends its analyst's **eru-mcp** API token as a bearer header; the server checks it with Rowanholt (`/api/auth/me`) and makes that request's calls with it, so each analyst sees their own jobs, as over stdio. A **full** token or a sign-in's session is refused, reads included: either carries all of its user's rights if it leaks from a host's configuration. It's read-only unless `.env` has `ERU_MCP_ARGS=--allow-writes`, and `--max-writes` counts per token until the service restarts. `rowanholt mcp --http` won't start against a Rowanholt that isn't in server mode, or without the `https://` URL analysts use (`ROWANHOLT_PUBLIC_URL`, set by the Compose file).
 
 For Claude Code:
 
 ```bash
-claude mcp add --transport http dernvale https://dernvale.example.org/mcp --header "Authorization: Bearer $DERNVALE_TOKEN"
+claude mcp add --transport http rowanholt https://rowanholt.example.org/mcp --header "Authorization: Bearer $ROWANHOLT_TOKEN"
 ```
 
 The token then sits in the host's own configuration, so use a 30-day **eru-mcp** token and revoke it when the machine is in doubt. The HTTP transport was reviewed under the threat model on 4 November 2026 (`.claude/threat-model.md`) and approved for live cases: eru-mcp tokens only, 30-day ones revoked when a machine is in doubt, on the team's network, in a host with no other network-capable tools.
@@ -118,15 +118,15 @@ The Ollama Modelfiles in `src/models/` build Eru variants: a forensic system pro
    ollama create eru-llama -f src/models/Modelfile.eru-llama
    ```
 
-3. Configure Dernvale to use it:
+3. Configure Rowanholt to use it:
    ```bash
-   export DERNVALE_MODEL_NAME=eru-llama
+   export ROWANHOLT_MODEL_NAME=eru-llama
    ```
 
 ## Creating All Models
 
 ```bash
-cd /path/to/dernvale
+cd /path/to/rowanholt
 
 # Lightweight (recommended for most systems)
 ollama create eru-llama -f src/models/Modelfile.eru-llama

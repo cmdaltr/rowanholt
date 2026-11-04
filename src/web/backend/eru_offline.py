@@ -436,13 +436,13 @@ GENERAL_ANSWERS = {
         "Eru generates answers with a local model served by Ollama, so case data never leaves this machine.\n"
         "1. Install Ollama: `brew install ollama` on macOS, or see ollama.com for Linux and Windows.\n"
         "2. Start it: `ollama serve` (the macOS app starts it for you).\n"
-        "3. Pull the model Dernvale is set to use (DERNVALE_MODEL_NAME, default llama3.2:3b): `ollama pull llama3.2:3b`.\n"
-        "4. Dernvale's backend reaches it at OLLAMA_HOST (default http://host.docker.internal:11434 from Docker). "
+        "3. Pull the model Rowanholt is set to use (ROWANHOLT_MODEL_NAME, default llama3.2:3b): `ollama pull llama3.2:3b`.\n"
+        "4. Rowanholt's backend reaches it at OLLAMA_HOST (default http://host.docker.internal:11434 from Docker). "
         "Point that at another machine's Ollama if this one is short of memory.\n"
         "Reload Ask Eru once it's running: the LLM badge turns green."
     ),
     "windows_persistence": (
-        "**Where Windows persistence lives, and where Dernvale shows it**\n\n"
+        "**Where Windows persistence lives, and where Rowanholt shows it**\n\n"
         "• Run/RunOnce keys and services: registry (SOFTWARE, SYSTEM, NTUSER.DAT), tagged T1547.001 / T1543.003\n"
         "• Scheduled tasks: System32\\Tasks (Artemis) and the TaskScheduler event log, T1053.005\n"
         "• Startup folders: startup_items.csv, T1547.001\n"
@@ -451,7 +451,7 @@ GENERAL_ANSWERS = {
         "Check the Navigator layer for what was actually tagged in a case."
     ),
     "linux_persistence": (
-        "**Linux persistence checklist, as Dernvale collects it**\n\n"
+        "**Linux persistence checklist, as Rowanholt collects it**\n\n"
         "• cron and at: cron/, crontab, T1053.003\n"
         "• systemd units, user units and generators: services/, autostart.csv, generators.csv, T1543.002\n"
         "• shell start-up: /etc/profile(.d), bashrc, rc.local: shell_init.csv, T1546.004 / T1037.004\n"
@@ -460,7 +460,7 @@ GENERAL_ANSWERS = {
         "• udev, XDG autostart, SSH authorized_keys, kernel modules: udev_rules.csv, autostart.csv, kernel_modules.csv"
     ),
     "macos_persistence": (
-        "**macOS persistence checklist, as Dernvale collects it**\n\n"
+        "**macOS persistence checklist, as Rowanholt collects it**\n\n"
         "• LaunchAgents and LaunchDaemons (system, Apple's and per user): plists, T1543.001 / T1543.004\n"
         "• Login and background items as macOS 13+ tracks them: btm_items.csv, T1547.015\n"
         "• emond rules: emond_rules.csv, T1546.014\n"
@@ -543,8 +543,8 @@ def unavailable_reason(status: Dict[str, object], host: str, model: str) -> str:
                 f"service instead. Install and start Ollama, then `ollama pull {model}`; until then, the questions "
                 f"below are answered straight from the case files, without a model.")
     if not status.get("model_loaded"):
-        return (f"Ollama is running at {host}, but the model Dernvale uses ({model}) isn't pulled. "
-                f"Run `ollama pull {model}` (or set DERNVALE_MODEL_NAME to one of: "
+        return (f"Ollama is running at {host}, but the model Rowanholt uses ({model}) isn't pulled. "
+                f"Run `ollama pull {model}` (or set ROWANHOLT_MODEL_NAME to one of: "
                 f"{', '.join(status.get('models') or []) or 'none installed'}). Until then, the questions below "
                 f"are answered straight from the case files.")
     return ""

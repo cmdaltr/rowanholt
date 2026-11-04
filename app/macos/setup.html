@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Set up Dernvale</title>
+<title>Set up Rowanholt</title>
 <style>
 :root { color-scheme: dark; --bg: #0b1210; --card: #101a17; --line: #1d2b26; --text: #b9c9b4;
         --dim: #7d907a; --strong: #e1ecdc; --ok: #8fc79a; --warn: #e8c27a; --bad: #e8a07a;
@@ -47,18 +47,18 @@ footer { text-align: center; margin-top: 20px; }
 <body>
 <main>
   <header>
-    <img src="dernvale.png" alt="Dernvale">
-    <p>A few steps, then Dernvale starts. Come back any time from the Dernvale menu: Set Up Dernvale…</p>
+    <img src="rowanholt.png" alt="Rowanholt">
+    <p>A few steps, then Rowanholt starts. Come back any time from the Rowanholt menu: Set Up Rowanholt…</p>
   </header>
 
   <section>
-    <h2><span class="n">1</span>Where Dernvale runs</h2>
+    <h2><span class="n">1</span>Where Rowanholt runs</h2>
     <div id="location"></div>
   </section>
 
   <section id="runtime-section">
     <h2><span class="n">2</span>Container runtime <span id="runtime-chip" class="chip dim">Checking…</span></h2>
-    <p id="runtime-text">Dernvale runs as a set of Docker containers.</p>
+    <p id="runtime-text">Rowanholt runs as a set of Docker containers.</p>
     <div id="runtime-actions" class="row"></div>
     <div id="orb-progress" hidden><p id="orb-text" class="small"></p><div class="bar"><div id="orb-bar"></div></div></div>
     <p class="small dim">OrbStack and Docker Desktop are free for personal use; commercial use of either may need a paid licence.</p>
@@ -66,7 +66,7 @@ footer { text-align: center; margin-top: 20px; }
 
   <section id="evidence-section">
     <h2><span class="n">3</span>Evidence folders <span class="chip dim">Optional</span></h2>
-    <p>Folders of disk images, memory dumps and Gandalf archives to make visible inside Dernvale, at the same paths.
+    <p>Folders of disk images, memory dumps and Gandalf archives to make visible inside Rowanholt, at the same paths.
        External drives under <code>/Volumes</code> are always visible.</p>
     <p id="evidence-locked" class="warn small" hidden>This copy has a hand-written <code>docker-compose.local.yml</code>, so setup leaves its mounts alone.</p>
     <ul id="evidence"></ul>
@@ -74,13 +74,13 @@ footer { text-align: center; margin-top: 20px; }
   </section>
 
   <footer>
-    <button id="finish" class="primary">Start Dernvale</button>
+    <button id="finish" class="primary">Start Rowanholt</button>
     <p id="error" class="bad" hidden></p>
     <p id="busy" class="dim" hidden></p>
   </footer>
 </main>
 <script>
-const send = (action, extra) => webkit.messageHandlers.dernvale.postMessage(Object.assign({ action }, extra || {}));
+const send = (action, extra) => webkit.messageHandlers.rowanholt.postMessage(Object.assign({ action }, extra || {}));
 const el = (tag, props, ...children) => {
   const node = Object.assign(document.createElement(tag), props || {});
   children.forEach(c => node.append(c));
@@ -104,8 +104,8 @@ function render(s) {
   const states = {
     checking: ['Checking…', 'dim', 'Looking for Docker…'],
     running: ['Ready', 'ok', `${s.runtime.name} is running.`],
-    installed: ['Installed', 'ok', `${s.runtime.name} is installed. Dernvale starts it when it launches.`],
-    missing: ['Not installed', 'bad', 'Dernvale needs OrbStack or Docker Desktop. OrbStack is lighter and faster on a Mac; this installs it for you.'],
+    installed: ['Installed', 'ok', `${s.runtime.name} is installed. Rowanholt starts it when it launches.`],
+    missing: ['Not installed', 'bad', 'Rowanholt needs OrbStack or Docker Desktop. OrbStack is lighter and faster on a Mac; this installs it for you.'],
   };
   const [label, cls, body] = states[s.runtime.status];
   chip.textContent = label;
@@ -134,20 +134,20 @@ function render(s) {
     return el('label', { className: 'choice' }, radio, el('div', {}, el('div', { textContent: title }), detail, controls || ''));
   };
   if (s.bundled) {
-    loc.append(choice('bundled', `Install Dernvale ${s.version}`,
+    loc.append(choice('bundled', `Install Rowanholt ${s.version}`,
       el('div', { className: 'small dim' }, 'Into ', el('code', { textContent: s.installPath }), s.installNote ? ` — ${s.installNote}` : ''),
       el('div', { className: 'row' }, button('Change…', 'chooseInstall', null, true))));
   }
   loc.append(choice('existing', 'Use a copy I already have',
-    el('div', { className: 'small dim' }, s.existingPath ? el('code', { textContent: s.existingPath }) : 'A git clone of github.com/cmdaltr/dernvale, for instance.'),
+    el('div', { className: 'small dim' }, s.existingPath ? el('code', { textContent: s.existingPath }) : 'A git clone of github.com/cmdaltr/rowanholt, for instance.'),
     el('div', { className: 'row' }, button('Choose folder…', 'chooseExisting', null, true))));
   const address = el('input', {
-    type: 'text', value: s.serverAddress, placeholder: 'dernvale.example.org', spellcheck: false,
+    type: 'text', value: s.serverAddress, placeholder: 'rowanholt.example.org', spellcheck: false,
     oninput: (e) => { typingAddress = true; send('serverAddress', { address: e.target.value }); },
     onfocus: () => { typingAddress = true; if (s.mode !== 'server') send('mode', { mode: 'server' }); },
   });
   address.className = 'address';
-  loc.append(choice('server', "Connect to my team's Dernvale server",
+  loc.append(choice('server', "Connect to my team's Rowanholt server",
     el('div', { className: 'small dim' }, 'Nothing runs on this Mac: no Docker, no files. Your team signs in on the server.'),
     el('div', { className: 'row' }, address)));
   if (typingAddress && s.mode === 'server') {
@@ -170,7 +170,7 @@ function render(s) {
     : s.runtime.status !== 'missing' && s.runtime.status !== 'checking' && (s.mode === 'bundled' || s.existingPath);
   const finish = document.getElementById('finish');
   finish.disabled = !ready || !!s.busy;
-  finish.textContent = s.mode === 'server' ? 'Connect' : 'Start Dernvale';
+  finish.textContent = s.mode === 'server' ? 'Connect' : 'Start Rowanholt';
   const error = document.getElementById('error');
   error.hidden = !s.error;
   error.textContent = s.error || '';

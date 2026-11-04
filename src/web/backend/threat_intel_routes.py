@@ -60,7 +60,7 @@ class LookupRequest(BaseModel):
     value: str = Field(..., min_length=3, max_length=300)
 
 
-AGENT_HEADERS = ("X-Dernvale-Agent", "X-Rivendell-Agent")
+AGENT_HEADERS = ("X-Rowanholt-Agent", "X-Rivendell-Agent")
 
 
 class TaxiiRequest(BaseModel):
@@ -84,7 +84,7 @@ async def indicators(q: str = "", source: str = "", limit: int = Query(100, le=5
 @router.post("/import")
 async def import_file(file: UploadFile = File(...)):
     """Indicators from an uploaded file: the Iran APT workbook, a STIX bundle,
-    MITRESaw's procedures, Dernvale's own CSV or a text watchlist."""
+    MITRESaw's procedures, Rowanholt's own CSV or a text watchlist."""
     package = _package()
     name = os.path.basename(file.filename or "upload")
     if not name.lower().endswith(UPLOAD_SUFFIXES):
@@ -112,7 +112,7 @@ async def import_file(file: UploadFile = File(...)):
 async def import_taxii(request: TaxiiRequest):
     """Every object in a TAXII 2.1 collection (or those added after a date), as indicators."""
     _package()
-    from dernvale.threat_intel.stix import IntelFormatError, import_taxii_with_validity as pull
+    from rowanholt.threat_intel.stix import IntelFormatError, import_taxii_with_validity as pull
     try:
         loaded, validity = pull(request.url, request.username, request.password, request.added_after)
     except IntelFormatError as exc:
@@ -127,7 +127,7 @@ async def import_taxii(request: TaxiiRequest):
 async def set_validity(indicator_id: int, request: ValidityRequest):
     """Extend an indicator's expiry, or clear it (no expiry); an expired one matches again once extended."""
     _package()
-    from dernvale.threat_intel.validity import parse_time
+    from rowanholt.threat_intel.validity import parse_time
     until = None
     if request.valid_until:
         until = parse_time(request.valid_until)
@@ -173,7 +173,7 @@ async def lookup_status():
 
 @router.post("/lookup")
 async def lookup(request: LookupRequest, http: Request):
-    """What the online provider says about one IP, domain or hash. Sends the value outside Dernvale,
+    """What the online provider says about one IP, domain or hash. Sends the value outside Rowanholt,
     so it's an analyst's call only: refused to an eru-mcp token and to Eru's MCP server."""
     if access.token_scope(http) == "eru-mcp" or any(http.headers.get(h) for h in AGENT_HEADERS):
         raise HTTPException(status_code=403, detail="Online lookups are an analyst's, not Eru's")

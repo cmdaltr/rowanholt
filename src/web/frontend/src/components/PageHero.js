@@ -1,15 +1,15 @@
 import React from 'react';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/dernvale.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt.png`;
 
-// The logo and title banner every Dernvale page opens with (as ElrondLanding and GandalfLanding)
+// The logo and title banner every Rowanholt page opens with (as ElrondLanding and GandalfLanding)
 function PageHero({ title, children }) {
   return (
     <>
       <section className="hero-section">
         <img
           src={heroImage}
-          alt="Dernvale"
+          alt="Rowanholt"
           className="hero-image"
           style={{ transform: 'scale(0.2)', transformOrigin: 'center top' }}
         />

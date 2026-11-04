@@ -24,7 +24,7 @@ USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9._@-]{2,64}$")
 
 
 class AdminPasswordMissing(RuntimeError):
-    """Server mode with no users yet and no DERNVALE_ADMIN_PASSWORD to create the first admin."""
+    """Server mode with no users yet and no ROWANHOLT_ADMIN_PASSWORD to create the first admin."""
 
 
 def ensure_data_dir() -> None:
@@ -81,16 +81,16 @@ def init_default_admin() -> dict:
     """Create the first admin if there are no users, and return the users.
 
     Locally that admin has the built-in password. A server takes it from
-    DERNVALE_ADMIN_PASSWORD and refuses to create one without it, since the
+    ROWANHOLT_ADMIN_PASSWORD and refuses to create one without it, since the
     built-in password is public.
     """
     users = load_users()
     if users:
         return users
-    if settings.dernvale_server_mode:
-        if not settings.dernvale_admin_password:
-            raise AdminPasswordMissing("Set DERNVALE_ADMIN_PASSWORD (dernvale server init does) to create the first admin")
-        password = settings.dernvale_admin_password
+    if settings.rowanholt_server_mode:
+        if not settings.rowanholt_admin_password:
+            raise AdminPasswordMissing("Set ROWANHOLT_ADMIN_PASSWORD (rowanholt server init does) to create the first admin")
+        password = settings.rowanholt_admin_password
     else:
         password = settings.default_admin_password
     admin = new_user("admin", settings.default_admin_email, role="admin", password=password, full_name="Administrator")

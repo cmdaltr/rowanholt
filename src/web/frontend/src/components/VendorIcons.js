@@ -1,7 +1,7 @@
 /**
  * Vendor Logo Icons
  *
- * SVG icons for SIEM and threat intelligence vendors used throughout the Dernvale application.
+ * SVG icons for SIEM and threat intelligence vendors used throughout the Rowanholt application.
  * This component provides reusable vendor icons with proper gradients and styling.
  */
 

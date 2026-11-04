@@ -3,7 +3,7 @@ requires = ["setuptools>=65.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dernvale-dfir"
+name = "rowanholt-dfir"
 version = "2.0.0"
 description = "Unified Digital Forensics Suite - Remote Acquisition (Gandalf) and Automated Analysis (Elrond)"
 readme = "README.md"
@@ -72,20 +72,20 @@ all = [
 ]
 
 [project.scripts]
-dernvale = "src.cli.dernvale:main"
-dernvale-acquire = "src.acquisition.python.gandalf:main"
-dernvale-analyze = "src.analysis.cli:main"
-dernvale-mordor = "src.cli.mordor:main"
-dernvale-web = "src.web.backend.main:start_server"
+rowanholt = "src.cli.rowanholt:main"
+rowanholt-acquire = "src.acquisition.python.gandalf:main"
+rowanholt-analyze = "src.analysis.cli:main"
+rowanholt-mordor = "src.cli.mordor:main"
+rowanholt-web = "src.web.backend.main:start_server"
 # Legacy compatibility
 elrond = "src.analysis.cli:main"
 gandalf = "src.acquisition.python.gandalf:main"
 
 [project.urls]
-Homepage = "https://github.com/cmdaltr/dernvale"
-Documentation = "https://github.com/cmdaltr/dernvale"
-Repository = "https://github.com/cmdaltr/dernvale.git"
-Issues = "https://github.com/cmdaltr/dernvale/issues"
+Homepage = "https://github.com/cmdaltr/rowanholt"
+Documentation = "https://github.com/cmdaltr/rowanholt"
+Repository = "https://github.com/cmdaltr/rowanholt.git"
+Issues = "https://github.com/cmdaltr/rowanholt/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

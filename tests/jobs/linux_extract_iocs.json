@@ -1,9 +1,9 @@
 {
   "case_number": "TEST_linux_extract_iocs",
   "source_paths": [
-    "/Volumes/Media5TB/dernvale_imgs/Linux_mail.vmdk.raw"
+    "/Volumes/Media5TB/rowanholt_imgs/Linux_mail.vmdk.raw"
   ],
-  "destination_path": "/Volumes/Media5TB/dernvale_imgs/tests/linux_extract_iocs",
+  "destination_path": "/Volumes/Media5TB/rowanholt_imgs/tests/linux_extract_iocs",
   "options": {
     "local": true,
     "gandalf": false,

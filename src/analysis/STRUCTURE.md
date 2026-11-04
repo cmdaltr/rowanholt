@@ -24,7 +24,7 @@ elrond/
 ├── 📁 tools/                    # 🛠️ Tool management
 ├── 📁 utils/                    # 🔨 Utility functions
 ├── 📁 config/                   # ⚙️ Configuration
-├── 📁 dernvale/                # 🏰 Forensic modules (legacy)
+├── 📁 rowanholt/                # 🏰 Forensic modules (legacy)
 ├── 📁 web/                      # 🌐 Web application
 ├── 📁 tests/                    # 🧪 Test suite
 └── 📁 images/                   # 🖼️ Image assets
@@ -158,12 +158,12 @@ config/
 
 **Purpose**: Centralized configuration management.
 
-## Dernvale (dernvale/)
+## Rowanholt (rowanholt/)
 
 Legacy forensic modules - being gradually refactored:
 
 ```
-dernvale/
+rowanholt/
 ├── main.py                      # Main orchestrator
 ├── meta.py                      # Metadata operations
 ├── audit.py                     # Audit logging
@@ -320,7 +320,7 @@ tests/
 ### By Layer
 - **core/**: Business logic (platform-agnostic)
 - **platform/**: Platform-specific implementations
-- **dernvale/**: Forensic operations
+- **rowanholt/**: Forensic operations
 - **web/**: User interface
 
 ### By Responsibility
@@ -379,7 +379,7 @@ docker-compose -f docker/docker-compose.prod.yml build
 | platform/ | 6 | Platform adapters |
 | tools/ | 6 | Tool management |
 | utils/ | 9 | Utilities |
-| dernvale/ | 50+ | Forensic modules |
+| rowanholt/ | 50+ | Forensic modules |
 | web/backend/ | 10+ | Backend API |
 | web/frontend/ | 100+ | Frontend app |
 | tests/ | 10+ | Test suite |

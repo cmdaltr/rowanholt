@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """
-Dernvale Mordor Dataset Manager
+Rowanholt Mordor Dataset Manager
 
 CLI for managing OTRF Security Datasets (Mordor datasets) for forensic analysis
 and threat hunting.
 
 Usage:
-    dernvale-mordor list [--platform PLATFORM] [--tactic TACTIC] [--technique TECHNIQUE] [--search TEXT]
-    dernvale-mordor download <dataset_id> [--output DIR]
-    dernvale-mordor info <dataset_id>
-    dernvale-mordor local [--status STATUS]
-    dernvale-mordor delete <dataset_id> [--force]
-    dernvale-mordor verify <dataset_id>
-    dernvale-mordor refresh [--force]
-    dernvale-mordor stats
+    rowanholt-mordor list [--platform PLATFORM] [--tactic TACTIC] [--technique TECHNIQUE] [--search TEXT]
+    rowanholt-mordor download <dataset_id> [--output DIR]
+    rowanholt-mordor info <dataset_id>
+    rowanholt-mordor local [--status STATUS]
+    rowanholt-mordor delete <dataset_id> [--force]
+    rowanholt-mordor verify <dataset_id>
+    rowanholt-mordor refresh [--force]
+    rowanholt-mordor stats
 """
 
 import argparse
@@ -366,7 +366,7 @@ def cmd_stats(args):
 def main():
     """Main entry point for the CLI."""
     parser = argparse.ArgumentParser(
-        description="Dernvale Mordor Dataset Manager - Manage OTRF Security Datasets",
+        description="Rowanholt Mordor Dataset Manager - Manage OTRF Security Datasets",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -411,7 +411,7 @@ For more information, visit: https://github.com/OTRF/Security-Datasets
     dl_parser.add_argument(
         "--output",
         "-o",
-        help="Output directory (default: /tmp/dernvale/mordor)",
+        help="Output directory (default: /tmp/rowanholt/mordor)",
     )
     dl_parser.add_argument(
         "--force",

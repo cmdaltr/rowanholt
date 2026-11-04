@@ -1,4 +1,4 @@
-# Dernvale Configuration Guide
+# Rowanholt Configuration Guide
 
 **Version:** 2.1.0
 **Last Updated:** 2025-01-15
@@ -21,13 +21,13 @@
 
 ### Default Configuration
 
-Dernvale works out-of-the-box with sensible defaults:
+Rowanholt works out-of-the-box with sensible defaults:
 
 - **Backend**: http://localhost:5688
 - **Frontend**: http://localhost:5687
 - **Database**: PostgreSQL (localhost:5432)
 - **Redis**: localhost:6379
-- **Default Admin**: admin@dernvale.app / IWasThere3000YearsAgo!
+- **Default Admin**: admin@rowanholt.app / IWasThere3000YearsAgo!
 
 ### Environment Variables
 
@@ -35,11 +35,11 @@ Create `.env` file in `/src/web/backend/`:
 
 ```bash
 # Application
-APP_NAME="Dernvale Web Interface"
+APP_NAME="Rowanholt Web Interface"
 DEBUG=false
 
 # Database
-DATABASE_URL=postgresql://dernvale:dernvale@postgres:5432/dernvale
+DATABASE_URL=postgresql://rowanholt:rowanholt@postgres:5432/rowanholt
 
 # Redis
 REDIS_HOST=redis
@@ -102,7 +102,7 @@ allowed_paths = [
     "/Volumes",
     "/mnt",
     "/media",
-    "/tmp/dernvale",
+    "/tmp/rowanholt",
     "/host/tmp",  # Host /tmp mounted in Docker
 ]
 ```
@@ -111,15 +111,15 @@ allowed_paths = [
 ```python
 allowed_paths = [
     "/Volumes",
-    "/tmp/dernvale",
+    "/tmp/rowanholt",
 ]
 ```
 
 **Windows:**
 ```python
 allowed_paths = [
-    "C:\\Temp\\dernvale",
-    "D:\\Temp\\dernvale",
+    "C:\\Temp\\rowanholt",
+    "D:\\Temp\\rowanholt",
 ]
 ```
 
@@ -171,18 +171,18 @@ ls -la build/
 postgres:
   image: postgres:15-alpine
   environment:
-    POSTGRES_USER: dernvale
-    POSTGRES_PASSWORD: dernvale
-    POSTGRES_DB: dernvale
+    POSTGRES_USER: rowanholt
+    POSTGRES_PASSWORD: rowanholt
+    POSTGRES_DB: rowanholt
   ports:
     - "5432:5432"
   volumes:
-    - dernvale-postgres:/var/lib/postgresql/data
+    - rowanholt-postgres:/var/lib/postgresql/data
 ```
 
 **Connection String:**
 ```
-postgresql://dernvale:dernvale@localhost:5432/dernvale
+postgresql://rowanholt:rowanholt@localhost:5432/rowanholt
 ```
 
 ### Database Migrations
@@ -208,7 +208,7 @@ redis:
   ports:
     - "6379:6379"
   volumes:
-    - dernvale-redis:/data
+    - rowanholt-redis:/data
 ```
 
 ---
@@ -368,13 +368,13 @@ yara --version
 **Solutions:**
 ```bash
 # Check database connection
-psql -h localhost -U dernvale -d dernvale
+psql -h localhost -U rowanholt -d rowanholt
 
 # Check Redis connection
 redis-cli ping
 
 # Check logs
-docker logs dernvale-backend
+docker logs rowanholt-backend
 
 # Verify dependencies
 pip install -r requirements/web.txt
@@ -422,13 +422,13 @@ python -m alembic history
 ```bash
 # Check allowed_paths in config.py
 # Verify directory exists
-ls -la /tmp/dernvale
+ls -la /tmp/rowanholt
 
 # Check permissions
-chmod 755 /tmp/dernvale
+chmod 755 /tmp/rowanholt
 
 # Check Docker volume mounts
-docker inspect dernvale-backend | grep Mounts
+docker inspect rowanholt-backend | grep Mounts
 ```
 
 #### Celery Tasks Not Running
@@ -438,13 +438,13 @@ docker inspect dernvale-backend | grep Mounts
 **Solutions:**
 ```bash
 # Check Celery worker
-docker logs dernvale-celery-worker
+docker logs rowanholt-celery-worker
 
 # Check Redis
 redis-cli ping
 
 # Restart Celery
-docker restart dernvale-celery-worker
+docker restart rowanholt-celery-worker
 ```
 
 ### Debug Mode
@@ -457,15 +457,15 @@ DEBUG=true
 LOG_LEVEL=DEBUG
 
 # Or environment variable
-export DERNVALE_DEBUG=1
+export ROWANHOLT_DEBUG=1
 ```
 
 ### Getting Help
 
-1. Check logs: `docker logs dernvale-backend`
+1. Check logs: `docker logs rowanholt-backend`
 2. Review [API.md](API.md) for endpoint docs
 3. See [SECURITY.md](SECURITY.md) for security setup
-4. Check GitHub issues: https://github.com/cmdaltr/dernvale/issues
+4. Check GitHub issues: https://github.com/cmdaltr/rowanholt/issues
 
 ---
 
@@ -503,8 +503,8 @@ Control how user profiles are collected during forensic analysis:
 
 | Environment Variable | Values | Default | Description |
 |---------------------|--------|---------|-------------|
-| `DERNVALE_EXCLUDE_PROFILE_CACHE` | `true`/`false` | `true` | Skip cache directories when copying full user profiles |
-| `DERNVALE_DEBUG_PROFILE_COPY` | `true`/`false` | `false` | Show progress updates during profile copies (every 60s) |
+| `ROWANHOLT_EXCLUDE_PROFILE_CACHE` | `true`/`false` | `true` | Skip cache directories when copying full user profiles |
+| `ROWANHOLT_DEBUG_PROFILE_COPY` | `true`/`false` | `false` | Show progress updates during profile copies (every 60s) |
 
 When enabled, the following directories are excluded from user profile collection:
 - `AppData/Local/Temp` - Temporary files
@@ -521,7 +521,7 @@ When enabled, the following directories are excluded from user profile collectio
 **To disable exclusions** (copy everything including caches):
 ```yaml
 # In docker-compose.yml under celery-worker environment:
-- DERNVALE_EXCLUDE_PROFILE_CACHE=false
+- ROWANHOLT_EXCLUDE_PROFILE_CACHE=false
 ```
 
 Then restart: `docker compose up -d --force-recreate celery-worker`
@@ -547,17 +547,17 @@ Then restart: `docker compose up -d --force-recreate celery-worker`
 
 ```bash
 # Backup
-docker exec dernvale-postgres pg_dump -U dernvale dernvale > backup_$(date +%Y%m%d).sql
+docker exec rowanholt-postgres pg_dump -U rowanholt rowanholt > backup_$(date +%Y%m%d).sql
 
 # Restore
-docker exec -i dernvale-postgres psql -U dernvale dernvale < backup_20250115.sql
+docker exec -i rowanholt-postgres psql -U rowanholt rowanholt < backup_20250115.sql
 ```
 
 ### Configuration Backup
 
 ```bash
 # Backup all configs
-tar czf dernvale-config_$(date +%Y%m%d).tar.gz \
+tar czf rowanholt-config_$(date +%Y%m%d).tar.gz \
   /src/web/backend/.env \
   /src/web/backend/config.py \
   /src/web/frontend/.env
@@ -567,7 +567,7 @@ tar czf dernvale-config_$(date +%Y%m%d).tar.gz \
 
 ```bash
 # Add to crontab
-0 2 * * * /opt/dernvale/scripts/backup.sh
+0 2 * * * /opt/rowanholt/scripts/backup.sh
 ```
 
 ---

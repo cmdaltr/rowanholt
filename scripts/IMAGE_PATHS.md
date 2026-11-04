@@ -1,6 +1,6 @@
-# Dernvale Image Path Manager
+# Rowanholt Image Path Manager
 
-Interactive script to manage forensic image paths in Dernvale without reinstalling.
+Interactive script to manage forensic image paths in Rowanholt without reinstalling.
 
 ## Usage
 
@@ -26,7 +26,7 @@ Current Forensic Image Paths
 
 Configured paths:
 
-  ✓ /Volumes/Media5TB/dernvale_imgs
+  ✓ /Volumes/Media5TB/rowanholt_imgs
      → /data (in container)
 
   ✓ /home/user/backup-images
@@ -71,7 +71,7 @@ Remove Forensic Image Paths
 
 Current paths:
 
-  1. /Volumes/Media5TB/dernvale_imgs → /data
+  1. /Volumes/Media5TB/rowanholt_imgs → /data
   2. /home/user/backup-images → /data1
   3. /mnt/external/forensics → /data2
 
@@ -96,7 +96,7 @@ Replace All Forensic Image Paths
 
 Current paths will be replaced:
 
-  ✗ /Volumes/Media5TB/dernvale_imgs
+  ✗ /Volumes/Media5TB/rowanholt_imgs
   ✗ /home/user/backup-images
 
 Replace all paths? (y/N): y
@@ -173,7 +173,7 @@ Paths are mounted inside containers as:
 $ python3 scripts/image-paths.py
 
 ======================================================================
-  Dernvale Image Path Manager
+  Rowanholt Image Path Manager
 ======================================================================
 
 Options:
@@ -200,13 +200,13 @@ Select option (1-5): 1
 
 Configured paths:
 
-  ✓ /Volumes/Media5TB/dernvale_imgs
+  ✓ /Volumes/Media5TB/rowanholt_imgs
      → /data (in container)
 
 Press Enter to continue...
 
 ======================================================================
-  Dernvale Image Path Manager
+  Rowanholt Image Path Manager
 ======================================================================
 
 Options:
@@ -231,12 +231,12 @@ Enter path #2 (or Enter to finish):
 
 Configured paths:
 
-  • /Volumes/Media5TB/dernvale_imgs
+  • /Volumes/Media5TB/rowanholt_imgs
     → /data (in container)
   • /home/user/new-images
     → /data1 (in container)
 
-ℹ  Restart Dernvale for changes to take effect:
+ℹ  Restart Rowanholt for changes to take effect:
   docker compose down
   ./scripts/start-testing-mode.sh
 
@@ -245,10 +245,10 @@ Press Enter to continue...
 
 ## After Updating Paths
 
-After updating paths, you must restart Dernvale:
+After updating paths, you must restart Rowanholt:
 
 ```bash
-# Stop Dernvale
+# Stop Rowanholt
 docker compose down
 
 # Start in testing mode
@@ -309,7 +309,7 @@ python3 scripts/image-paths.py
 ### Changes don't take effect
 
 **Solution:**
-- Restart Dernvale after updating paths:
+- Restart Rowanholt after updating paths:
   ```bash
   docker compose down
   ./scripts/start-testing-mode.sh
@@ -375,7 +375,7 @@ The script performs surgical updates to `docker-compose.yml`:
 
 ## Integration with Installer
 
-This script uses the same path management logic as the main installer (`install-dernvale.py`), ensuring consistency across:
+This script uses the same path management logic as the main installer (`install-rowanholt.py`), ensuring consistency across:
 - Initial installation
 - Path updates
 - Path validation
@@ -383,4 +383,4 @@ This script uses the same path management logic as the main installer (`install-
 
 ---
 
-**Need help?** See [INSTALL.md](../INSTALL.md) or open an [issue](https://github.com/cmdaltr/dernvale/issues)
+**Need help?** See [INSTALL.md](../INSTALL.md) or open an [issue](https://github.com/cmdaltr/rowanholt/issues)

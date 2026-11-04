@@ -1,5 +1,5 @@
 """
-Unified encryption utilities for Dernvale DF Acceleration Suite
+Unified encryption utilities for Rowanholt DF Acceleration Suite
 
 Provides consistent encryption/decryption across acquisition modules.
 Eliminates duplicate encryption code found in 3+ files.

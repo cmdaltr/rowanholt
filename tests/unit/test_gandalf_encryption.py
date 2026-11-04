@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(ROOT / "src" / "analysis"))
 
-from dernvale.core import gandalf  # noqa: E402
+from rowanholt.core import gandalf  # noqa: E402
 
 try:
     from cryptography.fernet import Fernet

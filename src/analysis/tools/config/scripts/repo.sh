@@ -32,14 +32,14 @@ sudo mv osxpmem.app.zip /opt/elrond/elrond/tools/
 sudo mv volatility.zip /opt/elrond/elrond/tools/
 sudo mv volatility3.zip /opt/elrond/elrond/tools/
 
-#/opt/elrond/elrond/dernvale/memory/
+#/opt/elrond/elrond/rowanholt/memory/
 unzip volatility-sym-prof-plug.zip 1> /dev/null
-sudo mv volatility /opt/elrond/elrond/dernvale/memory/
-sudo mv volatility3 /opt/elrond/elrond/dernvale/memory/
+sudo mv volatility /opt/elrond/elrond/rowanholt/memory/
+sudo mv volatility3 /opt/elrond/elrond/rowanholt/memory/
 
-#/opt/elrond/elrond/dernvale/post/splunk/
+#/opt/elrond/elrond/rowanholt/post/splunk/
 unzip apps.zip 1> /dev/null
-sudo mkdir /opt/elrond/elrond/dernvale/post/splunk/apps/
-sudo mv /tmp/apps/*.py /opt/elrond/elrond/dernvale/post/splunk/apps/
+sudo mkdir /opt/elrond/elrond/rowanholt/post/splunk/apps/
+sudo mv /tmp/apps/*.py /opt/elrond/elrond/rowanholt/post/splunk/apps/
 sudo rm -rf /tmp/*.zip
 cd ~

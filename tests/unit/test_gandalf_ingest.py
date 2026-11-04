@@ -14,8 +14,8 @@ from pathlib import Path
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from dernvale.core import gandalf  # noqa: E402
-from dernvale.core.identify import parse_gandalf_host_info  # noqa: E402
+from rowanholt.core import gandalf  # noqa: E402
+from rowanholt.core.identify import parse_gandalf_host_info  # noqa: E402
 
 UNIX_LAYOUT = {
     "artefacts/host.info": "lab-rocky::Linux\nLinux lab-rocky 7.0\n",
@@ -131,7 +131,7 @@ class GandalfIngestTests(unittest.TestCase):
         self.assertFalse((self.out / "lab-rocky" / "gandalf_integrity.csv").exists())
 
     def test_zsh_extended_history(self):
-        from dernvale.process.nix import parse_zsh_history
+        from rowanholt.process.nix import parse_zsh_history
 
         entries = parse_zsh_history(": 1792800000:0;whoami\nplain\n: 1792800020:3;echo a \\\nb\n")
         self.assertEqual(entries, [("2026-10-24T00:00:00Z", "whoami"), ("", "plain"),

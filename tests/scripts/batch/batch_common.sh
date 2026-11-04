@@ -62,7 +62,7 @@ check_file_handles() {
     local threshold="${1:-100}"
 
     echo "Checking for file handles from previous runs..."
-    HANDLE_COUNT=$(lsof 2>/dev/null | grep -c "/Volumes/Media5TB/dernvale_imgs" 2>/dev/null) || HANDLE_COUNT=0
+    HANDLE_COUNT=$(lsof 2>/dev/null | grep -c "/Volumes/Media5TB/rowanholt_imgs" 2>/dev/null) || HANDLE_COUNT=0
 
     if [ "$HANDLE_COUNT" -gt "$threshold" ]; then
         echo "⚠️  Found $HANDLE_COUNT file handles - cleaning up before starting batch..."
@@ -140,7 +140,7 @@ run_batch() {
             sleep "$DELAY_BETWEEN_TESTS"
 
             # Check file handle count and cleanup if needed
-            HANDLE_COUNT=$(lsof 2>/dev/null | grep -c "/Volumes/Media5TB/dernvale_imgs" 2>/dev/null) || HANDLE_COUNT=0
+            HANDLE_COUNT=$(lsof 2>/dev/null | grep -c "/Volumes/Media5TB/rowanholt_imgs" 2>/dev/null) || HANDLE_COUNT=0
             if [ "$HANDLE_COUNT" -gt 1000 ]; then
                 echo "⚠️  High file handle count ($HANDLE_COUNT) - cleaning up OrbStack..."
                 cleanup_docker

@@ -1,12 +1,12 @@
-# How Dernvale compares
+# How Rowanholt compares
 
-Dernvale sits among a well-established set of DFIR tools, free and commercial. This page compares what each does, says where Dernvale is strong and where it isn't, and lists what nothing else does in the same way. It was written in October 2026 from each project's public documentation, release notes and published prices; vendors ship often, so if a row is out of date, open an issue and it'll be corrected.
+Rowanholt sits among a well-established set of DFIR tools, free and commercial. This page compares what each does, says where Rowanholt is strong and where it isn't, and lists what nothing else does in the same way. It was written in October 2026 from each project's public documentation, release notes and published prices; vendors ship often, so if a row is out of date, open an issue and it'll be corrected.
 
 **Legend:** ✓ built in · ◐ partial, an add-on, or one platform only · — not offered, or not found in the public documentation
 
 ## Free and open-source tools
 
-| | Dernvale | Velociraptor | Autopsy | KAPE + EZ Tools | Plaso + Timesketch | Dissect |
+| | Rowanholt | Velociraptor | Autopsy | KAPE + EZ Tools | Plaso + Timesketch | Dissect |
 |---|---|---|---|---|---|---|
 | Remote collection | ✓ Windows, Linux, macOS; agentless (SSH, PowerShell remoting) | ✓ agent-based, fleet scale | — | ◐ Windows | — | ◐ `acquire` |
 | Disk images (E01, raw, VMDK) | ✓ | ✓ raw and E01 | ✓ | ✓ mounted | ✓ | ✓ |
@@ -28,7 +28,7 @@ Hayabusa and Chainsaw aren't in the table because they do one job, Windows event
 
 ## Commercial tools
 
-| | Dernvale | Binalyze AIR | Cyber Triage | Magnet AXIOM Cyber | Belkasoft X Corporate | X-Ways Forensics |
+| | Rowanholt | Binalyze AIR | Cyber Triage | Magnet AXIOM Cyber | Belkasoft X Corporate | X-Ways Forensics |
 |---|---|---|---|---|---|---|
 | Remote collection | ✓ agentless | ✓ agent; Windows, Linux, macOS, ESXi, ChromeOS | ◐ Windows-focused | ✓ agent | ✓ Belkasoft R | ◐ with F-Response |
 | Disk images | ✓ | ◐ | ✓ | ✓ | ✓ | ✓ |
@@ -50,9 +50,9 @@ Hayabusa and Chainsaw aren't in the table because they do one job, Windows event
 
 Prices are the vendors' own where published; check with them before relying on a figure.
 
-## Where Dernvale stands
+## Where Rowanholt stands
 
-Dernvale is an automation platform rather than a viewer. Point it at a host, a disk or memory image, a Gandalf collection or a set of cloud logs, and it runs the whole chain: collect, verify, parse with 30+ tools, map to ATT&CK, stack across hosts, match against threat intelligence, and hand the result to an analyst, a team or a SIEM. The closest commercial equivalents are Binalyze AIR and Cyber Triage; the closest free one is Velociraptor feeding Plaso and Timesketch, which takes three tools and the glue between them to cover the same ground.
+Rowanholt is an automation platform rather than a viewer. Point it at a host, a disk or memory image, a Gandalf collection or a set of cloud logs, and it runs the whole chain: collect, verify, parse with 30+ tools, map to ATT&CK, stack across hosts, match against threat intelligence, and hand the result to an analyst, a team or a SIEM. The closest commercial equivalents are Binalyze AIR and Cyber Triage; the closest free one is Velociraptor feeding Plaso and Timesketch, which takes three tools and the glue between them to cover the same ground.
 
 It isn't a replacement for a forensic suite when the job is reviewing one device in depth: there's no hex or file viewer, no carving review, and no mobile support. Nor is it a fleet-scale hunting agent like Velociraptor or AIR; Gandalf collects host by host. It has no court track record or third-party validation yet, it's maintained by one person, and it wants 16 GB of RAM to run comfortably. The cloud modules have had less lab time than the host analysis.
 
@@ -74,4 +74,4 @@ It isn't a replacement for a forensic suite when the job is reviewing one device
 
 ## Using it alongside other tools
 
-Dernvale's output is CSV and JSON per artefact, a Plaso timeline, an ATT&CK Navigator layer, and Splunk or Elasticsearch indices. A suite such as AXIOM or X-Ways can take the same image for in-depth review of one device; Timesketch can take the Plaso timeline; and Hayabusa or Chainsaw can run over the same event logs for a second opinion from Sigma.
+Rowanholt's output is CSV and JSON per artefact, a Plaso timeline, an ATT&CK Navigator layer, and Splunk or Elasticsearch indices. A suite such as AXIOM or X-Ways can take the same image for in-depth review of one device; Timesketch can take the Plaso timeline; and Hayabusa or Chainsaw can run over the same event logs for a second opinion from Sigma.

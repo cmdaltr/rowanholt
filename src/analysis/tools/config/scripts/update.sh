@@ -7,7 +7,7 @@ HOSTNAME=$(hostname)
 sudo rm -rf /opt/elrond/elrond/tools/avml*
 sudo rm -rf /opt/elrond/elrond/tools/osxpmem.app.zip
 sudo rm -rf /opt/elrond/elrond/tools/volatility*
-sudo mv /tmp/apps/*.py /opt/elrond/elrond/dernvale/post/splunk/apps/
+sudo mv /tmp/apps/*.py /opt/elrond/elrond/rowanholt/post/splunk/apps/
 clear
 
 # downloading latest version

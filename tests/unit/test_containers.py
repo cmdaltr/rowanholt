@@ -9,9 +9,9 @@ from pathlib import Path
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from dernvale.collect import linux as collect  # noqa: E402
-from dernvale.process import linux_artefacts as la  # noqa: E402
-from dernvale.process.extractions import bbolt, containers, k8s_audit  # noqa: E402
+from rowanholt.collect import linux as collect  # noqa: E402
+from rowanholt.process import linux_artefacts as la  # noqa: E402
+from rowanholt.process.extractions import bbolt, containers, k8s_audit  # noqa: E402
 
 CID = "4f1c9e2ab3d7" + "0" * 52
 # Made by containerd 1.7 itself (lab/linux-targets/seed/containerd/make-meta-db.sh)

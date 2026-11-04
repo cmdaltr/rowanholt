@@ -1,5 +1,5 @@
 """Threat intelligence: the fixed schema, every loader, matching rules, a case match, and the
-backend's store (dernvale/threat_intel/, src/web/backend/threat_intel_store.py)."""
+backend's store (rowanholt/threat_intel/, src/web/backend/threat_intel_store.py)."""
 import csv
 import dataclasses
 import json
@@ -12,12 +12,12 @@ REPO = Path(__file__).resolve().parents[2]
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(REPO / "src" / "analysis"))
 
-from dernvale.threat_intel import COLUMNS, Indicator, ThreatIntelIndex, enrich_artefact, load, load_all  # noqa: E402
-from dernvale.threat_intel.index import classify  # noqa: E402
-from dernvale.threat_intel.match import match_case  # noqa: E402
-from dernvale.threat_intel.schema import read_csv, write_csv  # noqa: E402
-from dernvale.threat_intel.stix import parse_stix_bundle, parse_stix_bundle_with_validity  # noqa: E402
-from dernvale.threat_intel.validity import Validity, default_validity  # noqa: E402
+from rowanholt.threat_intel import COLUMNS, Indicator, ThreatIntelIndex, enrich_artefact, load, load_all  # noqa: E402
+from rowanholt.threat_intel.index import classify  # noqa: E402
+from rowanholt.threat_intel.match import match_case  # noqa: E402
+from rowanholt.threat_intel.schema import read_csv, write_csv  # noqa: E402
+from rowanholt.threat_intel.stix import parse_stix_bundle, parse_stix_bundle_with_validity  # noqa: E402
+from rowanholt.threat_intel.validity import Validity, default_validity  # noqa: E402
 
 TEN = ["Evidential Element", "Threat Group", "Procedure Example", "Technique ID", "Technique Name", "Tactic",
        "Contextual Evidence", "Reference URL", "Navigation Layer URL", "Source Type"]

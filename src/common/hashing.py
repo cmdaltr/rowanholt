@@ -1,5 +1,5 @@
 """
-Unified hashing utilities for Dernvale DF Acceleration Suite
+Unified hashing utilities for Rowanholt DF Acceleration Suite
 
 Provides consistent file hashing across acquisition and analysis modules.
 Eliminates duplicate SHA256 code found in 10+ files.
@@ -20,7 +20,7 @@ def calculate_sha256(filepath: str, chunk_size: int = DEFAULT_CHUNK_SIZE) -> str
 
     Unified implementation replacing duplicate code in:
     - acquisition/python/collect_artefacts-py
-    - analysis/dernvale/meta.py
+    - analysis/rowanholt/meta.py
     - acquisition/bash/gandalf.sh (via sha256sum)
 
     Args:
