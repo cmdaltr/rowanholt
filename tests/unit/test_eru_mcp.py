@@ -196,7 +196,7 @@ class EruMcpTest(BackendCase):
 
     def test_over_http_each_request_is_its_own_analyst(self):
         """Streamable HTTP (a team server's /mcp): no token of its own; each request's API token is checked
-        against Dernvale and used for its calls, a sign-in's JWT is refused, and writes need eru-mcp."""
+        against Dernvale and used for its calls; only eru-mcp tokens are taken, reads included."""
         import socket
         import threading
         import time
@@ -247,15 +247,15 @@ class EruMcpTest(BackendCase):
             meta = httpx2.get(f"http://127.0.0.1:{port}/.well-known/oauth-protected-resource/mcp").json()
             self.assertEqual([s.rstrip("/") for s in meta["authorization_servers"]], [url[:-len("/mcp")]])
             job = self.create_job(self.alice, "CASE-MCP-HTTP-1")
-            alice, bob = token(self.alice, "eru-mcp"), token(self.bob, "full")
+            alice, bob = token(self.alice, "eru-mcp"), token(self.bob, "eru-mcp")
             self.assertIn(job, asyncio.run(call(alice, "list_cases"))[1])
             self.assertNotIn(job, asyncio.run(call(bob, "list_cases"))[1])
-            with self.assertRaises(Exception):  # a sign-in's JWT, or nothing Dernvale knows: 401
-                asyncio.run(call(self.alice["Authorization"][7:], "list_cases"))
-            with self.assertRaises(Exception):
-                asyncio.run(call("not-a-token", "list_cases"))
+            # A full token, a sign-in's JWT, or nothing Dernvale knows: 401, before any tool
+            for refused in (token(self.alice, "full"), self.alice["Authorization"][7:], "not-a-token"):
+                with self.assertRaises(Exception):
+                    asyncio.run(call(refused, "list_cases"))
             error, text = asyncio.run(call(bob, "add_note", job_id=job, body="from bob"))
-            self.assertTrue(error and "eru-mcp token" in text, text)
+            self.assertTrue(error and "not found" in text.lower(), text)  # bob's eru-mcp token, alice's job
             self.assertEqual(asyncio.run(call(alice, "add_note", job_id=job, body="from Eru"))[0], False)
             error, text = asyncio.run(call(alice, "add_note", job_id=job, body="again"))
             self.assertTrue(error and "made its 1 writes" in text, text)

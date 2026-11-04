@@ -24,10 +24,10 @@ Python 3.10+ and requirements/mcp.txt. Nothing but the protocol may go to stdout
 
 On a team server it can also run over streamable HTTP (--http), behind Caddy at /mcp, for analysts
 whose MCP host isn't on the server. Then there is no DERNVALE_TOKEN: each request carries its
-analyst's own API token as a bearer header, checked against Dernvale (DernvaleTokens), and every call
-it makes to Dernvale carries that token, so each analyst sees what their token lets them see. A
-sign-in's JWT isn't accepted, only an API token; writes need an eru-mcp one, and --max-writes counts
-per token until the server restarts.
+analyst's own eru-mcp API token as a bearer header, checked against Dernvale (DernvaleTokens), and
+every call it makes to Dernvale carries that token, so each analyst sees what their token lets them
+see. Full tokens and sign-ins' JWTs aren't accepted, and --max-writes counts per token until the
+server restarts.
 """
 
 import argparse
@@ -166,9 +166,10 @@ def request_token() -> str:
 
 
 class DernvaleTokens:
-    """The HTTP transport's token check: a bearer token is good if Dernvale takes it as an API token
-    (/api/auth/me shows one). A sign-in's JWT is refused here: it carries all of its user's rights,
-    for as long as a sign-in lasts, and can't be revoked on its own."""
+    """The HTTP transport's token check: a bearer token is good if Dernvale takes it as an eru-mcp API
+    token (/api/auth/me shows one). A full token or a sign-in's JWT is refused, reads included: left in
+    an MCP host's configuration, either carries its user's whole rights against the API if it leaks,
+    where an eru-mcp token can only read, flag leads and add notes (threat model, 4 November 2026)."""
 
     def __init__(self, api_for: Callable[[str], DernvaleAPI]):
         self.api_for = api_for
@@ -179,7 +180,7 @@ class DernvaleTokens:
         except ApiError:
             return None
         record = me.get("token") if isinstance(me, dict) else None
-        if not isinstance(record, dict) or not record.get("scope"):
+        if not isinstance(record, dict) or record.get("scope") != ERU_TOKEN_SCOPE:
             return None
         return AccessToken(token=token, client_id=me.get("username") or "", scopes=[record["scope"]],
                            subject=str(me.get("id") or ""), claims={"token_id": record["id"]})
@@ -336,7 +337,7 @@ def build_server(api: DernvaleAPI, writes: bool = False, max_writes: int = MAX_W
     def write(path: str, body: dict) -> Any:
         # Over stdio a session is the process; over HTTP, each token (until the server restarts)
         access = get_access_token()
-        if http_url and (not access or ERU_TOKEN_SCOPE not in access.scopes):
+        if http_url and (not access or ERU_TOKEN_SCOPE not in access.scopes):  # DernvaleTokens already holds it
             raise ToolError(f"Writing needs an {ERU_TOKEN_SCOPE} token: make one under Account in the web app.")
         key = (access.claims or {}).get("token_id") if access else None
         if written.get(key, 0) >= max_writes:

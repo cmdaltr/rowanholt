@@ -54,7 +54,7 @@ services:
 
   # Eru's MCP server at https://<host>/mcp, for MCP hosts on analysts' machines. Off unless the
   # "mcp" profile is on (COMPOSE_PROFILES=mcp); read-only unless ERU_MCP_ARGS=--allow-writes.
-  # Pending the threat model's review of the HTTP transport: not near a live case until then.
+  # Takes eru-mcp API tokens only (threat model review, 4 November 2026).
   eru-mcp:
     profiles: ["mcp"]
     build:

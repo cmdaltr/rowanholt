@@ -82,7 +82,7 @@ A team server can run the same server over streamable HTTP at `https://<host>/mc
 COMPOSE_PROFILES=mcp ./dernvale start
 ```
 
-It holds no token of its own. Every request sends its analyst's API token as a bearer header; the server checks it with Dernvale (`/api/auth/me`) and makes that request's calls with it, so each analyst sees their own jobs, as over stdio. Only API tokens are accepted, not a sign-in's session, which carries all of its user's rights and can't be revoked on its own. It's read-only unless `.env` has `ERU_MCP_ARGS=--allow-writes`; then only an **eru-mcp** token can write, and `--max-writes` counts per token until the service restarts. `dernvale mcp --http` won't start against a Dernvale that isn't in server mode, or without the `https://` URL analysts use (`DERNVALE_PUBLIC_URL`, set by the Compose file).
+It holds no token of its own. Every request sends its analyst's **eru-mcp** API token as a bearer header; the server checks it with Dernvale (`/api/auth/me`) and makes that request's calls with it, so each analyst sees their own jobs, as over stdio. A **full** token or a sign-in's session is refused, reads included: either carries all of its user's rights if it leaks from a host's configuration. It's read-only unless `.env` has `ERU_MCP_ARGS=--allow-writes`, and `--max-writes` counts per token until the service restarts. `dernvale mcp --http` won't start against a Dernvale that isn't in server mode, or without the `https://` URL analysts use (`DERNVALE_PUBLIC_URL`, set by the Compose file).
 
 For Claude Code:
 
@@ -90,7 +90,7 @@ For Claude Code:
 claude mcp add --transport http dernvale https://dernvale.example.org/mcp --header "Authorization: Bearer $DERNVALE_TOKEN"
 ```
 
-The token then sits in the host's own configuration, so use a 30-day **eru-mcp** token and revoke it when the machine is in doubt. The HTTP transport hasn't been through the threat model's review yet (`.claude/threat-model.md`); until it has, keep it away from live cases and use stdio.
+The token then sits in the host's own configuration, so use a 30-day **eru-mcp** token and revoke it when the machine is in doubt. The HTTP transport was reviewed under the threat model on 4 November 2026 (`.claude/threat-model.md`) and approved for live cases: eru-mcp tokens only, 30-day ones revoked when a machine is in doubt, on the team's network, in a host with no other network-capable tools.
 
 ## Eru Models
 

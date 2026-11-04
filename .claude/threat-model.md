@@ -15,7 +15,7 @@
 
 ## Risk areas specific to this project
 
-- **Eru MCP tools** — Eru has outbound network access for threat intel enrichment. Any new MCP tool registration must be reviewed before it goes near a live case. The write tools (`flag_lead`, `add_note`, phase 2) exist only with `dernvale mcp --allow-writes`: leads only, recorded as "Eru (for <user>)", the backend refusing Eru other statuses, edits, deletes and assignments, and a per-session write cap. Reviewed 3 November 2026 (below).
+- **Eru MCP tools** — Eru has outbound network access for threat intel enrichment. Any new MCP tool registration must be reviewed before it goes near a live case. The write tools (`flag_lead`, `add_note`, phase 2) exist only with `dernvale mcp --allow-writes`: leads only, recorded as "Eru (for <user>)", the backend refusing Eru other statuses, edits, deletes and assignments, and a per-session write cap. Reviewed 3 November 2026; the HTTP transport, 4 November (below).
 - **Subprocess calls to forensic tools** — Volatility3, log2timeline, RegRipper run with elevated access to memory dumps. Do not modify subprocess invocation patterns without explicit instruction.
 - **SQLite case database** — schema changes require a migration. Do not ALTER TABLE directly; create a migration script.
 - **Iran APT XLSX loader** — `dernvale/threat_intel/iran_apt_loader.py`. The 10-column schema is fixed. Do not add columns without updating the dataclass, index, and tests.
@@ -31,20 +31,22 @@ Approved for live cases on these conditions.
 
 Re-review when a tool is added to the MCP server, when its writes go beyond leads and notes, or when online lookups are proposed.
 
-## Draft review: Eru MCP over streamable HTTP (4 November 2026, proposed by Claude, NOT YET APPROVED)
+## Review: Eru MCP over streamable HTTP (4 November 2026, Ben)
 
-What changed: `dernvale mcp --http` (the `eru-mcp` service, Compose profile `mcp`, behind Caddy at `https://<host>/mcp`) serves the same tools to MCP hosts on other machines. It holds no token. Each request's bearer token is checked with `/api/auth/me` (`DernvaleTokens`) and used for that request's calls; a sign-in's JWT is refused; writes, with `ERU_MCP_ARGS=--allow-writes`, need an `eru-mcp` token, capped at `--max-writes` per token until the service restarts. Until Ben approves this section, stdio only on live cases.
+Approved for live cases on these conditions, all as recommended, with 3 built as proposed.
 
-1. **The endpoint is on the network: recommend accept.** Anyone who can reach the server's 443 can reach `/mcp`, but every MCP request (initialise and tool listing included) needs a token Dernvale accepts as an API token, and what it can see is that token's user's jobs, as in the web app. The protected-resource metadata at `/.well-known/oauth-protected-resource` is public; it names only the public URL (fixed 4 November: it had named the backend's address inside the stack). No port is published; the service only answers Caddy's Host and Origin (DNS rebinding protection).
-2. **Tokens in MCP hosts' configuration: recommend accept with a rule.** Over HTTP the token sits in the host's own configuration (for Claude Code, `claude mcp add --header`), as `DERNVALE_TOKEN` did over stdio. Rule: 30-day eru-mcp tokens, revoked as soon as the machine is in doubt (as condition 3).
-3. **Full tokens for reads: recommend refusing them (one-line change).** Today a `full` token works over HTTP for the read tools. The server only exposes its read tools, but the token itself, sitting in a host's configuration, carries its user's whole rights against the API if it leaks. Requiring the `eru-mcp` scope for every HTTP request, reads included, makes a leaked MCP token worth only reads, leads and notes. Not built until Ben decides.
+What changed: `dernvale mcp --http` (the `eru-mcp` service, Compose profile `mcp`, behind Caddy at `https://<host>/mcp`) serves the same tools to MCP hosts on other machines. It holds no token. Each request's bearer token is checked with `/api/auth/me` (`DernvaleTokens`) and used for that request's calls; only `eru-mcp` API tokens are taken; writes, with `ERU_MCP_ARGS=--allow-writes`, are capped at `--max-writes` per token until the service restarts.
+
+1. **The endpoint is on the network: accepted.** Anyone who can reach the server's 443 can reach `/mcp`, but every MCP request (initialise and tool listing included) needs a token Dernvale accepts as an eru-mcp API token, and what it can see is that token's user's jobs, as in the web app. The protected-resource metadata at `/.well-known/oauth-protected-resource` is public; it names only the public URL (fixed 4 November: it had named the backend's address inside the stack). No port is published; the service only answers Caddy's Host and Origin (DNS rebinding protection).
+2. **Tokens in MCP hosts' configuration: accepted, with a rule.** Over HTTP the token sits in the host's own configuration (for Claude Code, `claude mcp add --header`), as `DERNVALE_TOKEN` did over stdio. Rule: 30-day eru-mcp tokens, revoked as soon as the machine is in doubt (as condition 3).
+3. **Full tokens: refused, enforced.** A `full` token, sitting in a host's configuration, would carry its user's whole rights against the API if it leaked. Over HTTP every request, reads included, needs the `eru-mcp` scope (`DernvaleTokens`; tested: a full token, a JWT and an unknown token get 401 before any tool), so a leaked MCP token is worth only reads, leads and notes.
 4. **Sessions: confirmed no crossing.** A streamable HTTP session ID gives nothing without a token: every request is checked again and its Dernvale calls carry its own token, never one cached from the session (`request_token`, tested with two analysts on one server).
-5. **Write cap: recommend accept.** Over stdio the cap is per session (the process); over HTTP it's per token until the service restarts. It still bounds what text inside a case can make one host write. An analyst can mint more tokens, but the cap is against a misled model, not the analyst.
-6. **Condition 2 still applies.** HTTP helps its file-access half (the host is on another machine from the case store), but a host with other network-capable tools is the same risk as before.
-7. **Unauthenticated load: recommend accept for a team network.** Every request with a bad token costs a call to `/api/auth/me`. Caddy could rate-limit `/mcp` if the server is ever reachable from outside the team's network.
+5. **Write cap: accepted.** Over stdio the cap is per session (the process); over HTTP it's per token until the service restarts. It still bounds what text inside a case can make one host write. An analyst can mint more tokens, but the cap is against a misled model, not the analyst.
+6. **Condition 2 still applies: kept.** HTTP helps its file-access half (the host is on another machine from the case store), but a host with other network-capable tools is the same risk as before.
+7. **Unauthenticated load: accepted for a team network.** Every request with a bad token costs a call to `/api/auth/me`. Caddy could rate-limit `/mcp` if the server is ever reachable from outside the team's network.
 8. **Outbound calls: confirmed still none.** The service calls only `/api/` on `http://backend:5688` inside the stack.
 
-Ben's decisions needed: approve 1, 2, 5, 7; decide 3; keep 6.
+Re-review if the endpoint is opened beyond the team's network, if it takes any token but eru-mcp, or on the phase 2 triggers above.
 
 ## Chain of custody note
 
