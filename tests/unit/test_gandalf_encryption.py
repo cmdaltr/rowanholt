@@ -30,9 +30,10 @@ TEMPLATE = ROOT / "src" / "acquisition" / "python" / "collect_artefacts-py"
 
 def zip_bytes(host):
     buf = io.BytesIO()
+    # A fixed time: two calls a second apart would otherwise differ (the test compares bytes)
     with zipfile.ZipFile(buf, "w") as z:
-        z.writestr(f"{host}/artefacts/host.info", f"{host}::Linux\n")
-        z.writestr(f"{host}/artefacts/etc+passwd", "root:x:0:0")
+        z.writestr(zipfile.ZipInfo(f"{host}/artefacts/host.info", (2026, 1, 1, 0, 0, 0)), f"{host}::Linux\n")
+        z.writestr(zipfile.ZipInfo(f"{host}/artefacts/etc+passwd", (2026, 1, 1, 0, 0, 0)), "root:x:0:0")
     return buf.getvalue()
 
 

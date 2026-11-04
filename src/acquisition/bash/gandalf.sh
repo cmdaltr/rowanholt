@@ -1099,8 +1099,9 @@ acquire_local() {
 
     # Collect
     collect_volatile "$acq_dir" "$hostname" "$audit_log"
-    [ "$LIVE_CONTAINERS" = true ] && ! is_macos && collect_live_containers "$acq_dir" "$hostname" "$audit_log"
     collect_memory "$acq_dir" "$hostname" "$audit_log"
+    # After memory: an export reads whole filesystems through the page cache
+    [ "$LIVE_CONTAINERS" = true ] && ! is_macos && collect_live_containers "$acq_dir" "$hostname" "$audit_log"
     collect_artifacts "$acq_dir" "$hostname" "$audit_log" "$meta_log"
     write_manifest "$acq_dir" "$hostname" "$audit_log" "$meta_log"
 

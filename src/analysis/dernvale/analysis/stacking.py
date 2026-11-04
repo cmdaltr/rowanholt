@@ -19,7 +19,7 @@ that is the sum of named features, so every row says why it's there:
     outside logon hours
                      a process, task, service or driver first seen on the host at an hour (UTC) when
                      no one logs on to it: the host's interactive and remote logons (4624 types 2, 10
-                     and 11, accounts not ending $) give its hours, widened an hour each way, once
+                     and 11, not machine accounts or DWM-/UMFD-) give its hours, widened an hour each way, once
                      there are LOGON_MIN of them
 
 The last three are the host's own: they only add to the score of a value that is already rare or
@@ -71,6 +71,8 @@ WEIGHTS = {"rare": 2.0, "user path": 1.5, "generated name": 1.0, "not in baselin
            "no team ID": 1.0, "outside logon hours": 1.0}
 LOGON_MIN = 10  # interactive logons on a host before its logon hours say anything
 LOGON_TYPES = {"2", "10", "11"}  # interactive, remote interactive (RDP), cached interactive
+# Windows' own type 2 logons at every boot (Window Manager, the font driver host): not people
+SYSTEM_LOGON = re.compile(r"^(?:DWM|UMFD)-\d+$", re.I)
 APPLE_TEAMS = {"", "apple", "APPLECOMPUTER"}  # process/mac_artefacts.py: Apple's own items carry no team
 VOWELS = set("aeiouy")
 FAMILY_OS = {"process": "windows", "parent > child": "windows", "scheduled task": "windows",
@@ -189,7 +191,8 @@ def _security(path: str) -> Iterable[Value]:
         elif event_id == 4698 and data.get("TaskName"):
             yield "scheduled task", _norm_name(data["TaskName"].strip("\\")), data["TaskName"], ref, (), _when(r)
         elif (event_id == 4624 and data.get("LogonType") in LOGON_TYPES
-              and not data.get("TargetUserName", "").endswith("$")):
+              and not data.get("TargetUserName", "").endswith("$")
+              and not SYSTEM_LOGON.match(data.get("TargetUserName", ""))):
             yield "_logon", "", "", ref, (), _when(r)
 
 

@@ -1111,8 +1111,6 @@ def acquire_artefacts(
     collect_volatile_data(gandalf_artefact_destination)
     if platform.system() == "Linux":
         collect_linux_volatile_files(gandalf_artefact_destination, gandalf_host)
-        if LIVE_CONTAINERS:
-            collect_live_containers(gandalf_artefact_destination, gandalf_host)
     if memory != "None":
         print(
             "      Acquiring memory dump from '{}'".format(
@@ -1150,6 +1148,9 @@ def acquire_artefacts(
         print()
     else:
         pass
+    # After memory: an export reads whole filesystems through the page cache
+    if LIVE_CONTAINERS and platform.system() == "Linux":
+        collect_live_containers(gandalf_artefact_destination, gandalf_host)
     staging_taken = platform.system() != "Darwin"
     for artefact, artefact_output_dir in sorted(system_artefacts.items(), key=volatility_rank):
         if not staging_taken and volatility_rank((artefact, artefact_output_dir)) >= 2:

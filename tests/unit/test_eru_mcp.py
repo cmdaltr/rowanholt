@@ -243,6 +243,9 @@ class EruMcpTest(BackendCase):
             return result.is_error, "".join(getattr(c, "text", "") for c in result.content)
 
         try:
+            # What a client reads after a 401 names Dernvale as analysts reach it, not the backend inside the stack
+            meta = httpx2.get(f"http://127.0.0.1:{port}/.well-known/oauth-protected-resource/mcp").json()
+            self.assertEqual([s.rstrip("/") for s in meta["authorization_servers"]], [url[:-len("/mcp")]])
             job = self.create_job(self.alice, "CASE-MCP-HTTP-1")
             alice, bob = token(self.alice, "eru-mcp"), token(self.bob, "full")
             self.assertIn(job, asyncio.run(call(alice, "list_cases"))[1])

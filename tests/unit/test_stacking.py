@@ -209,6 +209,8 @@ def test_unsigned_no_team_id_and_outside_logon_hours(tmp_path):
     office = [evt(4624, f"2026-10-{d:02}T{h:02}:05:00Z", LogonType="2", TargetUserName="alice")
               for d in range(1, 4) for h in (8, 12, 16, 17)]
     office.append(evt(4624, "2026-10-02T03:00:00Z", LogonType="3", TargetUserName="WS01$"))  # network, machine
+    office += [evt(4624, "2026-10-02T03:10:00Z", LogonType="2", TargetUserName=name)  # Windows' own, at boot
+               for name in ("DWM-1", "UMFD-0")]
     for n in range(1, 4):
         cooked = case / f"WS0{n}" / "artefacts" / "cooked"
         (cooked / "evt").mkdir(parents=True)

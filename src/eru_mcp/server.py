@@ -179,7 +179,7 @@ class DernvaleTokens:
         except ApiError:
             return None
         record = me.get("token") if isinstance(me, dict) else None
-        if not record:
+        if not isinstance(record, dict) or not record.get("scope"):
             return None
         return AccessToken(token=token, client_id=me.get("username") or "", scopes=[record["scope"]],
                            subject=str(me.get("id") or ""), claims={"token_id": record["id"]})
@@ -192,7 +192,10 @@ def build_server(api: DernvaleAPI, writes: bool = False, max_writes: int = MAX_W
     checked against Dernvale and used for that request's calls, so `api` should take request_token."""
     auth = {}
     if http_url:
-        auth = {"auth": AuthSettings(issuer_url=api.base_url, resource_server_url=http_url,
+        # The issuer clients are pointed to after a 401 is Dernvale as analysts reach it, never the
+        # backend's own address inside the stack
+        public = http_url[:-len("/mcp")] if http_url.endswith("/mcp") else http_url
+        auth = {"auth": AuthSettings(issuer_url=public, resource_server_url=http_url,
                                      validate_token_resource=False),
                 "token_verifier": DernvaleTokens(api.with_token)}
     server = MCPServer("dernvale-eru", title="Eru (Dernvale)",
