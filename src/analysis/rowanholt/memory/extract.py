@@ -52,23 +52,23 @@ def use_plugins(
             vol_cmd = "/usr/local/bin/vol.py"
             if not os.path.exists(vol_cmd):
                 vol_cmd = "vol"  # Fallback to 'vol' command
+            # Decoded, not str(bytes): its repr doubled every backslash in a path, and a
+            # non-ASCII character or a quote of each kind made the whole plugin's JSON unreadable
             plugoutlist = (
-                str(
-                    subprocess.Popen(
-                        [
-                            vol_cmd,
-                            "-f",
-                            artefact + memext,
-                            "-r",  # Specify renderer
-                            "json",  # Use JSON output format for easier parsing
-                            plugin,
-                        ],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                    ).communicate()[0]
-                )[2:-1]
-                .replace("\\\\n", "\\\\ n")
-                .split("\\n")
+                subprocess.Popen(
+                    [
+                        vol_cmd,
+                        "-f",
+                        artefact + memext,
+                        "-r",  # Specify renderer
+                        "json",  # Use JSON output format for easier parsing
+                        plugin,
+                    ],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                ).communicate()[0]
+                .decode("utf-8", "replace")
+                .split("\n")
             )
             if "Windows" in profile or profile.startswith("Win"):
                 jsonlist = windows_vol3(

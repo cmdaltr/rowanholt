@@ -59,6 +59,31 @@ def validate_yara(verbosity, output_directory, img, yara_file, binary_dir):
     invoke_yara(verbosity, output_directory, img, yara_file, binary_dir)
 
 
+def yara_rows(yara_output):
+    """(rule, file, offset, string, data) rows from yara -s output, and the (rule, file) matches.
+    A rule that matched on its condition alone (filesize, pe.*) prints no string lines; it still
+    gets a row, with "-" for the string, where it used to be left out of yara.csv."""
+    rows, matched, current, had_strings = [], [], None, False
+    for line in yara_output.split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith("0x") and line.count(":") >= 2 and current:
+            offset, sig_name, data = line.split(":", 2)
+            rows.append((*current, offset, sig_name.lstrip("$"), data.lstrip()))
+            had_strings = True
+            continue
+        parts = line.split(" ", 1)
+        if len(parts) == 2:
+            if current and not had_strings:
+                rows.append((*current, "-", "-", "-"))
+            current, had_strings = (parts[0], parts[1]), False
+            matched.append(current)
+    if current and not had_strings:
+        rows.append((*current, "-", "-", "-"))
+    return rows, set(matched)
+
+
 def invoke_yara(verbosity, output_directory, img, yara_file, binary_dir):
     """Run YARA rules against target directory and save results."""
     img_name = img.split("::")[0]
@@ -94,49 +119,16 @@ def invoke_yara(verbosity, output_directory, img, yara_file, binary_dir):
         with open(csv_path, "w") as f:
             f.write("yara_rule,yara_file,file,path,offset,signature_name,matched_data\n")
 
-    matches_found = 0
-    current_rule = None
-    current_file = None
-    matched = set()
-
-    for line in yara_output.split("\n"):
-        line = line.strip()
-        if not line:
-            continue
-
-        # Check if this is a rule match line (rule_name file_path)
-        # or a string match line (offset:$name:data)
-        if line.startswith("0x") and ":" in line:
-            # This is a string match line
-            if current_rule and current_file:
-                parts = line.split(":", 2)
-                if len(parts) >= 3:
-                    offset = parts[0]
-                    sig_name = parts[1].lstrip("$")
-                    matched_data = parts[2] if len(parts) > 2 else ""
-
-                    # Write to CSV
-                    file_name = current_file.split("/")[-1]
-                    file_path = "/".join(current_file.split("/")[:-1])
-
-                    with open(csv_path, "a") as f:
-                        # Escape commas in matched data
-                        matched_data_escaped = matched_data.replace(",", "%2C").replace("\n", "\\n")
-                        f.write(f"{current_rule},{yara_file},{file_name},{file_path},{offset},{sig_name},{matched_data_escaped}\n")
-
-                    matches_found += 1
-
-                    # Log the match
-                    entry = f"{datetime.now().isoformat()},{img_name},yara,rule '{current_rule}' (${sig_name}) matched in '{file_name}'\n"
-                    prnt = f" -> {datetime.now().isoformat().replace('T', ' ')} -> YARA rule '{current_rule}' matched in '{file_name}'"
-                    write_audit_log_entry(verbosity, output_directory, entry, prnt)
-        else:
-            # This is a rule match line
-            parts = line.split(" ", 1)
-            if len(parts) >= 2:
-                current_rule = parts[0]
-                current_file = parts[1]
-                matched.add((current_rule, current_file))
+    rows, matched = yara_rows(yara_output)
+    with open(csv_path, "a") as f:
+        for rule, path, offset, sig_name, matched_data in rows:
+            file_name, file_path = path.split("/")[-1], "/".join(path.split("/")[:-1])
+            f.write(",".join(v.replace(",", "%2C").replace("\n", "\\n") for v in (
+                rule, yara_file, file_name, file_path, offset, sig_name, matched_data)) + "\n")
+            entry = f"{datetime.now().isoformat()},{img_name},yara,rule '{rule}' (${sig_name}) matched in '{file_name}'\n"
+            prnt = f" -> {datetime.now().isoformat().replace('T', ' ')} -> YARA rule '{rule}' matched in '{file_name}'"
+            write_audit_log_entry(verbosity, output_directory, entry, prnt)
+    matches_found = len(rows)
 
     # A rule's meta can name the techniques it detects; any hit on a web-root script
     # is a likely web shell
