@@ -62,6 +62,7 @@ const COLLECTORS = {
       { key: 'files', label: 'Files named in lists\\files.list', flag: '-CollectFiles' },
       { key: 'progress', label: 'Show progress', flag: '-ShowProgress' },
       { key: 'noprompt', label: 'No questions (accept the defaults)', flag: '-NoPrompt' },
+      { key: 'livecontainers', label: 'Live containers (asks Docker; every command audited)', flag: '-LiveContainers' },
     ],
   },
 };

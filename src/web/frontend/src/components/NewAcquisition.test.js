@@ -24,8 +24,8 @@ test('gandalf.py: -O -M -A -F -L, remote targets from lists/hosts.list', () => {
 
 test('Invoke-Gandalf.ps1: named parameters, Remote reads lists\\hosts.list', () => {
   expect(buildCommand({ ...base, collector: 'powershell', encryption: 'none', destination: 'D:',
-    options: { memory: true, files: true, progress: true, noprompt: true } }).command)
-    .toBe('cd src\\acquisition; .\\windows\\Invoke-Gandalf.ps1 -EncryptionObject None -Acquisition Local -OutputDirectory D: -Memory -CollectFiles -ShowProgress -NoPrompt');
+    options: { memory: true, files: true, progress: true, noprompt: true, livecontainers: true } }).command)
+    .toBe('cd src\\acquisition; .\\windows\\Invoke-Gandalf.ps1 -EncryptionObject None -Acquisition Local -OutputDirectory D: -Memory -CollectFiles -ShowProgress -NoPrompt -LiveContainers');
   const remote = buildCommand({ ...base, collector: 'powershell', remote: true, hosts: ['ws-01'] });
   expect(remote.command).toBe('cd src\\acquisition; .\\windows\\Invoke-Gandalf.ps1 -EncryptionObject Key -Acquisition Remote');
   expect(remote.hostsList).toBe('src\\acquisition\\lists\\hosts.list');
