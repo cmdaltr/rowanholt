@@ -4,7 +4,6 @@ import json
 import os
 import re
 import struct
-import time
 from datetime import datetime
 from pathlib import Path
 
@@ -76,7 +75,13 @@ TIMESTOMP_LOCATIONS = re.compile(r"^\.?[\\/](users|programdata|windows[\\/]temp|
 # timestomping on a clean install. Still reported, but marked as safe to ignore.
 SETUP_COPIED = re.compile(r"^\.?[\\/](programdata[\\/]microsoft|users[\\/]default)[\\/]", re.I)
 SETUP_COPIED_NOTE = "likely benign: Windows setup copies files here with their original times"
-EXECUTABLE = re.compile(r"\.(exe|dll|sys|scr|ps1|psm1|bat|cmd|vbs|vbe|js|jse|hta|wsf|lnk|msi)$", re.I)
+# What's worth backdating: what runs, and what stages or carries it (archives, disk images)
+TIMESTOMP_TYPES = re.compile(
+    r"\.(exe|dll|sys|scr|ps1|psm1|bat|cmd|vbs|vbe|js|jse|hta|wsf|lnk|msi|py|jar"
+    r"|zip|7z|rar|cab|iso|img|vhd|vhdx)$", re.I)
+# Artemis's $STANDARD_INFORMATION times and the $FILE_NAME ones they're checked against.
+# Tools that backdate a file rewrite $SI; $FN keeps when the file really arrived.
+TIMESTOMP_PAIRS = (("created", "filename_created"), ("modified", "filename_modified"))
 MFT_JSON_NAMES = ("mft.json", "mft.jsonl", "rawfiles.json", "rawfiles.jsonl", "journal_mft.json")
 
 
@@ -140,15 +145,15 @@ def mft_findings(record):
     for stream in record.get("ads_info") or []:
         findings.append(("AlternateDataStream", stream.get("name", "unknown") if isinstance(stream, dict) else str(stream)))
     path = str(record.get("full_path") or record.get("filename") or "")
-    si_created, fn_created = record.get("created"), record.get("filename_created")
-    if (
-        si_created and fn_created and type(si_created) is type(fn_created) and si_created < fn_created
-        and TIMESTOMP_LOCATIONS.match(path) and EXECUTABLE.search(path)
-    ):
-        value = "$SI: {}|$FN: {}".format(si_created, fn_created)
-        if SETUP_COPIED.match(path):
-            value += "|" + SETUP_COPIED_NOTE
-        findings.append(("Timestomp", value))
+    if TIMESTOMP_LOCATIONS.match(path) and TIMESTOMP_TYPES.search(path):
+        # Artemis writes fixed-width ISO 8601 UTC, so the strings order as the times do
+        earlier = [(si, fn) for si, fn in ((record.get(s), record.get(f)) for s, f in TIMESTOMP_PAIRS)
+                   if si and fn and type(si) is type(fn) and si < fn]
+        if earlier:
+            value = "|".join("$SI: {}|$FN: {}".format(si, fn) for si, fn in earlier)
+            if SETUP_COPIED.match(path):
+                value += "|" + SETUP_COPIED_NOTE
+            findings.append(("Timestomp", value))
     return findings
 
 
@@ -219,7 +224,7 @@ def analyse_artefacts(
         now = datetime.now().isoformat().replace("T", " ")
         print(" -> {} -> MFT analysis complete: {} records processed".format(now, records_processed))
         print(" -> {} ->   Extended Attributes (not Windows' own): {} files".format(now, counts["ExtendedAttributes"]))
-        print(" -> {} ->   Timestomping indicators ($SI before $FN, executables in user-writable paths): {} files".format(now, counts["Timestomp"]))
+        print(" -> {} ->   Timestomping indicators ($SI created or modified before $FN; executables, scripts and archives in user-writable paths): {} files".format(now, counts["Timestomp"]))
         if setup_copied:
             print(" -> {} ->     of which {} under Users\\Default or ProgramData\\Microsoft ({})".format(now, setup_copied, SETUP_COPIED_NOTE))
         if counts["AlternateDataStream"]:
@@ -267,155 +272,6 @@ def analyse_artefacts(
         now = datetime.now().isoformat().replace("T", " ")
         print(" -> {} ->   Alternate Data Streams: {} files ({} likely benign: Mark of the Web, compression and similar)".format(now, total, benign))
 
-    def analyse_disk_images(stage, vssimage, ar, f, anysd):
-        print()
-        print(
-            "     Analysing MFT for Extended Attributes, Alternate Data Streams & Timestomping for {}...".format(
-                vssimage
-            )
-        )
-        with open(ar + "/" + f) as afh:
-            for line in afh:
-                mftinfo = re.findall(
-                    r"[^\,]*\,[^\,]*\,[^\,]*\,([^\,]*)\,[^\,]*\,[^\,]*\,[^\,]*\,([^\,]*)\,([^\,]*)\,[^\,]*\,[^\,]*\,[^\,]*\,([^\,]*)\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,([^\,]*)\,([^\,]*)\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,[^\,]*\,([^\,]*)\,[^\,]*\,[^\,]*\,[^\,]*",
-                    line,
-                )
-                if len(mftinfo) > 0 and (
-                    (
-                        mftinfo[0][0] == "File"
-                        and mftinfo[0][1] != "NoFNRecord"
-                        and (
-                            mftinfo[0][4] == "True"
-                            or mftinfo[0][5] == "True"
-                            or mftinfo[0][6] == "Y"
-                        )
-                    )
-                    or (
-                        mftinfo[0][0] == "file"
-                        and mftinfo[0][1] != "nofnrecord"
-                        and (
-                            mftinfo[0][4] == "true"
-                            or mftinfo[0][5] == "true"
-                            or mftinfo[0][6] == "y"
-                        )
-                    )
-                ):
-                    if not os.path.exists(anysd + "/analysis.csv"):
-                        with open(anysd + "/analysis.csv", "a") as analysisfile:
-                            analysisfile.write(
-                                "LastWriteTime,elrond_host,Filename,AnalysisType,AnalysisValue\n"
-                            )
-                    else:
-                        with open(anysd + "/analysis.csv", "a") as analysisfile:
-                            if (mftinfo[0][4] == "True" or mftinfo[0][5] == "True") or (
-                                mftinfo[0][4] == "true" or mftinfo[0][5] == "true"
-                            ):
-                                analysisfile.write(
-                                    "{},{},{},ExtendedAttributes,Yes\n".format(
-                                        datetime.now().isoformat(),
-                                        vssimage.replace("'", ""),
-                                        mftinfo[0][1],
-                                    )
-                                )
-                                (
-                                    entry,
-                                    prnt,
-                                ) = "{},{},{},extended attribute found in '{}'\n".format(
-                                    datetime.now().isoformat(),
-                                    vssimage,
-                                    stage,
-                                    mftinfo[0][1].split("/")[-1],
-                                ), " -> {} -> extended attribute found in '{}' for {}".format(
-                                    datetime.now().isoformat().replace("T", " "),
-                                    mftinfo[0][1].split("/")[-1],
-                                    vssimage,
-                                )
-                                write_audit_log_entry(
-                                    verbosity, output_directory, entry, prnt
-                                )
-                            elif mftinfo[0][6] == "Y" or mftinfo[0][6] == "y":
-                                analysisfile.write(
-                                    "{},{},{},AlternateDataStream,Yes\n".format(
-                                        datetime.now().isoformat(),
-                                        vssimage.replace("'", ""),
-                                        mftinfo[0][1],
-                                    )
-                                )
-                                (
-                                    entry,
-                                    prnt,
-                                ) = "{},{},{},alternate data stream found in '{}'\n".format(
-                                    datetime.now().isoformat(),
-                                    vssimage,
-                                    stage,
-                                    mftinfo[0][1].split("/")[-1],
-                                ), " -> {} -> alternate data stream found in '{}' for {}".format(
-                                    datetime.now().isoformat().replace("T", " "),
-                                    mftinfo[0][1].split("/")[-1],
-                                    vssimage,
-                                )
-                                write_audit_log_entry(
-                                    verbosity, output_directory, entry, prnt
-                                )
-                            if (
-                                mftinfo[0][2].split(".")[0]
-                                != mftinfo[0][3].split(".")[0]
-                            ):
-                                stdepoch, fnepoch = int(
-                                    time.mktime(
-                                        time.strptime(
-                                            mftinfo[0][2].split(".")[0],
-                                            strpformat,
-                                        )
-                                    )
-                                ), int(
-                                    time.mktime(
-                                        time.strptime(
-                                            mftinfo[0][3].split(".")[0],
-                                            strpformat,
-                                        )
-                                    )
-                                )
-                                if (
-                                    stdepoch < fnepoch
-                                    or mftinfo[0][2][20:] == "000000"
-                                    or mftinfo[0][3][20:] == "000000"
-                                ):
-                                    with open(
-                                        anysd + "/analysis.csv", "a"
-                                    ) as analysisfile:
-                                        analysisfile.write(
-                                            "{},{},{},Timestomp,$SI: {}|$FN: {}\n".format(
-                                                datetime.now().isoformat(),
-                                                vssimage.replace("'", ""),
-                                                mftinfo[0][1],
-                                                stdepoch,
-                                                fnepoch,
-                                            )
-                                        )
-                                    (
-                                        entry,
-                                        prnt,
-                                    ) = "{},{},{},evidence of timestomping found in '{}'\n".format(
-                                        datetime.now().isoformat(),
-                                        vssimage,
-                                        stage,
-                                        mftinfo[0][1].split("/")[-1],
-                                    ), " -> {} -> evidence of timestomping found in '{}' for {}".format(
-                                        datetime.now().isoformat().replace("T", " "),
-                                        mftinfo[0][1].split("/")[-1],
-                                        vssimage,
-                                    )
-                                    write_audit_log_entry(
-                                        verbosity, output_directory, entry, prnt
-                                    )
-        print(
-            "     Completed analysis of Extended Attributes, Alternate Data Streams & Timestomping for {}...".format(
-                vssimage
-            )
-        )
-        print()
-
     stage = "analysing"
     # Safe parsing of img - handle both "image::type" and plain "image" formats
     # Extract basename since img may contain full path
@@ -425,7 +281,6 @@ def analyse_artefacts(
 
     atftd = output_directory + img_name + "/artefacts/cooked/"
     anysd = output_directory + img_name + "/analysis/"
-    strpformat = "%Y-%m-%d %H:%M:%S"
     if analysis:
         if "vss" in img_type:
             vss_part = img_type.split("_")[1] if "_" in img_type else img_type
@@ -710,10 +565,7 @@ def analyse_artefacts(
                 if is_vss_path:
                     vss_part = img_mount.split("_")[1] if "_" in img_mount else ""
                     if vss_part in atftd:
-                        if f.endswith("MFT.csv"):
-                            mft_files_found = True
-                            analyse_disk_images(stage, vssimage, ar, f, anysd)
-                        elif f.lower() in MFT_JSON_NAMES:
+                        if f.lower() in MFT_JSON_NAMES:
                             mft_files_found = True
                             analyse_mft_json(stage, vssimage, os.path.join(ar, f), anysd, verbosity, output_directory)
                         # Handle Artemis UUID-named output files
@@ -721,10 +573,7 @@ def analyse_artefacts(
                             mft_files_found = True
                             _analyse_artemis_mft_from_status_log(ar, f, stage, vssimage, anysd, verbosity, output_directory, analyse_mft_json)
                 elif is_cooked_dir:
-                    if f.endswith("MFT.csv"):
-                        mft_files_found = True
-                        analyse_disk_images(stage, vssimage, ar, f, anysd)
-                    elif f.lower() in MFT_JSON_NAMES:
+                    if f.lower() in MFT_JSON_NAMES:
                         mft_files_found = True
                         analyse_mft_json(stage, vssimage, os.path.join(ar, f), anysd, verbosity, output_directory)
                     # Handle Artemis UUID-named output files via status.log
@@ -751,13 +600,8 @@ def analyse_artefacts(
                             pass
 
         if not mft_files_found:
-            print(" -> {} -> no Extended Attributes found for '{}'".format(
-                datetime.now().isoformat().replace("T", " "), img_name
-            ))
-            print(" -> {} -> no Alternate Data Streams found for '{}'".format(
-                datetime.now().isoformat().replace("T", " "), img_name
-            ))
-            print(" -> {} -> no evidence of Timestomping found for '{}'".format(
+            # Not checked isn't the same as nothing found: say which it was
+            print(" -> {} -> no $MFT for '{}': Extended Attributes, Alternate Data Streams and Timestomping not checked".format(
                 datetime.now().isoformat().replace("T", " "), img_name
             ))
     if extractiocs:

@@ -10,10 +10,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "analysis")
 from rowanholt.analysis.analysis import SETUP_COPIED_NOTE, iter_json_records, mft_findings  # noqa: E402
 
 
-def record(path: str, created: str = "2025-01-01T00:00:00.000Z", fn_created: str = "2025-01-01T00:00:00.000Z", eas=()) -> dict:
+SAME = "2025-01-01T00:00:00.000Z"
+
+
+def record(path: str, created: str = SAME, fn_created: str = SAME, eas=(), modified: str = SAME,
+           fn_modified: str = SAME) -> dict:
     return {
         "filename": path.split("\\")[-1], "full_path": path, "is_file": True,
-        "created": created, "filename_created": fn_created,
+        "created": created, "filename_created": fn_created, "modified": modified, "filename_modified": fn_modified,
         "attribute_list": [{"offset": 0, "flags": 0, "name_size": len(n), "data_size": 4, "name": n, "data": "AAAA"} for n in eas],
     }
 
@@ -62,3 +66,31 @@ def test_setup_copied_paths_are_reported_as_likely_benign() -> None:
 def test_seeded_timestomp_is_not_marked_benign() -> None:
     [(_, value)] = mft_findings(record(".\\ProgramData\\RivendellLab\\helper.ps1", created="2019-03-14T09:26:53.000Z"))
     assert SETUP_COPIED_NOTE not in value
+
+
+def test_backdated_modified_time_alone_is_reported() -> None:
+    # Some tools set only the modified time, leaving $SI's created as it was
+    [(kind, value)] = mft_findings(record(".\\Users\\a\\AppData\\Local\\Temp\\x.dll", modified="2019-03-01T00:00:00.000Z"))
+    assert kind == "Timestomp" and value == "$SI: 2019-03-01T00:00:00.000Z|$FN: " + SAME
+
+
+def test_both_backdated_times_are_in_one_finding() -> None:
+    old = "2019-03-01T00:00:00.000Z"
+    [(_, value)] = mft_findings(record(".\\Users\\a\\Downloads\\run.exe", created=old, modified=old))
+    assert value.count("$SI: " + old) == 2
+
+
+def test_archives_and_disk_images_are_checked() -> None:
+    old = "2019-03-01T00:00:00.000Z"
+    for name in ("stage.zip", "payload.iso", "tool.jar", "loader.py"):
+        assert [k for k, _ in mft_findings(record(".\\Users\\a\\Downloads\\" + name, created=old))] == ["Timestomp"]
+
+
+def test_later_si_times_are_not_timestomping() -> None:
+    # $SI moves on with every write; only $SI before $FN says it was set back
+    assert mft_findings(record(".\\Users\\a\\Downloads\\run.exe", modified="2026-01-01T00:00:00.000Z")) == []
+
+
+def test_nothing_reads_mft_csv_any_more() -> None:
+    source = (Path(__file__).resolve().parents[2] / "src" / "analysis" / "rowanholt" / "analysis" / "analysis.py").read_text()
+    assert "MFT.csv" not in source
