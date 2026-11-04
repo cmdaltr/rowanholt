@@ -42,6 +42,7 @@ PERSISTENCE_LISTS = ("startup_items.csv", "generators.csv")
 STACKING_PERSISTENCE = {"scheduled task", "wmi consumer", "service (Windows)", "autorun (Windows)", "service (systemd)",
                         "autorun (Linux)", "kernel module", "autorun (macOS)", "driver (Windows)"}
 RARE_ROWS = 8
+NETWORK_IOC_TYPES = ("IPv4 address", "IPv6 address", "domain")
 # The rows the lines shown so far came from, while answer_with_rows() runs
 _citing: ContextVar[Optional[List[Dict[str, str]]]] = ContextVar("eru_offline_citing", default=None)
 
@@ -229,9 +230,12 @@ def iocs(case_path: str) -> str:
         if not rows:
             continue
         kinds = Counter(r.get("indicator_type", "?") for r in rows)
-        values = Counter(r.get("ioc", "") for r in rows if r.get("indicator_type") in ("ipv4", "ipv6", "domain", "url", "email"))
+        # analysis/iocs.py's types; it once read "ipv4", which Elrond never wrote, so no address was listed
+        values = Counter(r.get("ioc", "") for r in rows if r.get("indicator_type") in NETWORK_IOC_TYPES)
+        watched = {r.get("ioc", "") for r in rows if r.get("watchlist_match")}
         sections.append(f"**{host.name}**: {len(rows)} indicators (" + ", ".join(f"{k} {n}" for k, n in kinds.most_common()) +
-                        ")\n" + _bullets(f"{v} (×{n})" for v, n in values.most_common(MAX_ROWS)))
+                        ")\n" + _bullets(f"{v} (×{n}{', watchlist' if v in watched else ''})"
+                                         for v, n in values.most_common(MAX_ROWS)))
     if not sections:
         return "No IOCs were extracted. Run Elrond with --extractIocs."
     return "**Extracted IOCs** (most frequent network indicators first; check before acting on them):\n\n" + "\n\n".join(sections)
@@ -329,10 +333,22 @@ def detections(case_path: str) -> str:
         for p in _cooked(host, "xprotect_*.csv"):
             lines += [_cited(f"XProtect ({p.stem}): {', '.join(f'{k}={v}' for k, v in list(r.items())[:4])}",
                              *_where(host, p), ref, normal) for ref, r, normal in list(_numbered(p))[:10]]
+        # Elrond's own scanners: ClamAV's rows in analysis.csv, and one line per YARA rule and file
+        clamav = host / "analysis" / "analysis.csv"
+        lines += [_cited(f"ClamAV: {r.get('analysis_value')} {r.get('Filename')}", *_where(host, clamav), ref, normal)
+                  for ref, r, normal in _numbered(clamav) if r.get("analysis_type") == "ClamAV"]
+        yara = host / "analysis" / "yara.csv"
+        seen = set()
+        for ref, r, normal in _numbered(yara):
+            key = (r.get("yara_rule"), r.get("path"), r.get("file"))
+            if key not in seen:
+                seen.add(key)
+                lines.append(_cited(f"YARA {r.get('yara_rule')}: {r.get('path')}/{r.get('file')}", *_where(host, yara),
+                                    ref, normal))
         if lines:
             sections.append(f"**{host.name}**\n" + _bullets(lines))
     if not sections:
-        return "No Defender detections, XProtect events or web shells in the processed artefacts."
+        return "No Defender detections, XProtect events, web shells, ClamAV or YARA hits in the processed artefacts."
     return "**Detections:**\n\n" + "\n\n".join(sections)
 
 

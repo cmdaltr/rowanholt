@@ -5,7 +5,7 @@ import subprocess
 
 from rowanholt.process.extractions.mitre_tagger import tag_mitre_technique
 
-from rowanholt.process.extractions.registry.system import cleaned, records_of, run_key_records
+from rowanholt.process.extractions.registry.system import cleaned, records_of, rip_text, run_key_records
 
 
 LAST_WRITE_TIME = re.compile(r"^[\d-]{10} [\d:]{8}Z?$")
@@ -1381,7 +1381,7 @@ def extract_registry_profile(
     ) as regjson:
         try:
             # Use perl to invoke rip.pl since the shebang may be Windows-style
-            rgrplistj = str(
+            rgrplistj = rip_text(
                 subprocess.Popen(
                     [
                         "perl",
@@ -1401,7 +1401,7 @@ def extract_registry_profile(
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                 ).communicate()[0]
-            )[2:-1]
+            )
         except Exception:
             # RegRipper execution failed - skip
             return

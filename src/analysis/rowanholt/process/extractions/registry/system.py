@@ -23,6 +23,25 @@ def records_of(regjsonlist):
     return records
 
 
+def _utf8(match):
+    """A run of \\xNN escapes back to the text it was, if it's UTF-8 and really an escape: one after an
+    odd run of backslashes was a literal backslash in the value, doubled by the repr."""
+    before = len(match.string[:match.start()]) - len(match.string[:match.start()].rstrip("\\"))
+    if before % 2:
+        return match.group(0)
+    try:
+        return bytes.fromhex(match.group(0).replace("\\x", "")).decode("utf-8")
+    except UnicodeDecodeError:
+        return match.group(0)
+
+
+def rip_text(raw):
+    """RegRipper's stdout as the plugin parsers read it: str(bytes)[2:-1], whose escaped newlines and
+    doubled backslashes their patterns expect, but with non-ASCII text put back (a user called Zoë
+    came out as Zo\\xc3\\xab)."""
+    return re.sub(r"(?:\\x[0-9a-f]{2})+", _utf8, str(raw)[2:-1])
+
+
 def cleaned(value):
     """A record's values as written to registry/<hive>.json: backslashes (doubled, as rip.pl's
     output is str(bytes)) as one '/', escaped quotes as quotes, runs of spaces as one. Done on
@@ -1528,7 +1547,7 @@ def extract_registry_system(
     ) as regjson:
         try:
             rgrplistj, userinfo, sids = (
-                str(
+                rip_text(
                     subprocess.Popen(
                         [
                             rip_pl_path,
@@ -1540,7 +1559,7 @@ def extract_registry_system(
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
                     ).communicate()[0]
-                )[2:-1],
+                ),
                 [],
                 [],
             )

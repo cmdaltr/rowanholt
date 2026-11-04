@@ -174,6 +174,12 @@ class RunKeyRecordsTest(unittest.TestCase):
                 self.assertEqual(records[1]["AppLocation"], '"C:/Program Files/msedge.exe" --no-startup-window')
                 self.assertEqual(records[1]["RegistryKey"], "Microsoft/Windows/CurrentVersion/Run")
 
+    def test_regripper_text_keeps_non_ascii(self) -> None:
+        from rowanholt.process.extractions.registry.system import rip_text
+        self.assertEqual(rip_text("Zoë\nC:\\Users\\Zoë\n".encode()), "Zoë\\nC:\\\\Users\\\\Zoë\\n")
+        self.assertEqual(rip_text(b"C:\\x86app\n"), "C:\\\\x86app\\n")  # a literal backslash-x stays
+        self.assertEqual(rip_text(b"\xff\xfe x"), "\\xff\\xfe x")  # not UTF-8: left escaped
+
     def test_cleaned_values(self) -> None:
         self.assertEqual(cleaned({"a": "it\\'s  C:\\\\x ", "n": 3, "l": ["y\\\\z"]}),
                          {"a": "it's C:/x", "n": 3, "l": ["y/z"]})
