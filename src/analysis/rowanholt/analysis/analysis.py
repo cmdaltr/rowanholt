@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import stat
 import struct
 from datetime import datetime
 from pathlib import Path
@@ -15,54 +16,31 @@ from rowanholt.process.extractions.artemis import _record_techniques
 
 def _analyse_artemis_mft_from_status_log(ar, f, stage, vssimage, anysd, verbosity, output_directory, analyse_mft_json_func):
     """
-    Parse Artemis status.log to find MFT artifact files and analyze them.
+    Analyse the MFT outputs an Artemis status.log names; True if there was one.
 
-    Artemis outputs files with UUID names (e.g., 68330d32-c35e-4d43-8655-1cb5e9d90b83.jsonl)
-    and creates a status.log mapping file in the format:
-    "artifact_name:uuid.jsonl"
-
-    This function finds MFT/rawfiles artifacts and analyzes them.
+    Artemis names its outputs by UUID (68330d32-c35e-4d43-8655-1cb5e9d90b83.jsonl) and maps
+    them in status.log, a line per output: "artifact_name:uuid.jsonl".
     """
+    found = False
     try:
-        status_log_path = os.path.join(ar, f)
-        print(" -> {} -> found Artemis status.log, checking for MFT data...".format(
-            datetime.now().isoformat().replace("T", " ")
-        ))
-        with open(status_log_path, 'r', encoding='utf-8', errors='replace') as log_file:
+        with open(os.path.join(ar, f), 'r', encoding='utf-8', errors='replace') as log_file:
             for line in log_file:
-                line = line.strip()
-                if not line:
+                artifact_type, _, filename = line.strip().partition(':')
+                if artifact_type.lower() not in ('mft', 'rawfiles'):
                     continue
-                # Format: "mft:uuid.jsonl" or "rawfiles:uuid.jsonl"
-                if ':' in line:
-                    artifact_type, filename = line.split(':', 1)
-                    # Look for MFT-related artifacts
-                    if artifact_type.lower() in ('mft', 'rawfiles', 'filelisting'):
-                        artifact_path = os.path.join(ar, filename.strip('"').strip())
-                        if os.path.exists(artifact_path):
-                            print(" -> {} -> found MFT artifact: {}".format(
-                                datetime.now().isoformat().replace("T", " "),
-                                os.path.basename(artifact_path)
-                            ))
-                            analyse_mft_json_func(stage, vssimage, artifact_path, anysd, verbosity, output_directory)
-                        else:
-                            # Try looking for the file in subdirectories
-                            for root, _, files in os.walk(ar):
-                                for potential_file in files:
-                                    if potential_file.endswith('.jsonl') or potential_file.endswith('.json'):
-                                        potential_path = os.path.join(root, potential_file)
-                                        if os.path.exists(potential_path):
-                                            print(" -> {} -> found potential MFT file: {}".format(
-                                                datetime.now().isoformat().replace("T", " "),
-                                                potential_file
-                                            ))
-                                            analyse_mft_json_func(stage, vssimage, potential_path, anysd, verbosity, output_directory)
-                                            break
-    except Exception as e:
+                artifact_path = os.path.join(ar, filename.strip('"').strip())
+                if os.path.isfile(artifact_path):
+                    print(" -> {} -> found MFT artifact: {}".format(
+                        datetime.now().isoformat().replace("T", " "), os.path.basename(artifact_path)
+                    ))
+                    analyse_mft_json_func(stage, vssimage, artifact_path, anysd, verbosity, output_directory)
+                    found = True
+    except OSError as e:
         print(" -> {} -> error parsing status.log: {}".format(
             datetime.now().isoformat().replace("T", " "),
             str(e)[:100]
         ))
+    return found
 
 
 VSS_DIR = re.compile(r"^vss\d+$")
@@ -83,6 +61,40 @@ TIMESTOMP_TYPES = re.compile(
 # Tools that backdate a file rewrite $SI; $FN keeps when the file really arrived.
 TIMESTOMP_PAIRS = (("created", "filename_created"), ("modified", "filename_modified"))
 MFT_JSON_NAMES = ("mft.json", "mft.jsonl", "rawfiles.json", "rawfiles.jsonl", "journal_mft.json")
+# Keys only Artemis's MFT records have, to know an unnamed .jsonl for one (prefetch and others
+# also have filename, created and modified)
+MFT_ONLY_KEYS = ("filename_created", "attribute_list", "ads_info")
+ANALYSIS_HEADER = "LastWriteTime,hostname,Filename,analysis_type,analysis_value\n"
+
+# What each extension's file starts with. Windows' delta-compressed copies (WinSxS, updates) keep
+# the extension of what they expand to; an image saved under another image's extension (a web
+# cache's .png that's a JPEG) is still an image. A .doc in RTF or ZIP is reported: a renamed RTF
+# is how CVE-2017-11882 documents arrive
+_PE = (b"MZ", b"DCM\x01", b"DCN\x01", b"DCD\x01", b"DCH\x01", b"DCS\x01", b"PA30", b"PA31",
+       b"\x00\x02", b"\x02\x00")
+_ZIP = (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08")
+_IMAGE = (b"\xff\xd8\xff", b"\x89PNG\r\n\x1a\n", b"GIF87a", b"GIF89a", b"BM", b"RIFF", b"\x00\x00\x01\x00",
+          b"DCH\x01")
+SIGNATURES = {
+    **dict.fromkeys(("exe", "dll", "sys", "com"), _PE),
+    **dict.fromkeys(("docx", "xlsx", "pptx", "odt", "odp", "ott", "zip", "jar"), _ZIP),
+    **dict.fromkeys(("doc", "xls", "ppt"), (b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1",)),
+    **dict.fromkeys(("jpg", "jpeg", "png", "gif"), _IMAGE),
+    "cab": (b"MSCF", b"ISc("), "elf": (b"\x7fELF",), "7z": (b"7z\xbc\xaf\x27\x1c",), "rar": (b"Rar!\x1a\x07",),
+    "chm": (b"ITSF",),
+}
+HEADER_BYTES = 1024  # a PDF's %PDF- may come anywhere in its first 1024 bytes
+
+
+def signature_mismatch(name, header):
+    """True when a file's first bytes aren't what its extension says it is."""
+    extension = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    if not header:
+        return False
+    if extension == "pdf":
+        return b"%PDF-" not in header[:HEADER_BYTES]
+    expected = SIGNATURES.get(extension)
+    return bool(expected) and not header.startswith(expected)
 
 
 def iter_json_records(f, chunk=1 << 20):
@@ -199,9 +211,6 @@ def analyse_artefacts(
                         continue
                     filename = str(record.get("full_path") or record.get("filename") or "unknown")
                     short = filename.replace("\\", "/").split("/")[-1]
-                    if not os.path.exists(anysd + "/analysis.csv"):
-                        with open(anysd + "/analysis.csv", "a") as analysisfile:
-                            analysisfile.write("LastWriteTime,elrond_host,Filename,AnalysisType,AnalysisValue\n")
                     with open(anysd + "/analysis.csv", "a") as analysisfile:
                         for kind, value in findings:
                             counts[kind] += 1
@@ -221,6 +230,9 @@ def analyse_artefacts(
             print(" -> {} -> warning: could not analyse MFT JSON: {}".format(
                 datetime.now().isoformat().replace("T", " "), str(e)[:100]
             ))
+        # The technique comes from what was found, not from the MFT having been parsed
+        if counts["Timestomp"] > setup_copied:
+            _record_techniques(os.path.join(output_directory, "mitre_techniques.txt"), ["T1070.006"])
         now = datetime.now().isoformat().replace("T", " ")
         print(" -> {} -> MFT analysis complete: {} records processed".format(now, records_processed))
         print(" -> {} ->   Extended Attributes (not Windows' own): {} files".format(now, counts["ExtendedAttributes"]))
@@ -244,9 +256,6 @@ def analyse_artefacts(
                 datetime.now().isoformat().replace("T", " "), str(e)[:100]
             ))
             return
-        if streams and not os.path.exists(anysd + "/analysis.csv"):
-            with open(anysd + "/analysis.csv", "a") as analysisfile:
-                analysisfile.write("LastWriteTime,elrond_host,Filename,AnalysisType,AnalysisValue\n")
         with open(anysd + "/analysis.csv", "a") as analysisfile:
             for path, stream, size in streams:
                 total += 1
@@ -309,10 +318,9 @@ def analyse_artefacts(
         write_audit_log_entry(verbosity, output_directory, entry, prnt)
         if not os.path.exists(anysd):
             os.mkdir(anysd)
-        with open(anysd + "/analysis.csv", "a") as analysisfile:
-            analysisfile.write(
-                "LastWriteTime,hostname,Filename,analysis_type,analysis_value\n"
-            )
+        if not os.path.exists(anysd + "/analysis.csv"):
+            with open(anysd + "/analysis.csv", "w") as analysisfile:
+                analysisfile.write(ANALYSIS_HEADER)
         if magicbytes:
             print(
                 "     Analysing files for file-signature (magic-byte) discrepencies for {}...".format(
@@ -328,218 +336,36 @@ def analyse_artefacts(
                 )
             for root, _, files in os.walk(mnt):
                 for f in files:
+                    extension = f.rsplit(".", 1)[-1].lower() if "." in f else ""
+                    if extension not in SIGNATURES and extension != "pdf":
+                        continue
+                    full = os.path.join(root, f)
                     try:
-                        if 0 < os.stat(os.path.join(root, f)).st_size < 10000000:  # 10MB
-                            if (
-                                os.path.join(root, f) != "/mnt/elrond_mount/hiberfil.sys"
-                                and os.path.join(root, f)
-                                != "/mnt/elrond_mount/pagefile.sys"
-                                and os.path.join(root, f)
-                                != "/mnt/elrond_mount1/hiberfil.sys"
-                                and os.path.join(root, f)
-                                != "/mnt/elrond_mount1/pagefile.sys"
-                                and os.path.join(root, f)
-                                != "/mnt/elrond_mount2/hiberfil.sys"
-                                and os.path.join(root, f)
-                                != "/mnt/elrond_mount2/pagefile.sys"
-                                and os.path.join(root, f)
-                                != "/mnt/elrond_mount3/hiberfil.sys"
-                                and os.path.join(root, f)
-                                != "/mnt/elrond_mount3/pagefile.sys"
-                                and os.path.join(root, f)
-                                != "/mnt/elrond_mount4/hiberfil.sys"
-                                and os.path.join(root, f)
-                                != "/mnt/elrond_mount4/pagefile.sys"
-                                and os.path.join(root, f)
-                                != "/mnt/elrond_mount5/hiberfil.sys"
-                                and os.path.join(root, f)
-                                != "/mnt/elrond_mount5/pagefile.sys"
-                            ) and (
-                                "." in f
-                                and (
-                                    f.endswith(".cab")
-                                    or f.endswith(".elf")
-                                    or f.endswith(".doc")
-                                    or f.endswith(".xls")
-                                    or f.endswith(".ppt")
-                                    or f.endswith(".pdf")
-                                    or f.endswith(".odt")
-                                    or f.endswith(".odp")
-                                    or f.endswith(".ott")
-                                    or f.endswith(".zip")
-                                    or f.endswith(".rar")
-                                    or f.endswith(".7z")
-                                    or f.endswith(".chm")
-                                    or f.endswith(".docx")
-                                    or f.endswith(".xlsx")
-                                    or f.endswith(".pptx")
-                                    or f.endswith(".com")
-                                    or f.endswith(".dll")
-                                    or f.endswith(".exe")
-                                    or f.endswith(".sys")
-                                    or f.endswith(".gif")
-                                    or f.endswith(".jpg")
-                                    or f.endswith(".jpeg")
-                                    or f.endswith(".png")
-                                )
-                            ):
-                                try:
-                                    with open(os.path.join(root, f), "rb") as magic_file:
-                                        # The checks below only look at the first
-                                        # few bytes; reading whole files cost
-                                        # 52 min on a Windows volume.
-                                        file_hdr = magic_file.read(16)
-                                except:
-                                    file_hdr = "0000000000"
-                                if (
-                                    file_hdr != "0000000000"
-                                    and str(file_hdr)[2:10] != "'"
-                                    and (
-                                        (
-                                            f.endswith(".cab")
-                                            and str(file_hdr)[2:10] != "\\x4d\\x53"
-                                            and str(file_hdr)[2:10] != "MSCF\\x00"
-                                        )
-                                        or (
-                                            f.endswith(".elf")
-                                            and str(file_hdr)[2:10] != "\\x7f\\x45"
-                                            and str(file_hdr)[2:10] != "\\x7fELF\\"
-                                        )
-                                        or (
-                                            (
-                                                f.endswith(".com")
-                                                or f.endswith(".dll")
-                                                or f.endswith(".exe")
-                                                or f.endswith(".sys")
-                                            )
-                                            and (
-                                                str(file_hdr)[2:10] != "\\x4d\\x5a"
-                                                and str(file_hdr)[2:10] != "MZ\\x90\\x"
-                                                and str(file_hdr)[2:10] != "MZ\\x00\\x"
-                                                and str(file_hdr)[2:10] != "MZx\\x00\\"
-                                                and str(file_hdr)[2:10] != "MZ\\x9f\\x"
-                                                and str(file_hdr)[2:10] != "\\x00\\x02"
-                                                and str(file_hdr)[2:10] != "\\x02\\x00"
-                                                and str(file_hdr)[2:9] != "DCH\\x01"
-                                                and str(file_hdr)[2:9] != "DCD\\x01"
-                                                and str(file_hdr)[2:9] != "DCN\\x01"
-                                                and str(file_hdr)[2:9] != "DCN\\x01"
-                                            )
-                                        )
-                                        or (
-                                            (
-                                                f.endswith(".docx")
-                                                or f.endswith(".xlsx")
-                                                or f.endswith(".pptx")
-                                            )
-                                            and str(file_hdr)[2:10] != "\\x50\\x4b"
-                                            and str(file_hdr)[2:10] != "PK\\x03\\x"
-                                        )
-                                        or (
-                                            (
-                                                f.endswith(".doc")
-                                                or f.endswith(".xls")
-                                                or f.endswith(".ppt")
-                                            )
-                                            and (str(file_hdr)[2:10] != "\\x50\\x4b")
-                                            and str(file_hdr)[2:10] != "\\xd0\\xcf"
-                                        )
-                                        or (
-                                            (
-                                                f.endswith(".odt")
-                                                or f.endswith(".odp")
-                                                or f.endswith(".ott")
-                                            )
-                                            and str(file_hdr)[2:10] != "\\x50\\x4b"
-                                            and str(file_hdr)[2:10] != "PK\\x03\\x"
-                                        )
-                                        or (
-                                            f.endswith(".pdf")
-                                            and (
-                                                str(file_hdr)[2:9] != "%PDF-1."
-                                                and str(file_hdr)[2:10] != "\\x25\\x50"
-                                            )
-                                        )
-                                        or (
-                                            f.endswith(".7z")
-                                            and (
-                                                str(file_hdr)[2:10] != "7z\\xbc\\x"
-                                                and str(file_hdr)[2:10] != "\\x37\\x7a"
-                                            )
-                                        )
-                                        or (
-                                            (f.endswith(".jar") or f.endswith(".zip"))
-                                            and str(file_hdr)[2:10] != "\\x50\\x4b"
-                                            and str(file_hdr)[2:10] != "PK\\x03\\x"
-                                            and str(file_hdr)[2:9] != "PK\\x03"
-                                        )
-                                        or (
-                                            f.endswith(".rar")
-                                            and (
-                                                str(file_hdr)[2:10] != "Rar!\\x1a"
-                                                and str(file_hdr)[2:10] != "\\x52\\x61"
-                                            )
-                                        )
-                                        or (
-                                            (f.endswith(".jpg") or f.endswith(".jpeg"))
-                                            and (str(file_hdr)[2:10] != "\\xff\\xd8")
-                                            and str(file_hdr)[2:10] != "GIF89a\\x"
-                                            and str(file_hdr)[2:9] != "DCH\\x01"
-                                        )
-                                        or (
-                                            f.endswith(".gif")
-                                            and (
-                                                str(file_hdr)[2:8] != "GIF89a"
-                                                and str(file_hdr)[2:8] != "GIF87a"
-                                                and str(file_hdr)[2:10] != "\\x47\\x49"
-                                            )
-                                        )
-                                        or (
-                                            f.endswith(".png")
-                                            and (
-                                                str(file_hdr)[2:10] != "\\x89\\x50"
-                                                and str(file_hdr)[2:10] != "\\x89PNG\\"
-                                                and str(file_hdr)[2:10] != "\\xff\\xd8"
-                                            )
-                                        )
-                                        or (
-                                            f.endswith(".chm")
-                                            and (
-                                                str(file_hdr)[2:10] != "ITSF\\x03"
-                                                and str(file_hdr)[2:10] != "\\x49\\x54"
-                                            )
-                                        )
-                                    )
-                                ):
-                                    with open(anysd + "/analysis.csv", "a") as analysisfile:
-                                        analysisfile.write(
-                                            "{},{},{},File-signature (magic-byte) Discrepency,'{}'\n".format(
-                                                datetime.now().isoformat(),
-                                                vssimage.replace("'", ""),
-                                                f,
-                                                str(file_hdr)[2:10],
-                                            )
-                                        )
-                                    (
-                                        entry,
-                                        prnt,
-                                    ) = "{},{},{},file-signature (magic-byte) discrepency of '{}' for '{}'\n".format(
-                                        datetime.now().isoformat(),
-                                        vssimage,
-                                        stage,
-                                        str(file_hdr)[2:10],
-                                        f,
-                                    ), " -> {} -> identified file-signature (magic-byte) discrepency of '{}' from '{}' for {}".format(
-                                        datetime.now().isoformat().replace("T", " "),
-                                        str(file_hdr)[2:10],
-                                        f,
-                                        vssimage,
-                                    )
-                                    write_audit_log_entry(
-                                        verbosity, output_directory, entry, prnt
-                                    )
-                    except:
-                        pass
+                        # Regular files only: a mounted image's symlinks point at the host, a FIFO blocks
+                        if not stat.S_ISREG(os.lstat(full).st_mode):
+                            continue
+                        with open(full, "rb") as magic_file:
+                            file_hdr = magic_file.read(HEADER_BYTES)
+                    except OSError:
+                        continue
+                    if not signature_mismatch(f, file_hdr):
+                        continue
+                    path = "/" + os.path.relpath(full, mnt)
+                    with open(anysd + "/analysis.csv", "a") as analysisfile:
+                        analysisfile.write(
+                            "{},{},{},File-signature (magic-byte) Discrepency,{}\n".format(
+                                datetime.now().isoformat(),
+                                vssimage.replace("'", ""),
+                                path.replace(",", "%2C"),
+                                file_hdr[:8].hex(" "),
+                            )
+                        )
+                    entry, prnt = "{},{},{},file-signature (magic-byte) discrepency of '{}' for '{}'\n".format(
+                        datetime.now().isoformat(), vssimage, stage, file_hdr[:8].hex(" "), f,
+                    ), " -> {} -> identified file-signature (magic-byte) discrepency of '{}' from '{}' for {}".format(
+                        datetime.now().isoformat().replace("T", " "), file_hdr[:8].hex(" "), f, vssimage,
+                    )
+                    write_audit_log_entry(verbosity, output_directory, entry, prnt)
         # Analyze MFT data for Extended Attributes, Alternate Data Streams, and Timestomping
         print(" -> {} -> scanning for MFT data to analyse for '{}'...".format(
             datetime.now().isoformat().replace("T", " "), img_name
@@ -570,16 +396,16 @@ def analyse_artefacts(
                             analyse_mft_json(stage, vssimage, os.path.join(ar, f), anysd, verbosity, output_directory)
                         # Handle Artemis UUID-named output files
                         elif f == "status.log":
-                            mft_files_found = True
-                            _analyse_artemis_mft_from_status_log(ar, f, stage, vssimage, anysd, verbosity, output_directory, analyse_mft_json)
+                            if _analyse_artemis_mft_from_status_log(ar, f, stage, vssimage, anysd, verbosity, output_directory, analyse_mft_json):
+                                mft_files_found = True
                 elif is_cooked_dir:
                     if f.lower() in MFT_JSON_NAMES:
                         mft_files_found = True
                         analyse_mft_json(stage, vssimage, os.path.join(ar, f), anysd, verbosity, output_directory)
                     # Handle Artemis UUID-named output files via status.log
                     elif f == "status.log":
-                        mft_files_found = True
-                        _analyse_artemis_mft_from_status_log(ar, f, stage, vssimage, anysd, verbosity, output_directory, analyse_mft_json)
+                        if _analyse_artemis_mft_from_status_log(ar, f, stage, vssimage, anysd, verbosity, output_directory, analyse_mft_json):
+                            mft_files_found = True
                     # Also scan any JSONL files that might be Artemis MFT output (UUID-named)
                     elif f.endswith(".jsonl") and len(f) > 30:  # UUID-named files are typically 36+ chars
                         # Check if this looks like an MFT output by sampling content
@@ -590,7 +416,7 @@ def analyse_artefacts(
                                 if first_line:
                                     sample_data = json.loads(first_line)
                                     # Check for MFT-related fields
-                                    if any(key in sample_data for key in ['filename', 'full_path', 'created', 'modified', 'ads_info', 'attributes']):
+                                    if isinstance(sample_data, dict) and any(key in sample_data for key in MFT_ONLY_KEYS):
                                         print(" -> {} -> found potential MFT data in '{}'".format(
                                             datetime.now().isoformat().replace("T", " "), f
                                         ))
@@ -628,7 +454,9 @@ def analyse_artefacts(
                     dirs[:] = [d for d in dirs if not VSS_DIR.match(d)]
                 for f in files:
                     try:
-                        if 0 < os.stat(os.path.join(root, f)).st_size < 10000000:  # 10MB
+                        # lstat: an image's absolute symlinks resolve to the analysis host's own files
+                        info = os.lstat(os.path.join(root, f))
+                        if stat.S_ISREG(info.st_mode) and 0 < info.st_size < 10000000:  # 10MB
                             with open(os.path.join(root, f), "rb") as filetest:
                                 if b"\x00" in filetest.read(8192):
                                     continue  # binary (jumplists, databases): noise as text
