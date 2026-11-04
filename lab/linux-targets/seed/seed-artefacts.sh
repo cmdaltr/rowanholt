@@ -114,7 +114,7 @@ cat > /etc/rivendell-lab/expected.json <<'EOF'
     {"path": "/home/gandalf/.ssh/authorized_keys", "attack": "T1098.004", "expect": ["attacker@rivendell-lab.test"]},
     {"path": "/tmp/.x/update.sh", "attack": "T1105", "yara": ["Suspicious_Network_Activity"]},
     {"path": "/tmp/.x/notes.txt", "keywords": ["password", "secret", "api_key"]},
-    {"path": "/var/www/html/status.php", "attack": "T1505.003", "yara": ["Suspicious_PowerShell_Command"]},
+    {"path": "/var/www/html/status.php", "attack": "T1505.003", "attack_by": "yara", "yara": ["Suspicious_PowerShell_Command"]},
     {"path": "/var/log/auth.log", "attack": "T1110.001", "expect": ["198.51.100.77"]},
     {"path": "/etc/profile.d/lab-update.sh", "attack": "T1546.004", "cooked": "shell_init.csv"},
     {"path": "/etc/pam.d/lab-backdoor", "attack": "T1556.003", "cooked": "pam.csv"},

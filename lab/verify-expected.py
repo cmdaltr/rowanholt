@@ -14,7 +14,7 @@ target by name, or paired when there's only one of each.
 Checks per seeded item (a dash where expected.json asks nothing of that kind):
   collected  the file's name is in the host's raw/ (path entries only)
   cooked     the named cooked file exists
-  attack     the technique ID is in mitre_techniques.txt
+  attack     the technique ID is in mitre_techniques.txt ("not run" when only YARA gives it, attack_by)
   expect     every string appears somewhere in the host's output
   yara       every rule name appears in the output (skipped unless YARA ran)
   keywords   every keyword appears in the output (skipped unless keywords ran)
@@ -95,6 +95,9 @@ def verify(host: Path, target: Path, techniques: set) -> list:
         row["attack"] = (item["attack"] in techniques or item["attack"].split(".")[0] in techniques) if "attack" in item else None
         if "attack" in item and row["attack"] and item["attack"] not in techniques:
             row["attack"] = "parent"
+        # A technique only YARA gives (the web shell marker in a web root) can't be there without it
+        if item.get("attack_by") == "yara" and not yara_ran and row["attack"] is False:
+            row["attack"] = "not run"
         row["expect"] = [s for s in item.get("expect", []) if s.lower() not in corpus] if "expect" in item else None
         row["yara"] = ([r for r in item["yara"] if r.lower() not in corpus] if yara_ran else "not run") if "yara" in item else None
         row["keywords"] = ([k for k in item["keywords"] if k.lower() not in corpus] if keywords_ran else "not run") if "keywords" in item else None

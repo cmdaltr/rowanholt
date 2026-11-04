@@ -310,6 +310,12 @@ start_vm() {
     utmctl start --hide "$VM" >/dev/null 2>&1 || true
     local _
     for _ in $(seq 1 30); do [ "$(vm_status)" = started ] && break; sleep 2; done
+    # UTM 5.0.8's utmctl start can fail with OSStatus -10004 and start nothing, while its
+    # AppleScript start works
+    if [ "$(vm_status)" != started ]; then
+      utm "start virtual machine named \"$VM\"" >/dev/null 2>&1 || true
+      for _ in $(seq 1 30); do [ "$(vm_status)" = started ] && break; sleep 2; done
+    fi
     [ "$(vm_status)" = started ] || die "UTM didn't start $VM (status: $(vm_status)). UTM may be showing a dialog: check its window, or quit and reopen UTM."
   fi
 }
