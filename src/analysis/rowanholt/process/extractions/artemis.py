@@ -21,6 +21,7 @@ from datetime import datetime
 from typing import Optional, Dict, List
 
 from rowanholt.audit import write_audit_log_entry
+from rowanholt.process.extractions.mitre_tagger import presence_technique
 
 ARTEMIS_PATH = "/usr/local/bin/artemis"
 
@@ -260,6 +261,54 @@ def eventlog_techniques(records) -> set:
     return found
 
 
+# Windows' own tasks, services and WMI consumers: every clean host has them, so they don't stand
+# for T1053.005, T1543.003 or T1546.003. A task outside Microsoft's folders, a service run from
+# outside Windows' (or one that runs an interpreter), and a consumer Windows doesn't create do
+OWN_TASK = re.compile(r"(?i)^\\?(?:microsoft\\|softlanding\\|microsoftedgeupdate|onedrive )")
+OWN_SERVICE_PATH = re.compile(
+    r"(?i)^\s*\"?(?:%systemroot%|%windir%|\\systemroot|\\\?\?\\[a-z]:\\windows|[a-z]:\\windows|system32)\\"
+    r"|\\windows defender\\|\\microsoft\\windows defender\\")
+INTERPRETER = re.compile(r"(?i)(?:^|[\\/\"\s])(?:cmd|powershell|pwsh|wscript|cscript|mshta)(?:\.exe)?(?=[\s\"]|$)")
+OWN_WMI_CONSUMERS = {"scm event log consumer", "bvtconsumer"}
+
+
+def _records(json_path: str) -> List[dict]:
+    """The dicts in a JSON file: a list, one object, or JSON Lines; "tasks" lists opened up."""
+    try:
+        with open(json_path, errors="ignore") as f:
+            text = f.read()
+        try:
+            data = json.loads(text)
+            items = data if isinstance(data, list) else [data]
+        except ValueError:
+            items = [json.loads(line) for line in text.splitlines() if line.strip().startswith("{")]
+    except (OSError, ValueError):
+        return []
+    out = []
+    for item in items:
+        if isinstance(item, dict) and isinstance(item.get("tasks"), list):
+            out.extend(i for i in item["tasks"] if isinstance(i, dict))
+        elif isinstance(item, dict):
+            out.append(item)
+    return out
+
+
+def _not_windows_own(artifact_type: str, record: dict) -> bool:
+    if artifact_type == "tasks":
+        # Without a URI, the task's file name says where it sits (Gandalf writes \ as +)
+        uri = ((record.get("registration_info") or {}).get("uri")
+               or str(record.get("path") or record.get("name") or "").replace("\\", "/").split("/")[-1].replace("+", "\\"))
+        return bool(uri) and not OWN_TASK.match(uri)
+    if artifact_type == "services":
+        path = str(record.get("path") or record.get("image_path") or record.get("ImagePath") or "")
+        return bool(path) and (not OWN_SERVICE_PATH.search(path) or bool(INTERPRETER.search(path)))
+    name = str(record.get("consumer_name") or "")
+    return bool(name) and not record.get("note") and name.lower() not in OWN_WMI_CONSUMERS
+
+
+PERSISTENCE_ARTEFACTS = {"tasks": "T1053.005", "services": "T1543.003", "wmipersist": "T1546.003"}
+
+
 def enrich_with_mitre(json_path: str, artifact_type: str) -> bool:
     """
     Fast MITRE enrichment for all artifact files.
@@ -324,6 +373,12 @@ def enrich_with_mitre(json_path: str, artifact_type: str) -> bool:
                 return True
 
         base_technique = ARTEFACT_MITRE_MAPPING.get(artifact_type.lower(), {}).get("technique_id")
+        if base_technique and not presence_technique(base_technique):
+            base_technique = None  # a parsed MFT isn't timestomping, nor a USN journal file deletion
+        if artifact_type.lower() in PERSISTENCE_ARTEFACTS:
+            kind = artifact_type.lower()
+            mine = any(_not_windows_own(kind, r) for r in _records(json_path))
+            base_technique = PERSISTENCE_ARTEFACTS[kind] if mine else None
 
         found_techniques = set()
         if base_technique:
@@ -422,17 +477,15 @@ def _get_patterns_for_artifact(artifact_type: str):
     if artifact_lower in ["registry", "reg", "shimcache", "amcache", "userassist"]:
         patterns = {
             # Registry-specific
-            "T1547.001": ["\\run", "\\runonce", "\\explorer\\shell", "\\winlogon"],  # Autostart
-            "T1546.001": ["\\classes\\", "\\shell\\open\\command"],  # File associations
-            "T1112": ["\\policies\\", "\\software\\microsoft\\"],  # Registry modification
-            "T1562.001": ["\\windows defender\\", "disableantispyware"],  # Disable security
-            # Command lines in registry values
-            "T1059.001": ["powershell", ".ps1", "-enc", "-encodedcommand", "-nop", "-w hidden"],
-            "T1059.003": ["cmd.exe", "cmd /c", "cmd /k"],
-            "T1059.005": ["wscript", "cscript", ".vbs"],
-            "T1218": ["mshta", "regsvr32", "rundll32", "msiexec", "certutil"],
+            # Every hive has Run keys, Classes, Policies and Defender's settings: those are
+            # recorded from the values in them (registry/system.py, profile.py), not the key names
+            "T1562.001": ["disableantispyware", "disablerealtimemonitoring"],  # Disable security
+            # Command lines in registry values. Windows' own associations open .vbs with wscript,
+            # .hta with mshta and MSIs with msiexec, and its uninstall strings run rundll32
+            "T1059.001": ["-encodedcommand", " -enc ", " -nop ", "-w hidden", "-windowstyle hidden"],
+            "T1218": ["certutil"],
             # Files referenced in registry
-            "T1003": ["mimikatz", "procdump", "lsass", "sam", "system", "security", "pwdump"],
+            "T1003": ["mimikatz", "procdump", "pwdump"],
             "T1105": ["psexec", "paexec", "bitsadmin"],
             "T1219": ["anydesk", "teamviewer", "vnc", "logmein"],
         }
@@ -445,11 +498,13 @@ def _get_patterns_for_artifact(artifact_type: str):
     if artifact_lower in ["prefetch", "pf"]:
         patterns = {
             "T1059": ["powershell", "cmd.exe", "wscript", "cscript", "python", "perl"],
-            "T1218": ["mshta", "regsvr32", "rundll32", "msiexec", "certutil", "cmstp"],
+            # rundll32, regsvr32 and msiexec run all day on a clean host
+            "T1218": ["mshta", "certutil", "cmstp"],
             "T1003": ["mimikatz", "procdump", "pwdump", "gsecdump", "secretsdump"],
-            "T1105": ["psexec", "paexec", "bitsadmin", "curl", "wget"],
-            "T1036": ["svchost", "csrss", "lsass", "services"],  # Masquerading
-            "T1070.004": ["sdelete", "cipher"],  # File deletion
+            "T1105": ["psexec", "paexec", "bitsadmin"],
+            # svchost, csrss, lsass and services are Windows' own: masquerading is a copy elsewhere,
+            # which a Prefetch file name can't show
+            "T1070.004": ["sdelete"],  # File deletion
             "T1219": ["anydesk", "teamviewer", "vnc", "logmein", "screenconnect"],
         }
         field_pattern = r'"(?:filename|name|path|executable)"\s*:\s*"([^"]+)"'
@@ -459,16 +514,15 @@ def _get_patterns_for_artifact(artifact_type: str):
     # WINDOWS-ONLY: MFT, USNJrnl
     # ========================================
     if artifact_lower in ["mft", "usnjrnl"]:
+        # A file table lists what's on the volume, not what ran: Windows ships scripts, mshta,
+        # certutil and wevtutil, and every volume has $Recycle.Bin, Startup folders and readme.txt.
+        # Only names Windows doesn't ship count. ntds.dit is a domain controller's own
         patterns = {
-            "T1059": [".ps1", ".vbs", ".js", ".bat", ".cmd", "powershell", "wscript", "cscript"],
-            "T1036": ["svchost", "csrss", "lsass", "services", "winlogon", "explorer"],
-            "T1003": ["mimikatz", "procdump", "lsass.dmp", "sam.save", "system.save", "ntds.dit", "pwdump"],
-            "T1105": ["psexec", "paexec", "certutil", "bitsadmin"],
-            "T1218": ["mshta", "regsvr32", "rundll32", "msiexec"],
-            "T1547": ["\\run\\", "\\runonce\\", "startup"],
-            "T1070": ["wevtutil", "fsutil", "$recycle", "sdelete"],
-            "T1219": ["anydesk", "teamviewer", "vnc", "logmein", "ammyy"],
-            "T1486": [".encrypted", ".locked", ".crypto", "readme.txt", "decrypt"],  # Ransomware
+            "T1003": ["mimikatz", "procdump", "lsass.dmp", "sam.save", "system.save", "pwdump"],
+            "T1105": ["psexec", "paexec"],
+            "T1070.004": ["sdelete"],
+            "T1219": ["anydesk", "teamviewer", "logmein", "ammyy"],
+            "T1486": [".encrypted", ".locked"],  # Ransomware
         }
         field_pattern = r'"(?:full_path|filename|name|path)"\s*:\s*"([^"]+)"'
         return patterns, field_pattern
@@ -477,20 +531,12 @@ def _get_patterns_for_artifact(artifact_type: str):
     # CROSS-PLATFORM: Generic file listings
     # ========================================
     if artifact_lower in ["filelisting", "files"]:
+        # As for the MFT: what's on disk, so only what an OS doesn't ship ("nc" was in every "sync")
         patterns = {
-            # Cross-platform scripting
-            "T1059.001": [".ps1", "powershell"],  # PowerShell (Windows)
-            "T1059.004": [".sh", "/bin/bash", "/bin/sh", "/bin/zsh"],  # Unix shell
-            "T1059.005": [".vbs", "wscript", "cscript"],  # VBScript (Windows)
-            "T1059.006": [".py", "python"],  # Python
-            "T1059.007": [".js"],  # JavaScript
-            # Cross-platform tools
             "T1003": ["mimikatz", "procdump", "pwdump", "hashdump"],
-            "T1105": ["psexec", "paexec", "curl", "wget", "nc", "netcat"],
-            "T1219": ["anydesk", "teamviewer", "vnc", "logmein"],
-            "T1486": [".encrypted", ".locked", ".crypto", "ransom"],  # Ransomware
-            # Persistence locations
-            "T1547": ["startup", "autostart", ".bashrc", ".zshrc", "crontab", "launchagents"],
+            "T1105": ["psexec", "paexec", "netcat"],
+            "T1219": ["anydesk", "teamviewer", "logmein"],
+            "T1486": [".encrypted", ".locked", "ransom"],  # Ransomware
         }
         field_pattern = r'"(?:full_path|filename|name|path)"\s*:\s*"([^"]+)"'
         return patterns, field_pattern
@@ -504,8 +550,8 @@ def _get_patterns_for_artifact(artifact_type: str):
             "T1059.006": ["python", "/usr/bin/python"],  # Python
             "T1053.003": ["cron", "crontab"],  # Cron
             "T1543.002": ["systemctl"],  # Systemd
-            "T1070.002": ["rm ", "unlink", "shred"],  # Log deletion
-            "T1105": ["curl", "wget", "nc", "netcat", "scp", "rsync"],
+            "T1070.002": ["shred"],  # Log deletion
+            "T1105": ["netcat"],
         }
         field_pattern = r'"(?:message|msg|command|unit|exe)"\s*:\s*"([^"]+)"'
         return patterns, field_pattern
@@ -525,8 +571,8 @@ def _get_patterns_for_artifact(artifact_type: str):
             "T1059.006": ["python", "/usr/bin/python", "python3"],  # Python
             "T1059.007": ["node", "javascript"],  # JavaScript
             # Suspicious binaries
-            "T1105": ["curl", "wget", "nc", "netcat"],
-            "T1553.001": ["quarantine", "xattr"],  # Gatekeeper bypass
+            "T1105": ["netcat"],
+            "T1553.001": ["xattr -d com.apple.quarantine", "xattr -c"],  # Gatekeeper bypass
         }
         field_pattern = r'"(?:path|program|label|command|arguments|ProgramArguments|Program)"\s*:\s*"([^"]+)"'
         return patterns, field_pattern
@@ -536,10 +582,9 @@ def _get_patterns_for_artifact(artifact_type: str):
     # ========================================
     if artifact_lower in ["browser", "chromium", "firefox", "safari", "history", "downloads"]:
         patterns = {
-            "T1567": ["drive.google", "dropbox", "onedrive", "mega.nz", "wetransfer"],  # Exfil to cloud
+            # Visiting OneDrive or a login page is a day's browsing, not exfiltration or phishing
+            "T1567": ["mega.nz", "wetransfer"],  # Exfil to cloud
             "T1102": ["pastebin", "hastebin", "ghostbin"],  # Web service C2
-            "T1189": ["exploit", "payload", ".exe", ".dll", ".scr"],  # Drive-by
-            "T1566.002": ["login", "account", "verify", "suspended"],  # Phishing keywords
         }
         field_pattern = r'"(?:url|path|title|filename)"\s*:\s*"([^"]+)"'
         return patterns, field_pattern
@@ -549,12 +594,8 @@ def _get_patterns_for_artifact(artifact_type: str):
     # ========================================
     if artifact_lower in ["shellbags"]:
         patterns = {
-            "T1083": ["users\\", "documents", "desktop", "downloads"],  # File discovery
-            "T1005": ["confidential", "password", "secret", "backup"],  # Data from local system
-            "T1025": ["usb", "removable"],  # Removable media
-            # Command-related paths
-            "T1059": ["powershell", "cmd.exe", ".ps1", ".bat", ".vbs"],
-            "T1218": ["mshta", "regsvr32", "rundll32"],
+            # Folders a user opened: Documents and Desktop are every user's
+            "T1025": ["removable"],  # Removable media
         }
         field_pattern = r'"(?:path|name|full_path|target)"\s*:\s*"([^"]+)"'
         return patterns, field_pattern
@@ -573,8 +614,8 @@ def _get_patterns_for_artifact(artifact_type: str):
             "T1059.004": ["/bin/sh", "/bin/bash", "sh -c"],
             "T1059.005": ["wscript", "cscript", ".vbs"],
             "T1059.006": ["python", "/usr/bin/python"],
-            "T1218": ["mshta", "regsvr32", "rundll32", "certutil"],
-            "T1105": ["curl", "wget", "psexec", "bitsadmin"],
+            "T1218": ["mshta", "regsvr32", "certutil"],  # Windows' own tasks run rundll32
+            "T1105": ["psexec", "bitsadmin"],
         }
         field_pattern = r'"(?:path|command|action|name|arguments|program|schedule)"\s*:\s*"([^"]+)"'
         return patterns, field_pattern
@@ -585,9 +626,8 @@ def _get_patterns_for_artifact(artifact_type: str):
     if artifact_lower in ["services"]:
         patterns = {
             # Service-specific
-            "T1543.003": ["\\system32\\", "\\syswow64\\"],  # Windows Service paths
+            # Every service runs from System32; svchost is how most of them run
             "T1569.002": ["psexec", "paexec"],  # Service Execution
-            "T1036": ["svchost", "csrss", "lsass"],  # Masquerading
             # Command lines in service configs
             "T1059.001": ["powershell", ".ps1", "-enc"],
             "T1059.003": ["cmd.exe", "cmd /c"],
@@ -610,18 +650,15 @@ def _get_patterns_for_artifact(artifact_type: str):
             "T1059.004": ["/bin/sh", "/bin/bash", "/bin/zsh", "sh -c"],
             "T1059.006": ["python", "/usr/bin/python"],
             # Authentication/credential access
-            "T1110": ["failed password", "authentication failure", "invalid user"],
-            "T1078": ["accepted password", "session opened", "successful login"],
-            "T1548.003": ["sudo", "doas", "root"],
+            # A failed or successful logon is a log's daily business: brute force is counted from
+            # the records (login_records), and "root" was in every other line
+            "T1548.003": ["doas"],
             # Persistence
             "T1053.003": ["cron", "crontab"],
             "T1543.002": ["systemctl"],
             # Lateral movement / tools
-            "T1021.004": ["ssh", "sshd", "accepted publickey"],
-            "T1105": ["curl", "wget", "scp", "rsync", "nc", "netcat"],
-            # Suspicious activity
-            "T1070.002": ["log deleted", "cleared", "truncated"],
-            "T1003": ["mimikatz", "procdump", "lsass", "hashdump"],
+            "T1105": ["netcat"],
+            "T1003": ["mimikatz", "procdump", "hashdump"],
         }
         field_pattern = r'"(?:message|msg|log|line|content|text|data)"\s*:\s*"([^"]+)"'
         return patterns, field_pattern
@@ -630,9 +667,8 @@ def _get_patterns_for_artifact(artifact_type: str):
     # DEFAULT: Generic patterns (fallback)
     # ========================================
     patterns = {
-        "T1059": [".ps1", ".vbs", ".bat", ".sh", "powershell", "cmd.exe", "/bin/bash"],
-        "T1003": ["mimikatz", "procdump", "lsass"],
-        "T1105": ["psexec", "certutil", "curl", "wget"],
+        "T1003": ["mimikatz", "procdump"],
+        "T1105": ["psexec"],
     }
     field_pattern = r'"(?:path|name|command|value|message|data)"\s*:\s*"([^"]+)"'
     return patterns, field_pattern

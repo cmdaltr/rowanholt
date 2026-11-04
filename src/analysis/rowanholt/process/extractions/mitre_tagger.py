@@ -204,6 +204,18 @@ ARTEFACT_MITRE_MAPPING = {
 }
 
 
+# A technique an artefact's mere presence may stand for: the persistence mechanisms and
+# interpreters a host has (tasks, services, launch agents, shells). Anything else (indicator
+# removal, discovery, collection, credential access) is on every clean host that has the artefact,
+# so it's recorded only from what the records show
+PRESENCE_TECHNIQUES = ("T1053", "T1059", "T1543", "T1546.003", "T1547.015")
+
+
+def presence_technique(technique_id: str) -> bool:
+    """Whether an artefact merely being there may tag this technique."""
+    return technique_id.split(".")[0] in ("T1053", "T1059", "T1543") or technique_id in PRESENCE_TECHNIQUES
+
+
 def get_mitre_techniques(artefact_type: str) -> List[str]:
     """
     Get MITRE ATT&CK technique IDs for an artefact type.
@@ -216,7 +228,7 @@ def get_mitre_techniques(artefact_type: str) -> List[str]:
     """
     artefact_lower = artefact_type.lower()
     mapping = ARTEFACT_MITRE_MAPPING.get(artefact_lower, {})
-    return mapping.get("technique_ids", [])
+    return [t for t in mapping.get("technique_ids", []) if presence_technique(t)]
 
 
 def tag_mitre_technique(
