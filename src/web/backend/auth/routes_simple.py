@@ -84,7 +84,7 @@ def _session(response: Response, user: dict) -> dict:
         key="session_token",
         value=access_token,
         httponly=True,
-        secure=settings.rivendell_server_mode,
+        secure=settings.rowanholt_server_mode,
         samesite="lax",
         max_age=settings.access_token_expire_minutes * 60,
     )
@@ -92,7 +92,7 @@ def _session(response: Response, user: dict) -> dict:
 
 
 def _check_password_strength(password: str) -> None:
-    if settings.rivendell_server_mode and len(password) < MIN_PASSWORD:
+    if settings.rowanholt_server_mode and len(password) < MIN_PASSWORD:
         raise HTTPException(status_code=400, detail=f"Passwords need at least {MIN_PASSWORD} characters")
 
 
@@ -106,11 +106,11 @@ def _users_or_503() -> dict:
 # Routes
 @router.get("/config")
 async def auth_config():
-    """How this Rivendell signs people in, for the login page."""
-    server = settings.rivendell_server_mode
+    """How this Rowanholt signs people in, for the login page."""
+    server = settings.rowanholt_server_mode
     return {
         "server_mode": server,
-        "local_login": settings.rivendell_local_login or not settings.oidc_enabled,
+        "local_login": settings.rowanholt_local_login or not settings.oidc_enabled,
         "guest": not server,
         "register": not server,
         "sso": {"enabled": settings.oidc_enabled, "name": settings.oidc_display_name},
@@ -152,7 +152,7 @@ async def login(
             detail="Account is disabled",
         )
     # With single sign-on as the only way in, a password still works for admins (break glass)
-    if settings.oidc_enabled and not settings.rivendell_local_login and user["role"] != "admin":
+    if settings.oidc_enabled and not settings.rowanholt_local_login and user["role"] != "admin":
         raise HTTPException(status_code=403, detail=f"Sign in with {settings.oidc_display_name}")
 
     user["last_login"] = datetime.utcnow().isoformat()
@@ -163,7 +163,7 @@ async def login(
 @router.post("/guest", response_model=LoginResponse)
 async def login_as_guest(response: Response):
     """Login as guest user (limited access). Not on a server."""
-    if settings.rivendell_server_mode:
+    if settings.rowanholt_server_mode:
         raise HTTPException(status_code=403, detail="Guest access is off on this server")
     access_token = create_access_token(
         data={"sub": "guest", "role": "guest"},
@@ -184,7 +184,7 @@ async def login_as_guest(response: Response):
         "token_type": "bearer",
         "user": {
             "id": "guest",
-            "email": "guest@rivendell.app",
+            "email": "guest@rowanholt.app",
             "username": "guest",
             "full_name": "Guest User",
             "role": "guest",
@@ -196,7 +196,7 @@ async def login_as_guest(response: Response):
 async def register(request: RegisterRequest, http_request: Request):
     """Register a new user account. On a server, only admins create accounts."""
     role = "user"
-    if settings.rivendell_server_mode:
+    if settings.rowanholt_server_mode:
         access.require_admin(http_request)
         role = request.role
     _check_password_strength(request.password)
@@ -263,13 +263,13 @@ async def verify(request: Request, response: Response, login_redirect: bool = Fa
     Navigator (service=navigator), a case's layer also needs access to the case: the
     proxy sends the URI it's asking about in X-Forwarded-Uri."""
     user = access.user_from_request(request)
-    if not user and login_redirect and settings.rivendell_public_url:
-        return RedirectResponse(f"{settings.rivendell_public_url.rstrip('/')}/login", status_code=302)
+    if not user and login_redirect and settings.rowanholt_public_url:
+        return RedirectResponse(f"{settings.rowanholt_public_url.rstrip('/')}/login", status_code=302)
     if not user:
         raise HTTPException(status_code=401, detail="Sign in required")
     if service == "navigator" and not access.layer_allowed(user, request.headers.get("X-Forwarded-Uri", "/")):
         raise HTTPException(status_code=403, detail="Not your case")
-    response.headers["X-Rivendell-User"] = user["username"]
+    response.headers["X-Rowanholt-User"] = user["username"]
     return {"username": user["username"]}
 
 
@@ -297,7 +297,7 @@ class TokenRequest(BaseModel):
 
 
 def _token_storage():
-    if not settings.rivendell_server_mode:
+    if not settings.rowanholt_server_mode:
         raise HTTPException(status_code=400, detail="Tokens are for a team server: on your own machine the API needs none")
     if access._storage is None:
         raise HTTPException(status_code=503, detail="Token storage isn't available")
@@ -413,7 +413,7 @@ async def oidc_login():
         return RedirectResponse(f"/login?sso_error={quote(f'Identity provider unreachable: {exc}')}", status_code=302)
     redirect = RedirectResponse(url, status_code=302)
     redirect.set_cookie("oidc_flow", oidc.seal(flow), max_age=oidc.STATE_SECONDS, httponly=True,
-                        secure=settings.rivendell_server_mode, samesite="lax", path="/api/auth/oidc")
+                        secure=settings.rowanholt_server_mode, samesite="lax", path="/api/auth/oidc")
     return redirect
 
 

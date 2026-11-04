@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Set this Rivendell up as a team's shared server (writes the server settings into .env)
+# Set this Rowanholt up as a team's shared server (writes the server settings into .env)
 #
-#   rivendell server init <hostname> [--tls internal|<acme-email>|files]
+#   rowanholt server init <hostname> [--tls internal|<acme-email>|files]
 #
-# <hostname> is the name people will open, e.g. rivendell.dfir.example.org. --tls picks
+# <hostname> is the name people will open, e.g. rowanholt.dfir.example.org. --tls picks
 # the certificate: Caddy's own CA (internal, the default), Let's Encrypt for a public
 # name (an email address), or your organisation's own (files: deploy/server/certs/
-# rivendell.crt and rivendell.key). Afterwards `rivendell start` runs the server profile.
+# rowanholt.crt and rowanholt.key). Afterwards `rowanholt start` runs the server profile.
 #
 # Secrets are generated once and kept: SECRET_KEY, the first admin's password (printed
 # once), and the Postgres, Elastic and Splunk passwords for stores that don't exist yet.
-# Stores created earlier keep their passwords, since changing them would lock Rivendell
+# Stores created earlier keep their passwords, since changing them would lock Rowanholt
 # out of its own data; on a server those stores aren't reachable from the network.
 set -euo pipefail
 
@@ -27,14 +27,14 @@ while [ $# -gt 0 ]; do
     esac
     shift
 done
-[ -n "$HOSTNAME_ARG" ] || { echo "Usage: rivendell server init <hostname> [--tls internal|<acme-email>|files]" >&2; exit 1; }
+[ -n "$HOSTNAME_ARG" ] || { echo "Usage: rowanholt server init <hostname> [--tls internal|<acme-email>|files]" >&2; exit 1; }
 [[ "$HOSTNAME_ARG" =~ ^[A-Za-z0-9.-]+$ ]] || { echo "Error: '$HOSTNAME_ARG' isn't a hostname" >&2; exit 1; }
 
 case "$TLS" in
     internal) TLS_VALUE="internal" ;;
     files)
-        TLS_VALUE="/certs/rivendell.crt /certs/rivendell.key"
-        for f in rivendell.crt rivendell.key; do
+        TLS_VALUE="/certs/rowanholt.crt /certs/rowanholt.key"
+        for f in rowanholt.crt rowanholt.key; do
             [ -f "$ROOT/deploy/server/certs/$f" ] || echo "Note: put $f in deploy/server/certs before starting." >&2
         done
         ;;
@@ -59,24 +59,24 @@ set_value() {
 secret() { od -An -N24 -tx1 /dev/urandom | tr -d ' \n'; }
 store_exists() { docker volume ls -q 2>/dev/null | grep -qE "(^|_)$1\$"; }
 
-set_value RIVENDELL_DEPLOYMENT server
-set_value RIVENDELL_HOSTNAME "$HOSTNAME_ARG"
-set_value RIVENDELL_TLS "$TLS_VALUE"
+set_value ROWANHOLT_DEPLOYMENT server
+set_value ROWANHOLT_HOSTNAME "$HOSTNAME_ARG"
+set_value ROWANHOLT_TLS "$TLS_VALUE"
 
 key="$(current SECRET_KEY)"
 case "$key" in ""|change-this-to-a-random-secret-key|your-secret-key-change-in-production) set_value SECRET_KEY "$(secret)$(secret)" ;; esac
 
 ADMIN_PASSWORD=""
-if [ -z "$(current RIVENDELL_ADMIN_PASSWORD)" ]; then
+if [ -z "$(current ROWANHOLT_ADMIN_PASSWORD)" ]; then
     ADMIN_PASSWORD="$(secret)"
-    set_value RIVENDELL_ADMIN_PASSWORD "$ADMIN_PASSWORD"
+    set_value ROWANHOLT_ADMIN_PASSWORD "$ADMIN_PASSWORD"
 fi
 
 kept=()
 for pair in POSTGRES_PASSWORD:postgres_data ELASTIC_PASSWORD:elastic_data KIBANA_PASSWORD:elastic_data SPLUNK_PASSWORD:splunk_var; do
     var="${pair%%:*}" volume="${pair#*:}"
     value="$(current "$var")"
-    if [ -n "$value" ] && [ "$value" != rivendell ] && [ "$value" != changeme ]; then
+    if [ -n "$value" ] && [ "$value" != rowanholt ] && [ "$value" != changeme ]; then
         continue
     fi
     if store_exists "$volume"; then
@@ -86,11 +86,11 @@ for pair in POSTGRES_PASSWORD:postgres_data ELASTIC_PASSWORD:elastic_data KIBANA
     fi
 done
 
-echo "Rivendell is set up as a server for https://$HOSTNAME_ARG"
+echo "Rowanholt is set up as a server for https://$HOSTNAME_ARG"
 echo ""
 if [ -n "$ADMIN_PASSWORD" ]; then
     echo "  First admin:  admin / $ADMIN_PASSWORD"
-    echo "  (shown once; it's also RIVENDELL_ADMIN_PASSWORD in .env until you change it after signing in)"
+    echo "  (shown once; it's also ROWANHOLT_ADMIN_PASSWORD in .env until you change it after signing in)"
     echo ""
 fi
 if [ ${#kept[@]} -gt 0 ]; then
@@ -98,10 +98,10 @@ if [ ${#kept[@]} -gt 0 ]; then
     echo ""
 fi
 case "$TLS_VALUE" in
-    internal) echo "  Certificates: Caddy's own CA. After 'rivendell start', 'rivendell server ca' prints its root to trust on clients." ;;
-    /certs/*) echo "  Certificates: deploy/server/certs/rivendell.crt and rivendell.key." ;;
+    internal) echo "  Certificates: Caddy's own CA. After 'rowanholt start', 'rowanholt server ca' prints its root to trust on clients." ;;
+    /certs/*) echo "  Certificates: deploy/server/certs/rowanholt.crt and rowanholt.key." ;;
     *) echo "  Certificates: Let's Encrypt for $TLS_VALUE; $HOSTNAME_ARG must reach this host on ports 80 and 443." ;;
 esac
 echo ""
-echo "Next: rivendell start    (with Splunk and Elastic: COMPOSE_PROFILES=siem rivendell start)"
+echo "Next: rowanholt start    (with Splunk and Elastic: COMPOSE_PROFILES=siem rowanholt start)"
 echo "Single sign-on: set OIDC_ISSUER, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET in .env (docs/SERVER.md)."

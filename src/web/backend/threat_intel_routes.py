@@ -1,7 +1,8 @@
 """Threat intelligence: importing indicators, browsing them, and what they say about one value.
 
 Reading is open to every signed-in user; importing, TAXII pulls, deleting a source and changing
-an indicator's expiry are admin-only on a team server (auth/access.py), as Mordor's are.
+an indicator's expiry are admin-only on a team server (auth/access.py), as Mordor's are. Online
+lookups (threat_intel_lookup.py) are for any analyst, never for Eru.
 """
 
 import logging
@@ -10,12 +11,16 @@ import tempfile
 import threading
 from typing import Optional
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
-from pydantic import BaseModel
+from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
+from pydantic import BaseModel, Field
 
 try:
+    from . import threat_intel_lookup as online
+    from .auth import access
     from .threat_intel_store import ThreatIntelUnavailable, store, threat_intel
 except ImportError:
+    import threat_intel_lookup as online
+    from auth import access
     from threat_intel_store import ThreatIntelUnavailable, store, threat_intel
 
 router = APIRouter(prefix="/api/threat-intel", tags=["Threat intelligence"])
@@ -51,6 +56,13 @@ class ValidityRequest(BaseModel):
     valid_until: Optional[str] = None  # ISO date or time (UTC); null: no expiry
 
 
+class LookupRequest(BaseModel):
+    value: str = Field(..., min_length=3, max_length=300)
+
+
+AGENT_HEADERS = ("X-Rowanholt-Agent", "X-Rivendell-Agent")
+
+
 class TaxiiRequest(BaseModel):
     url: str
     username: str = ""
@@ -72,7 +84,7 @@ async def indicators(q: str = "", source: str = "", limit: int = Query(100, le=5
 @router.post("/import")
 async def import_file(file: UploadFile = File(...)):
     """Indicators from an uploaded file: the Iran APT workbook, a STIX bundle,
-    MITRESaw's procedures, Rivendell's own CSV or a text watchlist."""
+    MITRESaw's procedures, Rowanholt's own CSV or a text watchlist."""
     package = _package()
     name = os.path.basename(file.filename or "upload")
     if not name.lower().endswith(UPLOAD_SUFFIXES):
@@ -100,7 +112,7 @@ async def import_file(file: UploadFile = File(...)):
 async def import_taxii(request: TaxiiRequest):
     """Every object in a TAXII 2.1 collection (or those added after a date), as indicators."""
     _package()
-    from rivendell.threat_intel.stix import IntelFormatError, import_taxii_with_validity as pull
+    from rowanholt.threat_intel.stix import IntelFormatError, import_taxii_with_validity as pull
     try:
         loaded, validity = pull(request.url, request.username, request.password, request.added_after)
     except IntelFormatError as exc:
@@ -115,7 +127,7 @@ async def import_taxii(request: TaxiiRequest):
 async def set_validity(indicator_id: int, request: ValidityRequest):
     """Extend an indicator's expiry, or clear it (no expiry); an expired one matches again once extended."""
     _package()
-    from rivendell.threat_intel.validity import parse_time
+    from rowanholt.threat_intel.validity import parse_time
     until = None
     if request.valid_until:
         until = parse_time(request.valid_until)
@@ -150,3 +162,25 @@ def enrich_value(value: str) -> Optional[list]:
         return threat_intel().enrich_artefact(value, value_index())
     except (ThreatIntelUnavailable, RuntimeError):
         return None
+
+
+@router.get("/lookup")
+async def lookup_status():
+    """Whether online lookups are on, and which provider they go to."""
+    name = online.provider()
+    return {"enabled": bool(name), "provider": name or None}
+
+
+@router.post("/lookup")
+async def lookup(request: LookupRequest, http: Request):
+    """What the online provider says about one IP, domain or hash. Sends the value outside Rowanholt,
+    so it's an analyst's call only: refused to an eru-mcp token and to Eru's MCP server."""
+    if access.token_scope(http) == "eru-mcp" or any(http.headers.get(h) for h in AGENT_HEADERS):
+        raise HTTPException(status_code=403, detail="Online lookups are an analyst's, not Eru's")
+    user = getattr(http.state, "user", None) or {}
+    try:
+        return online.lookup(request.value, user.get("username", "unknown"))
+    except online.LookupRefused as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except online.LookupFailed as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc))

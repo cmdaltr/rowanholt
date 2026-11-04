@@ -165,8 +165,8 @@ src/acquisition/tools/disk_tools.zip
 
 # Desktop app: evidence mounts from setup, and the version markers of an app-installed copy
 docker-compose.local.yml
-.rivendell-version
-.rivendell-built
+.rowanholt-version
+.rowanholt-built
 
 # A server's own TLS certificate and key (deploy/server/certs/README)
 deploy/server/certs/*

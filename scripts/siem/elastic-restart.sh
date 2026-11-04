@@ -2,7 +2,7 @@
 # Restart Elasticsearch instance inside Docker container
 # Usage: ./restart-elastic.sh
 
-CONTAINER_NAME="rivendell-elastic"
+CONTAINER_NAME="rowanholt-elastic"
 
 echo "Restarting Elasticsearch in container: $CONTAINER_NAME"
 
@@ -24,12 +24,12 @@ for i in {1..90}; do
         echo "Elasticsearch is ready!"
 
         # Also restart Kibana since it depends on Elastic
-        if docker ps --format '{{.Names}}' | grep -q "^rivendell-kibana$"; then
+        if docker ps --format '{{.Names}}' | grep -q "^rowanholt-kibana$"; then
             echo "Restarting Kibana..."
-            docker restart rivendell-kibana
+            docker restart rowanholt-kibana
             echo "Waiting for Kibana to be ready..."
             for j in {1..60}; do
-                KIBANA_STATUS=$(docker inspect --format='{{.State.Health.Status}}' "rivendell-kibana" 2>/dev/null)
+                KIBANA_STATUS=$(docker inspect --format='{{.State.Health.Status}}' "rowanholt-kibana" 2>/dev/null)
                 if [ "$KIBANA_STATUS" = "healthy" ]; then
                     echo "Kibana is ready!"
                     exit 0

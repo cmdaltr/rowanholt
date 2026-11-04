@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>The road to Rivendell</title>
+<title>The road to Rowanholt</title>
 <style>
 :root { color-scheme: dark; --bg: #0b1210; --text: #b9c9b4; --dim: #7d907a; --strong: #e1ecdc;
         --bad: #e8a07a; --ink: #4a3a22; --road: #6b4f2a; --line: #1d2b26; }
@@ -44,8 +44,8 @@ pre { height: 26vh; overflow: auto; margin: 8px 0 0; padding: 12px; background: 
 </style>
 </head>
 <body>
-<img class="plain-logo" src="rivendell.png" alt="Rivendell">
-<h1>The road to Rivendell</h1>
+<img class="plain-logo" src="rowanholt.png" alt="Rowanholt">
+<h1>The road to Rowanholt</h1>
 <div class="map" id="map">
   <img src="journey.png" alt="">
   <svg viewBox="0 0 520 300" id="svg">
@@ -71,7 +71,7 @@ pre { height: 26vh; overflow: auto; margin: 8px 0 0; padding: 12px; background: 
   <div id="where">Gandalf sets out from the Shire</div>
   <div id="eta">Reckoning the road…</div>
   <div id="phase"></div>
-  <button onclick="webkit.messageHandlers.rivendell.postMessage('retry')">Try again</button>
+  <button onclick="webkit.messageHandlers.rowanholt.postMessage('retry')">Try again</button>
 </div>
 <details>
   <summary>The road's log</summary>
@@ -85,7 +85,7 @@ const STOPS = [
   [0.0, 60, 190, 'The Shire', 0, 16, 'middle'], [0.18, 150, 178, 'Bree', 0, -8, 'middle'],
   [0.38, 212, 165, 'Weathertop', 0, 16, 'middle'], [0.55, 255, 148, 'The Last Bridge', 4, 15, 'start'],
   [0.7, 285, 125, 'The Trollshaws', -7, -4, 'end'], [0.86, 310, 108, 'Ford of Bruinen', 7, 9, 'start'],
-  [1.0, 332, 95, 'Rivendell', 0, -9, 'middle'],
+  [1.0, 332, 95, 'Rowanholt', 0, -9, 'middle'],
 ];
 const NS = 'http://www.w3.org/2000/svg';
 const pathFor = (pts) => pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
@@ -116,7 +116,7 @@ function pointAt(f) {
 }
 
 let shown = 0, target = 0, lastReport = 0, startedAt = Date.now(), failed = false, finished = false;
-// A typical start on this Mac, for walking without reports (expect() from Rivendell.app)
+// A typical start on this Mac, for walking without reports (expect() from Rowanholt.app)
 let typical = 150;
 
 function draw() {
@@ -152,22 +152,22 @@ function frame() {
 
 function formatEta(seconds) {
   if (seconds <= 0) return 'Arrived';
-  if (seconds < 45) return 'Less than a minute to Rivendell';
-  if (seconds < 90) return 'About a minute to Rivendell';
+  if (seconds < 45) return 'Less than a minute to Rowanholt';
+  if (seconds < 90) return 'About a minute to Rowanholt';
   const minutes = Math.round(seconds / 60);
-  return minutes < 60 ? `About ${minutes} minutes to Rivendell` : `About ${Math.floor(minutes / 60)} h ${minutes % 60} min to Rivendell`;
+  return minutes < 60 ? `About ${minutes} minutes to Rowanholt` : `About ${Math.floor(minutes / 60)} h ${minutes % 60} min to Rowanholt`;
 }
 
 function placeLine(r) {
-  if (r.fraction >= 1) return 'Gandalf has come to Rivendell';
+  if (r.fraction >= 1) return 'Gandalf has come to Rowanholt';
   const name = STOPS.filter(s => s[0] <= r.fraction).slice(-1)[0][3];
   return name === 'The Shire' ? 'Gandalf sets out from the Shire' : `Gandalf has passed ${name}`;
 }
 
-// From Rivendell.app: the median of this Mac's earlier starts, in seconds
+// From Rowanholt.app: the median of this Mac's earlier starts, in seconds
 function expect(seconds) { if (seconds > 0) typical = seconds; }
 
-// From Rivendell.app: one @@progress report from startup_progress.py
+// From Rowanholt.app: one @@progress report from startup_progress.py
 function progress(r) {
   lastReport = Date.now();
   target = Math.max(target, r.fraction);

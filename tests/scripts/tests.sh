@@ -1,5 +1,5 @@
 #!/bin/bash
-# Rivendell Test Runner
+# Rowanholt Test Runner
 # Runs all tests sequentially with proper error handling
 # Failed tests are logged to error.log for review
 
@@ -113,7 +113,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 log "=========================================="
-log "Rivendell Test Runner"
+log "Rowanholt Test Runner"
 log "Started: $(date)"
 log "Log file: $LOG_FILE"
 log "Delay between tests: ${DELAY_BETWEEN_TESTS}s"
@@ -123,19 +123,19 @@ log "=========================================="
 log "Checking API availability..."
 if ! curl -s --connect-timeout 5 http://localhost:5688/api/health > /dev/null 2>&1; then
     log "${RED}ERROR: Cannot connect to API at http://localhost:5688${NC}"
-    log "Make sure Rivendell is running: docker-compose up -d"
+    log "Make sure Rowanholt is running: docker-compose up -d"
     exit 1
 fi
 log "${GREEN}API is available${NC}"
 
 # Analysis files (keywords, YARA rules, IOC watchlists) are mounted via docker-compose volume
-# from ./files to /tmp/rivendell/files
+# from ./files to /tmp/rowanholt/files
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 FILES_DIR="$REPO_DIR/files"
 
 if [ -d "$FILES_DIR" ]; then
     log "${GREEN}Analysis files directory found at ${FILES_DIR}${NC}"
-    log "  (Mounted in container at /tmp/rivendell/files via docker-compose)"
+    log "  (Mounted in container at /tmp/rowanholt/files via docker-compose)"
 else
     log "${YELLOW}WARNING: Analysis files directory not found at ${FILES_DIR}${NC}"
     log "${YELLOW}Keywords, YARA, and IOC tests may fail${NC}"

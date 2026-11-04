@@ -1,5 +1,5 @@
 #!/bin/bash
-# Rivendell - Cleanup Old Jobs
+# Rowanholt - Cleanup Old Jobs
 # This script deletes old completed, failed, cancelled, or archived jobs
 
 set -e
@@ -12,8 +12,8 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-API_HOST="${RIVENDELL_API_HOST:-localhost}"
-API_PORT="${RIVENDELL_API_PORT:-5688}"
+API_HOST="${ROWANHOLT_API_HOST:-localhost}"
+API_PORT="${ROWANHOLT_API_PORT:-5688}"
 API_BASE="http://${API_HOST}:${API_PORT}/api"
 
 # Default settings
@@ -81,7 +81,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║         Rivendell - Cleanup Old Jobs                      ║${NC}"
+echo -e "${BLUE}║         Rowanholt - Cleanup Old Jobs                        ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -110,8 +110,8 @@ fi
 # Test API connectivity
 echo -e "${BLUE}Checking API connectivity...${NC}"
 if ! curl -s -f "${API_BASE}/health" > /dev/null 2>&1; then
-    echo -e "${RED}Error: Cannot connect to Rivendell API at ${API_BASE}${NC}"
-    echo -e "${YELLOW}Make sure Rivendell backend is running on ${API_HOST}:${API_PORT}${NC}"
+    echo -e "${RED}Error: Cannot connect to Rowanholt API at ${API_BASE}${NC}"
+    echo -e "${YELLOW}Make sure Rowanholt backend is running on ${API_HOST}:${API_PORT}${NC}"
     exit 1
 fi
 echo -e "${GREEN}✓ API is reachable${NC}"

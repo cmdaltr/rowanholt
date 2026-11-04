@@ -1,7 +1,7 @@
 """Eru's MCP server (src/eru_mcp/server.py), driven through the MCP SDK's in-memory client against
 the real backend in server mode (test_server_access.BackendCase). These are the threat model's
 checks before it goes near a live case: the tool list against what's never exposed, no reaching a
-job that isn't yours or shared with you, no reaching raw/, and no calls but Rivendell's API.
+job that isn't yours or shared with you, no reaching raw/, and no calls but Rowanholt's API.
 
 Needs the backend's requirements and requirements/mcp.txt; skipped without them.
 """
@@ -47,14 +47,14 @@ class EruMcpTest(BackendCase):
         super().tearDownClass()
 
     def server(self, headers, **options):
-        def send(method, path, params, body):
+        def send(method, path, params, body, token):
             self.calls.append(path)
-            # RivendellAPI._urllib sends the agent header (test_the_agent_header_is_sent)
+            # RowanholtAPI._urllib sends the agent header (test_the_agent_header_is_sent)
             resp = self.client.request(method, path, params=params, json=body,
                                        headers={**headers, eru_mcp.AGENT_HEADER[0]: eru_mcp.AGENT_HEADER[1]})
             is_json = "json" in resp.headers.get("content-type", "")
             return resp.status_code, resp.json() if is_json else resp.text
-        return eru_mcp.build_server(eru_mcp.RivendellAPI("http://testserver", transport=send), **options)
+        return eru_mcp.build_server(eru_mcp.RowanholtAPI("http://testserver", transport=send), **options)
 
     def call(self, headers, name, server=None, **arguments):
         """(is_error, result): the tool's structured result, or its error text."""
@@ -154,6 +154,14 @@ class EruMcpTest(BackendCase):
         confirmed = self.client.patch(f"{base}/findings/{lead['id']}", headers=self.alice, json={"status": "confirmed"})
         self.assertEqual(confirmed.json()["status"], "confirmed")
 
+    def test_an_mcp_server_from_before_the_rename_is_still_eru(self):
+        job = self.case_with_output("CASE-MCP-24")
+        eru = {**self.alice, "X-Rivendell-Agent": "eru-mcp"}
+        base = f"/api/jobs/{job}/case"
+        row = {"host": "WS01", "artefact": "artefacts/cooked/prefetch.csv", "row_ref": "3", "title": "x"}
+        self.assertEqual(self.client.post(f"{base}/findings", headers=eru, json={**row, "status": "confirmed"}).status_code, 403)
+        self.assertEqual(self.client.post(f"{base}/findings", headers=eru, json=row).json()["author"], "Eru (for alice)")
+
     def test_a_session_stops_at_its_write_limit(self):
         job = self.case_with_output("CASE-MCP-9")
         server = self.server(self.alice, writes=True, max_writes=2)
@@ -166,10 +174,10 @@ class EruMcpTest(BackendCase):
 
     def test_writes_need_an_eru_token_on_a_server(self):
         def api(headers):
-            def send(method, path, params, body):
+            def send(method, path, params, body, token):
                 resp = self.client.request(method, path, params=params, json=body, headers=headers)
                 return resp.status_code, resp.json()
-            return eru_mcp.RivendellAPI("http://testserver", transport=send)
+            return eru_mcp.RowanholtAPI("http://testserver", transport=send)
 
         def token(scope):
             made = self.client.post("/api/auth/tokens", headers=self.alice, json={"name": "mcp", "scope": scope})
@@ -180,11 +188,82 @@ class EruMcpTest(BackendCase):
         self.assertIn("not a sign-in token", eru_mcp.write_refusal(api(self.alice)))
         self.assertIn("can't check the token", eru_mcp.write_refusal(api({})))
         # On an analyst's own machine there's no token to check
-        self.settings.rivendell_server_mode = False
+        self.settings.rowanholt_server_mode = False
         try:
             self.assertIsNone(eru_mcp.write_refusal(api({})))
         finally:
-            self.settings.rivendell_server_mode = True
+            self.settings.rowanholt_server_mode = True
+
+    def test_over_http_each_request_is_its_own_analyst(self):
+        """Streamable HTTP (a team server's /mcp): no token of its own; each request's API token is checked
+        against Rowanholt and used for its calls; only eru-mcp tokens are taken, reads included."""
+        import socket
+        import threading
+        import time
+        import httpx2
+        import uvicorn
+        from mcp.client.streamable_http import streamable_http_client
+
+        def send(method, path, params, body, token):
+            headers = {eru_mcp.AGENT_HEADER[0]: eru_mcp.AGENT_HEADER[1], **({"Authorization": f"Bearer {token}"} if token else {})}
+            resp = self.client.request(method, path, params=params, json=body, headers=headers)
+            return resp.status_code, resp.json() if "json" in resp.headers.get("content-type", "") else resp.text
+
+        def token(headers, scope):
+            made = self.client.post("/api/auth/tokens", headers=headers, json={"name": "mcp-http", "scope": scope})
+            self.assertEqual(made.status_code, 200, made.text)
+            return made.json()["token"]
+
+        with socket.socket() as probe:
+            probe.bind(("127.0.0.1", 0))
+            port = probe.getsockname()[1]
+        url = f"http://127.0.0.1:{port}/mcp"
+        api = eru_mcp.RowanholtAPI("http://testserver", eru_mcp.request_token, transport=send)
+        self.assertIsNone(eru_mcp.http_refusal(api, "https://rowanholt.example.org"))
+        self.assertIn("https", eru_mcp.http_refusal(api, "http://rowanholt.example.org"))
+        self.settings.rowanholt_server_mode = False
+        try:
+            self.assertIn("team server", eru_mcp.http_refusal(api, "https://rowanholt.example.org"))
+        finally:
+            self.settings.rowanholt_server_mode = True
+        server = eru_mcp.build_server(api, writes=True, max_writes=1, http_url=url)
+        web = uvicorn.Server(uvicorn.Config(server.streamable_http_app(host="127.0.0.1"), host="127.0.0.1", port=port,
+                                            log_level="warning"))
+        thread = threading.Thread(target=web.run, daemon=True)
+        thread.start()
+        for _ in range(100):
+            if web.started:
+                break
+            time.sleep(0.05)
+
+        async def call(bearer, name, **arguments):
+            async with httpx2.AsyncClient(headers={"Authorization": f"Bearer {bearer}"}, timeout=30) as http:
+                async with Client(streamable_http_client(url, http_client=http)) as client:
+                    result = await client.call_tool(name, arguments)
+            return result.is_error, "".join(getattr(c, "text", "") for c in result.content)
+
+        try:
+            # What a client reads after a 401 names Rowanholt as analysts reach it, not the backend inside the stack
+            meta = httpx2.get(f"http://127.0.0.1:{port}/.well-known/oauth-protected-resource/mcp").json()
+            self.assertEqual([s.rstrip("/") for s in meta["authorization_servers"]], [url[:-len("/mcp")]])
+            job = self.create_job(self.alice, "CASE-MCP-HTTP-1")
+            alice, bob = token(self.alice, "eru-mcp"), token(self.bob, "eru-mcp")
+            self.assertIn(job, asyncio.run(call(alice, "list_cases"))[1])
+            self.assertNotIn(job, asyncio.run(call(bob, "list_cases"))[1])
+            # A full token, a sign-in's JWT, or nothing Rowanholt knows: 401, before any tool
+            for refused in (token(self.alice, "full"), self.alice["Authorization"][7:], "not-a-token"):
+                with self.assertRaises(Exception):
+                    asyncio.run(call(refused, "list_cases"))
+            error, text = asyncio.run(call(bob, "add_note", job_id=job, body="from bob"))
+            self.assertTrue(error and "not found" in text.lower(), text)  # bob's eru-mcp token, alice's job
+            self.assertEqual(asyncio.run(call(alice, "add_note", job_id=job, body="from Eru"))[0], False)
+            error, text = asyncio.run(call(alice, "add_note", job_id=job, body="again"))
+            self.assertTrue(error and "made its 1 writes" in text, text)
+            notes = self.client.get(f"/api/jobs/{job}/case/notes", headers=self.alice).json()
+            self.assertEqual([(n["body"], n["author"]) for n in notes], [("from Eru", "Eru (for alice)")])
+        finally:
+            web.should_exit = True
+            thread.join(10)
 
     def test_the_agent_header_is_sent(self):
         sent = []
@@ -207,8 +286,8 @@ class EruMcpTest(BackendCase):
             return Response()
 
         with mock.patch.object(eru_mcp.urllib.request, "urlopen", urlopen):
-            eru_mcp.RivendellAPI("http://testserver", "t0ken").get("/api/jobs")
-        self.assertEqual(sent[0].get("X-rivendell-agent"), "eru-mcp")
+            eru_mcp.RowanholtAPI("http://testserver", "t0ken").get("/api/jobs")
+        self.assertEqual(sent[0].get("X-rowanholt-agent"), "eru-mcp")
         self.assertEqual(sent[0].get("Authorization"), "Bearer t0ken")
 
     def test_reading_a_case(self):
@@ -325,7 +404,7 @@ class EruMcpTest(BackendCase):
         (data / "CASE-MCP-23" / "WS09" / "artefacts" / "cooked").mkdir(parents=True)
         bobs = self.create_job(self.bob, "CASE-MCP-23")
         (self.evidence / "out" / "CASE-MCP-23" / "WS01" / "artefacts" / "cooked").mkdir(parents=True)
-        with mock.patch.object(ai_routes, "RIVENDELL_DATA_DIR", str(data)):
+        with mock.patch.object(ai_routes, "ROWANHOLT_DATA_DIR", str(data)):
             def hosts(headers):
                 resp = self.client.post("/api/ai/offline/answer", headers=headers,
                                         json={"question_id": "hosts", "case_id": "CASE-MCP-23"})
@@ -360,8 +439,8 @@ class EruMcpTest(BackendCase):
         error, text = self.call(self.alice, "case_overview", job_id="..")
         self.assertTrue(error, text)
 
-    def test_only_rivendells_api(self):
-        api = eru_mcp.RivendellAPI("http://testserver", transport=lambda *a: (200, {}))
+    def test_only_rowanholts_api(self):
+        api = eru_mcp.RowanholtAPI("http://testserver", transport=lambda *a: (200, {}))
         for path in ("http://198.51.100.23/api/jobs", "/api/jobs/../../etc", "/healthz", "//198.51.100.23/api/"):
             with self.assertRaises(ValueError, msg=path):
                 api.get(path)

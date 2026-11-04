@@ -234,7 +234,7 @@ async def login_as_guest(response: Response):
         "token_type": "bearer",
         "user": {
             "id": "guest",
-            "email": "guest@rivendell.app",
+            "email": "guest@rowanholt.app",
             "username": "guest",
             "role": UserRole.GUEST,
         }

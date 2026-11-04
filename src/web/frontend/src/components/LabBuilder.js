@@ -113,7 +113,7 @@ function LabBuilder() {
     return (
       <div className="card">
         <h2>Start the lab agent</h2>
-        <p className="lab-note">The lab's machines run on the host, outside Rivendell's containers, so the lab drives them through a small agent there:</p>
+        <p className="lab-note">The lab's machines run on the host, outside Rowanholt's containers, so the lab drives them through a small agent there:</p>
         <div className="lab-command"><code>cd lab && {status.start_command || './lab.sh agent start'}</code></div>
         <button className="mt-pill" onClick={load}>Check again</button>
       </div>
@@ -131,8 +131,8 @@ function LabBuilder() {
   // Gandalf targets: the Linux containers and the lab VMs; Windows is PowerShell's, on its own
   const gandalfTargets = [
     ...(state.linux_containers || []).map((t) => ({ name: t, os: 'linux', up: running(t) })),
-    ...(tart ? [{ name: 'lab-macos', os: 'macos', up: running('rivendell-lab-macos') },
-      { name: 'lab-linuxvm', os: 'linux', up: running('rivendell-lab-linux') }] : []),
+    ...(tart ? [{ name: 'lab-macos', os: 'macos', up: running('rowanholt-lab-macos') },
+      { name: 'lab-linuxvm', os: 'linux', up: running('rowanholt-lab-linux') }] : []),
   ];
   const recordable = machines.filter((m) => m.os);
   const picked = recordable.find((m) => `${m.engine}/${m.name}` === machine) || recordable[0];

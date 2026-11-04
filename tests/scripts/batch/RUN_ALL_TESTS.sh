@@ -129,7 +129,7 @@ for batch in "${BATCHES[@]}"; do
     if [ $current_batch -lt $total_batches ]; then
         echo ""
         echo "Cleaning resources before next batch..."
-        docker restart rivendell-backend rivendell-celery-worker 2>/dev/null || true
+        docker restart rowanholt-backend rowanholt-celery-worker 2>/dev/null || true
         sleep 30
     fi
 done
@@ -143,6 +143,6 @@ echo "Failed batches: $failed_batches"
 echo "End: $(date)"
 echo ""
 echo "Test outputs are in:"
-echo "  /Volumes/Media5TB/rivendell_imgs/tests/"
+echo "  /Volumes/Media5TB/rowanholt_imgs/tests/"
 echo "  (or your configured TEST_OUTPUT_PATH)"
 echo "=================================================="

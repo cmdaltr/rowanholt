@@ -11,7 +11,7 @@ Usage:
     python -m analysis.mitre.coverage_cli dashboard CASE-001 /output
     python -m analysis.mitre.coverage_cli export CASE-001 /output --format json,csv,html
 
-Author: Rivendell DF Acceleration Suite
+Author: Rowanholt DF Acceleration Suite
 Version: 2.1.0
 """
 
@@ -285,7 +285,7 @@ def cmd_stats(args):
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="MITRE Coverage Analysis CLI for Rivendell",
+        description="MITRE Coverage Analysis CLI for Rowanholt",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

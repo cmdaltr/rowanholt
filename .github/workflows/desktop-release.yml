@@ -34,11 +34,11 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Source tarball
-        run: app/source-tarball.sh rivendell-src.tar.gz
+        run: app/source-tarball.sh rowanholt-src.tar.gz
       - uses: actions/upload-artifact@v4
         with:
           name: source
-          path: rivendell-src.tar.gz
+          path: rowanholt-src.tar.gz
 
   macos:
     needs: source
@@ -73,10 +73,10 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-        run: app/macos/package.sh --version "$VERSION" --source rivendell-src.tar.gz dist
+        run: app/macos/package.sh --version "$VERSION" --source rowanholt-src.tar.gz dist
       - uses: actions/upload-artifact@v4
         with:
-          name: rivendell-macos
+          name: rowanholt-macos
           path: dist/*.dmg
 
   linux:
@@ -90,15 +90,15 @@ jobs:
         with:
           name: source
       - name: Package
-        run: app/linux/package-deb.sh --version "$VERSION" --source rivendell-src.tar.gz dist
+        run: app/linux/package-deb.sh --version "$VERSION" --source rowanholt-src.tar.gz dist
       - name: Check the package
         run: |
           dpkg-deb --info dist/*.deb
-          dpkg-deb --contents dist/*.deb | grep -E 'opt/rivendell/|applications/rivendell.desktop'
-          dpkg-deb --fsys-tarfile dist/*.deb | tar -xO ./usr/share/applications/rivendell.desktop | desktop-file-validate /dev/stdin || true
+          dpkg-deb --contents dist/*.deb | grep -E 'opt/rowanholt/|applications/rowanholt.desktop'
+          dpkg-deb --fsys-tarfile dist/*.deb | tar -xO ./usr/share/applications/rowanholt.desktop | desktop-file-validate /dev/stdin || true
       - uses: actions/upload-artifact@v4
         with:
-          name: rivendell-linux
+          name: rowanholt-linux
           path: dist/*.deb
 
   windows:
@@ -114,13 +114,13 @@ jobs:
           name: source
       - name: Unpack the source
         shell: bash
-        run: mkdir stage && tar -xzf rivendell-src.tar.gz -C stage
+        run: mkdir stage && tar -xzf rowanholt-src.tar.gz -C stage
       - name: Build the installer
         shell: pwsh
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y | Out-Null }
-          & $iscc "/DAppVersion=$env:VERSION" "/DSourceDir=$PWD\stage\rivendell" "/DOutputDir=$PWD\dist" app\windows\rivendell.iss
+          & $iscc "/DAppVersion=$env:VERSION" "/DSourceDir=$PWD\stage\rowanholt" "/DOutputDir=$PWD\dist" app\windows\rowanholt.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Sign the installer
         if: env.HAS_CERT == 'true'
@@ -140,7 +140,7 @@ jobs:
           }
       - uses: actions/upload-artifact@v4
         with:
-          name: rivendell-windows
+          name: rowanholt-windows
           path: dist/*.exe
 
   release:
@@ -155,7 +155,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: rivendell-*
+          pattern: rowanholt-*
           merge-multiple: true
           path: dist
       - name: Checksums
@@ -163,5 +163,5 @@ jobs:
       - name: Attach to a draft release
         run: |
           gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
-            gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --draft --generate-notes --title "Rivendell $VERSION"
+            gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --draft --generate-notes --title "Rowanholt $VERSION"
           gh release upload "$GITHUB_REF_NAME" dist/* -R "$GITHUB_REPOSITORY" --clobber

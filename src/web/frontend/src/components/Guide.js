@@ -90,7 +90,7 @@ function Guide({ onClose, startPage }) {
   const route = page.route.includes(':') ? null : page.route;
 
   return (
-    <div className="guide-backdrop" role="dialog" aria-modal="true" aria-label="Rivendell guide" onClick={onClose}>
+    <div className="guide-backdrop" role="dialog" aria-modal="true" aria-label="Rowanholt guide" onClick={onClose}>
       <div className="guide" onClick={(e) => e.stopPropagation()}>
         <div className="guide-head">
           <h2>The guide</h2>
@@ -150,7 +150,7 @@ function Guide({ onClose, startPage }) {
 
         <label className="guide-check">
           <input type="checkbox" checked={atStart} onChange={(e) => toggleAtStart(e.target.checked)} />
-          Offer the guide when Rivendell starts
+          Offer the guide when Rowanholt starts
         </label>
       </div>
     </div>

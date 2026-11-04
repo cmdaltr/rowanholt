@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-# NSRL Database Download Script for Rivendell
+# NSRL Database Download Script for Rowanholt
 # ============================================
 #
 # Downloads and prepares the NIST National Software Reference Library (NSRL)
-# Reference Data Set (RDS) for use with Rivendell's hash comparison feature.
+# Reference Data Set (RDS) for use with Rowanholt's hash comparison feature.
 #
 # The NSRL contains cryptographic hashes of known software, helping to:
 # - Identify known-good files quickly
@@ -26,7 +26,7 @@
 #   - unzip
 #   - ~35GB free disk space (full) or ~5GB (minimal)
 #
-# After installation, configure Rivendell to use NSRL:
+# After installation, configure Rowanholt to use NSRL:
 #   elrond.py -c -p -n --nsrl /opt/nsrl/NSRLFile.txt <image>
 #
 # Or via CLI:
@@ -220,7 +220,7 @@ create_hash_index() {
     local HASH_COUNT=$(wc -l < "$INDEX_FILE" | tr -d ' ')
     log_success "Created index with $HASH_COUNT unique SHA-256 hashes"
 
-    # Create symlink for Rivendell
+    # Create symlink for Rowanholt
     ln -sf "$NSRL_FILE" "$NSRL_DIR/NSRLFile.txt" 2>/dev/null || true
 }
 
@@ -233,7 +233,7 @@ show_usage() {
     echo "Files available:"
     ls -lh "$NSRL_DIR"/*.txt 2>/dev/null | head -5 || echo "  (check subdirectories)"
     echo ""
-    echo "Usage with Rivendell CLI:"
+    echo "Usage with Rowanholt CLI:"
     echo "  elrond.py -c -p -n --nsrl $NSRL_DIR/NSRLFile.txt <image>"
     echo ""
     echo "Usage with standalone hash comparison:"
@@ -278,7 +278,7 @@ done
 # Main execution
 echo ""
 echo "=========================================="
-echo "  NSRL Database Download for Rivendell"
+echo "  NSRL Database Download for Rowanholt"
 echo "=========================================="
 echo ""
 echo "Download type: $DOWNLOAD_TYPE"

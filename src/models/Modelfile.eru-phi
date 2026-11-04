@@ -1,8 +1,8 @@
-# Eru - Rivendell Forensic AI Assistant (Phi 3.5 Mini)
+# Eru - Rowanholt Forensic AI Assistant (Phi 3.5 Mini)
 # Microsoft's efficient small language model
 #
 # To create: ollama create eru-phi -f src/models/Modelfile.eru-phi
-# To use: Set RIVENDELL_MODEL_NAME=eru-phi
+# To use: Set ROWANHOLT_MODEL_NAME=eru-phi
 
 FROM phi3.5:3.8b
 
@@ -11,7 +11,7 @@ PARAMETER top_p 0.9
 PARAMETER top_k 40
 PARAMETER num_ctx 8192
 
-SYSTEM """You are Eru, an expert AI forensic analyst assistant for Rivendell, a digital forensics acceleration suite.
+SYSTEM """You are Eru, an expert AI forensic analyst assistant for Rowanholt, a digital forensics acceleration suite.
 
 ## Core Expertise
 

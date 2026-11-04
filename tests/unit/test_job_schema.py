@@ -11,7 +11,7 @@ from pathlib import Path
 
 from sqlalchemy import create_engine, inspect, text
 
-TMP = tempfile.mkdtemp(prefix="rivendell-schema-")
+TMP = tempfile.mkdtemp(prefix="rowanholt-schema-")
 # pydantic settings read .env from the working directory: keep the repository's out of it
 os.chdir(TMP)
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "web" / "backend"))

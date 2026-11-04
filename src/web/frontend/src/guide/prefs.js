@@ -3,7 +3,7 @@
 import { TIPS } from './content';
 
 const RECENT = 10;
-const key = (user, name) => `rivendell.${user?.username || 'local'}.${name}`;
+const key = (user, name) => `rowanholt.${user?.username || 'local'}.${name}`;
 
 function read(name, fallback) {
   try {
@@ -47,7 +47,7 @@ export function nextTip(user, exclude) {
 // Once per start, where a start is the first visit after a twelve-hour gap. Kept in localStorage,
 // not sessionStorage: a session doesn't survive new tabs or the desktop app's reloads, so the
 // offer kept coming back. The Doors of Durin in the navigation show it on demand.
-const OFFERED = 'rivendell.offeredAt';
+const OFFERED = 'rowanholt.offeredAt';
 const START_GAP_MS = 12 * 60 * 60 * 1000;
 
 export function offeredThisStart() {

@@ -1,4 +1,4 @@
-# Rivendell Test Runner Guide
+# Rowanholt Test Runner Guide
 
 How to run the E2E tests against the Docker stack, control jobs while they run, and read the results. All commands run from the repository root.
 
@@ -29,9 +29,9 @@ Don't rebuild the worker image while a heavy job and the SIEM profile are runnin
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `TEST_IMAGES_PATH` | first match of `/Volumes/*/rivendell_imgs`, `/Volumes/*/rivendell`, `/Volumes/*/*/rivendell`, `/mnt/*/rivendell_imgs`, `/media/*/rivendell_imgs`, then `/tmp/rivendell` | Evidence images |
+| `TEST_IMAGES_PATH` | first match of `/Volumes/*/rowanholt_imgs`, `/Volumes/*/rowanholt`, `/Volumes/*/*/rowanholt`, `/mnt/*/rowanholt_imgs`, `/media/*/rowanholt_imgs`, then `/tmp/rowanholt` | Evidence images |
 | `TEST_OUTPUT_PATH` | `$TEST_IMAGES_PATH/tests` | One output directory per test |
-| `RIVENDELL_API_URL` | `http://localhost:5688` | Backend API |
+| `ROWANHOLT_API_URL` | `http://localhost:5688` | Backend API |
 
 Keep `TEST_OUTPUT_PATH` outside the image folder if you can. Before 22 Oct 2026 `$I30` extraction walked the whole evidence directory, so every test output stored beside the images slowed every later Windows job.
 
@@ -78,13 +78,13 @@ If a test's output directory already exists, `run_test.py` asks before overwriti
 Cancelling revokes the Celery task, but `elrond.py` and the tool it was running (foremost, yara, log2timeline) keep going inside the worker and keep the image mounted. Check and clean up before the next Linux job, or it can find its mount point busy:
 
 ```bash
-docker exec rivendell-celery-worker ps -eo pid,etime,cmd | grep -E "elrond|foremost|yara|log2timeline|psort"
-docker exec rivendell-celery-worker kill -9 <pid> ...
-docker exec rivendell-celery-worker sh -c 'mount | grep elrond_mount'
-docker exec rivendell-celery-worker umount /mnt/elrond_mount00
-docker exec rivendell-celery-worker kpartx -d /dev/loopN
-docker exec rivendell-celery-worker losetup -d /dev/loopN
-docker exec rivendell-celery-worker losetup -a   # should be empty
+docker exec rowanholt-celery-worker ps -eo pid,etime,cmd | grep -E "elrond|foremost|yara|log2timeline|psort"
+docker exec rowanholt-celery-worker kill -9 <pid> ...
+docker exec rowanholt-celery-worker sh -c 'mount | grep elrond_mount'
+docker exec rowanholt-celery-worker umount /mnt/elrond_mount00
+docker exec rowanholt-celery-worker kpartx -d /dev/loopN
+docker exec rowanholt-celery-worker losetup -d /dev/loopN
+docker exec rowanholt-celery-worker losetup -a   # should be empty
 ```
 
 Only release loop devices when no Linux job is running.
@@ -104,7 +104,7 @@ Check the processes in the worker (`ps` above) before cancelling anything that h
 
 ## Wrapper Scripts
 
-`tests/scripts/run_single_test.sh <test> [--no-restart]` runs one test with `--wait` and restarts `rivendell-backend` and `rivendell-celery-worker` afterwards. The batch scripts in `tests/scripts/batch/` group related tests; see [`tests/scripts/batch/README.md`](../scripts/batch/README.md) for the list.
+`tests/scripts/run_single_test.sh <test> [--no-restart]` runs one test with `--wait` and restarts `rowanholt-backend` and `rowanholt-celery-worker` afterwards. The batch scripts in `tests/scripts/batch/` group related tests; see [`tests/scripts/batch/README.md`](../scripts/batch/README.md) for the list.
 
 Both wrappers restart or tear down containers between tests (`batch_common.sh` runs `docker-compose down`). That drops the concurrency override and kills anything else queued, so don't use them while another run is in progress; queue with `run_test.py` instead.
 
@@ -114,7 +114,7 @@ Both wrappers restart or tear down containers between tests (`batch_common.sh` r
 
 ```
 $TEST_OUTPUT_PATH/<test>/
-├── rivendell_audit.log          # one CSV row per finished piece of work
+├── rowanholt_audit.log          # one CSV row per finished piece of work
 ├── mitre_techniques.txt
 ├── TEST_<test>_navigator.json   # navigator tests only
 └── <image>/
@@ -127,7 +127,7 @@ $TEST_OUTPUT_PATH/<test>/
 
 ## Timings
 
-`tests/scripts/test_timings.py` reads every `rivendell_audit.log` under the output root and charges each stage the gap since the previous entry. The output tables feed [`docs/PERFORMANCE.md`](../../docs/PERFORMANCE.md).
+`tests/scripts/test_timings.py` reads every `rowanholt_audit.log` under the output root and charges each stage the gap since the previous entry. The output tables feed [`docs/PERFORMANCE.md`](../../docs/PERFORMANCE.md).
 
 ```bash
 python3 tests/scripts/test_timings.py \
@@ -139,10 +139,10 @@ Audit timestamps are UTC. Silent steps (above) are charged to whichever stage lo
 
 ## Troubleshooting
 
-**Backend not responding.** `docker compose -f docker-compose.yml -f docker-compose.concurrency1.yml ps`, then `docker logs rivendell-backend --tail 50`. If Docker Desktop itself has died (`docker ps` returns a 500), restart it with `open -a Docker`. Any running job is lost and has to be re-queued.
+**Backend not responding.** `docker compose -f docker-compose.yml -f docker-compose.concurrency1.yml ps`, then `docker logs rowanholt-backend --tail 50`. If Docker Desktop itself has died (`docker ps` returns a 500), restart it with `open -a Docker`. Any running job is lost and has to be re-queued.
 
 **A job ran twice.** Redis re-delivers unacknowledged tasks after `visibility_timeout`. `tasks_docker.py` now sets it to 24 hours with `worker_prefetch_multiplier=1`. If you see repeats, check that the worker was restarted after that change.
 
 **A Linux job finishes in 20 seconds with no output.** Loop devices leaked from earlier jobs. Run the `losetup -a` check above and release them.
 
-**Test results.** Results for each run are tracked in the Notion "Rivendell — Test Plan" database. [`TEST_RESULTS.md`](TEST_RESULTS.md) holds a snapshot.
+**Test results.** Results for each run are tracked in the Notion "Rowanholt — Test Plan" database. [`TEST_RESULTS.md`](TEST_RESULTS.md) holds a snapshot.

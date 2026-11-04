@@ -147,7 +147,7 @@ def group(group_name: str, generate_dir: str, list_files=None) -> Dict:
     """Every detection of a group's latest run against recorded telemetry.
 
     `list_files(group_name, generate_dir) -> list[path]` names the detection YAMLs for the group;
-    inject your own (Rivendell's detection store). Each YAML needs `technique_id`, `name` and an
+    inject your own (Rowanholt's detection store). Each YAML needs `technique_id`, `name` and an
     `indicators:` map ({kind: [values]}); `requiredDataConnectors` is optional (used to label the SIEM).
     """
     import yaml

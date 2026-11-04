@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { listJobs, bulkDeleteJobs, bulkArchiveJobs, bulkRestartJobs, bulkCancelJobs, countFindings } from '../api';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rivendell.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt.png`;
 
 function JobList() {
   const [jobs, setJobs] = useState([]);
@@ -191,7 +191,7 @@ function JobList() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `rivendell-jobs-export-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `rowanholt-jobs-export-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -583,7 +583,7 @@ function JobList() {
       <section className="hero-section">
         <img
           src={heroImage}
-          alt="Rivendell - The Last Homely House"
+          alt="Rowanholt"
           className="hero-image"
           style={{
             transform: 'scale(0.2)',

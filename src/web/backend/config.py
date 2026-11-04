@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     celery_result_backend: str = "redis://redis:6379/0"
 
     # Database
-    database_url: str = "postgresql://rivendell:rivendell@postgres:5432/rivendell"
+    database_url: str = "postgresql://rowanholt:rowanholt@postgres:5432/rowanholt"
 
     # Storage
     upload_dir: Path = Path("/tmp/elrond/uploads")
@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     session_timeout: int = 3600  # 1 hour
 
     # Default Admin
-    default_admin_email: str = "admin@rivendell.app"
+    default_admin_email: str = "admin@rowanholt.app"
     default_admin_password: str = "IWasThere3000YearsAgo!"
 
     # Guest Mode
@@ -83,21 +83,24 @@ class Settings(BaseSettings):
     max_concurrent_analyses: int = 3
     analysis_timeout: int = 86400  # 24 hours
 
-    # Server mode (RIVENDELL_SERVER_MODE, set by deploy/server): one Rivendell shared by a
+    # Server mode (ROWANHOLT_SERVER_MODE, set by deploy/server): one Rowanholt shared by a
     # team. Every API route outside sign-in needs a user, each job is visible to its owner,
     # the people it's shared with and admins, sign-up and guest access are off, and the
-    # first admin's password comes from RIVENDELL_ADMIN_PASSWORD. Off (the default), the
+    # first admin's password comes from ROWANHOLT_ADMIN_PASSWORD. Off (the default), the
     # API stays open to whoever reaches it, as on an analyst's own machine.
-    rivendell_server_mode: bool = False
-    rivendell_admin_password: str = ""
-    # The URL people open, e.g. https://rivendell.example.org (CORS, cookies, OIDC redirects)
-    rivendell_public_url: str = ""
+    rowanholt_server_mode: bool = False
+    rowanholt_admin_password: str = ""
+    # The URL people open, e.g. https://rowanholt.example.org (CORS, cookies, OIDC redirects)
+    rowanholt_public_url: str = ""
+    # Online lookups (threat_intel_lookup.py): off unless both are set. "virustotal" is the only provider
+    rowanholt_online_lookups: str = ""
+    virustotal_api_key: str = ""
     # More places evidence may be read from and written to, separated by commas, as the
     # containers see them (a server's evidence share mounted at /srv/evidence, say)
-    rivendell_evidence_paths: str = ""
+    rowanholt_evidence_paths: str = ""
 
     # Password sign-in alongside single sign-on; turn off to make the IdP the only way in
-    rivendell_local_login: bool = True
+    rowanholt_local_login: bool = True
 
     # Single sign-on (OpenID Connect): on when issuer, client ID and secret are all set
     oidc_issuer: str = ""
@@ -106,7 +109,7 @@ class Settings(BaseSettings):
     oidc_display_name: str = "single sign-on"
     oidc_scopes: str = "openid profile email"
     oidc_groups_claim: str = "groups"
-    oidc_admin_group: str = ""  # members become Rivendell admins
+    oidc_admin_group: str = ""  # members become Rowanholt admins
     oidc_allowed_group: str = ""  # when set, only its members may sign in
 
     @property
@@ -117,8 +120,8 @@ class Settings(BaseSettings):
     @property
     def allowed_paths(self) -> list:
         """Directories evidence may come from and output go to: this OS's defaults, plus
-        RIVENDELL_EVIDENCE_PATHS."""
-        extra = [path.strip() for path in self.rivendell_evidence_paths.split(",") if path.strip()]
+        ROWANHOLT_EVIDENCE_PATHS."""
+        extra = [path.strip() for path in self.rowanholt_evidence_paths.split(",") if path.strip()]
         return self._default_paths() + [path for path in extra if path.startswith("/") or ":" in path]
 
     def _default_paths(self) -> list:
@@ -128,16 +131,16 @@ class Settings(BaseSettings):
         if system == "Windows":
             # Windows paths only
             return [
-                "C:\\Temp\\rivendell",
-                "D:\\Temp\\rivendell",
-                "E:\\Temp\\rivendell",
-                "F:\\Temp\\rivendell",
+                "C:\\Temp\\rowanholt",
+                "D:\\Temp\\rowanholt",
+                "E:\\Temp\\rowanholt",
+                "F:\\Temp\\rowanholt",
             ]
         elif system == "Darwin":
             # macOS paths
             return [
                 "/Volumes",
-                "/tmp/rivendell",
+                "/tmp/rowanholt",
             ]
         else:
             # Linux/Unix paths (includes Docker containers)
@@ -145,8 +148,8 @@ class Settings(BaseSettings):
                 "/Volumes",  # Docker on macOS - external drives
                 "/mnt",
                 "/media",
-                "/tmp/rivendell",
-                "/host/tmp/rivendell",  # Docker on macOS - host /tmp access
+                "/tmp/rowanholt",
+                "/host/tmp/rowanholt",  # Docker on macOS - host /tmp access
             ]
 
     class Config:
@@ -191,8 +194,8 @@ if settings.secret_key in ("", DEFAULT_SECRET_KEY):
     settings.secret_key = _persistent_secret_key()
 
 # A server answers only its own origin; a local stack keeps the localhost list
-if settings.rivendell_server_mode and settings.rivendell_public_url:
-    settings.cors_origins = [settings.rivendell_public_url.rstrip("/")]
+if settings.rowanholt_server_mode and settings.rowanholt_public_url:
+    settings.cors_origins = [settings.rowanholt_public_url.rstrip("/")]
 
 # Create necessary directories
 settings.upload_dir.mkdir(parents=True, exist_ok=True)

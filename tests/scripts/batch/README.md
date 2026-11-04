@@ -137,19 +137,19 @@ tests/logs/1b_collect--lnk-docs-20260115-204927.log
 Check file handle usage:
 ```bash
 # Current handle count
-lsof | grep "/Volumes/Media5TB/rivendell_imgs" | wc -l
+lsof | grep "/Volumes/Media5TB/rowanholt_imgs" | wc -l
 
 # Detailed view
-lsof -p $(pgrep OrbStack | head -1) | grep "/Volumes/Media5TB/rivendell_imgs" | head -30
+lsof -p $(pgrep OrbStack | head -1) | grep "/Volumes/Media5TB/rowanholt_imgs" | head -30
 ```
 
 Check job status:
 ```bash
-cd /Users/ben/Library/CloudStorage/OneDrive-Personal/Projects/GitHub/rivendell
+cd /Users/ben/Library/CloudStorage/OneDrive-Personal/Projects/GitHub/rowanholt
 ./scripts/status.sh
 
 # Or via Docker
-docker logs -f rivendell-celery-worker
+docker logs -f rowanholt-celery-worker
 ```
 
 ## Troubleshooting

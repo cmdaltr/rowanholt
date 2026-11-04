@@ -31,12 +31,12 @@ router = APIRouter(prefix="/api/ai", tags=["AI"])
 logger = logging.getLogger(__name__)
 
 # Configuration
-RIVENDELL_DATA_DIR = os.getenv("RIVENDELL_DATA_DIR", "/opt/rivendell/data")
+ROWANHOLT_DATA_DIR = os.getenv("ROWANHOLT_DATA_DIR", "/opt/rowanholt/data")
 # For Docker on macOS, use host.docker.internal to reach host machine's Ollama
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://host.docker.internal:11434")
-DEFAULT_MODEL = os.getenv("RIVENDELL_MODEL_NAME", "llama3.2:3b")
+DEFAULT_MODEL = os.getenv("ROWANHOLT_MODEL_NAME", "llama3.2:3b")
 # Ollama's own default window (2048 tokens) is shorter than the case context Eru sends
-NUM_CTX = int(os.getenv("RIVENDELL_NUM_CTX", "8192"))
+NUM_CTX = int(os.getenv("ROWANHOLT_NUM_CTX", "8192"))
 
 
 # Request/Response Models
@@ -128,7 +128,7 @@ class OllamaClient:
 ollama = OllamaClient()
 
 # Forensic assistant system prompt
-FORENSIC_SYSTEM_PROMPT = """You are Eru, an AI forensic analysis assistant for Rivendell, a digital forensics acceleration suite.
+FORENSIC_SYSTEM_PROMPT = """You are Eru, an AI forensic analysis assistant for Rowanholt, a digital forensics acceleration suite.
 
 Your expertise includes:
 - Windows, macOS, and Linux forensics
@@ -171,7 +171,7 @@ async def get_ai_status():
         "model_name": DEFAULT_MODEL if usable else None,
         "models": status.get("models", []),
         "ollama_host": OLLAMA_HOST,
-        "data_dir": RIVENDELL_DATA_DIR,
+        "data_dir": ROWANHOLT_DATA_DIR,
         # Why free text won't work, for Ask Eru to show; empty when it will
         "reason": "" if usable else eru_offline.unavailable_reason(status, OLLAMA_HOST, DEFAULT_MODEL),
     }
@@ -211,9 +211,9 @@ async def list_indexed_cases(request: Request):
     cases = []
 
     try:
-        if os.path.exists(RIVENDELL_DATA_DIR):
-            for case_dir in os.listdir(RIVENDELL_DATA_DIR):
-                case_path = os.path.join(RIVENDELL_DATA_DIR, case_dir)
+        if os.path.exists(ROWANHOLT_DATA_DIR):
+            for case_dir in os.listdir(ROWANHOLT_DATA_DIR):
+                case_path = os.path.join(ROWANHOLT_DATA_DIR, case_dir)
                 vector_db_path = os.path.join(case_path, "vector_db")
 
                 if os.path.isdir(case_path):
@@ -353,7 +353,7 @@ async def query_case(case_id: str, request: QueryRequest, http_request: Request,
     if os.path.exists(vector_db_path):
         try:
             # Try to use the forensic query engine
-            from rivendell.ai.query_engine import ForensicQueryEngine
+            from rowanholt.ai.query_engine import ForensicQueryEngine
 
             engine = ForensicQueryEngine.load(case_id, case_path)
             result = engine.query(request.question)
@@ -528,7 +528,7 @@ async def _find_case(case_id: str, user: Optional[dict] = None,
             return None, None
         return _job_case_root(job), job.id
 
-    data_path = os.path.join(RIVENDELL_DATA_DIR, case_id)
+    data_path = os.path.join(ROWANHOLT_DATA_DIR, case_id)
     if os.path.exists(data_path) and _folder_cases_visible(user):
         return data_path, None
 

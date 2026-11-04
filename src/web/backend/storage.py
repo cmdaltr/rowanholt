@@ -65,7 +65,7 @@ class JobAccessModel(Base):
 
 class ThreatIntelIndicatorModel(Base):
     """One threat intelligence indicator: the fixed 10-column schema of
-    rivendell/threat_intel/schema.py, with a key. Revision 7c41d2e9a0b3."""
+    rowanholt/threat_intel/schema.py, with a key. Revision 7c41d2e9a0b3."""
     __tablename__ = "threat_intel_indicators"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -82,7 +82,7 @@ class ThreatIntelIndicatorModel(Base):
 
 
 class ThreatIntelValidityModel(Base):
-    """How long a threat intelligence indicator holds (rivendell/threat_intel/validity.py): beside the
+    """How long a threat intelligence indicator holds (rowanholt/threat_intel/validity.py): beside the
     fixed 10-column table rather than in it. No row, or valid_until empty: no expiry. Revision 9e3c5a7b1f42."""
     __tablename__ = "threat_intel_validity"
 
@@ -180,7 +180,7 @@ class JobStorage:
         """
         self.database_url = database_url or os.getenv(
             "DATABASE_URL",
-            "postgresql://rivendell:rivendell@localhost:5432/rivendell"
+            "postgresql://rowanholt:rowanholt@localhost:5432/rowanholt"
         )
 
         # Create engine with connection pooling disabled for file-based compatibility

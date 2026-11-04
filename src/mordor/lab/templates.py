@@ -40,7 +40,7 @@ TEMPLATES = [
     # No Windows template: Tart can't run Windows (Apple's Virtualization.framework takes only
     # Linux and macOS guests), and UTM — which runs Windows 11 on ARM via QEMU — has no
     # create-from-image. ./lab.sh windows-vm create builds the lab's from Microsoft's ISO, or build
-    # one in the UTM app; Rivendell then manages and records it from Your machines (engines.UTM).
+    # one in the UTM app; Rowanholt then manages and records it from Your machines (engines.UTM).
 ]
 BY_ID = {t["id"]: t for t in TEMPLATES}
 

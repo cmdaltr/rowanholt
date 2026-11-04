@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Shared helpers for the Rivendell test lab. Sourced by lab.sh and scripts/*.sh.
+# Shared helpers for the Rowanholt test lab. Sourced by lab.sh and scripts/*.sh.
 # Written for macOS's stock bash 3.2: no associative arrays, mapfile or ${x,,}.
 
 LAB_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REPO_ROOT="${RIVENDELL_REPO:-$(cd "$LAB_ROOT/.." && pwd)}"  # RIVENDELL_REPO: test another checkout
-LAB_CONFIG_DIR="${HOME}/.config/rivendell-lab"
+REPO_ROOT="${ROWANHOLT_REPO:-$(cd "$LAB_ROOT/.." && pwd)}"  # ROWANHOLT_REPO: test another checkout
+LAB_CONFIG_DIR="${HOME}/.config/rowanholt-lab"
 LAB_CONFIG="${LAB_CONFIG_DIR}/lab.conf"
-KEYCHAIN_SERVICE="rivendell-lab"
+KEYCHAIN_SERVICE="rowanholt-lab"
 KEYCHAIN_ACCOUNT="gandalf"
 # Every lab target listens on loopback or a host-only network, so a well-known
 # default is fine; set your own with ./lab.sh configure.
 LAB_DEFAULT_PASSWORD="mellon"
-COMPOSE_PROJECT="rivendell-lab"
+COMPOSE_PROJECT="rowanholt-lab"
 
 if [ -t 1 ]; then
   C_RED=$'\033[1;31m'; C_GRN=$'\033[1;32m'; C_YEL=$'\033[1;33m'; C_BLU=$'\033[1;34m'; C_DIM=$'\033[2m'; C_OFF=$'\033[0m'
@@ -140,16 +140,17 @@ tart_bin() {
 load_config() {
   # Values exported in the environment win over lab.conf (CI, one-off runs).
   local _v _saved=""
-  for _v in LAB_DATA_DIR TEST_IMAGES_PATH LAB_VM_DIR WINDOWS_VM_MEMORY_MB WINDOWS_VM_CPUS LINUX_VM_MEMORY_MB WINDOWS_UTM_VM LAB_TART_HOME LAB_HIDDEN_MACHINES; do
+  for _v in LAB_DATA_DIR TEST_IMAGES_PATH LAB_VM_DIR WINDOWS_VM_MEMORY_MB WINDOWS_VM_CPUS LINUX_VM_MEMORY_MB WINDOWS_UTM_VM WINDOWS_CLEAN_PREFIX LAB_TART_HOME LAB_HIDDEN_MACHINES; do
     eval "if [ -n \"\${$_v:-}\" ]; then _saved=\"\$_saved $_v=\$(printf %q \"\${$_v}\")\"; fi"
   done
   # Defaults; lab.conf (written by `./lab.sh configure`) overrides them.
-  LAB_DATA_DIR="${LAB_DATA_DIR:-$HOME/rivendell-lab-data}"
+  LAB_DATA_DIR="${LAB_DATA_DIR:-$HOME/rowanholt-lab-data}"
   TEST_IMAGES_PATH="${TEST_IMAGES_PATH:-}"
   WINDOWS_VM_MEMORY_MB="${WINDOWS_VM_MEMORY_MB:-6144}"
   WINDOWS_VM_CPUS="${WINDOWS_VM_CPUS:-2}"
   LINUX_VM_MEMORY_MB="${LINUX_VM_MEMORY_MB:-2048}"
-  WINDOWS_UTM_VM="${WINDOWS_UTM_VM:-rivendell-lab-win11}"  # Apple silicon: the UTM VM the lab drives
+  WINDOWS_UTM_VM="${WINDOWS_UTM_VM:-rowanholt-lab-win11}"  # Apple silicon: the UTM VM the lab drives
+  WINDOWS_CLEAN_PREFIX="${WINDOWS_CLEAN_PREFIX:-rowanholt-lab-win11-clean}"  # its clean siblings, <prefix><n>
   LAB_TART_HOME="${LAB_TART_HOME:-}"  # Tart VMs elsewhere than LAB_VM_DIR (e.g. the internal SSD)
   LAB_HIDDEN_MACHINES="${LAB_HIDDEN_MACHINES:-}"  # VMs on this host the web UI leaves out (yours, not the lab's)
   # shellcheck disable=SC1090
@@ -167,7 +168,7 @@ load_config() {
 set_vm_homes() {
   if [ -n "${LAB_TART_HOME:-}" ]; then
     export TART_HOME="${TART_HOME:-$LAB_TART_HOME}"
-  elif ls -d "$HOME/.tart/vms/rivendell-lab-"* >/dev/null 2>&1; then
+  elif ls -d "$HOME/.tart/vms/rowanholt-lab-"* >/dev/null 2>&1; then
     export TART_HOME="${TART_HOME:-$HOME/.tart}"
   else
     export TART_HOME="${TART_HOME:-$LAB_VM_DIR/tart}"
@@ -177,7 +178,7 @@ set_vm_homes() {
   else
     export VAGRANT_HOME="${VAGRANT_HOME:-$LAB_VM_DIR/vagrant.d}"
   fi
-  if VBoxManage list vms 2>/dev/null | grep -q rivendell-lab-; then
+  if VBoxManage list vms 2>/dev/null | grep -q rowanholt-lab-; then
     :  # existing lab VMs registered in the user's VirtualBox: leave them there
   else
     # A lab-only VirtualBox home, so lab VMs don't touch the user's own VirtualBox setup.
@@ -196,7 +197,7 @@ prepare_vm_dirs() {
 save_config() {
   mkdir -p "$LAB_CONFIG_DIR"
   cat > "$LAB_CONFIG" <<EOF
-# Rivendell test lab settings (no secrets here; the lab password is in the macOS Keychain).
+# Rowanholt test lab settings (no secrets here; the lab password is in the macOS Keychain).
 LAB_DATA_DIR="$LAB_DATA_DIR"
 TEST_IMAGES_PATH="$TEST_IMAGES_PATH"
 LAB_VM_DIR="$LAB_VM_DIR"
@@ -204,6 +205,7 @@ WINDOWS_VM_MEMORY_MB="$WINDOWS_VM_MEMORY_MB"
 WINDOWS_VM_CPUS="$WINDOWS_VM_CPUS"
 LINUX_VM_MEMORY_MB="$LINUX_VM_MEMORY_MB"
 WINDOWS_UTM_VM="$WINDOWS_UTM_VM"
+WINDOWS_CLEAN_PREFIX="$WINDOWS_CLEAN_PREFIX"
 LAB_TART_HOME="$LAB_TART_HOME"
 LAB_HIDDEN_MACHINES="$LAB_HIDDEN_MACHINES"
 EOF
@@ -227,9 +229,9 @@ lab_password() {
 store_password() {
   if is_macos; then
     security add-generic-password -U -s "$KEYCHAIN_SERVICE" -a "$KEYCHAIN_ACCOUNT" -w "$1" \
-      -j "Rivendell test lab: password for the gandalf user on lab targets" >/dev/null && echo "the login Keychain"
+      -j "Rowanholt test lab: password for the gandalf user on lab targets" >/dev/null && echo "the login Keychain"
   elif need secret-tool; then
-    printf '%s' "$1" | secret-tool store --label "Rivendell test lab" service "$KEYCHAIN_SERVICE" account "$KEYCHAIN_ACCOUNT" && echo "the Secret Service keyring"
+    printf '%s' "$1" | secret-tool store --label "Rowanholt test lab" service "$KEYCHAIN_SERVICE" account "$KEYCHAIN_ACCOUNT" && echo "the Secret Service keyring"
   fi
 }
 
@@ -272,12 +274,12 @@ require_password() {
 
 # --- docker ---------------------------------------------------------------------------
 
-# Use the engine Rivendell runs on, so the lab and Rivendell share one host.
+# Use the engine Rowanholt runs on, so the lab and Rowanholt share one host.
 pick_docker_context() {
   require docker
   local ctx
   for ctx in $(docker context ls --format '{{.Name}}' 2>/dev/null); do
-    if docker --context "$ctx" ps --format '{{.Names}}' 2>/dev/null | grep -qx rivendell-backend; then
+    if docker --context "$ctx" ps --format '{{.Names}}' 2>/dev/null | grep -qx rowanholt-backend; then
       export DOCKER_CONTEXT="$ctx"; return
     fi
   done
@@ -304,10 +306,10 @@ build_lab_images() {
   local d base
   for d in ubuntu rocky; do
     case "$d" in ubuntu) base=ubuntu:24.04 ;; rocky) base=rockylinux:9 ;; esac
-    build_image "rivendell-lab-target:$d" "$LAB_ROOT/linux-targets" "BASE=$base" || return 1
+    build_image "rowanholt-lab-target:$d" "$LAB_ROOT/linux-targets" "BASE=$base" || return 1
   done
-  build_image rivendell-lab-target:ubuntu-clean "$LAB_ROOT/linux-targets" "BASE=ubuntu:24.04" "SEED=0" || return 1
-  build_image rivendell-lab-controller "$LAB_ROOT/controller"
+  build_image rowanholt-lab-target:ubuntu-clean "$LAB_ROOT/linux-targets" "BASE=ubuntu:24.04" "SEED=0" || return 1
+  build_image rowanholt-lab-controller "$LAB_ROOT/controller"
 }
 
 lab_compose() {

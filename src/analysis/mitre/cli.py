@@ -11,7 +11,7 @@ Usage:
     python -m analysis.mitre.cli info T1059.001
     python -m analysis.mitre.cli stats
 
-Author: Rivendell DF Acceleration Suite
+Author: Rowanholt DF Acceleration Suite
 Version: 2.1.0
 """
 
@@ -295,7 +295,7 @@ def cmd_list_artifacts(args):
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="MITRE ATT&CK CLI Tools for Rivendell",
+        description="MITRE ATT&CK CLI Tools for Rowanholt",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -351,7 +351,7 @@ Examples:
     dashboard_parser.add_argument(
         "-o",
         "--output",
-        default="/tmp/rivendell/dashboards",
+        default="/tmp/rowanholt/dashboards",
         help="Output directory for dashboards",
     )
     dashboard_parser.add_argument(

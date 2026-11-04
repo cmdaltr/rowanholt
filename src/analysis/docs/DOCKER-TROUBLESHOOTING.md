@@ -1,8 +1,8 @@
-# Docker Troubleshooting Guide for Rivendell
+# Docker Troubleshooting Guide for Rowanholt
 
-> **Legacy.** This describes the standalone Elrond stack in `src/analysis/web` and `src/analysis/docker` (ports 3000 and 8000), which Rivendell no longer uses. Rivendell runs from the repository's `docker-compose.yml` (web UI on :5687, API on :5688): start with [docs/QUICKSTART.md](../../../docs/QUICKSTART.md) and the `rivendell` command.
+> **Legacy.** This describes the standalone Elrond stack in `src/analysis/web` and `src/analysis/docker` (ports 3000 and 8000), which Rowanholt no longer uses. Rowanholt runs from the repository's `docker-compose.yml` (web UI on :5687, API on :5688): start with [docs/QUICKSTART.md](../../../docs/QUICKSTART.md) and the `rowanholt` command.
 
-This guide covers common Docker issues with Rivendell and their solutions.
+This guide covers common Docker issues with Rowanholt and their solutions.
 
 ## Table of Contents
 - [Build Failures](#build-failures)
@@ -131,7 +131,7 @@ services:
 **Quick Fix:**
 ```bash
 # From the analysis directory
-cd /path/to/rivendell/analysis
+cd /path/to/rowanholt/analysis
 
 # Check docker-compose.yml location
 ls -la docker/docker-compose.yml
@@ -509,7 +509,7 @@ docker system df
 
 **Rebuild from scratch:**
 ```bash
-cd /path/to/rivendell/analysis
+cd /path/to/rowanholt/analysis
 docker-compose -f docker/docker-compose.yml build --no-cache
 docker-compose -f docker/docker-compose.yml up
 ```
@@ -518,15 +518,15 @@ docker-compose -f docker/docker-compose.yml up
 
 ### Selective Clean-Up
 
-**Remove only Rivendell containers:**
+**Remove only Rowanholt containers:**
 ```bash
-# Stop Rivendell services
+# Stop Rowanholt services
 docker-compose -f docker/docker-compose.yml down
 
-# Remove Rivendell containers
+# Remove Rowanholt containers
 docker ps -a | grep elrond | awk '{print $1}' | xargs docker rm
 
-# Remove Rivendell images
+# Remove Rowanholt images
 docker images | grep elrond | awk '{print $3}' | xargs docker rmi
 ```
 
@@ -740,4 +740,4 @@ If you're still stuck after trying these solutions:
 ---
 
 **Last Updated:** November 2025
-**Rivendell Version:** 2.1.0
+**Rowanholt Version:** 2.1.0

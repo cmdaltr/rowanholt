@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { listApiTokens, createApiToken, revokeApiToken } from '../api';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rivendell.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt.png`;
 
 const AccountPage = () => {
   const navigate = useNavigate();
@@ -215,7 +215,7 @@ const AccountPage = () => {
       <section className="hero-section">
         <img
           src={heroImage}
-          alt="Rivendell - The Last Homely House"
+          alt="Rowanholt"
           className="hero-image"
           style={{
             transform: 'scale(0.2)',
@@ -227,7 +227,7 @@ const AccountPage = () => {
       <header>
         <h2>Account Settings</h2>
         <p>
-          Manage your Rivendell DF Acceleration Suite account, security settings, and API access.
+          Manage your Rowanholt DF Acceleration Suite account, security settings, and API access.
         </p>
       </header>
 
@@ -364,7 +364,7 @@ const AccountPage = () => {
                   A token lasts until it expires or you revoke it, and is shown once, when it's made. An{' '}
                   <code>eru-mcp</code> token can only read, flag leads and add notes, recorded as Eru acting for you;
                   a <code>full</code> token does what you can do, so keep it like a password. For{' '}
-                  <code>rivendell mcp</code>, set it as <code>RIVENDELL_TOKEN</code> (docs/ERU.md).
+                  <code>rowanholt mcp</code>, set it as <code>ROWANHOLT_TOKEN</code> (docs/ERU.md).
                 </p>
 
                 {tokenMessage.text && (

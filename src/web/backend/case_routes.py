@@ -2,19 +2,22 @@
 host assignments, an activity feed, and a report and Navigator layer from confirmed findings.
 
 Every route is under /api/jobs/{job_id}/, so auth/access.py's job check covers it in server
-mode: whoever can see the job can browse, flag and note. Nothing writes to the case directory;
+mode: whoever can see the job can browse, flag and note. The one websocket, /live, isn't seen by
+that middleware, so it checks with access.websocket_user itself. Nothing writes to the case directory;
 findings, notes and activity live in Postgres and reference rows by file, row and hash.
 """
 
+import asyncio
 import logging
 import re
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
 try:
@@ -35,9 +38,12 @@ STATUSES = ("lead", "confirmed", "benign")
 HOST_STATUSES = ("to do", "in progress", "done")
 TECHNIQUE = re.compile(r"^T\d{4}(?:\.\d{3})?$")
 EXCERPT = 600
+LIVE_EVERY = 2.0  # seconds between the live socket's checks
 # Eru's MCP server (src/eru_mcp) sends this on every call, so what it writes reads as Eru's, on the
 # analyst's behalf, and never passes for the analyst's own work
-AGENT_HEADER = "X-Rivendell-Agent"
+AGENT_HEADER = "X-Rowanholt-Agent"
+# What an MCP server from before the rename sends: still Eru, never the analyst
+OLD_AGENT_HEADER = "X-Rivendell-Agent"
 ERU_MCP = "eru-mcp"
 
 
@@ -196,6 +202,11 @@ class CaseStore:
             return [{"id": a.id, "actor": a.actor, "action": a.action, "detail": a.detail or "",
                      "created_at": a.created_at.isoformat() if a.created_at else None} for a in rows]
 
+    def latest(self, job_id: str) -> int:
+        """The newest activity id on this job (0 for none): every write the case browser shows logs one."""
+        with self.Session() as session:
+            return session.query(func.max(CaseActivityModel.id)).filter(CaseActivityModel.job_id == job_id).scalar() or 0
+
     def record(self, job_id: str, actor: str, action: str, detail: str) -> None:
         with self.Session() as session:
             self._log(session, job_id, actor, action, detail)
@@ -234,7 +245,7 @@ def restart_refusal(job_id: str, confirm: bool) -> Optional[Dict]:
 
 def _by_eru(request: Request) -> bool:
     """Eru's MCP server says so in a header; an eru-mcp token is Eru whatever it says."""
-    return (request.headers.get(AGENT_HEADER, "").strip().lower() == ERU_MCP
+    return (any(request.headers.get(h, "").strip().lower() == ERU_MCP for h in (AGENT_HEADER, OLD_AGENT_HEADER))
             or access.token_scope(request) == ERU_MCP)
 
 
@@ -447,6 +458,47 @@ async def assign_host(job_id: str, host: str, update: HostUpdate, request: Reque
 async def activity(job_id: str, since: int = Query(0, ge=0)):
     """Newest first; poll with `since` (the highest id seen) for what's new."""
     return store().activity(job_id, since)
+
+
+def live_state(job_id: str) -> Dict:
+    """What the live socket watches: the activity feed, and the job's own progress (the case's
+    tables appear as it runs)."""
+    job = _jobs.get_job(job_id) if _jobs else None
+    status = getattr(job, "status", "") or ""
+    return {"activity": store().latest(job_id), "status": getattr(status, "value", status),
+            "progress": getattr(job, "progress", 0) or 0}
+
+
+@router.websocket("/live")
+async def live(websocket: WebSocket, job_id: str):
+    """Says when the case changes, so the case browser reloads at once rather than on its next poll.
+    Sends only {activity, status, progress}: the data itself still comes through the routes above.
+    The caller is checked as for those (access.websocket_user, from the session cookie or a bearer
+    header, never a token in the URL), and again before each check, so signing out, an expired
+    sign-in or the job no longer being shared closes it."""
+    if not access.websocket_user(websocket):
+        await websocket.close(code=1008)
+        return
+    await websocket.accept()
+    sent = None
+    try:
+        while True:
+            if not access.websocket_user(websocket):
+                await websocket.close(code=1008)
+                return
+            state = await asyncio.to_thread(live_state, job_id)
+            if state != sent:
+                await websocket.send_json(state)
+                sent = state
+            # Waits by listening, so a closed tab ends this at once; what the page sends is ignored
+            try:
+                message = await asyncio.wait_for(websocket.receive(), LIVE_EVERY)
+            except asyncio.TimeoutError:
+                continue
+            if message["type"] == "websocket.disconnect":
+                return
+    except WebSocketDisconnect:
+        pass
 
 
 # ---- output from confirmed findings ----

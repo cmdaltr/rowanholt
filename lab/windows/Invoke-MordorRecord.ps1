@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Runs Atomic Red Team tests on this machine and saves each test's logs for Rivendell's recorded
+Runs Atomic Red Team tests on this machine and saves each test's logs for Rowanholt's recorded
 telemetry (src/mordor/telemetry/lab.py). Ported from Archer's record-atomics.ps1.
 
 .DESCRIPTION

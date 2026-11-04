@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Automated Test Runner for Rivendell
+Automated Test Runner for Rowanholt
 
 Runs all test cases sequentially (except Mordor tests) and updates TEST_RESULTS.md
 with actual results including status, date, duration, and notes.
@@ -187,12 +187,12 @@ def update_results_file(test_name: str, success: bool, duration: int, notes: str
 def main():
     """Main test runner."""
     # Parse command line args
-    parser = argparse.ArgumentParser(description="Run Rivendell test suite")
+    parser = argparse.ArgumentParser(description="Run Rowanholt test suite")
     parser.add_argument("--yes", "-y", action="store_true", help="Skip confirmation prompt")
     args = parser.parse_args()
 
     print("=" * 50)
-    print("RIVENDELL AUTOMATED TEST RUNNER")
+    print("ROWANHOLT AUTOMATED TEST RUNNER")
     print("=" * 50)
     print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Config file: {CONFIG_FILE}")

@@ -1,5 +1,5 @@
 """
-Unified archiving utilities for Rivendell DF Acceleration Suite
+Unified archiving utilities for Rowanholt DF Acceleration Suite
 
 Provides consistent archive creation with encryption support.
 Eliminates duplicate archiving code found in acquisition modules.

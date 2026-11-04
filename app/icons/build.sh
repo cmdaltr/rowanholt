@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regenerate the app icons (rivendell.icns, rivendell.ico, rivendell.png) from the logo.
+# Regenerate the app icons (rowanholt.icns, rowanholt.ico, rowanholt.png) from the logo.
 # macOS only (swift, sips, iconutil); the outputs are committed so the installers need none of it.
 set -euo pipefail
 
@@ -8,24 +8,24 @@ ROOT="$(cd "$HERE/../.." && pwd)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-swift "$HERE/make-icon.swift" "$ROOT/docs/images/rivendell.png" "$WORK/icon-1024.png"
+swift "$HERE/make-icon.swift" "$ROOT/docs/images/rowanholt.png" "$WORK/icon-1024.png"
 
-ICONSET="$WORK/rivendell.iconset"
+ICONSET="$WORK/rowanholt.iconset"
 mkdir "$ICONSET"
 for size in 16 32 128 256 512; do
     sips -z "$size" "$size" "$WORK/icon-1024.png" --out "$ICONSET/icon_${size}x${size}.png" >/dev/null
     double=$((size * 2))
     sips -z "$double" "$double" "$WORK/icon-1024.png" --out "$ICONSET/icon_${size}x${size}@2x.png" >/dev/null
 done
-iconutil -c icns "$ICONSET" -o "$HERE/rivendell.icns"
+iconutil -c icns "$ICONSET" -o "$HERE/rowanholt.icns"
 
-sips -z 512 512 "$WORK/icon-1024.png" --out "$HERE/rivendell.png" >/dev/null
+sips -z 512 512 "$WORK/icon-1024.png" --out "$HERE/rowanholt.png" >/dev/null
 
 # ICO with PNG-compressed entries (Vista onwards reads these at every size)
 for size in 16 24 32 48 64 128 256; do
     sips -z "$size" "$size" "$WORK/icon-1024.png" --out "$WORK/ico-$size.png" >/dev/null
 done
-python3 - "$WORK" "$HERE/rivendell.ico" <<'EOF'
+python3 - "$WORK" "$HERE/rowanholt.ico" <<'EOF'
 import struct, sys
 from pathlib import Path
 

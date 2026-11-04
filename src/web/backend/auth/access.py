@@ -6,7 +6,7 @@ Who is calling, and which jobs and cases they may see.
 Local mode (the default) keeps the API as open as it has always been on an analyst's
 own machine: a caller with no token acts as the local analyst, with admin rights.
 
-Server mode (settings.rivendell_server_mode) puts every /api route behind a signed-in
+Server mode (settings.rowanholt_server_mode) puts every /api route behind a signed-in
 user, apart from PUBLIC_PATHS, so a route added later is covered without remembering
 to protect it. Admin-only areas are listed in ADMIN_PREFIXES. A job is visible to its
 owner, the users it's shared with, and admins; a job from before server mode has no
@@ -22,6 +22,7 @@ from urllib.parse import unquote
 
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
+from starlette.requests import HTTPConnection
 
 try:
     from ..config import settings
@@ -56,6 +57,8 @@ PUBLIC_PATHS = {
     "/api/auth/oidc/callback",
     "/api/auth/verify",
 }
+# An online lookup is a POST (it sends the value out) that every analyst may make
+LOOKUP_PATH = "/api/threat-intel/lookup"
 ADMIN_PREFIXES = ("/api/lab", "/api/anduril", "/api/aragorn", "/api/auth/users")
 JOB_PATH = re.compile(r"^/api/jobs/([0-9a-fA-F-]{36})(?:/|$)")
 CASE_PATH = re.compile(r"^/api/ai/cases/([^/]+)/")
@@ -70,10 +73,10 @@ def configure(storage) -> None:
 
 
 def server_mode() -> bool:
-    return settings.rivendell_server_mode
+    return settings.rowanholt_server_mode
 
 
-def user_from_request(request: Request) -> Optional[dict]:
+def user_from_request(request: HTTPConnection) -> Optional[dict]:
     """The caller from the bearer token, else the session cookie (a stale or empty
     header mustn't hide a good cookie)."""
     header = request.headers.get("authorization", "")
@@ -142,7 +145,8 @@ async def middleware(request: Request, call_next):
         if not user:
             return JSONResponse({"detail": "Sign in required"}, status_code=401, headers={"WWW-Authenticate": "Bearer"})
         admin_only = path.startswith(ADMIN_PREFIXES) or (
-            path.startswith(("/api/mordor", "/api/threat-intel")) and request.method != "GET")
+            path.startswith(("/api/mordor", "/api/threat-intel")) and request.method != "GET"
+            and path != LOOKUP_PATH)
         if admin_only and not is_admin(user):
             return JSONResponse({"detail": "Admin privileges required"}, status_code=403)
         match = JOB_PATH.match(path)
@@ -153,6 +157,29 @@ async def middleware(request: Request, call_next):
         if match and not case_allowed(user, unquote(match.group(1))):
             return JSONResponse({"detail": "Case not found"}, status_code=404)
     return await call_next(request)
+
+
+def websocket_user(websocket: HTTPConnection) -> Optional[dict]:
+    """The caller of a websocket under /api, or None if refused. middleware() only sees HTTP
+    requests, so a websocket route asks this itself (at the handshake and again while open):
+    the same token, sign-in and job checks, read as a GET. Browsers send cookies with a
+    websocket to any site that opens one, so one from a page on another origin is refused
+    (an origin check is the only CSRF defence a websocket has)."""
+    origin = websocket.headers.get("origin")
+    if origin and origin.rstrip("/") not in [o.rstrip("/") for o in settings.cors_origins]:
+        return None
+    path = websocket.url.path
+    user = user_from_request(websocket)
+    if user and user.get("token") and tokens.refusal(user["token"], "GET", path, ADMIN_PREFIXES):
+        return None
+    if not server_mode():
+        return user or LOCAL_USER
+    if not user:
+        return None
+    match = JOB_PATH.match(path)
+    if match and not can_access_job(user, match.group(1)):
+        return None
+    return user
 
 
 def current_user(request: Request) -> dict:

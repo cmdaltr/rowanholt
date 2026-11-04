@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Administer a server's users from the host (list, add, password, role, disable, enable)
 #
-#   rivendell server users list
-#   rivendell server users add <username> <email> [--admin]
-#   rivendell server users password|disable|enable <username>
-#   rivendell server users role <username> admin|user
+#   rowanholt server users list
+#   rowanholt server users add <username> <email> [--admin]
+#   rowanholt server users password|disable|enable <username>
+#   rowanholt server users role <username> admin|user
 #
 # Works when nobody can sign in: a locked-out admin, or single sign-on down.
 set -euo pipefail

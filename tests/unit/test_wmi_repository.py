@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from rivendell.process.wmi_repository import wmi_subscriptions  # noqa: E402
+from rowanholt.process.wmi_repository import wmi_subscriptions  # noqa: E402
 
 SID = bytes.fromhex("1c0000000105000000000005150000008959115568eadd4857af4f11e8030000")
 

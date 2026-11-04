@@ -257,7 +257,7 @@ function LabMachines({ onRecorded = () => {} }) {
               <div className="mt-row">
                 {group.map((t) => (
                   <button key={t.id} className="mt-pill" disabled={!t.ready || busy} title={t.ready ? `Create with ${ENGINE_NAME[t.engine]}` : t.reason}
-                          onClick={() => setDialog({ kind: 'create', t, name: free(`rivendell-${t.id.replace(/-(vm|container)$/, '')}`) })}>
+                          onClick={() => setDialog({ kind: 'create', t, name: free(`rowanholt-${t.id.replace(/-(vm|container)$/, '')}`) })}>
                     <EngineIcon engine={t.engine} /> Create
                   </button>
                 ))}
@@ -379,7 +379,7 @@ function LabMachines({ onRecorded = () => {} }) {
               <option value="windows">Windows</option><option value="linux">Linux</option><option value="macos">macOS</option>
             </select>
           </label>
-          <p className="lab-note">So Rivendell knows how to turn on logging, install Atomic Red Team and record on it.</p>
+          <p className="lab-note">So Rowanholt knows how to turn on logging, install Atomic Red Team and record on it.</p>
           <div className="mt-modal-actions">
             <button className="mt-pill" onClick={() => setDialog(null)}>Cancel</button>
             <button onClick={() => post('adopt', { engine: dialog.m.engine, name: dialog.m.name, os: dialog.os || 'windows' })}>Save</button>

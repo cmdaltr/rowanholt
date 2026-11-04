@@ -1,9 +1,9 @@
 {
   "case_number": "TEST_mac_last_access",
   "source_paths": [
-    "/Volumes/Media5TB/rivendell_imgs/MacintoshHD_disk5.E01"
+    "/Volumes/Media5TB/rowanholt_imgs/MacintoshHD_disk5.E01"
   ],
-  "destination_path": "/Volumes/Media5TB/rivendell_imgs/tests/mac_last_access",
+  "destination_path": "/Volumes/Media5TB/rowanholt_imgs/tests/mac_last_access",
   "options": {
     "local": true,
     "gandalf": false,

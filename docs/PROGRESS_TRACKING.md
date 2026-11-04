@@ -1,4 +1,4 @@
-# Rivendell Progress Tracking
+# Rowanholt Progress Tracking
 
 This document describes how progress percentage is calculated during forensic analysis jobs.
 
@@ -26,7 +26,7 @@ Progress is tracked per-image and scaled to overall job progress:
 | **Commencing Analysis Phase** | **75%** |
 | **Completed Analysis Phase** | **95%** |
 | Splunk/Elastic/Navigator phases | 97% |
-| Rivendell completed | 95% (overall) |
+| Rowanholt completed | 95% (overall) |
 
 ## Collection Sub-Steps (Windows)
 

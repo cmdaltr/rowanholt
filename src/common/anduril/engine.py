@@ -111,7 +111,7 @@ def find_socket(explicit: Optional[str] = None) -> str:
 
 
 class Engine:
-    """Thin wrapper over the Engine API endpoints Rivendell needs."""
+    """Thin wrapper over the Engine API endpoints Rowanholt needs."""
 
     def __init__(self, socket_path: Optional[str] = None, timeout: float = 30.0) -> None:
         self.socket_path = find_socket(socket_path)

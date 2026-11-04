@@ -22,10 +22,10 @@ services:
     volumes:
       - ./src/web/backend:/app
       - /Volumes:/Volumes
-      - /tmp/rivendell:/tmp/elrond/output
-      - /tmp/rivendell:/tmp/rivendell
-      - ./fixtures:/tmp/rivendell/fixtures:ro
-      - rivendell_uploads:/tmp/elrond/uploads
+      - /tmp/rowanholt:/tmp/elrond/output
+      - /tmp/rowanholt:/tmp/rowanholt
+      - ./fixtures:/tmp/rowanholt/fixtures:ro
+      - rowanholt_uploads:/tmp/elrond/uploads
       - navigator_data:/navigator
       # NOTE: splunk volumes removed in testing mode
     deploy:
@@ -38,7 +38,7 @@ services:
   # Replace Splunk with a no-op container to satisfy dependency
   splunk:
     image: alpine:latest
-    container_name: rivendell-splunk-stub
+    container_name: rowanholt-splunk-stub
     command: /bin/sh -c "echo 'Splunk disabled in testing mode' && sleep infinity"
     restart: "no"
     deploy:
@@ -51,7 +51,7 @@ services:
   # Replace Elastic with a no-op container to satisfy dependency
   elastic:
     image: alpine:latest
-    container_name: rivendell-elastic-stub
+    container_name: rowanholt-elastic-stub
     command: /bin/sh -c "echo 'Elasticsearch disabled in testing mode' && sleep infinity"
     restart: "no"
     deploy:

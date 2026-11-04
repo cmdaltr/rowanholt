@@ -14,7 +14,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-TMP = tempfile.mkdtemp(prefix="rivendell-access-")
+TMP = tempfile.mkdtemp(prefix="rowanholt-access-")
 # The backend's settings read .env from the working directory; never the repository's
 os.chdir(TMP)
 os.environ.update({
@@ -22,13 +22,13 @@ os.environ.update({
     "USERS_FILE": f"{TMP}/users.json",
     "OUTPUT_DIR": f"{TMP}/output",
     "SECRET_KEY": "test-secret-key-for-unit-tests-only-0123456789",
-    "RIVENDELL_ADMIN_PASSWORD": "correct horse battery staple",
-    "RIVENDELL_PUBLIC_URL": "https://rivendell.test",
+    "ROWANHOLT_ADMIN_PASSWORD": "correct horse battery staple",
+    "ROWANHOLT_PUBLIC_URL": "https://rowanholt.test",
     # No Redis here: sign-in lockouts fall back to memory (port 1 refuses at once)
     "REDIS_HOST": "127.0.0.1",
     "REDIS_PORT": "1",
     # Threat intelligence from this checkout, as the backend container mounts it
-    "RIVENDELL_ELROND_SRC": str(Path(__file__).resolve().parents[2] / "src" / "analysis"),
+    "ROWANHOLT_ELROND_SRC": str(Path(__file__).resolve().parents[2] / "src" / "analysis"),
 })
 
 try:
@@ -69,7 +69,7 @@ class BackendCase(unittest.TestCase):
         cls.allowed = mock.patch.object(type(settings), "allowed_paths",
                                         new_callable=mock.PropertyMock, return_value=[str(cls.evidence)])
         cls.allowed.start()
-        settings.rivendell_server_mode = True
+        settings.rowanholt_server_mode = True
         cls.client = TestClient(cls.main.app)
         cls.admin = cls.login("admin", "correct horse battery staple")
         for name in ("alice", "bob"):
@@ -83,7 +83,7 @@ class BackendCase(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.allowed.stop()
-        cls.settings.rivendell_server_mode = False
+        cls.settings.rowanholt_server_mode = False
 
     @classmethod
     def login(cls, username, password):
@@ -183,6 +183,36 @@ class ServerAccessTest(BackendCase):
         resp = self.client.post("/api/jobs/bulk/cancel", headers=self.bob, json=[job])
         self.assertEqual(resp.json()["results"][0]["error"], "Job not found")
 
+    def test_live_case_updates_follow_job_access(self):
+        import case_routes
+        from starlette.websockets import WebSocketDisconnect
+        job = self.create_job(self.alice, "CASE-LIVE-1")
+        path = f"/api/jobs/{job}/case/live"
+        with mock.patch.object(case_routes, "LIVE_EVERY", 0.05):
+            with self.client.websocket_connect(path, headers=self.alice) as ws:
+                first = ws.receive_json()
+                self.assertEqual((first["activity"], first["status"]), (0, "pending"))
+                resp = self.client.post(f"/api/jobs/{job}/case/notes", headers=self.alice, json={"body": "seen"})
+                self.assertEqual(resp.status_code, 200, resp.text)
+                self.assertGreater(ws.receive_json()["activity"], 0)
+            # Not signed in, not shared, or opened by a page on another site: refused at the handshake
+            origin = {**self.alice, "Origin": "https://evil.example"}
+            for headers in ({}, self.bob, origin):
+                with self.assertRaises(WebSocketDisconnect) as refused:
+                    with self.client.websocket_connect(path, headers=headers) as ws:
+                        ws.receive_json()
+                self.assertEqual(refused.exception.code, 1008)
+            with self.client.websocket_connect(path, headers={**self.alice, "Origin": self.settings.cors_origins[0]}) as ws:
+                ws.receive_json()
+            # Sharing taken away closes a socket already open
+            self.client.put(f"/api/jobs/{job}/sharing", headers=self.alice, json={"usernames": ["bob"]})
+            with self.client.websocket_connect(path, headers=self.bob) as ws:
+                ws.receive_json()
+                self.client.put(f"/api/jobs/{job}/sharing", headers=self.alice, json={"usernames": []})
+                with self.assertRaises(WebSocketDisconnect):
+                    while True:
+                        ws.receive_json()
+
     def test_restart_with_findings_needs_confirm(self):
         import case_routes
         from models.job import JobStatus
@@ -247,9 +277,9 @@ class ServerAccessTest(BackendCase):
     def test_verify_for_the_proxy(self):
         self.assertEqual(self.client.get("/api/auth/verify").status_code, 401)
         resp = self.client.get("/api/auth/verify?login_redirect=1", follow_redirects=False)
-        self.assertEqual(resp.headers["location"], "https://rivendell.test/login")
+        self.assertEqual(resp.headers["location"], "https://rowanholt.test/login")
         resp = self.client.get("/api/auth/verify", headers=self.bob)
-        self.assertEqual(resp.headers["X-Rivendell-User"], "bob")
+        self.assertEqual(resp.headers["X-Rowanholt-User"], "bob")
 
     def test_navigator_layers_follow_the_case(self):
         self.create_job(self.alice, "CASE-LAYER-1")
@@ -305,7 +335,7 @@ class ServerAccessTest(BackendCase):
         self.assertGreater(throttle.locked_for("alice", "10.0.0.5"), 0)
 
     def test_a_session_gets_a_token_for_scripts(self):
-        """Account's token for scripts and rivendell mcp: the session cookie (a password or single
+        """Account's token for scripts and rowanholt mcp: the session cookie (a password or single
         sign-on) traded for a bearer token, with nothing more than the session had."""
         self.client.cookies.clear()
         self.assertEqual(self.client.post("/api/auth/session").status_code, 401)
@@ -345,12 +375,12 @@ class ServerAccessTest(BackendCase):
         self.assertEqual(resp.status_code, 400)
 
     def test_local_mode_stays_open(self):
-        self.settings.rivendell_server_mode = False
+        self.settings.rowanholt_server_mode = False
         try:
             self.assertEqual(self.client.get("/api/jobs").status_code, 200)
             self.assertEqual(self.client.get("/api/auth/me").json()["username"], "local")
         finally:
-            self.settings.rivendell_server_mode = True
+            self.settings.rowanholt_server_mode = True
 
 
 if __name__ == "__main__":

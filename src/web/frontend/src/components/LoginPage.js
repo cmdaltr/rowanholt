@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { login as apiLogin, loginAsGuest as apiLoginAsGuest, getAuthConfig } from '../api';
 import { API_BASE_URL } from '../apiBase';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rivendell.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt.png`;
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -14,7 +14,7 @@ const LoginPage = () => {
   const [searchParams] = useSearchParams();
   const [error, setError] = useState(searchParams.get('sso_error') || '');
   const [loading, setLoading] = useState(false);
-  // What this Rivendell offers: a local stack has guests and sign-up, a server may have SSO
+  // What this Rowanholt offers: a local stack has guests and sign-up, a server may have SSO
   const [config, setConfig] = useState({ local_login: true, guest: true, register: true, sso: { enabled: false } });
 
   useEffect(() => {
@@ -59,7 +59,7 @@ const LoginPage = () => {
       <section className="hero-section">
         <img
           src={heroImage}
-          alt="Rivendell - The Last Homely House"
+          alt="Rowanholt"
           className="hero-image"
           style={{
             transform: 'scale(0.2)',
@@ -71,7 +71,7 @@ const LoginPage = () => {
       <header>
         <h2>Login</h2>
         <p>
-          Access your Rivendell DF Acceleration Suite account.
+          Access your Rowanholt DF Acceleration Suite account.
         </p>
       </header>
 

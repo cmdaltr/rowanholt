@@ -1,14 +1,14 @@
 #!/bin/bash
 # Kibana Dashboard Setup Script
-# Imports Rivendell dashboards into Kibana on startup
+# Imports Rowanholt dashboards into Kibana on startup
 
 KIBANA_URL="${KIBANA_URL:-http://kibana:5601}"
 ELASTIC_USER="${ELASTIC_USER:-elastic}"
-ELASTIC_PASSWORD="${ELASTIC_PASSWORD:-rivendell}"
+ELASTIC_PASSWORD="${ELASTIC_PASSWORD:-rowanholt}"
 MAX_RETRIES=60
 RETRY_INTERVAL=5
 
-echo "Rivendell Kibana Dashboard Setup"
+echo "Rowanholt Kibana Dashboard Setup"
 echo "================================="
 
 # Wait for Kibana to be ready
@@ -30,7 +30,7 @@ if [ $retries -eq $MAX_RETRIES ]; then
 fi
 
 # Import dashboards
-echo "Importing Rivendell dashboards..."
+echo "Importing Rowanholt dashboards..."
 DASHBOARD_FILE="/dashboards/dashboards.ndjson"
 
 if [ -f "$DASHBOARD_FILE" ]; then
@@ -61,14 +61,14 @@ curl -s -X POST \
     "${KIBANA_URL}/api/kibana/settings" \
     -H "kbn-xsrf: true" \
     -H "Content-Type: application/json" \
-    -d '{"changes":{"defaultIndex":"rivendell-index-pattern"}}' > /dev/null
+    -d '{"changes":{"defaultIndex":"rowanholt-index-pattern"}}' > /dev/null
 
 echo ""
 echo "Kibana setup complete!"
-echo "  - Overview dashboard: ${KIBANA_URL}/app/dashboards#/view/rivendell-overview"
-echo "  - MITRE ATT&CK dashboard: ${KIBANA_URL}/app/dashboards#/view/rivendell-mitre"
-echo "  - Analysis dashboard: ${KIBANA_URL}/app/dashboards#/view/rivendell-analysis"
-echo "  - IoCs dashboard: ${KIBANA_URL}/app/dashboards#/view/rivendell-iocs"
-echo "  - Keywords dashboard: ${KIBANA_URL}/app/dashboards#/view/rivendell-keywords"
-echo "  - YARA dashboard: ${KIBANA_URL}/app/dashboards#/view/rivendell-yara"
-echo "  - Actors/Software dashboard: ${KIBANA_URL}/app/dashboards#/view/rivendell-actors"
+echo "  - Overview dashboard: ${KIBANA_URL}/app/dashboards#/view/rowanholt-overview"
+echo "  - MITRE ATT&CK dashboard: ${KIBANA_URL}/app/dashboards#/view/rowanholt-mitre"
+echo "  - Analysis dashboard: ${KIBANA_URL}/app/dashboards#/view/rowanholt-analysis"
+echo "  - IoCs dashboard: ${KIBANA_URL}/app/dashboards#/view/rowanholt-iocs"
+echo "  - Keywords dashboard: ${KIBANA_URL}/app/dashboards#/view/rowanholt-keywords"
+echo "  - YARA dashboard: ${KIBANA_URL}/app/dashboards#/view/rowanholt-yara"
+echo "  - Actors/Software dashboard: ${KIBANA_URL}/app/dashboards#/view/rowanholt-actors"

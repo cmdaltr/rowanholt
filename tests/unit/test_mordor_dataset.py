@@ -102,7 +102,7 @@ def test_not_a_recording_is_refused(tmp_path):
 
 
 def test_elrond_reads_both_kinds(tmp_path):
-    from rivendell.core import gandalf
+    from rowanholt.core import gandalf
     win = recording(tmp_path / "w", "windows", [{"technique": "T1547.001", "test": 1, "folder": "T-1"}],
                     {"T-1": {"events.xml": SYSMON_1}})
     lin = recording(tmp_path / "l", "linux", [{"technique": "T1053.003", "test": 1, "folder": "T-1"}],

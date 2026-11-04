@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Rivendell test lab: targets for Gandalf and datasets for Mordor, on one Mac.
+# Rowanholt test lab: targets for Gandalf and datasets for Mordor, on one Mac.
 #
 #   ./lab.sh            interactive menu
 #   ./lab.sh <command>  run one step (./lab.sh help lists them)
 #
-# Everything runs locally: containers on the Docker engine Rivendell uses,
+# Everything runs locally: containers on the Docker engine Rowanholt uses,
 # VMs on this Mac (Vagrant + VirtualBox on Intel, Tart on Apple silicon), and
 # only loopback or host-only networking. See lab/README.md.
 set -uo pipefail
@@ -12,7 +12,7 @@ set -uo pipefail
 load_config
 
 VAGRANT_DIR="$LAB_ROOT/vagrant"
-TESTS_ENV="$LAB_CONFIG_DIR/rivendell-tests.env"
+TESTS_ENV="$LAB_CONFIG_DIR/rowanholt-tests.env"
 LINUX_CONTAINERS="lab-ubuntu lab-rocky lab-ubuntu-clean1 lab-ubuntu-clean2"
 
 vagrant_env() {
@@ -43,7 +43,7 @@ cmd_check() {
       echo "  Linux container targets and Mordor downloads only; no unattended VM option on this host." ;;
     *) die "This host isn't supported: $(uname -sm). Use macOS (Intel/Apple silicon) or Linux (x86-64/arm64)." ;;
   esac
-  [ "$ram" -lt 16 ] && warn "Under 16 GB RAM: run Rivendell without the SIEM profile while VMs are up."
+  [ "$ram" -lt 16 ] && warn "Under 16 GB RAM: run Rowanholt without the SIEM profile while VMs are up."
 
   step "Tools"
   local t
@@ -61,7 +61,7 @@ cmd_check() {
   if need docker && docker info >/dev/null 2>&1; then
     pick_docker_context
     ok "engine: $DOCKER_CONTEXT"
-    if docker ps --format '{{.Names}}' | grep -qx rivendell-backend; then ok "Rivendell is running on this engine"; else warn "Rivendell isn't running (start it before running tests)"; fi
+    if docker ps --format '{{.Names}}' | grep -qx rowanholt-backend; then ok "Rowanholt is running on this engine"; else warn "Rowanholt isn't running (start it before running tests)"; fi
   else
     warn "No Docker engine running"
   fi
@@ -128,7 +128,7 @@ cmd_install() {
   fi
   need git || xcode-select --install
   if ! need docker; then
-    warn "No Docker CLI. Rivendell needs Docker Desktop or OrbStack."
+    warn "No Docker CLI. Rowanholt needs Docker Desktop or OrbStack."
     confirm "Install OrbStack?" y && brew_install --cask orbstack
   fi
   if uses_vagrant; then
@@ -151,13 +151,13 @@ cmd_install() {
 
 cmd_configure() {
   step "Where lab data lives"
-  echo "  Acquisitions and Mordor datasets go here, and Rivendell's worker must be able to"
-  echo "  read them. Anything under /Volumes is already shared with Rivendell's containers;"
+  echo "  Acquisitions and Mordor datasets go here, and Rowanholt's worker must be able to"
+  echo "  read them. Anything under /Volumes is already shared with Rowanholt's containers;"
   echo "  a folder in your home directory needs an extra compose file (generated for you)."
-  local opts=("$HOME/rivendell-lab-data (needs the compose override)") paths=("$HOME/rivendell-lab-data") v
+  local opts=("$HOME/rowanholt-lab-data (needs the compose override)") paths=("$HOME/rowanholt-lab-data") v
   for v in /Volumes/*; do
     [ -d "$v" ] && [ -w "$v" ] && [ "$v" != "/Volumes/Macintosh HD" ] || continue
-    opts+=("$v/rivendell-lab (external, $(free_gb "$v") GB free)"); paths+=("$v/rivendell-lab")
+    opts+=("$v/rowanholt-lab (external, $(free_gb "$v") GB free)"); paths+=("$v/rowanholt-lab")
   done
   opts+=("Somewhere else")
   menu "Data location" "${opts[@]}"
@@ -317,7 +317,7 @@ cmd_windows_vm() {
     start) vagrant up win ;;
     stop) vagrant halt win ;;
     provision) vagrant provision win ;;
-    gui) VBoxManage startvm rivendell-lab-win11 --type separate 2>/dev/null || open -a VirtualBox ;;
+    gui) VBoxManage startvm rowanholt-lab-win11 --type separate 2>/dev/null || open -a VirtualBox ;;
     delete) confirm "Destroy the Windows VM?" n && vagrant destroy -f win ;;
     status) vagrant status win ;;
   esac
@@ -370,14 +370,14 @@ cmd_gandalf_collect() {
       fi
     else
       # shellcheck disable=SC2086
-      docker image inspect rivendell-lab-controller >/dev/null 2>&1 || build_image rivendell-lab-controller "$LAB_ROOT/controller"
+      docker image inspect rowanholt-lab-controller >/dev/null 2>&1 || build_image rowanholt-lab-controller "$LAB_ROOT/controller"
       lab_compose --profile controller run --rm --pull never controller "$c" $targets $wflag || rc=1
     fi
   done
   echo
   info "Acquisitions under $ACQ_ROOT:"
   find "$ACQ_ROOT" -maxdepth 4 \( -name '*.zip' -o -name '*.7z' -o -name '*.tar.gz*' \) -exec ls -lh {} \; 2>/dev/null | awk '{print "  " $5 "  " $9}'
-  [ "$rc" = 0 ] && ok "Collection finished. Next: ./lab.sh rivendell-env" || warn "Some collections failed; see the collector logs next to the archives."
+  [ "$rc" = 0 ] && ok "Collection finished. Next: ./lab.sh rowanholt-env" || warn "Some collections failed; see the collector logs next to the archives."
   return $rc
 }
 
@@ -386,9 +386,9 @@ cmd_gandalf_collect() {
 cmd_stacking_eval() {
   pick_docker_context
   require_password
-  docker ps --format '{{.Names}}' | grep -qx rivendell-celery-worker || die "Rivendell isn't running: ./rivendell start"
+  docker ps --format '{{.Names}}' | grep -qx rowanholt-celery-worker || die "Rowanholt isn't running: ./rowanholt start"
   local root="${TEST_IMAGES_PATH:-$LAB_DATA_DIR}" case_id dest acq
-  docker exec rivendell-celery-worker test -d "$root" || die "Rivendell's worker can't see $root: run ./lab.sh rivendell-env"
+  docker exec rowanholt-celery-worker test -d "$root" || die "Rowanholt's worker can't see $root: run ./lab.sh rowanholt-env"
   case_id="STACKEVAL-$(date +%Y%m%d-%H%M)"
   dest="$root/stacking-eval/$case_id"
   # A collection of its own, so hosts left from earlier runs aren't stacked with these
@@ -398,7 +398,7 @@ cmd_stacking_eval() {
   cmd_linux_targets stacking || return 1
   GANDALF_WORKAROUNDS=0 cmd_gandalf_collect python "lab-ubuntu lab-rocky lab-ubuntu-clean1 lab-ubuntu-clean2" || return 1
   step "Elrond over the four hosts as $case_id"
-  docker exec rivendell-celery-worker sh -c 'cd "${ELROND_HOME:-/opt/elrond}" && python3 elrond.py "$@"' elrond \
+  docker exec rowanholt-celery-worker sh -c 'cd "${ELROND_HOME:-/opt/elrond}" && python3 elrond.py "$@"' elrond \
     "$case_id" "$acq" "$dest/elrond" --Gandalf --Process --Analysis || return 1
   step "Stacking against the plants"
   python3 "$LAB_ROOT/lib/stacking_eval.py" "$dest/elrond" "$acq" --readme "$LAB_ROOT/README.md" \
@@ -480,7 +480,7 @@ cmd_mordor_capture() {
 # Recorded telemetry (src/mordor/telemetry): each Atomic Red Team test's logs on their own, so
 # the telemetry engine knows which log records which technique. mordor-capture above makes one
 # dataset of a whole run for Elrond to analyse; this keeps the tests apart.
-TELEMETRY_LAB="${RIVENDELL_TELEMETRY_LAB:-$REPO_ROOT/src/mordor/data/telemetry/lab}"
+TELEMETRY_LAB="${ROWANHOLT_TELEMETRY_LAB:-$REPO_ROOT/src/mordor/data/telemetry/lab}"
 
 cmd_mordor_record() {
   local preset techniques run=""
@@ -516,7 +516,7 @@ cmd_mordor_record() {
     [ -f "$MORDOR_ROOT/telemetry/$run/manifest.json" ] || die "Nothing was recorded ($MORDOR_ROOT/telemetry/$run)"
     mkdir -p "$TELEMETRY_LAB" && cp -R "$MORDOR_ROOT/telemetry/$run" "$TELEMETRY_LAB/"
   fi
-  ( cd "$REPO_ROOT" && RIVENDELL_TELEMETRY_LAB="$TELEMETRY_LAB" python3 -m src.mordor.telemetry --build --source lab ) \
+  ( cd "$REPO_ROOT" && ROWANHOLT_TELEMETRY_LAB="$TELEMETRY_LAB" python3 -m src.mordor.telemetry --build --source lab ) \
     && ok "Recorded telemetry: $TELEMETRY_LAB/$run (source 'Your lab'; see /api/mordor/telemetry)"
 }
 
@@ -528,9 +528,9 @@ cmd_mordor_dataset() {
   ( cd "$REPO_ROOT" && python3 -m src.mordor.lab.dataset --run "$run" --src "$TELEMETRY_LAB" --dest "$MORDOR_ROOT/lab" )
 }
 
-# ----------------------------------------------------------------------- rivendell
+# ----------------------------------------------------------------------- rowanholt
 
-cmd_rivendell_env() {
+cmd_rowanholt_env() {
   step "Environment for tests/scripts/run_test.py"
   mkdir -p "$LAB_CONFIG_DIR"
   cat > "$TESTS_ENV" <<EOF
@@ -547,13 +547,13 @@ EOF
 
   pick_docker_context
   local probe="${TEST_IMAGES_PATH:-$LAB_DATA_DIR}"
-  if docker ps --format '{{.Names}}' | grep -qx rivendell-celery-worker; then
-    if docker exec rivendell-celery-worker test -d "$probe"; then
-      ok "Rivendell's worker can see $probe"
+  if docker ps --format '{{.Names}}' | grep -qx rowanholt-celery-worker; then
+    if docker exec rowanholt-celery-worker test -d "$probe"; then
+      ok "Rowanholt's worker can see $probe"
     else
       local override="$LAB_ROOT/docker-compose.lab.yml"
       cat > "$override" <<EOF
-# Generated by lab/lab.sh: lets Rivendell read the lab's data directory.
+# Generated by lab/lab.sh: lets Rowanholt read the lab's data directory.
 services:
   backend:
     volumes:
@@ -562,11 +562,11 @@ services:
     volumes:
       - "$probe:$probe"
 EOF
-      warn "Rivendell's worker can't see $probe. Recreate it with the generated override:"
+      warn "Rowanholt's worker can't see $probe. Recreate it with the generated override:"
       echo "    docker compose -f docker-compose.yml [your other -f files] -f lab/docker-compose.lab.yml up -d backend celery-worker"
     fi
   else
-    warn "Rivendell isn't running; start it, then re-run this step to check the mounts."
+    warn "Rowanholt isn't running; start it, then re-run this step to check the mounts."
   fi
 
   cat <<EOF
@@ -620,15 +620,15 @@ cmd_agent() {
   case "${1:-status}" in
     start)
       if [ -f "$AGENT_PID" ] && kill -0 "$(cat "$AGENT_PID")" 2>/dev/null; then ok "Lab agent already running (pid $(cat "$AGENT_PID"))"; return; fi
-      echo "The lab agent lets admin users of the Rivendell web UI run this lab's commands"
+      echo "The lab agent lets admin users of the Rowanholt web UI run this lab's commands"
       echo "on this machine: start/stop lab containers and VMs, collect with Gandalf, download"
-      echo "and generate Mordor datasets. It listens on $(forward_ip):5691 only, for the Rivendell"
+      echo "and generate Mordor datasets. It listens on $(forward_ip):5691 only, for the Rowanholt"
       echo "backend, and accepts nothing but the lab commands listed in ./lab.sh help."
       confirm "Start the lab agent?" y || return
       nohup python3 "$LAB_ROOT/agent/lab_agent.py" --bind "$(forward_ip)" >"$AGENT_LOG" 2>&1 &
       echo $! > "$AGENT_PID"
       sleep 1
-      kill -0 "$(cat "$AGENT_PID")" 2>/dev/null && ok "Lab agent running (log: $AGENT_LOG). Open Rivendell > Aragorn > Lab." || { fail "Agent failed to start:"; tail -5 "$AGENT_LOG"; }
+      kill -0 "$(cat "$AGENT_PID")" 2>/dev/null && ok "Lab agent running (log: $AGENT_LOG). Open Rowanholt > Aragorn > Lab." || { fail "Agent failed to start:"; tail -5 "$AGENT_LOG"; }
       ;;
     stop)
       [ -f "$AGENT_PID" ] && kill "$(cat "$AGENT_PID")" 2>/dev/null && rm -f "$AGENT_PID" && ok "Lab agent stopped" || warn "Lab agent wasn't running"
@@ -643,7 +643,7 @@ cmd_agent() {
 
 # ------------------------------------------------------- non-interactive (lab agent)
 
-CONFIG_KEYS="LAB_DATA_DIR TEST_IMAGES_PATH LAB_VM_DIR WINDOWS_VM_MEMORY_MB WINDOWS_VM_CPUS LINUX_VM_MEMORY_MB WINDOWS_UTM_VM LAB_TART_HOME LAB_HIDDEN_MACHINES"
+CONFIG_KEYS="LAB_DATA_DIR TEST_IMAGES_PATH LAB_VM_DIR WINDOWS_VM_MEMORY_MB WINDOWS_VM_CPUS LINUX_VM_MEMORY_MB WINDOWS_UTM_VM WINDOWS_CLEAN_PREFIX LAB_TART_HOME LAB_HIDDEN_MACHINES"
 
 # KEY=value lines describing this host and the lab, for the web UI.
 cmd_state() {
@@ -711,8 +711,8 @@ Usage: ./lab.sh [command]
   mordor-capture      Run atomics and export a dataset
   mordor-record [preset | custom <name> <T1,T2> [run]]   Record each atomic test's logs for the telemetry engine
   mordor-dataset <run>   Turn a recording into a dataset Elrond can analyse ($MORDOR_ROOT/lab/<run>)
-  rivendell-env       Write the env file for run_test.py and check mounts
-  agent [start|stop|status]   Host agent so the Rivendell web UI can drive the lab
+  rowanholt-env       Write the env file for run_test.py and check mounts
+  agent [start|stop|status]   Host agent so the Rowanholt web UI can drive the lab
   status | teardown
   quickstart          Guided first run: check, install, configure, targets, collect
 
@@ -727,14 +727,14 @@ cmd_quickstart() {
   confirm "Start the Linux container targets?" y && cmd_linux_targets up
   confirm "Collect from them with Gandalf (bash + python)?" y && { cmd_gandalf_collect bash ""; cmd_gandalf_collect python ""; }
   confirm "Download the Mordor datasets (APT29 day 1/2 only, to start)?" y && cmd_mordor_download apt29/day1 apt29/day2
-  cmd_rivendell_env
+  cmd_rowanholt_env
   echo
   info "VMs (Linux, macOS, Windows) are next; use the menu when you're ready, as they're large downloads."
 }
 
 main_menu() {
   while true; do
-    menu "Rivendell test lab ($(host_label), data: $LAB_DATA_DIR)" \
+    menu "Rowanholt test lab ($(host_label), data: $LAB_DATA_DIR)" \
       "Quickstart (guided first run)" \
       "Check this Mac" \
       "Install prerequisites" \
@@ -748,7 +748,7 @@ main_menu() {
       "Mordor: install sensor + Atomic Red Team (Windows VM)" \
       "Mordor: generate a dataset" \
       "Mordor: record telemetry (each test's logs)" \
-      "Rivendell: test environment and mounts" \
+      "Rowanholt: test environment and mounts" \
       "Web UI: start/stop the lab agent" \
       "Status" \
       "Tear down"
@@ -757,7 +757,7 @@ main_menu() {
       1) cmd_quickstart ;;   2) cmd_check ;;        3) cmd_install ;;     4) cmd_configure ;;
       5) cmd_linux_targets ;; 6) cmd_linux_vm ;;    7) cmd_macos_vm ;;    8) cmd_windows_vm ;;
       9) cmd_gandalf_collect ;; 10) cmd_mordor_download ;; 11) cmd_mordor_sensor ;; 12) cmd_mordor_capture ;;
-      13) cmd_mordor_record ;; 14) cmd_rivendell_env ;;
+      13) cmd_mordor_record ;; 14) cmd_rowanholt_env ;;
       15) menu "Lab agent" "Start" "Stop" "Status"; case "$MENU_CHOICE" in 1) cmd_agent start ;; 2) cmd_agent stop ;; 3) cmd_agent status ;; esac ;;
       16) cmd_status ;; 17) cmd_teardown ;;
     esac
@@ -784,7 +784,7 @@ case "${1:-}" in
   mordor-record) shift; cmd_mordor_record "$@" ;;
   mordor-dataset) shift; cmd_mordor_dataset "$@" ;;
   agent) shift; cmd_agent "$@" ;;
-  rivendell-env) cmd_rivendell_env ;;
+  rowanholt-env) cmd_rowanholt_env ;;
   state) cmd_state ;;
   set-config) shift; cmd_set_config "$@" ;;
   set-password) cmd_set_password ;;

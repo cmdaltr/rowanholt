@@ -177,7 +177,7 @@ def test_rare_cites_every_host_with_it(tmp_path):
 
 def test_stacking_persistence_families_match():
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
-    from rivendell.analysis import stacking
+    from rowanholt.analysis import stacking
     assert eru_offline.STACKING_PERSISTENCE == stacking.PERSISTENCE
 
 

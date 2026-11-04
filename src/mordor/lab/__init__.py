@@ -1,6 +1,6 @@
 """
-Mordor lab: create and manage the containers and VMs a recording runs on, from Rivendell's
-Mordor page. Ported from Archer's archer.lab. The Rivendell lab agent (lab/agent/lab_agent.py)
+Mordor lab: create and manage the containers and VMs a recording runs on, from Rowanholt's
+Mordor page. Ported from Archer's archer.lab. The Rowanholt lab agent (lab/agent/lab_agent.py)
 runs it on the host, because the backend's container can't reach Docker, Tart or UTM there.
 
 It drives what's on the machine it runs on: Docker (or OrbStack) for Linux containers, Tart

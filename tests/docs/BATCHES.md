@@ -1,6 +1,6 @@
 # Test Batch Scripts
 
-Automated test batch scripts for running Rivendell tests in smaller, Docker-friendly groups.
+Automated test batch scripts for running Rowanholt tests in smaller, Docker-friendly groups.
 
 **Organization**: Batches split into 2-3 tests each (~60-90 min) to prevent Docker crashes from resource exhaustion.
 
@@ -39,37 +39,37 @@ cd tests
 
 # Phase 1: Quick Tests (3-4 hours)
 ./scripts/batch/batch1a-archive-lnk.sh
-docker restart rivendell-backend rivendell-celery-worker && sleep 15
+docker restart rowanholt-backend rowanholt-celery-worker && sleep 15
 
 ./scripts/batch/batch1b-archive-docs.sh
-docker restart rivendell-backend rivendell-celery-worker && sleep 15
+docker restart rowanholt-backend rowanholt-celery-worker && sleep 15
 
 ./scripts/batch/batch1c-bin-hidden.sh
-docker restart rivendell-backend rivendell-celery-worker && sleep 15
+docker restart rowanholt-backend rowanholt-celery-worker && sleep 15
 
 # Phase 2: Collection Tests (3 hours)
 ./scripts/batch/batch2a-mail-scripts.sh
-docker restart rivendell-backend rivendell-celery-worker && sleep 15
+docker restart rowanholt-backend rowanholt-celery-worker && sleep 15
 
 ./scripts/batch/batch2b-virtual-web.sh
-docker restart rivendell-backend rivendell-celery-worker && sleep 15
+docker restart rowanholt-backend rowanholt-celery-worker && sleep 15
 
 ./scripts/batch/batch2c-extraction.sh
-docker restart rivendell-backend rivendell-celery-worker && sleep 15
+docker restart rowanholt-backend rowanholt-celery-worker && sleep 15
 
 # Phase 3: Advanced Tests (2.5 hours)
 ./scripts/batch/batch3a-profiles-vss.sh
-docker restart rivendell-backend rivendell-celery-worker && sleep 15
+docker restart rowanholt-backend rowanholt-celery-worker && sleep 15
 
 ./scripts/batch/batch3b-yara-memory.sh
-docker restart rivendell-backend rivendell-celery-worker && sleep 15
+docker restart rowanholt-backend rowanholt-celery-worker && sleep 15
 
 # Phase 4: Long Tests (2-3 hours)
 ./scripts/batch/batch4a-brisk.sh
-docker restart rivendell-backend rivendell-celery-worker && sleep 15
+docker restart rowanholt-backend rowanholt-celery-worker && sleep 15
 
 ./scripts/batch/batch4b-keywords.sh
-docker restart rivendell-backend rivendell-celery-worker && sleep 15
+docker restart rowanholt-backend rowanholt-celery-worker && sleep 15
 
 ./scripts/batch/batch4c-collect-all.sh
 
@@ -142,19 +142,19 @@ cd tests
 
 ```bash
 # Day 1 - Full Analysis
-docker restart rivendell-backend rivendell-celery-worker
+docker restart rowanholt-backend rowanholt-celery-worker
 cd tests && ./scripts/batch/batch5a-full-analysis.sh
 
 # Day 2 - Disk + Memory (after full Docker Desktop restart)
-docker restart rivendell-backend rivendell-celery-worker
+docker restart rowanholt-backend rowanholt-celery-worker
 ./scripts/batch/batch5b-disk-memory.sh
 
 # Day 3 - SIEM Exports (after full Docker Desktop restart)
-docker restart rivendell-backend rivendell-celery-worker
+docker restart rowanholt-backend rowanholt-celery-worker
 ./scripts/batch/batch5c-siem-exports.sh
 
 # Day 4 - Memory + SIEM (after full Docker Desktop restart)
-docker restart rivendell-backend rivendell-celery-worker
+docker restart rowanholt-backend rowanholt-celery-worker
 ./scripts/batch/batch5d-memory-siem.sh
 ```
 
@@ -174,17 +174,17 @@ docker ps
 python3 run_test.py --status
 
 # 3. Check disk space (need ~50GB+ free)
-# macOS:   df -h /Volumes/*/rivendell_imgs
-# Linux:   df -h /mnt/*/rivendell_imgs
-# Windows: dir [DriveLetter]:\rivendell_imgs
+# macOS:   df -h /Volumes/*/rowanholt_imgs
+# Linux:   df -h /mnt/*/rowanholt_imgs
+# Windows: dir [DriveLetter]:\rowanholt_imgs
 
 # 4. Optional: Clean old test outputs (adjust path to your drive/mount)
-# macOS:   rm -rf /Volumes/YourDrive/rivendell_imgs/tests/win_*
-# Linux:   rm -rf /mnt/YourMount/rivendell_imgs/tests/win_*
-# Windows: del /S [Drive]:\rivendell_imgs\tests\win_*
+# macOS:   rm -rf /Volumes/YourDrive/rowanholt_imgs/tests/win_*
+# Linux:   rm -rf /mnt/YourMount/rowanholt_imgs/tests/win_*
+# Windows: del /S [Drive]:\rowanholt_imgs\tests\win_*
 
 # 5. Restart Docker for clean state (recommended)
-docker restart rivendell-backend rivendell-celery-worker
+docker restart rowanholt-backend rowanholt-celery-worker
 sleep 10
 python3 run_test.py --status  # Verify still working
 ```
@@ -205,14 +205,14 @@ watch -n 10 'python3 run_test.py --status | grep -A 5 RUNNING'
 ### Check Docker Health
 ```bash
 # Container status
-docker ps --filter "name=rivendell"
+docker ps --filter "name=rowanholt"
 
 # Resource usage
-docker stats --no-stream rivendell-backend rivendell-celery-worker
+docker stats --no-stream rowanholt-backend rowanholt-celery-worker
 
 # Recent logs
-docker logs rivendell-celery-worker --tail 20
-docker logs rivendell-backend --tail 20
+docker logs rowanholt-celery-worker --tail 20
+docker logs rowanholt-backend --tail 20
 ```
 
 ### Monitor for Problems
@@ -228,7 +228,7 @@ docker logs rivendell-backend --tail 20
 
 ```bash
 # Option 1: Restart just the worker containers (fast, 10 seconds)
-docker restart rivendell-backend rivendell-celery-worker
+docker restart rowanholt-backend rowanholt-celery-worker
 sleep 10
 
 # Option 2: Restart Docker Desktop (slower, ~60 seconds)
@@ -276,7 +276,7 @@ Connection aborted, RemoteDisconnected
 **Solution**:
 ```bash
 # Restart backend
-docker restart rivendell-backend
+docker restart rowanholt-backend
 sleep 5
 
 # Test connection
@@ -298,10 +298,10 @@ docker compose restart
 python3 run_test.py --status
 
 # Check worker logs for errors
-docker logs rivendell-celery-worker --tail 50
+docker logs rowanholt-celery-worker --tail 50
 
 # Check for stuck processes
-docker exec rivendell-celery-worker ps aux | grep elrond
+docker exec rowanholt-celery-worker ps aux | grep elrond
 ```
 
 **Solution**:
@@ -317,13 +317,13 @@ docker exec rivendell-celery-worker ps aux | grep elrond
 **Solution**:
 ```bash
 # Check space (platform-specific commands)
-# macOS:   df -h /Volumes/*/rivendell_imgs
-# Linux:   df -h /mnt/*/rivendell_imgs
-# Windows: dir [Drive]:\rivendell_imgs
+# macOS:   df -h /Volumes/*/rowanholt_imgs
+# Linux:   df -h /mnt/*/rowanholt_imgs
+# Windows: dir [Drive]:\rowanholt_imgs
 
 # Clean old outputs (CAUTION: deletes test results)
-# macOS/Linux:  rm -rf [path]/rivendell_imgs/tests/win_*
-# Windows:      del /S [Drive]:\rivendell_imgs\tests\win_*
+# macOS/Linux:  rm -rf [path]/rowanholt_imgs/tests/win_*
+# Windows:      del /S [Drive]:\rowanholt_imgs\tests\win_*
 
 # Clean Docker volumes (if needed)
 docker system prune -a --volumes
@@ -465,7 +465,7 @@ cd tests && ./scripts/batch/batch4c-collect-all.sh
 **🔴 EXTREME**: ONE PER DAY, restart Docker before running
 
 ```bash
-docker restart rivendell-backend rivendell-celery-worker
+docker restart rowanholt-backend rowanholt-celery-worker
 cd tests && ./scripts/batch/batch5a-full-analysis.sh
 ```
 
@@ -478,7 +478,7 @@ cd tests && ./scripts/batch/batch5a-full-analysis.sh
 **🔴 EXTREME**: ONE PER DAY, restart Docker before running
 
 ```bash
-docker restart rivendell-backend rivendell-celery-worker
+docker restart rowanholt-backend rowanholt-celery-worker
 cd tests && ./scripts/batch/batch5b-disk-memory.sh
 ```
 
@@ -491,7 +491,7 @@ cd tests && ./scripts/batch/batch5b-disk-memory.sh
 **🔴 EXTREME**: ONE PER DAY, restart Docker before running
 
 ```bash
-docker restart rivendell-backend rivendell-celery-worker
+docker restart rowanholt-backend rowanholt-celery-worker
 cd tests && ./scripts/batch/batch5c-siem-exports.sh
 ```
 
@@ -504,7 +504,7 @@ cd tests && ./scripts/batch/batch5c-siem-exports.sh
 **🔴 EXTREME**: ONE PER DAY, restart Docker before running
 
 ```bash
-docker restart rivendell-backend rivendell-celery-worker
+docker restart rowanholt-backend rowanholt-celery-worker
 cd tests && ./scripts/batch/batch5d-memory-siem.sh
 ```
 
@@ -558,34 +558,34 @@ These logs contain:
 # Day 1: Quick verification (~4 hours)
 cd tests
 ./scripts/batch/batch1a-archive-lnk.sh     # 65 min - verify system works
-docker restart rivendell-backend rivendell-celery-worker && sleep 10
+docker restart rowanholt-backend rowanholt-celery-worker && sleep 10
 ./scripts/batch/batch1b-archive-docs.sh    # 60 min
-docker restart rivendell-backend rivendell-celery-worker && sleep 10
+docker restart rowanholt-backend rowanholt-celery-worker && sleep 10
 ./scripts/batch/batch1c-bin-hidden.sh      # 75 min
-docker restart rivendell-backend rivendell-celery-worker && sleep 10
+docker restart rowanholt-backend rowanholt-celery-worker && sleep 10
 
 # Day 2: Collection tests (~3 hours)
 ./scripts/batch/batch2a-mail-scripts.sh    # 60 min
-docker restart rivendell-backend rivendell-celery-worker && sleep 10
+docker restart rowanholt-backend rowanholt-celery-worker && sleep 10
 ./scripts/batch/batch2b-virtual-web.sh     # 60 min
-docker restart rivendell-backend rivendell-celery-worker && sleep 10
+docker restart rowanholt-backend rowanholt-celery-worker && sleep 10
 ./scripts/batch/batch2c-extraction.sh      # 60 min
 
 # Day 3: Advanced tests (~2.5 hours)
-docker restart rivendell-backend rivendell-celery-worker && sleep 10
+docker restart rowanholt-backend rowanholt-celery-worker && sleep 10
 ./scripts/batch/batch3a-profiles-vss.sh    # 60 min
-docker restart rivendell-backend rivendell-celery-worker && sleep 10
+docker restart rowanholt-backend rowanholt-celery-worker && sleep 10
 ./scripts/batch/batch3b-yara-memory.sh     # 90 min
 
 # Day 4: Long tests individually
-docker restart rivendell-backend rivendell-celery-worker && sleep 10
+docker restart rowanholt-backend rowanholt-celery-worker && sleep 10
 ./scripts/batch/batch4a-brisk.sh           # 10 min
 # (Later that day)
-docker restart rivendell-backend rivendell-celery-worker && sleep 10
+docker restart rowanholt-backend rowanholt-celery-worker && sleep 10
 ./scripts/batch/batch4b-keywords.sh        # 90 min
 
 # Day 5: Last long test
-docker restart rivendell-backend rivendell-celery-worker && sleep 10
+docker restart rowanholt-backend rowanholt-celery-worker && sleep 10
 ./scripts/batch/batch4c-collect-all.sh     # 90 min
 
 # Days 6-9: Extreme tests (one per day)

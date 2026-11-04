@@ -2,7 +2,7 @@
 
 ## Overview
 
-Rivendell implements comprehensive security measures to protect sensitive forensic data and user credentials. This document outlines all security features and best practices.
+Rowanholt implements comprehensive security measures to protect sensitive forensic data and user credentials. This document outlines all security features and best practices.
 
 ## Authentication & Authorization
 
@@ -45,7 +45,7 @@ Rivendell implements comprehensive security measures to protect sensitive forens
 - **Refresh**: Not implemented (users must re-login)
 
 #### API Tokens (team server)
-- **Purpose**: scripts and Eru's MCP server (`RIVENDELL_TOKEN`), made under Account in the web app
+- **Purpose**: scripts and Eru's MCP server (`ROWANHOLT_TOKEN`), made under Account in the web app
 - **Format**: `rvt_` and 43 random characters; only the SHA-256 is stored (`api_tokens` table), the token is shown once
 - **Lifetime**: 1 to 365 days (90 by default); revocable by its user or an admin; stops when the user is deactivated
 - **Scopes**: `eru-mcp` (read, ask Eru, flag leads, add notes, recorded as Eru; no admin areas) or `full` (the user's rights)
@@ -169,7 +169,7 @@ allowed_origins = [
 
 ### Credentials
 - **Storage**: Environment variables or .env file
-- **Default**: `rivendell:rivendell@postgres:5432/rivendell`
+- **Default**: `rowanholt:rowanholt@postgres:5432/rowanholt`
 - **Production TODO**: Use strong unique credentials
 
 ### SQL Injection Prevention

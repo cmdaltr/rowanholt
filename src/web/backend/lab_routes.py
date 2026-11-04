@@ -1,5 +1,5 @@
 """
-Lab routes: configure and run the Rivendell test lab (lab/) from the web UI.
+Lab routes: configure and run the Rowanholt test lab (lab/) from the web UI.
 
 The lab's containers and VMs run on the host, so the backend can't drive them
 itself. These admin-only endpoints proxy to the lab agent (lab/agent/lab_agent.py),
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/lab", tags=["lab"])
 
 LAB_AGENT_URL = os.environ.get("LAB_AGENT_URL", "http://host.docker.internal:5691")
-LAB_AGENT_TOKEN_PATH = Path(os.environ.get("LAB_AGENT_TOKEN_PATH", "/tmp/rivendell/.lab-agent/token"))
+LAB_AGENT_TOKEN_PATH = Path(os.environ.get("LAB_AGENT_TOKEN_PATH", "/tmp/rowanholt/.lab-agent/token"))
 DEFAULT_SECRET = "your-secret-key-change-in-production"
 START_COMMAND = "./lab.sh agent start"
 

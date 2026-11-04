@@ -1,8 +1,8 @@
-# Rivendell — Threat Model
+# Rowanholt — Threat Model
 
 ## What Claude Code can touch
 
-- Source code under `rivendell/`, `mcp/`, `src/`, `tests/`, `scripts/`
+- Source code under `rowanholt/`, `mcp/`, `src/`, `tests/`, `scripts/`
 - Case metadata and structured output JSON
 - XLSX evidence files under `data/`
 - Documentation under `docs/`
@@ -15,21 +15,54 @@
 
 ## Risk areas specific to this project
 
-- **Eru MCP tools** — Eru has outbound network access for threat intel enrichment. Any new MCP tool registration must be reviewed before it goes near a live case. The write tools (`flag_lead`, `add_note`, phase 2) exist only with `rivendell mcp --allow-writes`: leads only, recorded as "Eru (for <user>)", the backend refusing Eru other statuses, edits, deletes and assignments, and a per-session write cap. Reviewed 3 November 2026 (below).
+- **Eru MCP tools** — Eru has outbound network access for threat intel enrichment. Any new MCP tool registration must be reviewed before it goes near a live case. The write tools (`flag_lead`, `add_note`, phase 2) exist only with `rowanholt mcp --allow-writes`: leads only, recorded as "Eru (for <user>)", the backend refusing Eru other statuses, edits, deletes and assignments, and a per-session write cap. Reviewed 3 November 2026; the HTTP transport, 4 November (below).
 - **Subprocess calls to forensic tools** — Volatility3, log2timeline, RegRipper run with elevated access to memory dumps. Do not modify subprocess invocation patterns without explicit instruction.
 - **SQLite case database** — schema changes require a migration. Do not ALTER TABLE directly; create a migration script.
-- **Iran APT XLSX loader** — `rivendell/threat_intel/iran_apt_loader.py`. The 10-column schema is fixed. Do not add columns without updating the dataclass, index, and tests.
+- **Iran APT XLSX loader** — `rowanholt/threat_intel/iran_apt_loader.py`. The 10-column schema is fixed. Do not add columns without updating the dataclass, index, and tests.
 
 ## Review: Eru MCP phase 2 (3 November 2026, Ben)
 
 Approved for live cases on these conditions.
 
 1. **Prompt injection from case data: accepted.** Text in the evidence (a filename, a task description, a log line) can lead the model to flag decoy leads or write misleading notes. It can't confirm, change or remove findings, assign hosts, or write more than `--max-writes` (25) times a session, and every write is labelled "Eru (for <user>)". It can't be prevented in code: the model reads the evidence it's asked to analyse. Team rule: an Eru lead or note is a suggestion, never a clearance; only an analyst clears a host.
-2. **Case data leaving through another tool, or `raw/` read round the API: required rule.** Eru sends nothing outside Rivendell, but an MCP host with other network-capable tools (web fetch, Slack, GitHub, email) could be led by injected text to send case data out through them. The server's `raw/` boundary holds only for what goes through the API: a host with a shell or file tools on the machine holding the case store can read `raw/` (and every other case) directly, and the 3 November test run on THREATINTEL-DEMO-01 saw Claude Code offer to do just that when the server refused. On a live case, `--allow-writes` runs only in a host with no network-capable tools besides the Rivendell server and no shell or file access to the case store (e.g. Claude Desktop with only this server, or a host on another machine from the Rivendell server), or Ask Eru with local Ollama is used instead. Policy, not code: Rivendell can't see the host's other tools.
-3. **Token: enforced.** On a team server `--allow-writes` refuses to start unless `RIVENDELL_TOKEN` is an `eru-mcp` API token (`eru_mcp.server.write_refusal`, checked against `/api/auth/me`), so the backend itself holds the caller to reads, leads and notes whether or not the agent header is sent. Use 30-day tokens on live cases and revoke one as soon as its machine is suspect. A `full` token or a sign-in's JWT carries the user's whole rights and isn't accepted for writes.
-4. **Outbound calls: confirmed none.** The MCP server calls only `/api/` on the configured Rivendell (`RivendellAPI` refuses other paths; tested). `check_indicator` uses the backend's local value index (`/api/threat-intel/enrich`); the only outbound code in threat intelligence is TAXII import (`threat_intel/stix.py`), admin-only and refused to an `eru-mcp` token.
+2. **Case data leaving through another tool, or `raw/` read round the API: required rule.** Eru sends nothing outside Rowanholt, but an MCP host with other network-capable tools (web fetch, Slack, GitHub, email) could be led by injected text to send case data out through them. The server's `raw/` boundary holds only for what goes through the API: a host with a shell or file tools on the machine holding the case store can read `raw/` (and every other case) directly, and the 3 November test run on THREATINTEL-DEMO-01 saw Claude Code offer to do just that when the server refused. On a live case, `--allow-writes` runs only in a host with no network-capable tools besides the Rowanholt server and no shell or file access to the case store (e.g. Claude Desktop with only this server, or a host on another machine from the Rowanholt server), or Ask Eru with local Ollama is used instead. Policy, not code: Rowanholt can't see the host's other tools.
+3. **Token: enforced.** On a team server `--allow-writes` refuses to start unless `ROWANHOLT_TOKEN` is an `eru-mcp` API token (`eru_mcp.server.write_refusal`, checked against `/api/auth/me`), so the backend itself holds the caller to reads, leads and notes whether or not the agent header is sent. Use 30-day tokens on live cases and revoke one as soon as its machine is suspect. A `full` token or a sign-in's JWT carries the user's whole rights and isn't accepted for writes.
+4. **Outbound calls: confirmed none.** The MCP server calls only `/api/` on the configured Rowanholt (`RowanholtAPI` refuses other paths; tested). `check_indicator` uses the backend's local value index (`/api/threat-intel/enrich`); the only outbound code in threat intelligence is TAXII import (`threat_intel/stix.py`), admin-only and refused to an `eru-mcp` token.
 
 Re-review when a tool is added to the MCP server, when its writes go beyond leads and notes, or when online lookups are proposed.
+
+## Review: Eru MCP over streamable HTTP (4 November 2026, Ben)
+
+Approved for live cases on these conditions, all as recommended, with 3 built as proposed.
+
+What changed: `rowanholt mcp --http` (the `eru-mcp` service, Compose profile `mcp`, behind Caddy at `https://<host>/mcp`) serves the same tools to MCP hosts on other machines. It holds no token. Each request's bearer token is checked with `/api/auth/me` (`RowanholtTokens`) and used for that request's calls; only `eru-mcp` API tokens are taken; writes, with `ERU_MCP_ARGS=--allow-writes`, are capped at `--max-writes` per token until the service restarts.
+
+1. **The endpoint is on the network: accepted.** Anyone who can reach the server's 443 can reach `/mcp`, but every MCP request (initialise and tool listing included) needs a token Rowanholt accepts as an eru-mcp API token, and what it can see is that token's user's jobs, as in the web app. The protected-resource metadata at `/.well-known/oauth-protected-resource` is public; it names only the public URL (fixed 4 November: it had named the backend's address inside the stack). No port is published; the service only answers Caddy's Host and Origin (DNS rebinding protection).
+2. **Tokens in MCP hosts' configuration: accepted, with a rule.** Over HTTP the token sits in the host's own configuration (for Claude Code, `claude mcp add --header`), as `ROWANHOLT_TOKEN` did over stdio. Rule: 30-day eru-mcp tokens, revoked as soon as the machine is in doubt (as condition 3).
+3. **Full tokens: refused, enforced.** A `full` token, sitting in a host's configuration, would carry its user's whole rights against the API if it leaked. Over HTTP every request, reads included, needs the `eru-mcp` scope (`RowanholtTokens`; tested: a full token, a JWT and an unknown token get 401 before any tool), so a leaked MCP token is worth only reads, leads and notes.
+4. **Sessions: confirmed no crossing.** A streamable HTTP session ID gives nothing without a token: every request is checked again and its Rowanholt calls carry its own token, never one cached from the session (`request_token`, tested with two analysts on one server).
+5. **Write cap: accepted.** Over stdio the cap is per session (the process); over HTTP it's per token until the service restarts. It still bounds what text inside a case can make one host write. An analyst can mint more tokens, but the cap is against a misled model, not the analyst.
+6. **Condition 2 still applies: kept.** HTTP helps its file-access half (the host is on another machine from the case store), but a host with other network-capable tools is the same risk as before.
+7. **Unauthenticated load: accepted for a team network.** Every request with a bad token costs a call to `/api/auth/me`. Caddy could rate-limit `/mcp` if the server is ever reachable from outside the team's network.
+8. **Outbound calls: confirmed still none.** The service calls only `/api/` on `http://backend:5688` inside the stack.
+
+Re-review if the endpoint is opened beyond the team's network, if it takes any token but eru-mcp, or on the phase 2 triggers above.
+
+## Review: online lookups (4 November 2026, Ben)
+
+Approved as built, any analyst. Built on `feat/rowanholt-outstanding` behind a switch that's off: nothing leaves until `.env` sets `ROWANHOLT_ONLINE_LOOKUPS=virustotal` and `VIRUSTOTAL_API_KEY`.
+
+What it does. `POST /api/threat-intel/lookup` sends one value to VirusTotal v3 (`threat_intel_lookup.py`, stdlib `urllib`, a fixed `https://www.virustotal.com/api/v3/` URL, 15-second timeout) and returns the detection counts, reputation, tags and a link. Pippin's *Check a value* shows a **Look up on VirusTotal** button only when it's on. Answers are cached in memory for an hour, so a second click doesn't send again.
+
+1. **Who can send: any signed-in analyst, never Eru.** The route refuses an eru-mcp token and any request carrying `X-Rowanholt-Agent` (or the old header), and an eru-mcp token is refused by `tokens.refusal` anyway (a POST outside leads, notes and Eru's questions). The MCP server has no tool for it and Ask Eru doesn't call it, so point 4 of the phase 2 review ("outbound calls: confirmed none") still holds for Eru. Elrond never calls it. Decided: any analyst, not admin-only.
+2. **What can be sent: an IP, domain or hash only.** Private, loopback, link-local, CGNAT, reserved and documentation addresses are refused (`is_global`), as are single-label names and `.local`, `.lan`, `.corp`, `.internal`, `.home.arpa` and the like. Command lines, paths and process names can't be sent. Risk accepted: a public domain that is the client's own (their AD forest's public name, an internal service on a real domain) still goes, and tells VirusTotal, and anyone with VirusTotal's intelligence feeds, that someone is investigating it. A file hash looked up reveals interest in that file, and an unknown hash is a strong hint that something new is being looked at. No list of the client's own domains: the analyst decides what to look up.
+3. **The key.** Read from the environment only (`VIRUSTOTAL_API_KEY`), never stored, logged or returned. A public-API key's quota is small (`429` is shown as such). On a team server the key is the team's, so every analyst's lookups count against one account and appear in that account's history.
+4. **Audit.** Each lookup is logged (`Online lookup: <user> asked virustotal about <kind> <value>`) in the backend log, not the case's activity, because Pippin has no case. The roadmap's agreed shape was per case and in the case's audit log. Accepted: the backend log, from Pippin, not per case.
+5. **Prompt injection: none new.** Nothing a model reads reaches the lookup, and its answer goes only to the analyst's browser, not into Eru's context.
+
+Tests: `tests/unit/test_threat_intel_lookup.py` (off by default, what's refused, Eru refused, cache, VirusTotal's 404/429/401/timeouts) against the real backend in server mode, with the fetcher swapped so nothing is sent.
+
+Re-review if lookups are made automatic, offered to Eru or Elrond, sent to another provider, or given values other than IPs, domains and hashes.
 
 ## Chain of custody note
 

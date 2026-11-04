@@ -1,0 +1,466 @@
+#!/usr/bin/env bash
+# rowanholt - one command for the whole platform: the Docker stack, Gandalf, Elrond,
+# Mordor, Anduril, the lab and every script under scripts/. `rowanholt install` links
+# it into a directory on your PATH so it runs from anywhere.
+
+# Follow symlinks to the real file, so a link in ~/.local/bin still finds the repo
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+    DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+ROOT="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+PYTHON="${ROWANHOLT_PYTHON:-python3}"
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+usage() {
+    cat <<EOF
+Usage: rowanholt <command> [options]
+
+The platform (Docker):
+  start | stop | restart | status   Run the stack (--testing: no Splunk/Elastic; --logs: follow logs;
+                                    --server: the shared-server profile, automatic after 'server init';
+                                    --progress[=zenity]: phases and an ETA, waiting for the web UI)
+  server init|users|ca              A team server: TLS proxy, sign-in, per-user jobs (docs/SERVER.md)
+  anduril <command>                 Administer Rowanholt's containers (status, logs, restart, ...)
+
+Forensics (run from the directory you're working in; relative paths stay relative):
+  gandalf [bash|python] <args>      Collect from a Linux or macOS host (gandalf.sh by default)
+  acquire <args>                    Gandalf through the Python CLI (rowanholt acquire --help)
+  analyse <args>                    Elrond (rowanholt analyse --help); 'analyze' works too
+  mordor <command>                  Security datasets: list, download, info, local, verify, ...
+  web                               The web UI and API without Docker
+  mcp                               Eru's MCP server over stdio, for Claude Desktop, Claude Code and the like
+                                    (ROWANHOLT_API, ROWANHOLT_TOKEN; needs requirements/mcp.txt; docs/ERU.md)
+
+The lab and the scripts:
+  lab <command>                     The test lab (lab/lab.sh: linux-targets, windows-vm, gandalf-collect, ...)
+  scripts                           List every script under scripts/
+  <group> <name> [args]             Run one, e.g. 'rowanholt jobs status', 'rowanholt siem splunk-restart'
+
+Set-up:
+  install [dir]                     Link this command into dir (default ~/.local/bin) to run it from anywhere
+  uninstall [dir]                   Remove that link
+  app [install|uninstall] [--dock]  The desktop app: Rowanholt.app (macOS) or a menu entry (Linux)
+  map [realm|elrond|gandalf|journey] Open an architecture page (journey is the 3D one)
+  help                              This list
+
+The Windows collector is PowerShell: run Invoke-Gandalf.ps1 from src/acquisition/windows
+on Windows ('rowanholt where' prints the path).
+EOF
+}
+
+compose_cmd() {
+    # cd for the compose files only; every other command keeps the caller's directory
+    (cd "$ROOT" && $DC $COMPOSE_FILES "$@")
+}
+
+detect_compose() {
+    if docker compose version &>/dev/null; then
+        DC="docker compose"
+    elif command -v docker-compose &>/dev/null; then
+        DC="docker-compose"
+    else
+        echo "Error: docker compose is not available." >&2
+        exit 1
+    fi
+}
+
+# Starts the engine the current Docker context points at (OrbStack or Docker Desktop),
+# headless: no window, nothing new in the Dock. One that's already starting is waited
+# for, not joined by the other.
+start_docker_engine() {
+    local context engine=""
+    context="$(docker context show 2>/dev/null)"
+    case "$context" in
+        orbstack) engine=orbstack ;;
+        desktop-linux) engine=desktop ;;
+    esac
+    if [ -z "$engine" ]; then
+        if pgrep -q com.docker.backend; then engine=desktop
+        elif [ -d /Applications/OrbStack.app ] || command -v orb &>/dev/null; then engine=orbstack
+        else engine=desktop
+        fi
+    fi
+    if [ "$engine" = orbstack ]; then
+        echo "Starting OrbStack..."
+        # orb start runs the engine without the app's window
+        orb start &>/dev/null || open -g -j -a OrbStack
+    else
+        echo "Starting Docker Desktop..."
+        if pgrep -q com.docker.backend; then
+            echo "(already starting; waiting for it)"
+        else
+            docker desktop start --detach &>/dev/null || open -g -j -a Docker
+        fi
+    fi
+}
+
+ensure_docker() {
+    if docker info &>/dev/null; then
+        return 0
+    fi
+    echo "Docker is not running."
+    if [[ "$(uname)" == "Darwin" ]]; then
+        start_docker_engine
+        for i in $(seq 1 180); do
+            sleep 1
+            if docker info &>/dev/null; then
+                echo "Docker started."
+                return 0
+            fi
+        done
+        echo "Error: Docker did not start in time. Please start it manually." >&2
+        exit 1
+    else
+        echo "Error: Docker is not running. Start it and retry." >&2
+        exit 1
+    fi
+}
+
+print_urls() {
+    echo ""
+    if $SERVER; then
+        local host
+        host="$(sed -n 's/^ROWANHOLT_HOSTNAME=//p' "$ROOT/.env" | tail -1)"
+        echo "  Rowanholt:     https://$host"
+        echo "  Splunk, Kibana, Navigator (with COMPOSE_PROFILES=siem): https://$host:7755, :5601, :5602"
+        echo ""
+        echo "  Users: 'rowanholt server users list'. Nothing else is published."
+        echo ""
+        return
+    fi
+    if $TESTING; then
+        echo "  Frontend:    http://localhost:5687"
+        echo "  Backend API: http://localhost:5688"
+        echo ""
+        echo "  (Splunk, Kibana, Elasticsearch, Navigator disabled in testing mode)"
+    else
+        echo "  Frontend:      http://localhost:5687"
+        echo "  Backend API:   http://localhost:5688"
+        echo "  Splunk:        http://localhost:7755"
+        echo "  Kibana:        http://localhost:5601"
+        echo "  Elasticsearch: http://localhost:9200"
+        echo "  Navigator:     http://localhost:5602"
+    fi
+    echo ""
+    echo "  Credentials:   admin / rowanholt"
+    echo ""
+}
+
+# ── The stack ─────────────────────────────────────────────────────────────────
+stack() {
+    local command="$1" arg
+    shift
+    TESTING=false
+    FOLLOW_LOGS=false
+    SERVER=false
+    PROGRESS=""
+    # `rowanholt server init` marks a server in .env; --server asks for it explicitly
+    grep -q '^ROWANHOLT_DEPLOYMENT=server' "$ROOT/.env" 2>/dev/null && SERVER=true
+    for arg in "$@"; do
+        case "$arg" in
+            --testing) TESTING=true ;;
+            --logs)    FOLLOW_LOGS=true ;;
+            --server)  SERVER=true ;;
+            --progress) PROGRESS=json ;;
+            --progress=zenity) PROGRESS=zenity ;;
+            *)
+                echo "Error: unknown argument: $arg" >&2
+                exit 1
+                ;;
+        esac
+    done
+    detect_compose
+    COMPOSE_FILES="-f docker-compose.yml"
+    if $TESTING; then
+        COMPOSE_FILES="$COMPOSE_FILES -f tests/docker-compose.testing.yml"
+    fi
+    if $SERVER; then
+        server_preflight
+        COMPOSE_FILES="$COMPOSE_FILES -f deploy/server/docker-compose.server.yml"
+    fi
+    # Evidence folders added in the desktop app's setup (gitignored, so a pull never touches it)
+    if [ -f "$ROOT/docker-compose.local.yml" ]; then
+        COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.local.yml"
+    fi
+    if [ "$command" = start ] && [ -n "$PROGRESS" ] && progress_python; then
+        start_with_progress
+        return
+    fi
+    ensure_docker
+    case "$command" in
+        start)
+            not_migrated && exit 1
+            echo "Starting Rowanholt..."
+            prepare_app_copy
+            compose_cmd up -d $BUILD_FLAG || exit 1
+            [ -n "$BUILD_FLAG" ] && cat "$ROOT/.rowanholt-version" > "$ROOT/.rowanholt-built"
+            print_urls
+            # Not `$FOLLOW_LOGS && ...`: without --logs that leaves start's exit status at 1
+            if $FOLLOW_LOGS; then compose_cmd logs -f; fi
+            ;;
+        stop)
+            echo "Stopping Rowanholt..."
+            compose_cmd down --remove-orphans 2>/dev/null || true
+            echo "Stopped."
+            ;;
+        restart)
+            stack stop
+            stack start "$@"
+            ;;
+        status)
+            echo "Rowanholt service status:"
+            echo ""
+            compose_cmd ps
+            ;;
+    esac
+}
+
+# An install from before the rename starts on new, empty volumes and without its .env
+# settings until it's moved across, so it looks as if every job were gone: say so instead
+not_migrated() {
+    if grep -q '^RIVENDELL_' "$ROOT/.env" 2>/dev/null \
+        || { docker volume inspect rivendell_postgres_data &>/dev/null \
+             && ! docker volume inspect rowanholt_postgres_data &>/dev/null; }; then
+        echo "This install's settings and data are still under the name Rivendell." >&2
+        echo "Move them across first: rowanholt migrate from-rivendell" >&2
+        return 0
+    fi
+    return 1
+}
+
+# start --progress: src/common/startup_progress.py wakes Docker, starts the stack and
+# waits for the web UI, timing each phase against this machine's earlier starts for the
+# ETA (Rowanholt.app's journey; zenity on Linux)
+progress_python() {
+    command -v "$PYTHON" &>/dev/null || return 1
+    # On a Mac without the command-line tools, /usr/bin/python3 is a stub that opens an installer
+    if [[ "$(uname)" == "Darwin" ]] && [ "$(command -v "$PYTHON")" = /usr/bin/python3 ] && ! xcode-select -p &>/dev/null; then
+        return 1
+    fi
+}
+
+start_with_progress() {
+    local url="http://localhost:5687" status
+    not_migrated && exit 1
+    $SERVER && url="https://localhost"
+    prepare_app_copy
+    local args=(--root "$ROOT" --url "$url")
+    [ -n "$BUILD_FLAG" ] && args+=(--build)
+    $SERVER && args+=(--server)
+    [ "$PROGRESS" = zenity ] && args+=(--zenity)
+    # shellcheck disable=SC2086 # DC and COMPOSE_FILES are word lists
+    "$PYTHON" "$ROOT/src/common/startup_progress.py" "${args[@]}" -- $DC $COMPOSE_FILES
+    status=$?
+    [ $status -eq 0 ] || exit $status
+    [ -n "$BUILD_FLAG" ] && cat "$ROOT/.rowanholt-version" > "$ROOT/.rowanholt-built"
+    [ "$PROGRESS" = zenity ] || print_urls
+}
+
+# The server profile resets the base file's published ports with !reset (Compose 2.24)
+server_preflight() {
+    local version major minor
+    version="$($DC version --short 2>/dev/null | sed 's/^v//')"
+    major="${version%%.*}"; minor="${version#*.}"; minor="${minor%%.*}"
+    if [ "${major:-0}" -lt 2 ] || { [ "$major" -eq 2 ] && [ "${minor:-0}" -lt 24 ]; }; then
+        echo "Error: the server profile needs Docker Compose 2.24 or later (this is ${version:-unknown})." >&2
+        exit 1
+    fi
+    if ! grep -q '^ROWANHOLT_HOSTNAME=' "$ROOT/.env" 2>/dev/null; then
+        echo "Error: this isn't set up as a server yet. Run: rowanholt server init <hostname>" >&2
+        exit 1
+    fi
+}
+
+# A copy the desktop app installed (not a git clone) carries .rowanholt-version. It gets
+# a .env with its own SECRET_KEY on first start, and its images are rebuilt once after
+# each update, since the worker image copies the source in at build time.
+prepare_app_copy() {
+    BUILD_FLAG=""
+    [ -f "$ROOT/.rowanholt-version" ] || return 0
+    if [ ! -f "$ROOT/.env" ] && [ -f "$ROOT/.env.example" ]; then
+        local key
+        key="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
+        sed "s/^SECRET_KEY=.*/SECRET_KEY=$key/" "$ROOT/.env.example" > "$ROOT/.env"
+        chmod 600 "$ROOT/.env"
+        echo "Created .env with a new SECRET_KEY."
+    fi
+    if [ "$(cat "$ROOT/.rowanholt-version")" != "$(cat "$ROOT/.rowanholt-built" 2>/dev/null)" ]; then
+        echo "New Rowanholt version: rebuilding the images (this takes a while)..."
+        BUILD_FLAG="--build"
+    fi
+}
+
+# ── Scripts under scripts/ ────────────────────────────────────────────────────
+# scripts/<group>/<group>-<name>.sh or scripts/<group>/<name>.{sh,py}, and the
+# top-level scripts/<name>.{sh,py}: found at run time, so new scripts need no wiring
+find_script() {
+    local group="$1" name="${2:-}" candidate
+    if [ -d "$ROOT/scripts/$group" ] && [ -n "$name" ]; then
+        for candidate in "$ROOT/scripts/$group/$group-$name.sh" "$ROOT/scripts/$group/$name.sh" \
+                         "$ROOT/scripts/$group/$name.py" "$ROOT/scripts/$group/$name"; do
+            [ -f "$candidate" ] && { echo "$candidate"; return 0; }
+        done
+    fi
+    for candidate in "$ROOT/scripts/$group.sh" "$ROOT/scripts/$group.py"; do
+        [ -f "$candidate" ] && { echo "$candidate"; return 0; }
+    done
+    return 1
+}
+
+script_summary() {
+    # The first comment line after the shebang, or the first docstring line
+    sed -n '2,8p' "$1" | grep -m1 -E '^# *[A-Za-z]|^[A-Za-z].*' | sed -E 's/^# *//; s/^"""//' | cut -c1-70
+}
+
+list_scripts() {
+    local file rel group name
+    echo "Scripts (run from the repository root, wherever you are):"
+    echo ""
+    for file in "$ROOT"/scripts/*.sh "$ROOT"/scripts/*.py "$ROOT"/scripts/*/*.sh "$ROOT"/scripts/*/*.py; do
+        [ -f "$file" ] || continue
+        rel="${file#"$ROOT"/scripts/}"
+        name="$(basename "$rel")"; name="${name%.*}"
+        if [[ "$rel" == */* ]]; then
+            group="${rel%%/*}"
+            name="${name#"$group"-}"
+            printf '  rowanholt %-34s %s\n' "$group $name" "$(script_summary "$file")"
+        else
+            printf '  rowanholt %-34s %s\n' "$name" "$(script_summary "$file")"
+        fi
+    done
+}
+
+run_script() {
+    local script="$1"
+    shift
+    cd "$ROOT" || exit 1
+    case "$script" in
+        *.py) exec "$PYTHON" "$script" "$@" ;;
+        *)    exec bash "$script" "$@" ;;
+    esac
+}
+
+# ── Install ───────────────────────────────────────────────────────────────────
+install_link() {
+    local dir="${1:-$HOME/.local/bin}"
+    mkdir -p "$dir" || exit 1
+    if [ -e "$dir/rowanholt" ] && [ ! -L "$dir/rowanholt" ]; then
+        echo "Error: $dir/rowanholt exists and isn't a link; not replacing it." >&2
+        exit 1
+    fi
+    ln -sfn "$ROOT/rowanholt" "$dir/rowanholt"
+    echo "Linked $dir/rowanholt -> $ROOT/rowanholt"
+    case ":$PATH:" in
+        *":$dir:"*) echo "Run 'rowanholt help' from anywhere." ;;
+        *)
+            echo ""
+            echo "$dir isn't on your PATH. Add it to your shell profile:"
+            echo "  echo 'export PATH=\"$dir:\$PATH\"' >> ~/.zshrc   # or ~/.bashrc"
+            ;;
+    esac
+}
+
+uninstall_link() {
+    local dir="${1:-$HOME/.local/bin}"
+    if [ -L "$dir/rowanholt" ]; then
+        rm "$dir/rowanholt"
+        echo "Removed $dir/rowanholt"
+    else
+        echo "No rowanholt link in $dir"
+    fi
+}
+
+# The desktop app: app/macos builds Rowanholt.app, app/linux installs a desktop entry;
+# on Windows it's app/windows/install.ps1, run from PowerShell
+desktop_app() {
+    local action="${1:-install}"
+    [ $# -gt 0 ] && shift
+    case "$action" in
+        install|uninstall) ;;
+        *) echo "Usage: rowanholt app [install|uninstall] [--dock] [dir]" >&2; return 1 ;;
+    esac
+    case "$(uname -s)" in
+        Darwin)
+            if [ "$action" = uninstall ]; then
+                exec bash "$ROOT/app/macos/build.sh" --uninstall "$@"
+            fi
+            exec bash "$ROOT/app/macos/build.sh" "$@" ;;
+        Linux)
+            if [ "$action" = uninstall ]; then
+                exec bash "$ROOT/app/linux/install.sh" --uninstall
+            fi
+            exec bash "$ROOT/app/linux/install.sh" ;;
+        *)
+            echo "On Windows, from PowerShell:" >&2
+            echo "  powershell -ExecutionPolicy Bypass -File \"$ROOT/app/windows/install.ps1\"" >&2
+            return 1 ;;
+    esac
+}
+
+open_map() {
+    local dir="$ROOT/src/web/frontend/public/architecture" page
+    case "${1:-realm}" in
+        realm|elrond) page="rowanholt-architecture.html#${1:-realm}" ;;
+        gandalf)      page="gandalf-acquisition.html" ;;
+        journey|machine)
+            # ES modules don't load from file://, so the 3D page is served on loopback
+            local port="${ROWANHOLT_MAP_PORT:-5690}"
+            echo "The Rowanholt journey: http://127.0.0.1:$port/rowanholt-journey.html (Ctrl-C to stop)"
+            (sleep 1; open_url "http://127.0.0.1:$port/rowanholt-journey.html") &
+            exec "${ROWANHOLT_PYTHON:-python3}" -m http.server "$port" --bind 127.0.0.1 -d "$dir" ;;
+        *) echo "Unknown map '$1': realm, elrond, gandalf or journey" >&2; return 1 ;;
+    esac
+    open_url "file://$dir/$page"
+}
+
+open_url() {
+    if command -v open &>/dev/null; then open "$1"
+    elif command -v xdg-open &>/dev/null; then xdg-open "$1"
+    else echo "$1"
+    fi
+}
+
+# ── Dispatch ──────────────────────────────────────────────────────────────────
+COMMAND="${1:-}"
+[ -n "$COMMAND" ] && shift
+
+case "$COMMAND" in
+    ""|help|-h|--help) usage ;;
+    start|stop|restart|status) stack "$COMMAND" "$@" ;;
+    install) install_link "$@" ;;
+    uninstall) uninstall_link "$@" ;;
+    map) open_map "$@" ;;
+    app) desktop_app "$@" ;;
+    where) echo "$ROOT" ;;
+    lab) exec "$ROOT/lab/lab.sh" "$@" ;;
+    gandalf)
+        case "${1:-bash}" in
+            python) shift; exec "$PYTHON" "$ROOT/src/acquisition/python/gandalf.py" "$@" ;;
+            bash) [ "${1:-}" = bash ] && shift; exec bash "$ROOT/src/acquisition/bash/gandalf.sh" "$@" ;;
+            *) exec bash "$ROOT/src/acquisition/bash/gandalf.sh" "$@" ;;
+        esac
+        ;;
+    acquire|web) exec "$PYTHON" "$ROOT/src/cli/rowanholt.py" "$COMMAND" "$@" ;;
+    analyse|analyze) exec "$PYTHON" "$ROOT/src/cli/rowanholt.py" analyze "$@" ;;
+    anduril|aragorn) exec "$PYTHON" "$ROOT/src/cli/rowanholt.py" anduril "$@" ;;
+    mordor) exec "$PYTHON" "$ROOT/src/cli/mordor.py" "$@" ;;
+    # stdout is the MCP protocol: nothing else may print to it
+    mcp) PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}" exec "${ROWANHOLT_MCP_PYTHON:-$PYTHON}" -m eru_mcp.server "$@" ;;
+    scripts) list_scripts ;;
+    *)
+        if [ -d "$ROOT/scripts/$COMMAND" ] && [ -z "${1:-}" ]; then
+            list_scripts | grep -E "^  rowanholt $COMMAND " || true
+            exit 0
+        fi
+        if SCRIPT="$(find_script "$COMMAND" "${1:-}")"; then
+            [ -d "$ROOT/scripts/$COMMAND" ] && shift
+            run_script "$SCRIPT" "$@"
+        fi
+        echo "Error: unknown command: $COMMAND" >&2
+        echo "Run 'rowanholt help' for the commands, 'rowanholt scripts' for the scripts." >&2
+        exit 1
+        ;;
+esac

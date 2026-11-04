@@ -10,7 +10,7 @@ from pathlib import Path
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from rivendell.process import mac_artefacts as ma  # noqa: E402
+from rowanholt.process import mac_artefacts as ma  # noqa: E402
 
 
 def host(tmp_path):
@@ -214,7 +214,7 @@ def test_other_plists_fall_through_and_collected_only_files_are_consumed(tmp_pat
 
 
 def test_image_collection(tmp_path):
-    from rivendell.collect import mac as collect_mac
+    from rowanholt.collect import mac as collect_mac
 
     mnt = tmp_path / "mnt" / "root"
     files = {

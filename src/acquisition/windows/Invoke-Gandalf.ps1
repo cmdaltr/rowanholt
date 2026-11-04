@@ -19,6 +19,9 @@
  Print progress of individual artefact acquisition to screen
  .Parameter CollectFiles
  Collect files containing string (provided in files.list) in file name
+ .Parameter LiveContainers
+ Ask Docker about its running containers (inspect, processes, filesystem export); opt-in, as it
+ touches the live host; every command is audited
  .Example
  The following example invokes all of the parameters with the default arguments;
    -EncryptionObject None -Acquisition Local -OutputDirectory C:\TEMP\gandalf\gandalf
@@ -43,7 +46,8 @@ Param(
     [Parameter(Position = 5)][switch]$CollectFiles,
     # Accept the defaults for every question (no encryption confirmation,
     # overwrite the output directory).
-    [Parameter(Position = 6)][switch]$NoPrompt
+    [Parameter(Position = 6)][switch]$NoPrompt,
+    [Parameter(Position = 7)][switch]$LiveContainers
 )
 
 function Format-Art {
@@ -239,7 +243,7 @@ function Set-ArtefactParams {
     Param ($EncryptionObject, $OutputDirectory, $ShowProgress, $Memory, $CollectFiles, $Hostnames, $ArchiveObject, $GandalfHome, $TargetHome)
 
     $InvokeArtefactAcquisition = [IO.Path]::Combine($GandalfHome, "tools", "Invoke-ArtefactAcquisition.ps1"); $SetArtefactCollection = Join-Path $PSScriptRoot "Set-ArtefactCollection"
-    $ArtefactParams = "Param(`$EncryptionObject = '$EncryptionObject', `$OutputDirectory = '$OutputDirectory', `$ShowProgress = '$ShowProgress', `$Memory = '$Memory', `$CollectFiles = '$CollectFiles', `$Hostnames = '$Hostnames', `$ArchiveObject = '$ArchiveObject', `$GandalfHome = '$TargetHome')"
+    $ArtefactParams = "Param(`$EncryptionObject = '$EncryptionObject', `$OutputDirectory = '$OutputDirectory', `$ShowProgress = '$ShowProgress', `$Memory = '$Memory', `$CollectFiles = '$CollectFiles', `$Hostnames = '$Hostnames', `$ArchiveObject = '$ArchiveObject', `$GandalfHome = '$TargetHome', `$LiveContainers = '$LiveContainers')"
     $ArtefactCollection = Get-Content -Path $SetArtefactCollection
 
     Add-Content -Path $InvokeArtefactAcquisition -Value $ArtefactParams

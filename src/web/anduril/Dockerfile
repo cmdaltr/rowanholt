@@ -1,4 +1,4 @@
-# Anduril: the only Rivendell container that mounts the Docker socket.
+# Anduril: the only Rowanholt container that mounts the Docker socket.
 # Build context is the repository root (see docker-compose.yml).
 FROM python:3.12-alpine
 

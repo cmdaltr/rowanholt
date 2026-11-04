@@ -6,8 +6,8 @@ from pathlib import Path
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from rivendell.process import windows_artefacts as wa  # noqa: E402
-from rivendell.process.select import WINDOWS_RAW_FOLDERS  # noqa: E402
+from rowanholt.process import windows_artefacts as wa  # noqa: E402
+from rowanholt.process.select import WINDOWS_RAW_FOLDERS  # noqa: E402
 
 
 def host(tmp_path):

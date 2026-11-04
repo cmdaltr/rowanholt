@@ -9,6 +9,71 @@ function Add-LogEntry {
     }
 }
 
+# A command run on the target, not a file taken from it: audited as "ran"
+function Add-RanEntry {
+    Param ($OutputDirectory, $Hostnames, $Command)
+
+    $DateTime = Get-Date -Format yyyy-MM-ddTHH:mm:ss.fffffffZ
+    "$DateTime, $Hostnames, $Command, ran" | Add-Content $OutputDirectory\$Hostnames\log.audit
+}
+
+# -LiveContainers: what Docker (Docker Desktop's, or Windows Server's) says about its running
+# containers, as gandalf.sh -l and gandalf.py -L do: inspect, top and export, into
+# raw\live_containers\docker\<id>\. Asking the runtime touches the live host, so it's opt-in and
+# every command is audited; export never pauses or stops a container. Each export is cut at
+# GANDALF_CONTAINER_EXPORT_MAX bytes (default 2 GB; 0 leaves exports out). A Windows container's
+# top can't take ps's columns, so it's kept as top-windows.txt for the analyst, not parsed.
+function Get-LiveContainers {
+    Param ($ShowProgress, $OutputDirectory, $Hostnames)
+
+    $Docker = Get-Command docker -ErrorAction SilentlyContinue
+    if (-Not $Docker) { return }
+    $Docker = $Docker.Source
+    $Limit = [int64]2GB
+    if ($env:GANDALF_CONTAINER_EXPORT_MAX -match '^\d+$') { $Limit = [int64]$env:GANDALF_CONTAINER_EXPORT_MAX }
+    $OsType = (& $Docker info --format '{{.OSType}}' 2>$null | Out-String).Trim()
+    $NoBom = New-Object System.Text.UTF8Encoding $false
+    ForEach ($Id in @(& $Docker ps -q --no-trunc 2>$null)) {
+        if ($Id -notmatch '^[0-9a-f]{12,}$') { continue }
+        $Folder = Join-Path "$OutputDirectory\$Hostnames\artefacts\artefacts\raw\live_containers\docker" $Id.Substring(0, 12)
+        New-Item -Path $Folder -ItemType Directory -Force > $null
+        $Inspect = (& $Docker inspect $Id 2>$null) -join "`n"
+        if ($LASTEXITCODE -eq 0) {
+            [IO.File]::WriteAllText((Join-Path $Folder "inspect.json"), $Inspect, $NoBom)
+            Add-RanEntry $OutputDirectory $Hostnames "docker inspect $Id"
+        }
+        if ($OsType -eq "windows") {
+            $Top = (& $Docker top $Id 2>$null) -join "`n"; $TopFile = "top-windows.txt"
+        }
+        else {
+            $Top = (& $Docker top $Id -eo pid,ppid,user,etime,args 2>$null) -join "`n"; $TopFile = "top.txt"
+        }
+        if ($LASTEXITCODE -eq 0) {
+            [IO.File]::WriteAllText((Join-Path $Folder $TopFile), $Top + "`n", $NoBom)
+            Add-RanEntry $OutputDirectory $Hostnames "docker top $Id"
+        }
+        if ($Limit -le 0) { continue }
+        # Streamed, not piped: a PowerShell pipeline would turn the tar's bytes into text
+        $Start = New-Object System.Diagnostics.ProcessStartInfo $Docker, "export $Id"
+        $Start.RedirectStandardOutput = $true; $Start.RedirectStandardError = $true; $Start.UseShellExecute = $false
+        $Export = [System.Diagnostics.Process]::Start($Start)
+        $Out = [IO.File]::Create((Join-Path $Folder "export.tar"))
+        $Buffer = New-Object byte[] 1048576; [int64]$Taken = 0
+        while ($Taken -lt $Limit) {
+            $Read = $Export.StandardOutput.BaseStream.Read($Buffer, 0, [int][Math]::Min([int64]$Buffer.Length, $Limit - $Taken))
+            if ($Read -le 0) { break }
+            $Out.Write($Buffer, 0, $Read); $Taken += $Read
+        }
+        $Out.Close()
+        if (-Not $Export.HasExited) { $Export.Kill() }
+        $Export.WaitForExit()
+        if ($Taken -ge $Limit) { Add-RanEntry $OutputDirectory $Hostnames "docker export $Id (cut at $Limit bytes)" }
+        else { Add-RanEntry $OutputDirectory $Hostnames "docker export $Id" }
+    }
+    $Message = "asked Docker about its running containers on '$Hostnames'"
+    Add-LogEntry $ShowProgress $OutputDirectory $Hostnames "live_containers" $Message
+}
+
 function Get-Metadata {
     #$DateTime = "{0}" -f (Get-Date)
     $FileHash = Get-FileHash -Algorithm SHA256 $Artefact
@@ -1397,6 +1462,10 @@ function Invoke-LocalSession {
     Add-LogEntry $ShowProgress $OutputDirectory $Hostnames "acquisition_commenced" $Message
     Get-Platform $ShowProgress $DriveLetter $OutputDirectory $Hostnames
     Get-Artefacts $ShowProgress $Memory $DriveLetter $OutputDirectory $Hostnames
+    # After the memory dump (in Get-Artefacts): an export reads whole filesystems through the cache
+    if ($LiveContainers -And $LiveContainers -ne "False") {
+        Get-LiveContainers $ShowProgress $OutputDirectory $Hostnames
+    }
 
     if ($CollectFiles -And $CollectFiles -ne "False") {
         $Message = "commencing file collection from '$Hostnames'"

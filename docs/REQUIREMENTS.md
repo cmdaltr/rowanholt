@@ -152,7 +152,7 @@ sudo apt-get install docker-compose-plugin
 # Install Ollama for local LLM
 curl -fsSL https://ollama.com/install.sh | sh
 
-# Pull the default model (RIVENDELL_MODEL_NAME); see ERU.md for the eru-* models
+# Pull the default model (ROWANHOLT_MODEL_NAME); see ERU.md for the eru-* models
 ollama pull llama3.2:3b
 ```
 
@@ -251,8 +251,8 @@ python-magic>=0.4.27
 
 ```bash
 # Clone repository
-git clone https://github.com/cmdaltr/rivendell.git
-cd rivendell
+git clone https://github.com/cmdaltr/rowanholt.git
+cd rowanholt
 
 # Build and start containers
 docker compose up -d
@@ -265,8 +265,8 @@ docker compose up -d
 
 ```bash
 # Clone repository
-git clone https://github.com/cmdaltr/rivendell.git
-cd rivendell
+git clone https://github.com/cmdaltr/rowanholt.git
+cd rowanholt
 
 # Create virtual environment
 python3 -m venv venv

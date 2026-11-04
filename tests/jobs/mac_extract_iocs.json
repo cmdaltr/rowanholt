@@ -1,9 +1,9 @@
 {
   "case_number": "TEST_mac_extract_iocs",
   "source_paths": [
-    "/Volumes/Media5TB/rivendell_imgs/MacintoshHD_disk5.E01"
+    "/Volumes/Media5TB/rowanholt_imgs/MacintoshHD_disk5.E01"
   ],
-  "destination_path": "/Volumes/Media5TB/rivendell_imgs/tests/mac_extract_iocs",
+  "destination_path": "/Volumes/Media5TB/rowanholt_imgs/tests/mac_extract_iocs",
   "options": {
     "local": true,
     "gandalf": false,

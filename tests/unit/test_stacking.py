@@ -1,4 +1,4 @@
-"""Stacking (rivendell/analysis/stacking.py): rare values across hosts, explainable reasons,
+"""Stacking (rowanholt/analysis/stacking.py): rare values across hosts, explainable reasons,
 families compared only across hosts that have them, a baseline, and precision at k."""
 import csv
 import json
@@ -9,7 +9,7 @@ REPO = Path(__file__).resolve().parents[2]
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(REPO / "src" / "analysis"))
 
-from rivendell.analysis.stacking import (build_baseline, looks_generated, precision_at_k,  # noqa: E402
+from rowanholt.analysis.stacking import (build_baseline, looks_generated, precision_at_k,  # noqa: E402
                                          stack_case)
 
 PROGRAMS = ["svchost.exe", "explorer.exe", "msedge.exe", "onedrive.exe", "teams.exe"]
@@ -195,3 +195,61 @@ def test_windows_folders_vouch_for_consonant_names(tmp_path):
     assert rows["mscorsvw.exe"][0] == "rare"
     assert rows["ngrxbcpvt.exe"][0] == "rare, generated name"
     assert rows["ngrxbcpvt.exe"][1].endswith("\\USERS\\ALICE\\APPDATA\\LOCAL\\NGRXBCPVT.EXE")
+
+
+def evt(event_id, when, **data):
+    return {"data": {"Event": {"System": {"EventID": event_id, "TimeCreated": {"#attributes": {"SystemTime": when}}},
+                               "EventData": data}}}
+
+
+def test_unsigned_no_team_id_and_outside_logon_hours(tmp_path):
+    """The host's own traits add to a rare value's score: an unsigned module or driver, a third-party BTM
+    item with no Team ID, and a process first seen at an hour no one logs on; never a common value alone."""
+    case = tmp_path / "CASE-SIG"
+    office = [evt(4624, f"2026-10-{d:02}T{h:02}:05:00Z", LogonType="2", TargetUserName="alice")
+              for d in range(1, 4) for h in (8, 12, 16, 17)]
+    office.append(evt(4624, "2026-10-02T03:00:00Z", LogonType="3", TargetUserName="WS01$"))  # network, machine
+    office += [evt(4624, "2026-10-02T03:10:00Z", LogonType="2", TargetUserName=name)  # Windows' own, at boot
+               for name in ("DWM-1", "UMFD-0")]
+    for n in range(1, 4):
+        cooked = case / f"WS0{n}" / "artefacts" / "cooked"
+        (cooked / "evt").mkdir(parents=True)
+        security = office + [evt(4688, "2026-10-02T11:00:00Z", NewProcessName="C:\\Windows\\explorer.exe")]
+        sysmon = [evt(6, "2026-10-01T08:00:00Z", ImageLoaded="C:\\Windows\\System32\\drivers\\disk.sys",
+                      Signed="true", SignatureStatus="Valid", Signature="Microsoft Windows")]
+        if n == 1:
+            security += [evt(4688, "2026-10-02T03:14:00Z", NewProcessName="C:\\Tools\\nightly.exe"),
+                         evt(4688, "2026-10-02T12:30:00Z", NewProcessName="C:\\Tools\\daytime.exe")]
+            sysmon.append(evt(6, "2026-10-02T03:20:00Z", ImageLoaded="C:\\Windows\\Temp\\rk.sys", Signed="false"))
+        (cooked / "evt" / "Security.json").write_text(json.dumps(security))
+        (cooked / "evt" / "Microsoft-Windows-Sysmon%4Operational.json").write_text(json.dumps(sysmon))
+    for n in range(1, 4):
+        cooked = case / f"WEB0{n}" / "artefacts" / "cooked"
+        cooked.mkdir(parents=True)
+        with open(cooked / "kernel_modules.csv", "w", newline="") as out:
+            writer = csv.writer(out)
+            writer.writerow(["Name", "Taint", "Path"])
+            writer.writerows([["ext4", "", ""], ["xfs", "", ""]] + ([["lab_rk", "OE", "/tmp/lab_rk.ko"]] if n == 3 else []))
+    for n in range(1, 4):
+        cooked = case / f"MAC0{n}" / "artefacts" / "cooked"
+        cooked.mkdir(parents=True)
+        items = [["Zoom", "us.zoom.updater", "BJ4HAAB9B3", "/Library/Zoom/updater"]]
+        if n == 2:
+            items += [["Helper", "com.example.helper", "", "/Users/Shared/.x/helper"],
+                      ["Signed", "com.example.signed", "ABCDE12345", "/Applications/Signed.app/x"]]
+        with open(cooked / "btm_items.csv", "w", newline="") as out:
+            writer = csv.writer(out)
+            writer.writerow(["Name", "Identifier", "TeamIdentifier", "ExecutablePath"])
+            writer.writerows(items)
+    stack_case(str(case))
+    rows = {r["Value"]: r for r in read(case / "stacking.csv")}
+    assert rows["c:\\tools\\nightly.exe"]["Reasons"] == "rare, outside logon hours"
+    assert rows["c:\\tools\\daytime.exe"]["Reasons"] == "rare"
+    assert rows["c:\\windows\\temp\\rk.sys"]["Reasons"] == "rare, user path, unsigned, outside logon hours"
+    assert rows["c:\\windows\\temp\\rk.sys"]["Family"] == "driver (Windows)"
+    assert rows["lab_rk"]["Reasons"] == "rare, unsigned" and rows["lab_rk"]["Score"] == "3.5"
+    assert rows["/users/*/.x/helper"]["Reasons"] == "rare, no team ID"
+    assert rows["/applications/signed.app/x"]["Reasons"] == "rare"
+    # Common everywhere: no trait puts it on the list
+    assert "c:\\windows\\system32\\drivers\\disk.sys" not in rows and "c:\\windows\\explorer.exe" not in rows
+    assert int(rows["c:\\windows\\temp\\rk.sys"]["Rank"]) < int(rows["c:\\tools\\nightly.exe"]["Rank"])

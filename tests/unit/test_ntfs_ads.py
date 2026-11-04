@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from rivendell.analysis.ntfs_ads import known_stream_note, mft_alternate_data_streams  # noqa: E402
+from rowanholt.analysis.ntfs_ads import known_stream_note, mft_alternate_data_streams  # noqa: E402
 
 
 def resident(attr_type: int, content: bytes, name: str = "") -> bytes:

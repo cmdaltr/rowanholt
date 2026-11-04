@@ -12,7 +12,7 @@ This document provides detailed Docker-specific information, troubleshooting, an
 
 ```bash
 # Run the installer (includes Docker + image paths)
-python3 scripts/install-rivendell.py
+python3 scripts/install-rowanholt.py
 ```
 
 **This document is useful if you:**
@@ -122,9 +122,9 @@ python3 scripts/install-rivendell.py
 
 ## After Installation
 
-### Start Rivendell:
+### Start Rowanholt:
 ```bash
-cd /path/to/rivendell
+cd /path/to/rowanholt
 ./scripts/start-testing-mode.sh
 ```
 
@@ -190,7 +190,7 @@ docker context show
 - **Same Docker Engine**: v28.5.2 (stable), same as Docker Desktop 4.51.0
 - **Free for personal use**: Perfect for security researchers and students
 
-**Real-world testing with Rivendell:**
+**Real-world testing with Rowanholt:**
 - Processing 11GB E01 image on Docker Desktop 4.56.0: **CRASH** (gVisor bug)
 - Processing same image on OrbStack: **SUCCESS** in 60% of the time
 
@@ -201,12 +201,12 @@ If you can't use OrbStack (Windows/Linux or commercial use), Docker Desktop 4.51
 - **No gVisor networking bugs** (unlike 4.52.0+)
 - Latest version before Docker Engine v29.0.0
 - Released November 13, 2025 (still downloadable)
-- Proven stable for Rivendell's workloads
+- Proven stable for Rowanholt's workloads
 
 **⚠️ CRITICAL: Avoid Docker Desktop 4.52.0+**
 
 Docker Desktop 4.52.0 and newer include Docker Engine v29.x which has a **critical gVisor networking bug on macOS** that causes crashes when:
-- Accessing large files via VirtioFS (like Rivendell's 11GB E01 images)
+- Accessing large files via VirtioFS (like Rowanholt's 11GB E01 images)
 - Long-running HTTP connections (forensic processing)
 - Heavy I/O operations
 
@@ -260,10 +260,10 @@ https://desktop.docker.com/win/main/amd64/210443/Docker%20Desktop%20Installer.ex
 ## Contributing
 
 If you encounter issues or want to add support for more platforms:
-1. Open an issue: https://github.com/cmdaltr/rivendell/issues
+1. Open an issue: https://github.com/cmdaltr/rowanholt/issues
 2. Submit a pull request with fixes
 3. Test on your platform and report results
 
 ## License
 
-This installer is part of the Rivendell project.
+This installer is part of the Rowanholt project.

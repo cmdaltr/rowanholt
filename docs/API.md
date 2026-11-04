@@ -1,4 +1,4 @@
-# Rivendell Web API Reference
+# Rowanholt Web API Reference
 
 **Version:** 2.1.0
 **Base URL:** `http://localhost:5688/api`
@@ -271,7 +271,7 @@ There is no MFA step in the mounted auth router.
 ```json
 {
   "secret": "JBSWY3DPEHPK3PXP",
-  "qr_code_uri": "otpauth://totp/Rivendell:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Rivendell",
+  "qr_code_uri": "otpauth://totp/Rowanholt:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Rowanholt",
   "backup_codes": [
     "1234-5678",
     "9012-3456",
@@ -579,7 +579,7 @@ There is no MFA step in the mounted auth router.
 | Output | `splunk`, `elastic`, `navigator`, `archive`, `delete`, `save_template` |
 | Job control | `force_overwrite` (remove an existing `destination_path`), `debug` (verbose job log) |
 
-Paths are passed to the worker unchanged, except `/host/tmp/rivendell/…`, which becomes `/tmp/elrond/output/…`. Host paths under `/Volumes` work because both containers mount `/Volumes` at the same path.
+Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, which becomes `/tmp/elrond/output/…`. Host paths under `/Volumes` work because both containers mount `/Volumes` at the same path.
 
 **Response:** `201 Created`
 ```json
@@ -1014,19 +1014,19 @@ A bare JSON array of job IDs:
 
 **Role Required:** `ADMIN` (except `/status`)
 
-Anduril manages Rivendell's own containers and images. The backend doesn't hold the Docker socket: these endpoints proxy to the `anduril` service over the internal `rivendell-anduril` network. Anduril only acts on containers that carry the `com.docker.compose.project=rivendell` label and are named `rivendell-*`, and on the images those containers use; anything else returns `403`. The API is off (`503`) until Anduril is enabled on the host with `rivendell anduril enable`, and it stays off while the backend uses the default `SECRET_KEY`.
+Anduril manages Rowanholt's own containers and images. The backend doesn't hold the Docker socket: these endpoints proxy to the `anduril` service over the internal `rowanholt-anduril` network. Anduril only acts on containers that carry the `com.docker.compose.project=rowanholt` label and are named `rowanholt-*`, and on the images those containers use; anything else returns `403`. The API is off (`503`) until Anduril is enabled on the host with `rowanholt anduril enable`, and it stays off while the backend uses the default `SECRET_KEY`.
 
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/anduril/status` | Whether Anduril is usable. No authentication; returns `enabled`, `reason` (`secret_key`, `not_enabled`, `unreachable`) and `enable_command` |
-| `GET` | `/api/anduril/containers` | Rivendell containers: name, service, image, state, health, upstream or built image |
-| `GET` | `/api/anduril/images` | Rivendell images: tags, size, whether built locally, which containers use them |
+| `GET` | `/api/anduril/containers` | Rowanholt containers: name, service, image, state, health, upstream or built image |
+| `GET` | `/api/anduril/images` | Rowanholt images: tags, size, whether built locally, which containers use them |
 | `GET` | `/api/anduril/containers/{name}/logs?tail=200` | Last `tail` log lines (1–5000) |
 | `GET` | `/api/anduril/containers/{name}/stats` | One CPU, memory, network and block I/O sample |
 | `POST` | `/api/anduril/containers/{name}/{action}` | `start`, `stop`, `restart`, `update` (pull the upstream image and recreate if newer) or `recreate`. Body: `{"force": false}` |
-| `POST` | `/api/anduril/images/pull` | Pull a newer version of an upstream image Rivendell uses. Body: `{"ref": "redis:7-alpine"}` |
-| `POST` | `/api/anduril/images/remove` | Remove an unused Rivendell image (never forced). Body: `{"id": "sha256:..."}` |
-| `POST` | `/api/anduril/images/prune` | Remove dangling images built for Rivendell |
+| `POST` | `/api/anduril/images/pull` | Pull a newer version of an upstream image Rowanholt uses. Body: `{"ref": "redis:7-alpine"}` |
+| `POST` | `/api/anduril/images/remove` | Remove an unused Rowanholt image (never forced). Body: `{"id": "sha256:..."}` |
+| `POST` | `/api/anduril/images/prune` | Remove dangling images built for Rowanholt |
 | `GET` | `/api/anduril/ops` | The last 50 operations |
 | `GET` | `/api/anduril/ops/{id}` | One operation: `status` (`queued`, `running`, `succeeded`, `failed`), `log`, `result` |
 
@@ -1043,7 +1043,7 @@ Stopping, restarting, updating or recreating `celery-worker`, `postgres` or `red
 }
 ```
 
-Anduril won't stop, restart or recreate its own container from the API. Use `rivendell anduril disable` on the host.
+Anduril won't stop, restart or recreate its own container from the API. Use `rowanholt anduril disable` on the host.
 
 ---
 
@@ -1105,16 +1105,18 @@ A job returns `202` with a lab run (`id`, `label`, `status`); poll `/api/lab/run
 
 **Authentication:** none to read; `ADMIN` to import, pull or delete on a team server
 
-The indicators in `threat_intel_indicators`, in the fixed ten-column schema (Evidential Element, Threat Group, Procedure Example, Technique ID, Technique Name, Tactic, Contextual Evidence, Reference URL, Navigation Layer URL, Source Type). Parsing and matching are Elrond's (`src/analysis/rivendell/threat_intel/`); the backend mounts that package. A job with `"threat_intel": true` exports them for Elrond's `--threatIntel`.
+The indicators in `threat_intel_indicators`, in the fixed ten-column schema (Evidential Element, Threat Group, Procedure Example, Technique ID, Technique Name, Tactic, Contextual Evidence, Reference URL, Navigation Layer URL, Source Type). Parsing and matching are Elrond's (`src/analysis/rowanholt/threat_intel/`); the backend mounts that package. A job with `"threat_intel": true` exports them for Elrond's `--threatIntel`.
 
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/threat-intel` | `total`, `groups`, `expired` (past their `valid_until`, left out of matching) and `sources`: `[{source, count}]` |
 | `GET` | `/api/threat-intel/indicators?q=&source=&limit=&offset=` | Indicators whose element, group or technique ID contains `q`; `limit` up to 500. Each has `valid_until` (null: no expiry), `confidence`, `first_seen` and `expired` |
-| `POST` | `/api/threat-intel/import` | Multipart `file`: the Iran APT workbook (XLSX), a STIX 2.1 bundle (JSON), Rivendell's or MITRESaw's CSV, or a `.txt` watchlist. Up to 200 MB. Returns `read`, `added`, `duplicates` and `sources`; indicators already stored under the same element, group, technique and source are skipped, but their expiry is renewed. A STIX indicator keeps its own `valid_until` and `confidence`; IPs and domains from other sources hold for 90 days from import, everything else doesn't expire |
+| `POST` | `/api/threat-intel/import` | Multipart `file`: the Iran APT workbook (XLSX), a STIX 2.1 bundle (JSON), Rowanholt's or MITRESaw's CSV, or a `.txt` watchlist. Up to 200 MB. Returns `read`, `added`, `duplicates` and `sources`; indicators already stored under the same element, group, technique and source are skipped, but their expiry is renewed. A STIX indicator keeps its own `valid_until` and `confidence`; IPs and domains from other sources hold for 90 days from import, everything else doesn't expire |
 | `POST` | `/api/threat-intel/taxii` | `{"url", "username", "password", "added_after"}`: every object in a TAXII 2.1 collection. `502` when the collection can't be read |
 | `PUT` | `/api/threat-intel/indicators/{id}/validity` | `{"valid_until": "2027-01-01"}` extends one indicator, `{"valid_until": null}` clears its expiry; admins only on a team server. `400` for a date that isn't ISO, `404` for no such indicator |
 | `DELETE` | `/api/threat-intel/sources/{source}` | Every indicator from one source |
+| `GET` | `/api/threat-intel/lookup` | `{"enabled", "provider"}`: whether online lookups are on (`ROWANHOLT_ONLINE_LOOKUPS=virustotal` and `VIRUSTOTAL_API_KEY` in `.env`) |
+| `POST` | `/api/threat-intel/lookup` | `{"value"}`: one IP, domain or MD5/SHA-1/SHA-256 sent to VirusTotal. Returns `kind`, `found`, `malicious`, `suspicious`, `harmless`, `undetected`, `reputation`, `last_analysis`, `tags`, `link` and `cached` (answers are kept an hour). Any signed-in analyst; `403` to an eru-mcp token or Eru's agent header, `400` for anything else or a value that mustn't leave (a private, reserved or documentation address, an internal-looking name such as `.local` or `.corp`), `404` when lookups are off, `429` when VirusTotal's quota is spent, `502` when it can't be reached. Each lookup is logged with who asked |
 | `GET` | `/api/threat-intel/enrich?value=` | What the indicators say about one process name, command line, path, IP, domain or hash: per element, its `kind`, `breadth` (groups using it), `common` (more than 15), `groups`, `techniques` and `sources` |
 
 `503` means the package isn't mounted in the backend (`docker compose up -d backend` after pulling).
@@ -1138,6 +1140,7 @@ A job's output, read-only, and the team's findings, notes, host assignments and 
 | `GET` `POST` | `/api/jobs/{job_id}/case/notes` | Notes, Markdown: `{"body", "finding_id"}`, `finding_id` null for the case |
 | `PUT` | `/api/jobs/{job_id}/case/hosts/{host}` | `{"assignee", "status"}`; status is `to do`, `in progress` or `done`. In server mode the assignee must be an active user (username or email, stored as the username), otherwise `400`; `""` unassigns |
 | `GET` | `/api/jobs/{job_id}/case/activity?since=` | Who did what, newest first; `since` (the highest `id` seen) for polling |
+| `WS` | `/api/jobs/{job_id}/case/live` | Sends `{activity, status, progress}` when any of them changes (checked every 2 seconds): the newest activity id and the job's state, so a page knows when to reload; no case data. Authenticated like the routes above, by the session cookie or a bearer header (never a token in the URL), and checked again before each check, so signing out or losing the share closes it (code 1008); refused from a page on an origin the backend doesn't serve |
 | `GET` | `/api/jobs/{job_id}/case/report` | Markdown: case notes, then confirmed findings by host with their notes |
 | `GET` | `/api/jobs/{job_id}/case/layer` | An ATT&CK Navigator layer of confirmed findings' techniques only |
 
@@ -1147,7 +1150,7 @@ A job's output, read-only, and the team's findings, notes, host assignments and 
 
 **Authentication:** none
 
-Ask Eru's back end. Free-text answers come from Ollama at `OLLAMA_HOST` (default `http://host.docker.internal:11434`) with the model `RIVENDELL_MODEL_NAME` (default `llama3.2:3b`) and a `RIVENDELL_NUM_CTX`-token window (default 8192). Without them, `/status` says why and the offline endpoints answer fixed questions from Elrond's output.
+Ask Eru's back end. Free-text answers come from Ollama at `OLLAMA_HOST` (default `http://host.docker.internal:11434`) with the model `ROWANHOLT_MODEL_NAME` (default `llama3.2:3b`) and a `ROWANHOLT_NUM_CTX`-token window (default 8192). Without them, `/status` says why and the offline endpoints answer fixed questions from Elrond's output.
 
 | Method | Endpoint | Description |
 |---|---|---|

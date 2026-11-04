@@ -11,9 +11,9 @@
 
 set -e
 
-CONTAINER_NAME="rivendell-splunk"
+CONTAINER_NAME="rowanholt-splunk"
 SPLUNK_USER="admin"
-SPLUNK_PASS="rivendell"
+SPLUNK_PASS="rowanholt"
 
 echo "=========================================="
 echo "Splunk Trial License Reset Script"

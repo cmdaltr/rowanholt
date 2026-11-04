@@ -1,5 +1,5 @@
 """
-Unified file operations for Rivendell DF Acceleration Suite
+Unified file operations for Rowanholt DF Acceleration Suite
 
 Provides safe file handling with consistent error handling and permissions.
 Eliminates duplicate file operation code found across acquisition modules.

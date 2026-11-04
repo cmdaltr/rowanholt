@@ -10,7 +10,7 @@ import pytest
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from rivendell.process import linux_artefacts as la  # noqa: E402
+from rowanholt.process import linux_artefacts as la  # noqa: E402
 
 
 def host(tmp_path):
@@ -239,7 +239,7 @@ def test_wtmpdb_and_lastlog2(tmp_path):
 
 
 def test_selection_matches_whole_paths(tmp_path):
-    from rivendell.process.select import select_artefacts_to_process
+    from rowanholt.process.select import select_artefacts_to_process
 
     _, raw = host(tmp_path)
     for name in ("etc+sudoers", "etc+sudoers.d+gandalf"):
@@ -250,7 +250,7 @@ def test_selection_matches_whole_paths(tmp_path):
 
 
 def test_image_collection_matches_gandalf_layout(tmp_path):
-    from rivendell.collect import linux as collect_linux
+    from rowanholt.collect import linux as collect_linux
 
     mnt = tmp_path / "mnt"
     for rel, text in {

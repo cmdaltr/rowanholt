@@ -1,6 +1,6 @@
-# Rivendell Image Combination Tests
+# Rowanholt Image Combination Tests
 
-This directory contains test definitions and tooling for validating Rivendell's forensic image processing capabilities across different combinations of images and options.
+This directory contains test definitions and tooling for validating Rowanholt's forensic image processing capabilities across different combinations of images and options.
 
 ## Quick Start
 
@@ -106,9 +106,9 @@ Test configuration JSON files follow this structure:
 {
   "case_number": "TEST_win_vss",
   "source_paths": [
-    "/Volumes/Media5TB/rivendell_imgs/win7-64-nfury-c-drive.E01"
+    "/Volumes/Media5TB/rowanholt_imgs/win7-64-nfury-c-drive.E01"
   ],
-  "destination_path": "/tmp/rivendell_tests/win_vss",
+  "destination_path": "/tmp/rowanholt_tests/win_vss",
   "options": {
     "local": true,
     "gandalf": false,
@@ -145,7 +145,7 @@ Test configuration JSON files follow this structure:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `destination_path` | string | Output directory (defaults to `/tmp/rivendell/<case_number>`) |
+| `destination_path` | string | Output directory (defaults to `/tmp/rowanholt/<case_number>`) |
 | `options` | object | Processing options (see below) |
 
 ### Processing Options
@@ -205,9 +205,9 @@ Test configuration JSON files follow this structure:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TEST_IMAGES_PATH` | `/Volumes/Media5TB/rivendell_imgs` | Directory containing test images |
-| `TEST_OUTPUT_PATH` | `/Volumes/Media5TB/rivendell_imgs/tests` | Output directory for test results |
-| `RIVENDELL_API_URL` | `http://localhost:5688` | Backend API URL |
+| `TEST_IMAGES_PATH` | `/Volumes/Media5TB/rowanholt_imgs` | Directory containing test images |
+| `TEST_OUTPUT_PATH` | `/Volumes/Media5TB/rowanholt_imgs/tests` | Output directory for test results |
+| `ROWANHOLT_API_URL` | `http://localhost:5688` | Backend API URL |
 
 ## Tags Reference
 

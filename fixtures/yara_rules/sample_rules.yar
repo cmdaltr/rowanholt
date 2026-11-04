@@ -1,5 +1,5 @@
 /*
-    Rivendell Sample YARA Rules
+    Rowanholt Sample YARA Rules
     For testing purposes only
 */
 
@@ -7,7 +7,7 @@ rule Suspicious_PowerShell_Command {
     meta:
         attack = "T1059.001"
         description = "Detects suspicious PowerShell commands"
-        author = "Rivendell Test"
+        author = "Rowanholt Test"
         severity = "medium"
     strings:
         $ps1 = "powershell" nocase
@@ -23,7 +23,7 @@ rule Potential_Credential_Access {
     meta:
         attack = "T1003"
         description = "Detects potential credential access attempts"
-        author = "Rivendell Test"
+        author = "Rowanholt Test"
         severity = "high"
     strings:
         $s1 = "mimikatz" nocase
@@ -39,7 +39,7 @@ rule Suspicious_Network_Activity {
     meta:
         attack = "T1105"
         description = "Detects suspicious network-related strings"
-        author = "Rivendell Test"
+        author = "Rowanholt Test"
         severity = "medium"
     strings:
         $n1 = "wget http" nocase
@@ -56,7 +56,7 @@ rule Base64_Encoded_Content {
     meta:
         attack = "T1027"
         description = "Detects base64 encoded executable content"
-        author = "Rivendell Test"
+        author = "Rowanholt Test"
         severity = "low"
     strings:
         $mz = "TVqQAAMAAAA"  // Base64 MZ header
@@ -69,7 +69,7 @@ rule Persistence_Registry_Keys {
     meta:
         attack = "T1547.001"
         description = "Detects references to common persistence registry keys"
-        author = "Rivendell Test"
+        author = "Rowanholt Test"
         severity = "medium"
     strings:
         $r1 = "CurrentVersion\\Run" nocase

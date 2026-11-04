@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { API_BASE_URL } from '../apiBase';
 import { flagFinding } from '../api';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rivendell.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt.png`;
 
 // API base URL - adjust based on environment
 const API_BASE = API_BASE_URL;
@@ -91,7 +91,7 @@ function AIAssistant() {
       setLlmStatus({
         available: false,
         model: null,
-        reason: "Rivendell's backend didn't answer, so Eru can't reach its language model or the case files. Check the backend container is running.",
+        reason: "Rowanholt's backend didn't answer, so Eru can't reach its language model or the case files. Check the backend container is running.",
         checked: true
       });
     }
@@ -311,7 +311,7 @@ function AIAssistant() {
       <section className="hero-section">
         <img
           src={heroImage}
-          alt="Rivendell - The Last Homely House"
+          alt="Rowanholt"
           className="hero-image"
           style={{
             transform: 'scale(0.2)',
@@ -321,7 +321,7 @@ function AIAssistant() {
       </section>
 
       <header>
-        <h2>Eru (Rivendell AI Agent)</h2>
+        <h2>Eru (Rowanholt AI Agent)</h2>
         <p>
           Intelligent guidance for forensic analysis workflows, feature explanations, and guidance through investigations and case management.
         </p>

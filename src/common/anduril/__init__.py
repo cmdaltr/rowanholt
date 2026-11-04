@@ -1,7 +1,7 @@
-"""Scoped administration of Rivendell's Docker containers and images.
+"""Scoped administration of Rowanholt's Docker containers and images.
 
-Only resources labelled with the Rivendell compose project and named
-``rivendell-*`` are visible or touchable; see ``scope.py``.
+Only resources labelled with the Rowanholt compose project and named
+``rowanholt-*`` are visible or touchable; see ``scope.py``.
 """
 
 from .admin import DockerAdmin

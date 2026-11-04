@@ -12,6 +12,7 @@ import {
   addCaseNote,
   assignHost,
   getCaseActivity,
+  caseLiveUrl,
   getCaseReport,
   getConfirmedLayer,
   getAuthConfig,
@@ -39,7 +40,7 @@ const download = (name, text, type) => {
 const when = (iso) => (iso ? iso.slice(0, 16).replace('T', ' ') : '');
 
 // A case's tables, read-only, with findings flagged on their rows, notes, who has which host,
-// and what everyone has done. Polls, which is enough for a team of this size.
+// and what everyone has done. Live over a websocket, polling while that's down.
 function CaseBrowser() {
   const { jobId } = useParams();
   const [job, setJob] = useState(null);
@@ -83,8 +84,34 @@ function CaseBrowser() {
     getAuthConfig()
       .then((config) => (config.server_mode ? getUserDirectory().then(setPeople) : null))
       .catch(() => {});
-    const timer = setInterval(() => { loadShared(); loadOverview(); }, POLL_MS);
-    return () => clearInterval(timer);
+    // The live socket says when anything changes; polling stands in while it's down
+    let socket = null;
+    let live = false;
+    let retry = null;
+    let wait = 2000;
+    let closed = false;
+    let initial = true; // the first message is the state just loaded; after a reconnect it isn't
+    const connect = () => {
+      socket = new WebSocket(caseLiveUrl(jobId));
+      socket.onopen = () => { live = true; wait = 2000; };
+      socket.onmessage = () => {
+        if (!initial) { loadShared(); loadOverview(); }
+        initial = false;
+      };
+      socket.onclose = () => {
+        live = false;
+        if (!closed) retry = setTimeout(connect, wait);
+        wait = Math.min(wait * 2, 60000);
+      };
+    };
+    connect();
+    const timer = setInterval(() => { if (!live) { loadShared(); loadOverview(); } }, POLL_MS);
+    return () => {
+      closed = true;
+      clearInterval(timer);
+      clearTimeout(retry);
+      socket.close();
+    };
   }, [jobId, loadOverview, loadShared]);
 
   useEffect(() => {

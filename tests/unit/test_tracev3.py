@@ -11,8 +11,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from rivendell.process import mac_artefacts as ma  # noqa: E402
-from rivendell.process.extractions import tracev3 as t  # noqa: E402
+from rowanholt.process import mac_artefacts as ma  # noqa: E402
+from rowanholt.process.extractions import tracev3 as t  # noqa: E402
 
 MAIN = uuid.UUID("0123456789ABCDEF0123456789ABCDEF")
 BOOT = uuid.UUID("00112233445566778899AABBCCDDEEFF")
@@ -232,7 +232,7 @@ def test_refuses_what_is_not_a_tracev3_file(tmp_path):
 
 
 def test_image_collection_takes_the_store(tmp_path, monkeypatch):
-    from rivendell.collect import mac as collect_mac
+    from rowanholt.collect import mac as collect_mac
 
     mnt = tmp_path / "mnt"
     files = {"private/var/db/uuidtext/AB/CDEF": b"u" * 10, "private/var/db/uuidtext/dsc/0011": b"d" * 10,

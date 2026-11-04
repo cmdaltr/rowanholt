@@ -32,7 +32,7 @@ _cache: dict = {}
 
 
 class SignInRefused(Exception):
-    """The IdP vouched for the user, but Rivendell won't let them in (group, disabled)."""
+    """The IdP vouched for the user, but Rowanholt won't let them in (group, disabled)."""
 
 
 async def _get_json(url: str) -> dict:
@@ -52,7 +52,7 @@ async def discovery() -> dict:
 
 
 def redirect_uri() -> str:
-    return f"{settings.rivendell_public_url.rstrip('/')}/api/auth/oidc/callback"
+    return f"{settings.rowanholt_public_url.rstrip('/')}/api/auth/oidc/callback"
 
 
 def _b64url(data: bytes) -> str:
@@ -153,12 +153,12 @@ def _username_for(claims: dict, users: dict) -> str:
 
 
 def user_for(claims: dict) -> dict:
-    """The Rivendell user for verified claims: matched on issuer and subject, created on
+    """The Rowanholt user for verified claims: matched on issuer and subject, created on
     first sign-in, with the admin role following the admin group when one is configured."""
     groups = _groups(claims)
     if settings.oidc_allowed_group and settings.oidc_allowed_group not in groups \
             and settings.oidc_admin_group not in groups:
-        raise SignInRefused("Your account isn't in the group allowed to use Rivendell")
+        raise SignInRefused("Your account isn't in the group allowed to use Rowanholt")
     subject = f"{claims['iss']}|{claims['sub']}"
     users = load_users()
     user = next((u for u in users.values() if u.get("oidc_subject") == subject), None)
@@ -167,7 +167,7 @@ def user_for(claims: dict) -> dict:
                         full_name=claims.get("name"), oidc_subject=subject)
         users[user["id"]] = user
     if not user.get("is_active", True):
-        raise SignInRefused("Your Rivendell account is disabled")
+        raise SignInRefused("Your Rowanholt account is disabled")
     if settings.oidc_admin_group:
         user["role"] = "admin" if settings.oidc_admin_group in groups else "user"
     user["full_name"] = claims.get("name") or user.get("full_name")

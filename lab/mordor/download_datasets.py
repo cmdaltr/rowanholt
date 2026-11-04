@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download the OTRF Security-Datasets (Mordor) the Rivendell tests reference.
+"""Download the OTRF Security-Datasets (Mordor) the Rowanholt tests reference.
 
 Uses a sparse, blob-less git clone, so only the folders asked for are fetched
 (no GitHub API rate limits, no token). Each dataset is laid out as

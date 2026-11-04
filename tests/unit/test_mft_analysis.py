@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from rivendell.analysis.analysis import SETUP_COPIED_NOTE, iter_json_records, mft_findings  # noqa: E402
+from rowanholt.analysis.analysis import SETUP_COPIED_NOTE, iter_json_records, mft_findings  # noqa: E402
 
 
 def record(path: str, created: str = "2025-01-01T00:00:00.000Z", fn_created: str = "2025-01-01T00:00:00.000Z", eas=()) -> dict:

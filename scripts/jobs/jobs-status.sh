@@ -1,5 +1,5 @@
 #!/bin/bash
-# Quick status checker for Rivendell jobs
+# Quick status checker for Rowanholt jobs
 # Usage:
 #   ./status.sh              # Show job status summary
 #   ./status.sh --full       # Show full job IDs

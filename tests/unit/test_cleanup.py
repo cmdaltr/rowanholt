@@ -5,7 +5,7 @@ from pathlib import Path
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from rivendell.post.clean import (  # noqa: E402
+from rowanholt.post.clean import (  # noqa: E402
     cleanup_small_files_and_empty_dirs, output_folder_name, tidy_processed_output)
 
 
@@ -56,11 +56,11 @@ def test_one_walk_removes_small_files_and_nested_empty_dirs(tmp_path):
 
 
 def test_the_case_archive_is_in_the_case_and_survives_deletion(tmp_path):
-    from rivendell.post.clean import archive_artefacts, delete_artefacts
+    from rowanholt.post.clean import archive_artefacts, delete_artefacts
     import zipfile
     case = tmp_path / "CASE-1"
     write(case / "host" / "artefacts" / "raw" / "crontab", "* * * * * x")
-    write(case / "rivendell_audit.log", "")
+    write(case / "rowanholt_audit.log", "")
     archive_artefacts("", str(case) + "/")
     delete_artefacts("", str(case) + "/")
     archive = case / "CASE-1.zip"

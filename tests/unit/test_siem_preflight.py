@@ -8,7 +8,7 @@ import pytest
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from rivendell.post import siem  # noqa: E402
+from rowanholt.post import siem  # noqa: E402
 
 
 class Conn:

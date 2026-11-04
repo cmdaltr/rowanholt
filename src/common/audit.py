@@ -1,12 +1,12 @@
 """
-Unified audit logging for Rivendell DF Acceleration Suite
+Unified audit logging for Rowanholt DF Acceleration Suite
 
 Provides consistent audit trail logging across acquisition and analysis modules.
 Eliminates duplicate audit logging code found in 7+ files.
 
 Replaces:
 - acquisition/python/collect_artefacts-py: audit_log()
-- analysis/rivendell/audit.py: write_audit_log_entry()
+- analysis/rowanholt/audit.py: write_audit_log_entry()
 - acquisition/bash/gandalf.sh: log_audit()
 """
 

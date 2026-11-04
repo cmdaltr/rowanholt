@@ -5,8 +5,8 @@ from pathlib import Path
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from rivendell import mount  # noqa: E402
-from rivendell.collect.files.carve import carve_source  # noqa: E402
+from rowanholt import mount  # noqa: E402
+from rowanholt.collect.files.carve import carve_source  # noqa: E402
 
 
 def test_raw_images_are_carved_as_they_are():

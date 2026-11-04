@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Rivendell Image Path Manager
-Manage forensic image paths without reinstalling Rivendell
+Rowanholt Image Path Manager
+Manage forensic image paths without reinstalling Rowanholt
 
 Usage:
     python3 scripts/image-paths.py
@@ -361,7 +361,7 @@ class PathManager:
                     print(f"    → {mount_point} (in container)")
                 print()
 
-                self.print_info("Restart Rivendell for changes to take effect:")
+                self.print_info("Restart Rowanholt for changes to take effect:")
                 print(f"  docker-compose down")
                 print(f"  ./scripts/start-testing-mode.sh")
             else:
@@ -385,7 +385,7 @@ def main():
     manager = PathManager()
 
     while True:
-        manager.print_header("Rivendell Image Path Manager")
+        manager.print_header("Rowanholt Image Path Manager")
 
         print(f"{Colors.BOLD}Options:{Colors.END}\n")
         print(f"  {Colors.BOLD}1. Show current paths{Colors.END}")

@@ -9,9 +9,9 @@ from pathlib import Path
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from rivendell.collect import linux as collect  # noqa: E402
-from rivendell.process import linux_artefacts as la  # noqa: E402
-from rivendell.process.extractions import bbolt, containers, k8s_audit  # noqa: E402
+from rowanholt.collect import linux as collect  # noqa: E402
+from rowanholt.process import linux_artefacts as la  # noqa: E402
+from rowanholt.process.extractions import bbolt, containers, k8s_audit  # noqa: E402
 
 CID = "4f1c9e2ab3d7" + "0" * 52
 # Made by containerd 1.7 itself (lab/linux-targets/seed/containerd/make-meta-db.sh)
@@ -321,3 +321,25 @@ def test_lab_seed_end_to_end(tmp_path):
     audit = {r["Flag"] for r in rows(out, "k8s_audit.csv")}
     assert {"secrets read", "exec into a pod", "role binding created to cluster-admin"} <= audit
     assert {"T1611", "T1610", "T1105", "T1053.003", "T1543.005", "T1552.007", "T1609", "T1098.006"} <= set(techniques(out))
+
+
+def test_rootless_podman_is_collected_from_each_home_and_marked_with_its_user(tmp_path):
+    """A user's own Podman store (~/.local/share/containers/storage), collected the way Elrond
+    collects an image, reaches docker_containers.csv with the user in its Runtime."""
+    mnt = tmp_path / "mnt"
+    storage = mnt / "home" / "alice" / ".local" / "share" / "containers" / "storage"
+    (storage / "libpod").mkdir(parents=True)
+    (storage / "db.sql").write_bytes((PODMAN / "db.sql").read_bytes())
+    (storage / "libpod" / "bolt_state.db").write_bytes((PODMAN / "bolt_state.db").read_bytes())
+    out = str(tmp_path / "out") + "/"
+    raw = Path(out) / "HOST" / "artefacts" / "raw"
+    raw.mkdir(parents=True)
+    collect.collect_linux_extras(str(mnt), str(raw) + "/", "HOST::Linux", out, "collecting", 0)
+    collected = sorted(p.name for p in (raw / "user_profiles").iterdir())
+    assert collected == ["alice+bolt_state.db", "alice+db.sql"]
+    for name in collected:
+        assert run(out, raw / "user_profiles" / name)
+    found = rows(out, "docker_containers.csv")
+    assert len(found) == 6 and {r["Runtime"] for r in found} == {"podman (rootless, alice)"}
+    assert "privileged" in next(r for r in found if r["Name"] == "lab-escape")["Flag"]
+    assert techniques(out) == ["T1610", "T1611"]

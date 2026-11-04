@@ -1,9 +1,9 @@
 {
   "case_number": "TEST_linux_full",
   "source_paths": [
-    "/Volumes/Media5TB/rivendell_imgs/Linux_mail.vmdk.raw"
+    "/Volumes/Media5TB/rowanholt_imgs/Linux_mail.vmdk.raw"
   ],
-  "destination_path": "/Volumes/Media5TB/rivendell_imgs/tests/linux_full",
+  "destination_path": "/Volumes/Media5TB/rowanholt_imgs/tests/linux_full",
   "options": {
     "local": true,
     "gandalf": false,

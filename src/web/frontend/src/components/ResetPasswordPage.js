@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { resetPassword } from '../api';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rivendell.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt.png`;
 
 const ResetPasswordPage = () => {
   const navigate = useNavigate();
@@ -67,7 +67,7 @@ const ResetPasswordPage = () => {
       <section className="hero-section">
         <img
           src={heroImage}
-          alt="Rivendell - The Last Homely House"
+          alt="Rowanholt"
           className="hero-image"
           style={{
             transform: 'scale(0.2)',
@@ -79,7 +79,7 @@ const ResetPasswordPage = () => {
       <header>
         <h2>Reset Password</h2>
         <p>
-          Create a new password for your Rivendell account.
+          Create a new password for your Rowanholt account.
         </p>
       </header>
 

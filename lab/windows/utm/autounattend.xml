@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Unattended Windows 11 ARM64 install for the Rivendell lab's UTM VM.
+  Unattended Windows 11 ARM64 install for the Rowanholt lab's UTM VM.
   utm-vm.sh fills in @@...@@ and puts this on the LABCFG config ISO, where
   Windows Setup finds it. The disk is VirtIO, not NVMe: QEMU's NVMe TRIM
   handler (nvme_dsm_cb) crashes the VM when Windows trims. TPM, Secure Boot and RAM checks are bypassed
@@ -103,7 +103,7 @@
         <LocalAccounts>
           <LocalAccount wcm:action="add">
             <Name>gandalf</Name>
-            <DisplayName>Rivendell lab</DisplayName>
+            <DisplayName>Rowanholt lab</DisplayName>
             <Group>Administrators</Group>
             <Password><Value>@@PASSWORD@@</Value><PlainText>true</PlainText></Password>
           </LocalAccount>
@@ -118,7 +118,7 @@
       <FirstLogonCommands>
         <SynchronousCommand wcm:action="add">
           <Order>1</Order>
-          <Description>Provision the Rivendell lab target</Description>
+          <Description>Provision the Rowanholt lab target</Description>
           <CommandLine>powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "&amp; ((Get-Volume -FileSystemLabel LABCFG).DriveLetter + ':\firstlogon.ps1')"</CommandLine>
         </SynchronousCommand>
       </FirstLogonCommands>

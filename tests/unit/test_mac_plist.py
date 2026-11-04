@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from rivendell.process.mac import plist_record  # noqa: E402
+from rowanholt.process.mac import plist_record  # noqa: E402
 
 
 class PlistRecordTest(unittest.TestCase):

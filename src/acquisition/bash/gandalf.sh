@@ -4,7 +4,7 @@
 # Gandalf Bash - Remote Forensic Artifact Acquisition Tool
 #
 # A pure bash implementation for Linux and macOS forensic evidence collection
-# Part of the Rivendell DF Acceleration Suite
+# Part of the Rowanholt DF Acceleration Suite
 #
 # Usage: sudo ./gandalf.sh [ENCRYPTION] [MODE] [OPTIONS]
 #
@@ -33,6 +33,7 @@ OUTPUT_DIR="/tmp/gandalf/acquisitions"
 MEMORY_DUMP=false
 ACCESS_TIMES=false
 COLLECT_FILES=false
+LIVE_CONTAINERS=false
 HOSTS_FILE=""
 REMOTE_USER=""
 REMOTE_HOST=""
@@ -96,6 +97,8 @@ usage() {
     echo "  -m        Acquire memory dump"
     echo "  -a        Collect file access times"
     echo "  -c        Collect specific files from files.list"
+    echo "  -l        Live containers: ask Docker and Podman about their running containers"
+    echo "            (inspect, processes, filesystem export); opt-in, every command audited"
     echo "  -h HOST   Remote hostname (for Remote mode)"
     echo "  -u USER   Remote username (for Remote mode)"
     echo "  -f FILE   Hosts file (for Remote mode batch)"
@@ -170,12 +173,13 @@ parse_args() {
     esac
 
     # Parse options
-    while getopts "o:mach:u:f:" opt; do
+    while getopts "o:machlu:f:" opt; do
         case $opt in
             o) OUTPUT_DIR="$OPTARG" ;;
             m) MEMORY_DUMP=true ;;
             a) ACCESS_TIMES=true ;;
             c) COLLECT_FILES=true ;;
+            l) LIVE_CONTAINERS=true ;;
             h) REMOTE_HOST="$OPTARG" ;;
             u) REMOTE_USER="$OPTARG" ;;
             f) HOSTS_FILE="$OPTARG" ;;
@@ -276,6 +280,83 @@ collect_volatile() {
     is_macos && platform="macOS"
     { echo "${hostname}::${platform}"; uname -a; } > "${acq_dir}/artefacts/host.info" 2>/dev/null || true
     log_audit "$audit_log" "$hostname" "host.info"
+}
+
+# A command run on the target, not a file taken from it: audited as "ran"
+log_live() {
+    local timestamp
+    timestamp=$(date -u +"%Y-%m-%dT%H:%M:%S.%6NZ")
+    case "$timestamp" in *N*) timestamp=$(date -u +"%Y-%m-%dT%H:%M:%S.000000Z") ;; esac
+    echo "${timestamp},$2,$3,ran" >> "$1"
+}
+
+# -l: what Docker and Podman say about their running containers, which the files on disk
+# don't hold: the processes running in each, and its filesystem as it is now. Asking the
+# runtime touches the live host (its daemon logs the calls; export reads the whole
+# filesystem), so it's opt-in and every command is audited. export never pauses or stops
+# the container. Each export is cut at GANDALF_CONTAINER_EXPORT_MAX bytes (default 2 GB;
+# 0 leaves exports out), and the audit says when it was cut. Rootless Podman keeps each
+# user's containers to that user (root's podman doesn't list them), so each user with
+# rootless storage is asked as themselves too, and the audit names them.
+collect_live_containers() {
+    local acq_dir="$1" hostname="$2" audit_log="$3"
+    local name _x uid home source
+    local sources=()
+    command -v docker &> /dev/null && sources+=(docker)
+    if command -v podman &> /dev/null; then
+        sources+=(podman)
+        while IFS=: read -r name _x uid _x _x home _x; do
+            [ "$uid" -ge 1000 ] 2>/dev/null && [ "$uid" -lt 65534 ] || continue
+            [ -d "$home/.local/share/containers/storage" ] && sources+=("podman:$name")
+        done < /etc/passwd
+    fi
+    for source in "${sources[@]}"; do
+        live_from "$acq_dir" "$hostname" "$audit_log" "$source"
+    done
+}
+
+# docker, podman (root's), or podman:<user>, run as that user with their own runtime dir
+runtime_cmd() {
+    local source="$1"; shift
+    case "$source" in
+        podman:*)
+            local user="${source#podman:}" uid run=""
+            uid=$(id -u "$user" 2>/dev/null) || return 1
+            [ -d "/run/user/$uid" ] && run="XDG_RUNTIME_DIR=/run/user/$uid "
+            if command -v runuser &> /dev/null; then
+                runuser -l "$user" -c "${run}podman $*"
+            else
+                su -l "$user" -s /bin/sh -c "${run}podman $*"
+            fi ;;
+        *) "$source" "$@" ;;
+    esac
+}
+
+live_from() {
+    local acq_dir="$1" hostname="$2" audit_log="$3" source="$4"
+    local max="${GANDALF_CONTAINER_EXPORT_MAX:-2147483648}" runtime="${4%%:*}" label id dir size
+    label="$runtime"
+    [ "$source" != "$runtime" ] && label="$runtime (rootless, ${source#podman:})"
+    for id in $(runtime_cmd "$source" ps -q --no-trunc 2>/dev/null); do
+        case "$id" in *[!0-9a-f]*) continue ;; esac
+        dir="${acq_dir}/artefacts/live_containers/${runtime}/${id:0:12}"
+        mkdir -p "$dir"
+        runtime_cmd "$source" inspect "$id" > "$dir/inspect.json" 2>/dev/null && log_live "$audit_log" "$hostname" "$label inspect $id"
+        if [ "$runtime" = docker ]; then
+            docker top "$id" -eo pid,ppid,user,etime,args > "$dir/top.txt" 2>/dev/null
+        else
+            runtime_cmd "$source" top "$id" pid ppid user etime args > "$dir/top.txt" 2>/dev/null
+        fi && log_live "$audit_log" "$hostname" "$label top $id"
+        [ -s "$dir/top.txt" ] || rm -f "$dir/top.txt"
+        [ "$max" -gt 0 ] 2>/dev/null || continue
+        runtime_cmd "$source" export "$id" 2>/dev/null | head -c "$max" > "$dir/export.tar"
+        size=$(wc -c < "$dir/export.tar" | tr -d ' ')
+        if [ "$size" -ge "$max" ]; then
+            log_live "$audit_log" "$hostname" "$label export $id (cut at $max bytes)"
+        else
+            log_live "$audit_log" "$hostname" "$label export $id"
+        fi
+    done
 }
 
 # Collect memory dump
@@ -441,7 +522,8 @@ DIRS
         [ -d "$user_home" ] || continue
         username=$(basename "$user_home")
         for source in .zsh_history .viminfo .lesshst .python_history .mysql_history .psql_history .wget-hsts \
-            .local/share/recently-used.xbel; do
+            .local/share/recently-used.xbel .local/share/containers/storage/db.sql \
+            .local/share/containers/storage/db.sql-wal .local/share/containers/storage/libpod/bolt_state.db; do
             take "${user_home}/${source}" "${acq_dir}/artefacts/user/${username}/$(basename "$source")"
         done
         while IFS= read -r -d '' source; do
@@ -1054,6 +1136,8 @@ acquire_local() {
     # Collect
     collect_volatile "$acq_dir" "$hostname" "$audit_log"
     collect_memory "$acq_dir" "$hostname" "$audit_log"
+    # After memory: an export reads whole filesystems through the page cache
+    [ "$LIVE_CONTAINERS" = true ] && ! is_macos && collect_live_containers "$acq_dir" "$hostname" "$audit_log"
     collect_artifacts "$acq_dir" "$hostname" "$audit_log" "$meta_log"
     write_manifest "$acq_dir" "$hostname" "$audit_log" "$meta_log"
 
@@ -1126,7 +1210,7 @@ acquire_remote() {
         }
 
         # Execute remotely
-        if ! ssh "${REMOTE_USER}@${host}" "sudo bash ${remote_script} ${remote_encryption} Local -o /tmp/gandalf/acquisitions $([ "$MEMORY_DUMP" = true ] && echo -m)"; then
+        if ! ssh "${REMOTE_USER}@${host}" "sudo bash ${remote_script} ${remote_encryption} Local -o /tmp/gandalf/acquisitions $([ "$MEMORY_DUMP" = true ] && echo -m) $([ "$LIVE_CONTAINERS" = true ] && echo -l)"; then
             echo -e "${RED}[ERROR]${NC} Remote execution failed on $host"
             ssh "${REMOTE_USER}@${host}" "sudo rm -rf /tmp/gandalf ${remote_script}" || true
             failed=$((failed + 1))

@@ -130,18 +130,18 @@ def run_siem_export(job, output_dir: Path, logger):
             try:
                 # Check if elrond app already exists
                 check_result = subprocess.run(
-                    ['docker', 'exec', 'rivendell-splunk', 'test', '-d', '/opt/splunk/etc/apps/elrond'],
+                    ['docker', 'exec', 'rowanholt-splunk', 'test', '-d', '/opt/splunk/etc/apps/elrond'],
                     capture_output=True
                 )
 
                 if check_result.returncode != 0:
                     # App doesn't exist, create it
                     subprocess.run(
-                        ['docker', 'exec', 'rivendell-splunk', 'mkdir', '-p', '/opt/splunk/etc/apps/elrond/default'],
+                        ['docker', 'exec', 'rowanholt-splunk', 'mkdir', '-p', '/opt/splunk/etc/apps/elrond/default'],
                         check=True
                     )
                     subprocess.run(
-                        ['docker', 'exec', 'rivendell-splunk', 'chown', '-R', 'splunk:splunk', '/opt/splunk/etc/apps/elrond'],
+                        ['docker', 'exec', 'rowanholt-splunk', 'chown', '-R', 'splunk:splunk', '/opt/splunk/etc/apps/elrond'],
                         check=True
                     )
                     job.log.append(f"[{datetime.now().isoformat()}] -> created Splunk elrond app directory")
@@ -161,7 +161,7 @@ def run_siem_export(job, output_dir: Path, logger):
 
                 # Use Splunk CLI to create index
                 create_index_result = subprocess.run(
-                    ['docker', 'exec', 'rivendell-splunk', '/opt/splunk/bin/splunk', 'add', 'index', job.case_number, '-auth', 'admin:rivendell'],
+                    ['docker', 'exec', 'rowanholt-splunk', '/opt/splunk/bin/splunk', 'add', 'index', job.case_number, '-auth', 'admin:rowanholt'],
                     capture_output=True,
                     text=True
                 )
@@ -206,7 +206,7 @@ def run_siem_export(job, output_dir: Path, logger):
 
                         # Write to inputs.conf using docker exec
                         subprocess.run(
-                            ['docker', 'exec', 'rivendell-splunk', 'sh', '-c', f'echo "{monitor_stanza}" >> {inputs_conf}'],
+                            ['docker', 'exec', 'rowanholt-splunk', 'sh', '-c', f'echo "{monitor_stanza}" >> {inputs_conf}'],
                             check=True,
                             capture_output=True
                         )
@@ -225,7 +225,7 @@ def run_siem_export(job, output_dir: Path, logger):
                 job_storage.save_job(job)
 
                 subprocess.run(
-                    ['docker', 'exec', 'rivendell-splunk', '/opt/splunk/bin/splunk', 'reload', 'deploy-server', '-auth', 'admin:rivendell'],
+                    ['docker', 'exec', 'rowanholt-splunk', '/opt/splunk/bin/splunk', 'reload', 'deploy-server', '-auth', 'admin:rowanholt'],
                     capture_output=True,
                     timeout=10
                 )
@@ -269,12 +269,12 @@ def run_siem_export(job, output_dir: Path, logger):
 
                     # Run Elasticsearch ingest using subprocess to call the Python module directly
                     elrond_path = os.environ.get('ELROND_HOME', '/app/src/analysis')
-                    elastic_script = Path(elrond_path) / 'rivendell' / 'post' / 'elastic' / 'ingest.py'
+                    elastic_script = Path(elrond_path) / 'rowanholt' / 'post' / 'elastic' / 'ingest.py'
 
                     if elastic_script.exists():
                         # Import and call the function
                         sys.path.insert(0, str(elrond_path))
-                        from rivendell.post.elastic.ingest import ingest_elastic_data
+                        from rowanholt.post.elastic.ingest import ingest_elastic_data
 
                         ingest_elastic_data(
                             verbosity=2,
@@ -715,7 +715,7 @@ def translate_path_for_worker(path_str: str) -> str:
 
     Both containers mount:
       - elrond_uploads volume -> /tmp/elrond/uploads (SAME in both containers)
-      - /tmp/rivendell (host) -> /tmp/elrond/output (worker) or /host/tmp/rivendell (backend)
+      - /tmp/rowanholt (host) -> /tmp/elrond/output (worker) or /host/tmp/rowanholt (backend)
 
     Args:
         path_str: Path from backend perspective
@@ -729,9 +729,9 @@ def translate_path_for_worker(path_str: str) -> str:
     if path_str.startswith('/tmp/elrond/uploads/'):
         return path_str
 
-    # Backend uses /host/tmp/rivendell for output, worker uses /tmp/elrond/output
-    if path_str.startswith('/host/tmp/rivendell'):
-        return path_str.replace('/host/tmp/rivendell', '/tmp/elrond/output')
+    # Backend uses /host/tmp/rowanholt for output, worker uses /tmp/elrond/output
+    if path_str.startswith('/host/tmp/rowanholt'):
+        return path_str.replace('/host/tmp/rowanholt', '/tmp/elrond/output')
 
     # Backend uses /tmp/elrond/output, worker uses same
     if path_str.startswith('/tmp/elrond/output'):

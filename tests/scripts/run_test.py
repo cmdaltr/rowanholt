@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Run Rivendell Tests
+Run Rowanholt Tests
 
 This module defines test scenarios for various forensic image processing combinations.
 Each test case specifies source images and processing options to validate.
@@ -31,7 +31,7 @@ Examples:
     python tests/scripts/run_test.py --run-tags windows -y
 
 Test images should be placed in the path specified by TEST_IMAGES_PATH environment variable,
-or defaults to /Volumes/Media5TB/rivendell_imgs/
+or defaults to /Volumes/Media5TB/rowanholt_imgs/
 """
 
 import os
@@ -58,10 +58,10 @@ def _find_images_path():
     """Find the first existing test images path that contains actual forensic images.
 
     Checks platform-specific locations:
-    - macOS: /Volumes/*/rivendell_imgs, /Volumes/*/rivendell, /Volumes/*/*/rivendell (external drives)
-    - Linux: /mnt/*/rivendell_imgs, /media/*/rivendell_imgs (mount points)
-    - Windows: [A-Z]:/rivendell_imgs (drive letters)
-    - All: /tmp/rivendell (fallback)
+    - macOS: /Volumes/*/rowanholt_imgs, /Volumes/*/rowanholt, /Volumes/*/*/rowanholt (external drives)
+    - Linux: /mnt/*/rowanholt_imgs, /media/*/rowanholt_imgs (mount points)
+    - Windows: [A-Z]:/rowanholt_imgs (drive letters)
+    - All: /tmp/rowanholt (fallback)
     """
     if os.environ.get("TEST_IMAGES_PATH"):
         return os.environ["TEST_IMAGES_PATH"]
@@ -75,27 +75,28 @@ def _find_images_path():
     system = platform.system()
     if system == "Darwin":  # macOS
         search_patterns.extend([
-            "/Volumes/*/rivendell_imgs",  # External drives
-            "/Volumes/*/rivendell",
-            "/Volumes/*/*/rivendell",     # e.g. /Volumes/Portable6TB/Data/rivendell
-            "/tmp/rivendell",
+            "/Volumes/*/rowanholt_imgs",  # External drives
+            "/Volumes/*/rowanholt",
+            "/Volumes/*/*/rowanholt",     # e.g. /Volumes/Portable6TB/Data/rowanholt
+            "/Volumes/*/*/rivendell",     # folders made before the rename
+            "/tmp/rowanholt",
         ])
     elif system == "Linux":
         search_patterns.extend([
-            "/mnt/*/rivendell_imgs",     # Common mount point
-            "/media/*/rivendell_imgs",   # Ubuntu/Debian style mounts
-            "/mnt/rivendell_imgs",       # Direct mount
-            "/media/rivendell_imgs",     # Direct mount
-            "/tmp/rivendell",
+            "/mnt/*/rowanholt_imgs",     # Common mount point
+            "/media/*/rowanholt_imgs",   # Ubuntu/Debian style mounts
+            "/mnt/rowanholt_imgs",       # Direct mount
+            "/media/rowanholt_imgs",     # Direct mount
+            "/tmp/rowanholt",
         ])
     elif system == "Windows":
         # Check all drive letters (A-Z)
         for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-            search_patterns.append(f"{letter}:/rivendell_imgs")
-        search_patterns.append("C:/temp/rivendell")
+            search_patterns.append(f"{letter}:/rowanholt_imgs")
+        search_patterns.append("C:/temp/rowanholt")
     else:
         # Unknown system - just use temp
-        search_patterns.append("/tmp/rivendell")
+        search_patterns.append("/tmp/rowanholt")
 
     candidates = []
     for pattern in search_patterns:
@@ -120,9 +121,9 @@ def _find_images_path():
 
     # Return platform-specific default if none exist
     if system == "Windows":
-        return "C:/temp/rivendell"
+        return "C:/temp/rowanholt"
     else:
-        return "/tmp/rivendell"
+        return "/tmp/rowanholt"
 
 TEST_IMAGES_PATH = _find_images_path()
 
@@ -130,12 +131,12 @@ TEST_IMAGES_PATH = _find_images_path()
 # Defaults to a 'tests' subdirectory under the images path
 TEST_OUTPUT_PATH = os.environ.get("TEST_OUTPUT_PATH", f"{TEST_IMAGES_PATH}/tests")
 
-# API URL - override with RIVENDELL_API_URL env var
-API_URL = os.environ.get("RIVENDELL_API_URL", "http://localhost:5688")
+# API URL - override with ROWANHOLT_API_URL env var
+API_URL = os.environ.get("ROWANHOLT_API_URL", "http://localhost:5688")
 
 # Sample files for testing: the repo's fixtures/, which docker-compose.yml mounts
-# read-only into the worker at /tmp/rivendell/fixtures
-CONTAINER_FILES_PATH = "/tmp/rivendell/fixtures"
+# read-only into the worker at /tmp/rowanholt/fixtures
+CONTAINER_FILES_PATH = "/tmp/rowanholt/fixtures"
 SAMPLE_KEYWORDS_FILE = f"{CONTAINER_FILES_PATH}/keywords.txt"
 SAMPLE_YARA_DIR = f"{CONTAINER_FILES_PATH}/yara_rules"
 SAMPLE_IOCS_FILE = f"{CONTAINER_FILES_PATH}/iocs.txt"
@@ -155,13 +156,13 @@ GANDALF_BASH_PATH = os.environ.get(
 
 # Cloud-hosted image paths (override with env vars)
 # Format: s3://bucket/path or azure://container/path
-AWS_S3_DISK_IMAGE = os.environ.get("AWS_S3_DISK_IMAGE", "s3://rivendell-test-images/win10.E01")
-AWS_S3_MEMORY_IMAGE = os.environ.get("AWS_S3_MEMORY_IMAGE", "s3://rivendell-test-images/win10.mem")
+AWS_S3_DISK_IMAGE = os.environ.get("AWS_S3_DISK_IMAGE", "s3://rowanholt-test-images/win10.E01")
+AWS_S3_MEMORY_IMAGE = os.environ.get("AWS_S3_MEMORY_IMAGE", "s3://rowanholt-test-images/win10.mem")
 AZURE_BLOB_DISK_IMAGE = os.environ.get(
-    "AZURE_BLOB_DISK_IMAGE", "azure://rivendell-images/linux_server.raw"
+    "AZURE_BLOB_DISK_IMAGE", "azure://rowanholt-images/linux_server.raw"
 )
 AZURE_BLOB_MEMORY_IMAGE = os.environ.get(
-    "AZURE_BLOB_MEMORY_IMAGE", "azure://rivendell-images/linux_server.mem"
+    "AZURE_BLOB_MEMORY_IMAGE", "azure://rowanholt-images/linux_server.mem"
 )
 
 # Mordor dataset paths (https://github.com/OTRF/mordor)
@@ -177,7 +178,7 @@ _samples_copied = False
 def copy_samples_to_container():
     """Copy analysis files (keywords, yara rules, IOC watchlists) to the Docker container.
 
-    Note: docker-compose.yml mounts ./fixtures to /tmp/rivendell/fixtures (read-only),
+    Note: docker-compose.yml mounts ./fixtures to /tmp/rowanholt/fixtures (read-only),
     so this function is a fallback for cases where the volume mount isn't available.
     """
     global _samples_copied
@@ -188,9 +189,9 @@ def copy_samples_to_container():
 
     # Try different container names (most common first)
     container_names = [
-        "rivendell-celery-worker",
-        "rivendell-celery-worker-1",
-        "rivendell-web-celery-worker-1",
+        "rowanholt-celery-worker",
+        "rowanholt-celery-worker-1",
+        "rowanholt-web-celery-worker-1",
     ]
 
     container_name = None
@@ -2030,7 +2031,7 @@ TEST_LOOKUP = {test.name: test for test in ALL_TESTS}
 def list_tests(filter_tags: Optional[List[str]] = None):
     """List all available test cases."""
     print("\n" + "=" * 80)
-    print("RIVENDELL IMAGE COMBINATION TESTS")
+    print("ROWANHOLT IMAGE COMBINATION TESTS")
     print("=" * 80 + "\n")
 
     for test in ALL_TESTS:
@@ -2187,7 +2188,7 @@ def run_test(test: TestCase, api_url: str, wait: bool = False, yes: bool = False
                 time.sleep(5)
             else:
                 print(f"  ERROR: Could not connect to API at {api_url}")
-                print("  Make sure the Rivendell backend is running (docker-compose up)")
+                print("  Make sure the Rowanholt backend is running (docker-compose up)")
                 return {"status": "connection_error", "error": str(e)}
 
         except requests.exceptions.Timeout as e:
@@ -2356,7 +2357,7 @@ def queue_tests(test_names: List[str], api_url: str, yes: bool = False):
         print("\nJobs will be processed by Celery worker.")
         print("Monitor progress at: http://localhost:5687")
         print("\nCheck queue status:")
-        print("  docker logs -f rivendell-celery-worker")
+        print("  docker logs -f rowanholt-celery-worker")
 
     return results
 
@@ -2713,7 +2714,7 @@ def signal_jobs(api_url: str, job_ids: List[str], action: str):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Rivendell Image Combination Tests",
+        description="Rowanholt Image Combination Tests",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )

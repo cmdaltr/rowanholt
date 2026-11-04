@@ -1,8 +1,8 @@
 """
-What Rivendell knows about the machines it made: the template each came from, so the page can
+What Rowanholt knows about the machines it made: the template each came from, so the page can
 show its OS and what it records, and provisioning knows which script to run. Docker and Tart
-don't record that, so Rivendell keeps it. One small JSON file in the lab's config directory
-(it describes this host, not the repository). Machines made outside Rivendell are still listed,
+don't record that, so Rowanholt keeps it. One small JSON file in the lab's config directory
+(it describes this host, not the repository). Machines made outside Rowanholt are still listed,
 just without a template.
 """
 
@@ -11,7 +11,7 @@ import os
 import threading
 from typing import Dict, Optional
 
-LAB_DIR = os.environ.get("RIVENDELL_LAB_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".config", "rivendell-lab")
+LAB_DIR = os.environ.get("ROWANHOLT_LAB_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".config", "rowanholt-lab")
 _PATH = os.path.join(LAB_DIR, "mordor-machines.json")
 _lock = threading.Lock()
 
@@ -38,7 +38,7 @@ def _save(data: Dict):
 
 
 def record(engine: str, name: str, template_id: str, os_name: str, image: str, created: bool = False):
-    """Remember a machine Rivendell made (created=True: it may delete it) or was told the OS of."""
+    """Remember a machine Rowanholt made (created=True: it may delete it) or was told the OS of."""
     with _lock:
         data = _load()
         existing = data.get(_key(engine, name), {})

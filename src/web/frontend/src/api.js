@@ -197,7 +197,7 @@ export const completeSsoSignIn = async () => {
   return response.data;
 };
 
-// Long-lived, revocable tokens for scripts and RIVENDELL_TOKEN (rivendell mcp), made from a sign-in.
+// Long-lived, revocable tokens for scripts and ROWANHOLT_TOKEN (rowanholt mcp), made from a sign-in.
 // The token itself comes back once, from createApiToken; the list has only its first characters
 export const listApiTokens = async () => (await api.get('/api/auth/tokens')).data.tokens;
 export const createApiToken = async (name, scope, days) =>
@@ -392,6 +392,11 @@ export const enrichValue = async (value) => {
   return response.data;
 };
 
+// Online lookups (VirusTotal), when .env turns them on: the value leaves Rowanholt
+export const getLookupStatus = async () => (await api.get('/api/threat-intel/lookup')).data;
+
+export const lookupValue = async (value) => (await api.post('/api/threat-intel/lookup', { value })).data;
+
 // Case browser and collaboration API
 const caseBase = (jobId) => `/api/jobs/${jobId}/case`;
 
@@ -419,6 +424,13 @@ export const assignHost = async (jobId, host, changes) =>
 
 export const getCaseActivity = async (jobId, since = 0) =>
   (await api.get(`${caseBase(jobId)}/activity`, { params: { since } })).data;
+
+// The case's live socket (case_routes.live). Browsers can't put a header on a websocket, so it
+// goes by the session cookie, never a token in the URL
+export const caseLiveUrl = (jobId) => {
+  const base = new URL(API_BASE_URL || window.location.origin, window.location.href);
+  return `${base.origin.replace(/^http/, 'ws')}/api/jobs/${jobId}/case/live`; // https → wss
+};
 
 export const getCaseReport = async (jobId) =>
   (await api.get(`${caseBase(jobId)}/report`, { responseType: 'text' })).data;

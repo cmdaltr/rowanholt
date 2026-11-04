@@ -1,21 +1,24 @@
+# Fixed, so volumes and Andúril's project label don't follow the checkout's folder name
+name: rowanholt
+
 services:
   # PostgreSQL for job state storage
   postgres:
     image: postgres:16-alpine
-    container_name: rivendell-postgres
+    container_name: rowanholt-postgres
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_DB=rivendell
-      - POSTGRES_USER=rivendell
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-rivendell}
+      - POSTGRES_DB=rowanholt
+      - POSTGRES_USER=rowanholt
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-rowanholt}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - rivendell-network
+      - rowanholt-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rivendell"]
+      test: ["CMD-SHELL", "pg_isready -U rowanholt"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -29,13 +32,13 @@ services:
   # Redis for Celery task queue
   redis:
     image: redis:7-alpine
-    container_name: rivendell-redis
+    container_name: rowanholt-redis
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
-      - rivendell-network
+      - rowanholt-network
     restart: unless-stopped
     deploy:
       resources:
@@ -47,7 +50,7 @@ services:
     build:
       context: ./src/web/backend
       dockerfile: Dockerfile
-    container_name: rivendell-backend
+    container_name: rowanholt-backend
     ports:
       - "5688:5688"
     environment:
@@ -55,35 +58,38 @@ services:
       - REDIS_PORT=6379
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - DATABASE_URL=postgresql://rivendell:${POSTGRES_PASSWORD:-rivendell}@postgres:5432/rivendell
-      - RIVENDELL_EVIDENCE_PATHS=${RIVENDELL_EVIDENCE_PATHS:-}
+      - DATABASE_URL=postgresql://rowanholt:${POSTGRES_PASSWORD:-rowanholt}@postgres:5432/rowanholt
+      - ROWANHOLT_EVIDENCE_PATHS=${ROWANHOLT_EVIDENCE_PATHS:-}
       # JWT signing key. Docker administration stays disabled until this is changed.
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
       - ANDURIL_URL=http://anduril:5690
       # Eru's model (docs/ERU.md): set these in .env or the environment to change them
       - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
-      - RIVENDELL_MODEL_NAME=${RIVENDELL_MODEL_NAME:-llama3.2:3b}
-      - RIVENDELL_NUM_CTX=${RIVENDELL_NUM_CTX:-8192}
+      - ROWANHOLT_MODEL_NAME=${ROWANHOLT_MODEL_NAME:-llama3.2:3b}
+      - ROWANHOLT_NUM_CTX=${ROWANHOLT_NUM_CTX:-8192}
+      # Online lookups from the Pippin page (docs/API.md, threat intelligence): off unless both are set
+      - ROWANHOLT_ONLINE_LOOKUPS=${ROWANHOLT_ONLINE_LOOKUPS:-}
+      - VIRUSTOTAL_API_KEY=${VIRUSTOTAL_API_KEY:-}
     volumes:
       - ./src/web/backend:/app
-      - ./src/mordor:/opt/rivendell/src/mordor # Mordor: recorded attack telemetry (/api/mordor/telemetry)
-      - ./src/analysis/rivendell/threat_intel:/opt/elrond-src/rivendell/threat_intel:ro # threat intelligence parsing (/api/threat-intel)
+      - ./src/mordor:/opt/rowanholt/src/mordor # Mordor: recorded attack telemetry (/api/mordor/telemetry)
+      - ./src/analysis/rowanholt/threat_intel:/opt/elrond-src/rowanholt/threat_intel:ro # threat intelligence parsing (/api/threat-intel)
       - anduril_token:/run/anduril:ro # Written by anduril
       # Platform-specific mounts - uncomment for your OS:
       # - /mnt:/mnt:ro              # Linux: Mount points (read-only)
       # - /media:/media:ro          # Linux: Ubuntu/Debian mounts (read-only)
       - /Volumes:/Volumes:ro # macOS: External drives (read-only)
       # - D:/:/mnt/d:ro             # Windows: Mount D: drive (example, adjust as needed)
-      - /tmp/rivendell:/tmp/elrond/output # Output directory (accessible at /tmp/rivendell on host)
-      - /tmp/rivendell:/tmp/rivendell:ro # Mount for test images in /tmp/rivendell
-      - /tmp/rivendell:/host/tmp/rivendell # Also mount at /host/tmp/rivendell for frontend compatibility
-      - rivendell_uploads:/tmp/elrond/uploads # Upload directory
+      - /tmp/rowanholt:/tmp/elrond/output # Output directory (accessible at /tmp/rowanholt on host)
+      - /tmp/rowanholt:/tmp/rowanholt:ro # Mount for test images in /tmp/rowanholt
+      - /tmp/rowanholt:/host/tmp/rowanholt # Also mount at /host/tmp/rowanholt for frontend compatibility
+      - rowanholt_uploads:/tmp/elrond/uploads # Upload directory
     depends_on:
       - redis
       - postgres
     networks:
-      - rivendell-network
-      - rivendell-anduril
+      - rowanholt-network
+      - rowanholt-anduril
     restart: unless-stopped
     command: uvicorn main:app --host 0.0.0.0 --port 5688 --reload
     extra_hosts:
@@ -97,24 +103,24 @@ services:
         limits:
           memory: 256M
 
-  # Anduril administers Rivendell's own containers and images.
+  # Anduril administers Rowanholt's own containers and images.
   # Opt-in: it holds the Docker socket, which is root-equivalent on the Docker
-  # VM. Enable with `rivendell anduril enable` (or --profile anduril). It is only
-  # reachable from the backend over the internal rivendell-anduril network and
-  # refuses anything not labelled com.docker.compose.project=rivendell.
+  # VM. Enable with `rowanholt anduril enable` (or --profile anduril). It is only
+  # reachable from the backend over the internal rowanholt-anduril network and
+  # refuses anything not labelled com.docker.compose.project=rowanholt.
   anduril:
     profiles: [anduril]
     build:
       context: .
       dockerfile: src/web/anduril/Dockerfile
-    container_name: rivendell-anduril
+    container_name: rowanholt-anduril
     environment:
-      - RIVENDELL_COMPOSE_PROJECT=rivendell
+      - ROWANHOLT_COMPOSE_PROJECT=rowanholt
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock # Docker Desktop and OrbStack both expose this path
       - anduril_token:/run/anduril
     networks:
-      - rivendell-anduril
+      - rowanholt-anduril
     restart: unless-stopped
     read_only: true
     security_opt:
@@ -131,7 +137,7 @@ services:
     build:
       context: .
       dockerfile: src/web/backend/Dockerfile.forensics
-    container_name: rivendell-celery-worker
+    container_name: rowanholt-celery-worker
     privileged: true # Required for mounting forensic images
     devices:
       - /dev/fuse:/dev/fuse # Required for FUSE mounts
@@ -142,18 +148,18 @@ services:
       - REDIS_PORT=6379
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - DATABASE_URL=postgresql://rivendell:${POSTGRES_PASSWORD:-rivendell}@postgres:5432/rivendell
-      - RIVENDELL_EVIDENCE_PATHS=${RIVENDELL_EVIDENCE_PATHS:-}
+      - DATABASE_URL=postgresql://rowanholt:${POSTGRES_PASSWORD:-rowanholt}@postgres:5432/rowanholt
+      - ROWANHOLT_EVIDENCE_PATHS=${ROWANHOLT_EVIDENCE_PATHS:-}
       - SPLUNK_HOST=splunk
       - SPLUNK_PORT=8089
       - SPLUNK_USERNAME=admin
-      - SPLUNK_PASSWORD=${SPLUNK_PASSWORD:-rivendell}
+      - SPLUNK_PASSWORD=${SPLUNK_PASSWORD:-rowanholt}
       - ELASTICSEARCH_HOST=elastic
       - ELASTICSEARCH_PORT=9200
       - ELASTIC_USERNAME=elastic
-      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-rivendell}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-rowanholt}
       # Set to 'true' to exclude cache directories from user profile copies (faster but less complete)
-      - RIVENDELL_EXCLUDE_PROFILE_CACHE=true
+      - ROWANHOLT_EXCLUDE_PROFILE_CACHE=true
     volumes:
       - ./src/web/backend:/app
       # NOTE: elrond source is now copied into the image during build (see Dockerfile.forensics)
@@ -163,14 +169,14 @@ services:
       # - /media:/media             # Linux: Ubuntu/Debian mounts (read-write for output)
       - /Volumes:/Volumes # macOS: External drives (read-write for output) - COMMENT OUT ON LINUX/WINDOWS
       # - D:/:/mnt/d                # Windows: Mount D: drive (example, adjust as needed)
-      - /tmp/rivendell:/tmp/elrond/output # Output directory (accessible at /tmp/rivendell on host)
-      - /tmp/rivendell:/tmp/rivendell # Mount for test images in /tmp/rivendell
-      - ./fixtures:/tmp/rivendell/fixtures:ro # Keywords, YARA rules, IOC watchlists for analysis
+      - /tmp/rowanholt:/tmp/elrond/output # Output directory (accessible at /tmp/rowanholt on host)
+      - /tmp/rowanholt:/tmp/rowanholt # Mount for test images in /tmp/rowanholt
+      - ./fixtures:/tmp/rowanholt/fixtures:ro # Keywords, YARA rules, IOC watchlists for analysis
       # Volatility 3 symbol tables (ISF) for Linux and macOS memory, which it can't fetch
       # itself as it does Windows PDBs (E14); kept here so worker rebuilds don't lose them
       - ./symbols/linux:/usr/local/lib/python3.10/dist-packages/volatility3/symbols/linux:ro
       - ./symbols/mac:/usr/local/lib/python3.10/dist-packages/volatility3/symbols/mac:ro
-      - rivendell_uploads:/tmp/elrond/uploads # For uploaded forensic images
+      - rowanholt_uploads:/tmp/elrond/uploads # For uploaded forensic images
       - splunk_etc:/opt/splunk/etc
       - splunk_var:/opt/splunk/var
       - navigator_data:/navigator # Shared with navigator for ATT&CK Navigator JSON output
@@ -179,7 +185,7 @@ services:
       - postgres
       - backend
     networks:
-      - rivendell-network
+      - rowanholt-network
     restart: unless-stopped
     # Override PYTHONPATH to prioritize /app over /opt/elrond-src to avoid module conflicts
     command: sh -c 'cd /app && PYTHONPATH=/app exec /usr/bin/python3 -m celery -A tasks_docker.celery_app worker --loglevel=info'
@@ -199,7 +205,7 @@ services:
     build:
       context: ./src/web/frontend
       dockerfile: Dockerfile
-    container_name: rivendell-frontend
+    container_name: rowanholt-frontend
     ports:
       - "5687:3000"
     environment:
@@ -210,7 +216,7 @@ services:
     depends_on:
       - backend
     networks:
-      - rivendell-network
+      - rowanholt-network
     restart: unless-stopped
     deploy:
       resources:
@@ -222,7 +228,7 @@ services:
     profiles: [siem]
     image: splunk/splunk:latest
     platform: linux/amd64
-    container_name: rivendell-splunk
+    container_name: rowanholt-splunk
     hostname: splunk
     ports:
       - "8089:8089" # Splunk API
@@ -231,18 +237,18 @@ services:
     environment:
       - SPLUNK_START_ARGS=--accept-license
       - SPLUNK_GENERAL_TERMS=--accept-sgt-current-at-splunk-com
-      - SPLUNK_PASSWORD=${SPLUNK_PASSWORD:-rivendell}
+      - SPLUNK_PASSWORD=${SPLUNK_PASSWORD:-rowanholt}
     volumes:
       - splunk_etc:/opt/splunk/etc
       - splunk_var:/opt/splunk/var
-      - /tmp/rivendell:/tmp/elrond/output:ro # Mount output directory for monitoring
+      - /tmp/rowanholt:/tmp/elrond/output:ro # Mount output directory for monitoring
       # Custom output destinations, mounted where the worker mounts them (E10); add
       # any other root to SPLUNK_MONITOR_ROOTS on the worker
       - /Volumes:/Volumes:ro # macOS: External drives - COMMENT OUT ON LINUX/WINDOWS
       # - /mnt:/mnt:ro            # Linux
       # - /media:/media:ro        # Linux: Ubuntu/Debian mounts
     networks:
-      - rivendell-network
+      - rowanholt-network
     restart: unless-stopped
     # The image's checkstate.sh runs as 'ansible', which can't read splunk-owned
     # /opt/splunk/var/log, so it reports unhealthy while splunkd is fine.
@@ -263,7 +269,7 @@ services:
   elastic:
     profiles: [siem]
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
-    container_name: rivendell-elastic
+    container_name: rowanholt-elastic
     hostname: elastic
     ports:
       - "9200:9200"
@@ -273,12 +279,12 @@ services:
       - xpack.security.enabled=true
       - xpack.security.http.ssl.enabled=false
       - xpack.security.transport.ssl.enabled=false
-      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-rivendell}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-rowanholt}
       - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
     volumes:
       - elastic_data:/usr/share/elasticsearch/data
     networks:
-      - rivendell-network
+      - rowanholt-network
     restart: unless-stopped
     healthcheck:
       test:
@@ -301,15 +307,15 @@ services:
   elastic-setup:
     profiles: [siem]
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
-    container_name: rivendell-elastic-setup
+    container_name: rowanholt-elastic-setup
     depends_on:
       elastic:
         condition: service_healthy
     networks:
-      - rivendell-network
+      - rowanholt-network
     environment:
-      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-rivendell}
-      - KIBANA_PASSWORD=${KIBANA_PASSWORD:-rivendell}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-rowanholt}
+      - KIBANA_PASSWORD=${KIBANA_PASSWORD:-rowanholt}
     command: >
       bash -c '
         echo "Waiting for Elasticsearch to be ready...";
@@ -332,21 +338,21 @@ services:
   kibana:
     profiles: [siem]
     image: docker.elastic.co/kibana/kibana:8.11.0
-    container_name: rivendell-kibana
+    container_name: rowanholt-kibana
     hostname: kibana
     ports:
       - "5601:5601"
     environment:
       - ELASTICSEARCH_HOSTS=http://elastic:9200
       - ELASTICSEARCH_USERNAME=kibana_system
-      - ELASTICSEARCH_PASSWORD=${KIBANA_PASSWORD:-rivendell}
-      - SERVER_NAME=rivendell-kibana
+      - ELASTICSEARCH_PASSWORD=${KIBANA_PASSWORD:-rowanholt}
+      - SERVER_NAME=rowanholt-kibana
       - XPACK_SECURITY_ENABLED=true
     depends_on:
       elastic:
         condition: service_healthy
     networks:
-      - rivendell-network
+      - rowanholt-network
     restart: unless-stopped
     healthcheck:
       test:
@@ -363,28 +369,28 @@ services:
         limits:
           memory: 512M
 
-  # Kibana dashboard setup - imports Rivendell dashboards
+  # Kibana dashboard setup - imports Rowanholt dashboards
   kibana-setup:
     profiles: [siem]
     image: curlimages/curl:latest
-    container_name: rivendell-kibana-setup
+    container_name: rowanholt-kibana-setup
     depends_on:
       kibana:
         condition: service_healthy
     networks:
-      - rivendell-network
+      - rowanholt-network
     environment:
       - KIBANA_URL=http://kibana:5601
       - ELASTIC_USER=elastic
-      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-rivendell}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-rowanholt}
     volumes:
       - ./src/web/kibana:/dashboards:ro
     command: >
       sh -c '
-        echo "Rivendell Kibana Dashboard Setup";
+        echo "Rowanholt Kibana Dashboard Setup";
         echo "=================================";
 
-        echo "Importing Rivendell dashboards...";
+        echo "Importing Rowanholt dashboards...";
         response=$$(curl -s -X POST \
           -u "elastic:$$ELASTIC_PASSWORD" \
           "http://kibana:5601/api/saved_objects/_import?overwrite=true" \
@@ -403,17 +409,17 @@ services:
           "http://kibana:5601/api/kibana/settings" \
           -H "kbn-xsrf: true" \
           -H "Content-Type: application/json" \
-          -d "{\"changes\":{\"defaultIndex\":\"rivendell-index-pattern\"}}" > /dev/null;
+          -d "{\"changes\":{\"defaultIndex\":\"rowanholt-index-pattern\"}}" > /dev/null;
 
         echo "";
         echo "Kibana setup complete!";
-        echo "  - Overview: http://localhost:5601/app/dashboards#/view/rivendell-overview";
-        echo "  - MITRE ATT&CK: http://localhost:5601/app/dashboards#/view/rivendell-mitre";
-        echo "  - Analysis: http://localhost:5601/app/dashboards#/view/rivendell-analysis";
-        echo "  - IoCs: http://localhost:5601/app/dashboards#/view/rivendell-iocs";
-        echo "  - Keywords: http://localhost:5601/app/dashboards#/view/rivendell-keywords";
-        echo "  - YARA: http://localhost:5601/app/dashboards#/view/rivendell-yara";
-        echo "  - Actors: http://localhost:5601/app/dashboards#/view/rivendell-actors";
+        echo "  - Overview: http://localhost:5601/app/dashboards#/view/rowanholt-overview";
+        echo "  - MITRE ATT&CK: http://localhost:5601/app/dashboards#/view/rowanholt-mitre";
+        echo "  - Analysis: http://localhost:5601/app/dashboards#/view/rowanholt-analysis";
+        echo "  - IoCs: http://localhost:5601/app/dashboards#/view/rowanholt-iocs";
+        echo "  - Keywords: http://localhost:5601/app/dashboards#/view/rowanholt-keywords";
+        echo "  - YARA: http://localhost:5601/app/dashboards#/view/rowanholt-yara";
+        echo "  - Actors: http://localhost:5601/app/dashboards#/view/rowanholt-actors";
       '
     restart: "no"
 
@@ -421,7 +427,7 @@ services:
   navigator:
     profiles: [siem]
     image: node:18-alpine
-    container_name: rivendell-navigator
+    container_name: rowanholt-navigator
     hostname: navigator
     ports:
       - "5602:4200"
@@ -429,7 +435,7 @@ services:
     volumes:
       - navigator_data:/navigator
     networks:
-      - rivendell-network
+      - rowanholt-network
     restart: unless-stopped
     command: >
       sh -c "
@@ -459,8 +465,8 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  rivendell_output:
-  rivendell_uploads:
+  rowanholt_output:
+  rowanholt_uploads:
   splunk_etc:
   splunk_var:
   elastic_data:
@@ -468,9 +474,9 @@ volumes:
   anduril_token:
 
 networks:
-  rivendell-network:
+  rowanholt-network:
     driver: bridge
   # Backend <-> anduril only; no route out and nothing published.
-  rivendell-anduril:
+  rowanholt-anduril:
     driver: bridge
     internal: true

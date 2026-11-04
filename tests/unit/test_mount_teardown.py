@@ -5,7 +5,7 @@ from pathlib import Path
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from rivendell import mount  # noqa: E402
+from rowanholt import mount  # noqa: E402
 
 
 def test_kpartx_mappings_are_removed_before_losetup(monkeypatch):
