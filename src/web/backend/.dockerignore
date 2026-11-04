@@ -40,3 +40,15 @@ Dockerfile
 # Environment
 .env
 .env.local
+
+# Case output and evidence never go into the image: the dev stack mounts this folder as the
+# backend's /app, so a relative output path lands here (a whole E01 case once did)
+*.E01
+*.e01
+*.Ex01
+*.mem
+*.raw
+*.dd
+*.vmdk
+*.pst
+**/artefacts/
