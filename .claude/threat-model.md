@@ -48,21 +48,21 @@ What changed: `dernvale mcp --http` (the `eru-mcp` service, Compose profile `mcp
 
 Re-review if the endpoint is opened beyond the team's network, if it takes any token but eru-mcp, or on the phase 2 triggers above.
 
-## Review: online lookups (DRAFT, 4 November 2026, NOT YET APPROVED)
+## Review: online lookups (4 November 2026, Ben)
 
-For Ben. Built on `feat/dernvale-outstanding` behind a switch that's off: nothing leaves until `.env` sets `DERNVALE_ONLINE_LOOKUPS=virustotal` and `VIRUSTOTAL_API_KEY`.
+Approved as built, any analyst. Built on `feat/dernvale-outstanding` behind a switch that's off: nothing leaves until `.env` sets `DERNVALE_ONLINE_LOOKUPS=virustotal` and `VIRUSTOTAL_API_KEY`.
 
 What it does. `POST /api/threat-intel/lookup` sends one value to VirusTotal v3 (`threat_intel_lookup.py`, stdlib `urllib`, a fixed `https://www.virustotal.com/api/v3/` URL, 15-second timeout) and returns the detection counts, reputation, tags and a link. Pippin's *Check a value* shows a **Look up on VirusTotal** button only when it's on. Answers are cached in memory for an hour, so a second click doesn't send again.
 
-1. **Who can send: any signed-in analyst, never Eru.** The route refuses an eru-mcp token and any request carrying `X-Dernvale-Agent` (or the old header), and an eru-mcp token is refused by `tokens.refusal` anyway (a POST outside leads, notes and Eru's questions). The MCP server has no tool for it and Ask Eru doesn't call it, so point 4 of the phase 2 review ("outbound calls: confirmed none") still holds for Eru. Elrond never calls it. Decide: should it be admin-only instead, as imports are?
-2. **What can be sent: an IP, domain or hash only.** Private, loopback, link-local, CGNAT, reserved and documentation addresses are refused (`is_global`), as are single-label names and `.local`, `.lan`, `.corp`, `.internal`, `.home.arpa` and the like. Command lines, paths and process names can't be sent. Risk accepted or not: a public domain that is the client's own (their AD forest's public name, an internal service on a real domain) still goes, and tells VirusTotal, and anyone with VirusTotal's intelligence feeds, that someone is investigating it. A file hash looked up reveals interest in that file, and an unknown hash is a strong hint that something new is being looked at. Decide: add an `.env` list of the client's own domains that are never sent?
+1. **Who can send: any signed-in analyst, never Eru.** The route refuses an eru-mcp token and any request carrying `X-Dernvale-Agent` (or the old header), and an eru-mcp token is refused by `tokens.refusal` anyway (a POST outside leads, notes and Eru's questions). The MCP server has no tool for it and Ask Eru doesn't call it, so point 4 of the phase 2 review ("outbound calls: confirmed none") still holds for Eru. Elrond never calls it. Decided: any analyst, not admin-only.
+2. **What can be sent: an IP, domain or hash only.** Private, loopback, link-local, CGNAT, reserved and documentation addresses are refused (`is_global`), as are single-label names and `.local`, `.lan`, `.corp`, `.internal`, `.home.arpa` and the like. Command lines, paths and process names can't be sent. Risk accepted: a public domain that is the client's own (their AD forest's public name, an internal service on a real domain) still goes, and tells VirusTotal, and anyone with VirusTotal's intelligence feeds, that someone is investigating it. A file hash looked up reveals interest in that file, and an unknown hash is a strong hint that something new is being looked at. No list of the client's own domains: the analyst decides what to look up.
 3. **The key.** Read from the environment only (`VIRUSTOTAL_API_KEY`), never stored, logged or returned. A public-API key's quota is small (`429` is shown as such). On a team server the key is the team's, so every analyst's lookups count against one account and appear in that account's history.
-4. **Audit.** Each lookup is logged (`Online lookup: <user> asked virustotal about <kind> <value>`) in the backend log, not the case's activity, because Pippin has no case. The roadmap's agreed shape was per case and in the case's audit log. Decide: accept the backend log for now, or require the button to move into the case browser, switched on per case, with each lookup in `case_activity`?
+4. **Audit.** Each lookup is logged (`Online lookup: <user> asked virustotal about <kind> <value>`) in the backend log, not the case's activity, because Pippin has no case. The roadmap's agreed shape was per case and in the case's audit log. Accepted: the backend log, from Pippin, not per case.
 5. **Prompt injection: none new.** Nothing a model reads reaches the lookup, and its answer goes only to the analyst's browser, not into Eru's context.
 
 Tests: `tests/unit/test_threat_intel_lookup.py` (off by default, what's refused, Eru refused, cache, VirusTotal's 404/429/401/timeouts) against the real backend in server mode, with the fetcher swapped so nothing is sent.
 
-Approve, or approve with conditions, before `DERNVALE_ONLINE_LOOKUPS` is set on any install holding a live case.
+Re-review if lookups are made automatic, offered to Eru or Elrond, sent to another provider, or given values other than IPs, domains and hashes.
 
 ## Chain of custody note
 
