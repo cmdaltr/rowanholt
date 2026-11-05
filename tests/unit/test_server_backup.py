@@ -18,6 +18,7 @@ case "$1" in
     case "$*" in
       *pg_dump*) printf 'PGDMP fake dump' ;;
       *pg_restore*) cat > /dev/null; [ -z "$BAD_DUMP" ] ;;
+      *users.json*) echo '{"via": "backend"}' ;;
     esac ;;
 esac
 """
@@ -51,6 +52,21 @@ def test_state_backed_up_owner_only(tmp_path):
     assert (out / "rowanholt.pgdump").read_text().startswith("PGDMP")
     assert stat.S_IMODE(out.stat().st_mode) == 0o700
     assert stat.S_IMODE((out / ".env").stat().st_mode) == 0o600
+
+
+def test_root_owned_user_store_read_through_the_backend(tmp_path):
+    """The backend writes users.json as root, mode 600: the Mini's nightly run, as the server's user,
+    couldn't read it (5 November 2026)."""
+    root, env = tree(tmp_path)
+    users = root / "src" / "web" / "backend" / "data" / "users.json"
+    users.chmod(0)
+    try:
+        done = backup(root, env, tmp_path / "backups")
+    finally:
+        users.chmod(0o600)
+    assert done.returncode == 0, done.stderr
+    [out] = (tmp_path / "backups").iterdir()
+    assert (out / "users.json").read_text().strip() == '{"via": "backend"}'
 
 
 def test_newest_kept(tmp_path):

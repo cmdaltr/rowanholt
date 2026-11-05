@@ -43,9 +43,17 @@ trap '$DONE || rm -rf "$OUT"' EXIT  # a half-made backup never stays to be mista
 docker exec rowanholt-postgres pg_dump -U rowanholt -d rowanholt -Fc > "$OUT/rowanholt.pgdump"
 docker exec -i rowanholt-postgres pg_restore --list < "$OUT/rowanholt.pgdump" > /dev/null || {
     echo "Error: the database dump doesn't read back" >&2; exit 1; }
-for file in .env src/web/backend/data/users.json docker-compose.local.yml; do
-    [ -f "$ROOT/$file" ] && cp "$ROOT/$file" "$OUT/$(basename "$file")"
+for file in .env docker-compose.local.yml; do
+    [ -f "$ROOT/$file" ] && cp "$ROOT/$file" "$OUT/$file"
 done
+# The backend writes the user store as root, mode 600: a backup run as the server's user
+# reads it through the backend instead
+USERS="$ROOT/src/web/backend/data/users.json"
+if [ -r "$USERS" ]; then
+    cp "$USERS" "$OUT/users.json"
+elif [ -e "$USERS" ]; then
+    docker exec rowanholt-backend cat /app/data/users.json > "$OUT/users.json"
+fi
 DONE=true
 
 # Oldest first past the newest KEEP (the names sort by time)
