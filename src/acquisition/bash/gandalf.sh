@@ -70,8 +70,8 @@ EOF
     echo
     local quotes=(
         "You shall pass... your artifacts to the analyst!"
-        "A forensic analyst is never late, nor is he early..."
-        "Even the smallest clue can change the course of the investigation"
+        "The Road goes ever on and on... and ends at the analyst"
+        "Even the very wise cannot see all ends: collect everything"
         "Keep it secret, keep it safe... then decrypt it for analysis"
         "All we have to decide is what to do with the evidence given to us"
     )
