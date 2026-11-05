@@ -78,12 +78,12 @@ Stacking compares Linux hosts within their distribution family, so `lab-rocky` (
 
 `./lab.sh stacking-eval` does all of that in one go: it starts the four targets, collects them with `gandalf.py` into a folder of its own under `<data>/stacking-eval/STACKEVAL-<date>/`, runs Elrond in Rowanholt's worker with `--Gandalf --Process --Analysis`, and scores `stacking.csv` against the `stacking` values in each target's `expected.json` (`lib/stacking_eval.py`). It prints precision at 4, 8 and 20 and each plant's rank, adds a row to the table below, and exits 1 if a plant isn't in `stacking.csv` at all. `./lab.sh stacking-eval --reuse` skips the collection and runs Elrond over the latest case's (or `--reuse STACKEVAL-<date>`'s), for when only Elrond has changed; collect afresh when Gandalf or the seeded targets have. Run it every release; the Windows evaluation (clean siblings, below) at least once per major release.
 
-| Date | Hosts | Rows | P@4 | P@8 | P@20 | Plant ranks |
-|---|---|---|---|---|---|---|
-| 2026-11-03 | Linux containers (python collector) | 4 | 1.00 | 1.00 | 1.00 | 1, 2, 4 |
-| 2026-11-04 | Linux containers (python collector) | 4 | 1.00 | 1.00 | 1.00 | 1, 2, 4 |
-| 2026-11-04 | Linux containers (python collector) | 4 | 1.00 | 1.00 | 1.00 | 1, 2, 4 |
-| 2026-11-05 | Linux containers (python collector) | 4 | 1.00 | 1.00 | 1.00 | 1, 2, 4 |
+| Date | Case | Hosts | Rows | P@4 | P@8 | P@20 | Plant ranks |
+|---|---|---|---|---|---|---|---|
+| 2026-11-03 | `STACKEVAL-20261103-0257` or `-2252` | Linux containers (python collector) | 4 | 1.00 | 1.00 | 1.00 | 1, 2, 4 |
+| 2026-11-04 | `STACKEVAL-20261104-1203` | Linux containers (python collector) | 4 | 1.00 | 1.00 | 1.00 | 1, 2, 4 |
+| 2026-11-04 | `STACKEVAL-20261104-2129` | Linux containers (python collector) | 4 | 1.00 | 1.00 | 1.00 | 1, 2, 4 |
+| 2026-11-05 | `STACKEVAL-20261105-1023` | Linux containers (python collector) | 4 | 1.00 | 1.00 | 1.00 | 1, 2, 4 |
 <!-- stacking-eval: rows above -->
 
 The **Linux VM** (`linux-vm create`) is Ubuntu with a real kernel (`bento/ubuntu-24.04` under Vagrant, Cirrus Labs `ubuntu:latest` under Tart), on SSH port 2230. The **macOS VM** (`macos-vm create`, Apple silicon only) is a Cirrus Labs Sequoia image on port 2231, provisioned without prompts: a `gandalf` user, a LaunchAgent, zsh history with a download, and a hidden staging folder in `/Users/Shared`. Both collectors work against it. `gandalf.sh` runs with sudo and also gets the root-only TCC and KnowledgeC databases; `gandalf.py` collects as the SSH user, so it skips what that user can't read. On the reference run (USB HDD), first boot took about an hour, then provisioning took 2.5 minutes, the bash and Python collections about 3 and 2 minutes, and Elrond 1.5–4 minutes.

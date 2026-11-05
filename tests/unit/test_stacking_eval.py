@@ -10,6 +10,8 @@ spec = importlib.util.spec_from_file_location("stacking_eval", SCRIPT)
 stacking_eval = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(stacking_eval)
 
+# lab.sh runs Elrond into <case>/elrond; the row names the case
+OUT = Path("STACKEVAL-20261105-1023") / "elrond"
 HEADER = "Rank,Score,Family,Value,Hosts With It,Hosts In Case,Hosts,Reasons,Artefact,Example\n"
 
 
@@ -18,16 +20,16 @@ def lab_run(tmp_path: Path, rows: str) -> Path:
     (tmp_path / "acq" / "lab-ubuntu-clean1").mkdir()
     (tmp_path / "acq" / "lab-ubuntu" / "expected.json").write_text(json.dumps(
         {"seeded": [], "stacking": ["lab-sync.service", "lab-agent.service", "lab updater"]}))
-    (tmp_path / "out" / "CASE").mkdir(parents=True)
-    (tmp_path / "out" / "CASE" / "stacking.csv").write_text(HEADER + rows)
+    (tmp_path / OUT / "CASE").mkdir(parents=True)
+    (tmp_path / OUT / "CASE" / "stacking.csv").write_text(HEADER + rows)
     readme = tmp_path / "README.md"
-    readme.write_text("| Date | Hosts | Rows | P@4 | P@8 | P@20 | Plant ranks |\n|---|---|---|---|---|---|---|\n"
+    readme.write_text("| Date | Case | Hosts | Rows | P@4 | P@8 | P@20 | Plant ranks |\n|---|---|---|---|---|---|---|---|\n"
                       f"{stacking_eval.TABLE_END}\n")
     return readme
 
 
 def run(tmp_path: Path, monkeypatch, *extra: str) -> int:
-    monkeypatch.setattr(sys, "argv", ["stacking_eval.py", str(tmp_path / "out"), str(tmp_path / "acq"), *extra])
+    monkeypatch.setattr(sys, "argv", ["stacking_eval.py", str(tmp_path / OUT), str(tmp_path / "acq"), *extra])
     return stacking_eval.main()
 
 
@@ -42,7 +44,7 @@ def test_scores_and_records(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "5 rows" in out and "precision@4: 0.75" in out and "precision@8: 0.60" in out
     rows = readme.read_text().splitlines()
-    assert rows[-2].endswith("| synthetic | 5 | 0.75 | 0.60 | 0.60 | 1, 3, 4 |")
+    assert rows[-2].endswith("| `STACKEVAL-20261105-1023` | synthetic | 5 | 0.75 | 0.60 | 0.60 | 1, 3, 4 |")
     assert rows[-1] == stacking_eval.TABLE_END
 
 

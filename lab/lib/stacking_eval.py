@@ -96,7 +96,9 @@ def main() -> int:
     if options.readme:
         hosts = sorted(p.name for p in options.acquisitions.iterdir() if p.is_dir())
         placed = ", ".join(str(r) if r else "missing" for r in sorted(where.values(), key=lambda r: r or 10 ** 9))
-        append_row(options.readme, f"| {date.today().isoformat()} | {options.label or ', '.join(hosts)} | {total} | "
+        # the case folder: <case>/elrond when lab.sh ran Elrond, else the output folder itself
+        case = options.output.resolve().parent.name if options.output.name == "elrond" else options.output.resolve().name
+        append_row(options.readme, f"| {date.today().isoformat()} | `{case}` | {options.label or ', '.join(hosts)} | {total} | "
                                    + " | ".join(f"{precisions[k]:.2f}" for k in KS) + f" | {placed} |")
         print(f"Added to {options.readme}")
     return 0 if all(where.values()) else 1
