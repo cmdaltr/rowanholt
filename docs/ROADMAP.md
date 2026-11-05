@@ -217,6 +217,10 @@ The day v2.3 was merged (PR #2, merge commit `a9c118b`). Bug numbers are in `tes
 | The CLI banner says Rowanholt, with a rowan in it; the banner quotes are the books' words, each credited, no film dialogue | `src/cli/rowanholt.py`, Gandalf, `passkey_decrypt.py` |
 | Lab VMs are `rowan-lab-*`; `./lab.sh stacking-eval --reuse` scores Elrond over a saved collection; the stacking table names each row's case; `rowanholt elrond process-one` processes one raw file | `lab/`, `src/analysis/process_one.py` |
 | The architecture map is drawn on a new parchment map | `scripts/docs/architecture/` |
+| Windows live containers: `Invoke-Gandalf -LiveContainers` no longer ends the collection at the first container, and Elrond flags a Windows host's containers from `docker inspect` (Docker Desktop keeps `config.v2.json` in its WSL VM); the lab tests it without Docker Desktop (`./lab.sh windows-vm live-containers`) | `Set-ArtefactCollection`, `containers.py`, `lab/windows/` |
+| A team server stood up on a tailnet (Ubuntu in OrbStack on the Mac Mini) and passed its smoke test: exposure, TLS, sign-in, two users, a job on the evidence share, Eru's MCP endpoint, a second device, a restart. It found three bugs, all fixed: the production frontend didn't build (lock file out of step); an Elrond run stopped by an error exited 0, so its job "completed" with an empty case; a `*.ts.net` name got no certificate | `src/web/frontend/package-lock.json`, Elrond's error exits |
+| `server init --tls tailscale` serves Tailscale's certificate for a MagicDNS name (refusing `internal` there), and `rowanholt server cert` renews it | `scripts/server/`, [SERVER.md](SERVER.md#certificates) |
+| A server's accounts live in the checkout's `users.json`, not the images: rebuilds keep them, `git clean -x` doesn't, so back it up with `.env` and Postgres | [SERVER.md](SERVER.md#limits-worth-knowing) |
 
 ## Decisions (Ben, 29 October 2026)
 

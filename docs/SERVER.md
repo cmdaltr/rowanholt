@@ -133,6 +133,7 @@ People can use the server from the desktop app instead of a browser tab: in setu
 - **Andúril holds the Docker socket.** It's opt-in (`rowanholt anduril enable`) and admin-only on a server, but whoever administers it administers the host's Docker.
 - **Splunk and Kibana** have their own users and indexes. Rowanholt's sign-in in front of them keeps out anyone without a Rowanholt account, but doesn't map job sharing onto their data. The Navigator does follow it: a case's layer is served only to people who can see the case, and layers from command-line runs (no job) only to admins.
 - **Sessions are 24-hour tokens** (`access_token_expire_minutes`); disabling a user stops their next request, since every request checks the user store.
+- **Accounts live in the checkout, not the database.** The user store is `src/web/backend/data/users.json`, on the host through the backend's bind mount and kept out of the images by `.dockerignore`, so a rebuild or a pull leaves accounts alone. It's gitignored, so `git clean -x` deletes it: back it up with `.env` (the secrets, `SECRET_KEY` among them) and Postgres (jobs, findings, API tokens).
 
 ## How sign-in lockouts work
 
