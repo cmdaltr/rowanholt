@@ -102,8 +102,11 @@ def verify(host: Path, target: Path, techniques: set) -> list:
         row["yara"] = ([r for r in item["yara"] if r.lower() not in corpus] if yara_ran else "not run") if "yara" in item else None
         row["keywords"] = ([k for k in item["keywords"] if k.lower() not in corpus] if keywords_ran else "not run") if "keywords" in item else None
         rows.append(row)
-    iocs = expected.get("iocs", [])
-    rows.append({"item": "IOCs", "expect": [i for i in iocs if i.lower() not in corpus]})
+    # An IOC only in a seeded file's text (sync.ps1's download URL) is found by --extractIocs
+    # alone; without it, a missing IOC wasn't looked for rather than missed
+    missing = [i for i in expected.get("iocs", []) if i.lower() not in corpus]
+    iocs_ran = (host / "analysis" / "iocs.csv").exists()
+    rows.append({"item": "IOCs", "expect": missing if iocs_ran or not missing else "not run"})
     return rows
 
 
