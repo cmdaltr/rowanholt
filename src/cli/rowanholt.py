@@ -28,19 +28,26 @@ VERSION = "2.0.0"
 
 def print_banner():
     """Print Rowanholt banner"""
+    # The counters of R, o, a and o are rowan berries and the l a rowan in leaf; plain text when piped or NO_COLOR is set
+    colour = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+    red, green, brown, reset = (("\033[1;91m", "\033[1;92m", "\033[38;5;130m", "\033[0m") if colour
+                                else ("", "", "", ""))
     banner = r"""
-    ____                          _           _ _
-   |  _ \ _____      ____ _ _ __ | |__   ___ | | |_
-   | |_) / _ \ \ /\ / / _` | '_ \| '_ \ / _ \| | __|
-   |  _ < (_) \ V  V / (_| | | | | | | | (_) | | |_
-   |_| \_\___/ \_/\_/ \__,_|_| |_|_| |_|\___/|_|\__|
+                                           {green}.-. .-.{reset}
+                                          {green}(   V   ){reset}
+                                           {green}`-'{reset}{brown}|{reset}{green}`-'{reset}
+    ____                          _           {brown}_{reset} _
+   |  {red}_{reset} \ _____      ____ _ _ __ | |__   ___ {brown}| |{reset} |_
+   | {red}|_){reset} / {red}_{reset} \ \ /\ / / {red}_{reset}` | '_ \| '_ \ / {red}_{reset} \{brown}| |{reset} __|
+   |  _ < {red}(_){reset} \ V  V / {red}(_|{reset} | | | | | | | {red}(_){reset} {brown}| |{reset} |_
+   |_| \_\___/ \_/\_/ \__,_|_| |_|_| |_|\___/{brown}|_|{reset}\__|
 
    Digital Forensics Suite - Acquisition & Analysis
-   Version {}
+   Version {version}
 
    Gandalf: Remote Forensic Acquisition
    Elrond:  Automated Forensic Analysis
-""".format(VERSION)
+""".format(red=red, green=green, brown=brown, reset=reset, version=VERSION)
     print(banner)
 
 
