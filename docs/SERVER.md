@@ -133,7 +133,26 @@ People can use the server from the desktop app instead of a browser tab: in setu
 - **Andúril holds the Docker socket.** It's opt-in (`rowanholt anduril enable`) and admin-only on a server, but whoever administers it administers the host's Docker.
 - **Splunk and Kibana** have their own users and indexes. Rowanholt's sign-in in front of them keeps out anyone without a Rowanholt account, but doesn't map job sharing onto their data. The Navigator does follow it: a case's layer is served only to people who can see the case, and layers from command-line runs (no job) only to admins.
 - **Sessions are 24-hour tokens** (`access_token_expire_minutes`); disabling a user stops their next request, since every request checks the user store.
-- **Accounts live in the checkout, not the database.** The user store is `src/web/backend/data/users.json`, on the host through the backend's bind mount and kept out of the images by `.dockerignore`, so a rebuild or a pull leaves accounts alone. It's gitignored, so `git clean -x` deletes it: back it up with `.env` (the secrets, `SECRET_KEY` among them) and Postgres (jobs, findings, API tokens).
+- **Accounts live in the checkout, not the database.** The user store is `src/web/backend/data/users.json`, on the host through the backend's bind mount and kept out of the images by `.dockerignore`, so a rebuild or a pull leaves accounts alone. It's gitignored, so `git clean -x` deletes it: `rowanholt server backup` (below) keeps it with `.env` and the database.
+
+## Backups
+
+```bash
+rowanholt server backup /backups/rowanholt            # --keep 14 by default
+```
+
+Each run writes a dated folder holding the database dump (jobs, findings, notes, activity, API tokens, threat intelligence), `users.json`, `.env` and `docker-compose.local.yml`. The dump is read back before the backup counts, and a failed run leaves nothing behind. The folder holds the server's secrets, so it's created owner-only: keep it off shared storage. Case output and evidence aren't in it; back up the evidence storage on its own. Daily from cron, to storage that isn't the server's own disk:
+
+```
+30 3 * * * /path/to/rowanholt server backup /backups/rowanholt >/dev/null
+```
+
+To restore on a fresh checkout: put `.env`, `users.json` (in `src/web/backend/data/`) and `docker-compose.local.yml` back, `rowanholt start`, then load the dump and restart the backend:
+
+```bash
+docker exec -i rowanholt-postgres pg_restore -U rowanholt -d rowanholt --clean --if-exists --no-owner < rowanholt.pgdump
+docker restart rowanholt-backend
+```
 
 ## How sign-in lockouts work
 
