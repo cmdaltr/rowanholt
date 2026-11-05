@@ -18,7 +18,11 @@ param(
     [switch]$Memory,
     # Seeded files outside Gandalf's artefact set (expected.json's IOCs live in them),
     # collected with -CollectFiles; an empty list skips file collection
-    [string[]]$Files = @("sync.ps1", "notes.txt")
+    [string[]]$Files = @("sync.ps1", "notes.txt"),
+    # -LiveContainers asks the docker CLI for its running containers; -DockerHost points that CLI
+    # at an engine elsewhere (the lab's throwaway one on the Mac, utm-vm.sh live-containers)
+    [switch]$LiveContainers,
+    [string]$DockerHost = ""
 )
 $ErrorActionPreference = "Stop"
 
@@ -57,6 +61,12 @@ try {
     $gandalfArgs = @{ EncryptionObject = "None"; Acquisition = "Local"; OutputDirectory = "acquisitions" }
     if ($Memory) { $gandalfArgs.Memory = $true }
     if ($Files) { $gandalfArgs.CollectFiles = $true }
+    if ($LiveContainers) {
+        $gandalfArgs.LiveContainers = $true
+        if (Test-Path "C:\lab\docker\docker.exe") { $env:PATH = "C:\lab\docker;$env:PATH" }
+        if ($DockerHost) { $env:DOCKER_HOST = $DockerHost }
+        Write-Host "docker: $((Get-Command docker -ErrorAction SilentlyContinue).Source) -> $env:DOCKER_HOST"
+    }
     # Newer Invoke-Gandalf declares -NoPrompt; the Read-Host shim covers older copies.
     if ((Get-Command $entry).Parameters.ContainsKey("NoPrompt")) { $gandalfArgs.NoPrompt = $true }
     # Gandalf expects PowerShell's default "Continue": under "Stop" one artefact's

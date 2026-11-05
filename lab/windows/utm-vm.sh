@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Apple silicon only: an unattended Windows 11 ARM VM in UTM.
-#   utm-vm.sh create|adopt [bundle.utm]|start|stop|delete|status|collect
+#   utm-vm.sh create|adopt [bundle.utm]|start|stop|delete|status|collect|live-containers
 #   utm-vm.sh sensor | record <T1,T2> <run> <dest-dir>   (Atomic Red Team telemetry)
 #   utm-vm.sh raw-check [dest-dir]   (reader vs RawCopy, live and off a snapshot; report per run)
 # adopt takes a Windows VM that's already installed (a .utm in $LAB_VM_DIR/utm,
@@ -18,7 +18,7 @@ set -euo pipefail
 . "$(dirname "$0")/../lib/common.sh"
 load_config
 
-action="${1:?create|adopt|start|stop|delete|status|collect|raw-check|sensor|record}"
+action="${1:?create|adopt|start|stop|delete|status|collect|live-containers|raw-check|sensor|record}"
 uses_tart || die "The UTM VM is for Apple silicon. On x86-64 hosts the lab uses Vagrant: ./lab.sh windows-vm"
 [ -d /Applications/UTM.app ] || die "UTM is not installed. Run: ./lab.sh install"
 
@@ -351,7 +351,7 @@ collect() {
   info "Running Invoke-Gandalf in $VM"
   # A full collection, file search and hashing run past ssh.exp's 15 minutes; cut off,
   # the session ends mid-archive and nothing new comes back
-  LAB_SSH_TIMEOUT="${LAB_SSH_TIMEOUT:-7200}" ssh_vm "powershell -NoProfile -ExecutionPolicy Bypass -File C:\\lab\\scripts\\Run-GandalfLocal.ps1 -GandalfSource C:\\lab\\gandalf-src -AcquisitionsRoot C:\\lab\\acquisitions" \
+  LAB_SSH_TIMEOUT="${LAB_SSH_TIMEOUT:-7200}" ssh_vm "powershell -NoProfile -ExecutionPolicy Bypass -File C:\\lab\\scripts\\Run-GandalfLocal.ps1 -GandalfSource C:\\lab\\gandalf-src -AcquisitionsRoot C:\\lab\\acquisitions${LIVE_ARGS:-}" \
     | grep -v -i password || true
   local dest="$ACQ_ROOT/powershell_collection/acquisitions" tmp host
   host="$(ssh_vm 'Write-Output "HOST=$env:COMPUTERNAME"' | tr -d '\r' | sed -n 's/^HOST=//p' | tail -1)"
@@ -453,6 +453,41 @@ record() {
   ok "Recorded: $dest/$run"
 }
 
+# live-containers: Invoke-Gandalf -LiveContainers against real containers without Docker Desktop
+# (WSL2 needs nested virtualisation, which UTM on Apple silicon doesn't give a Windows guest).
+# A throwaway Docker engine runs on the Mac, published on 127.0.0.1 only, which the guest reaches
+# as 10.0.2.2 through UTM's emulated network; it has no authentication, so it lives only for the
+# run. Two containers are seeded (one plain, one privileged with / mounted), the docker CLI is put
+# in C:\lab\docker, Gandalf collects with -LiveContainers, and the engine is removed.
+LIVE_ENGINE="rowan-lab-dockerd"
+LIVE_PORT="${LIVE_DOCKER_PORT:-2375}"
+DOCKER_CLI_URL="${DOCKER_CLI_URL:-https://download.docker.com/win/static/stable/x86_64/docker-27.3.1.zip}"
+
+live_containers() {
+  require_password
+  nc -z 127.0.0.1 "$PORT" 2>/dev/null || die "$VM isn't reachable on 127.0.0.1:$PORT. Start it: ./lab.sh windows-vm start"
+  command -v docker >/dev/null || die "docker isn't installed on this Mac"
+  docker rm -f "$LIVE_ENGINE" >/dev/null 2>&1 || true
+  trap 'docker rm -f "$LIVE_ENGINE" >/dev/null 2>&1 || true' EXIT
+  info "Starting a throwaway Docker engine on 127.0.0.1:$LIVE_PORT"
+  docker run -d --name "$LIVE_ENGINE" --privileged -e DOCKER_TLS_CERTDIR= -p "127.0.0.1:$LIVE_PORT:2375" \
+    docker:27-dind --host=tcp://0.0.0.0:2375 >/dev/null || die "Couldn't start $LIVE_ENGINE"
+  local engine="tcp://127.0.0.1:$LIVE_PORT" seeded="${TMPDIR:-/tmp}/lab-live-containers.txt" _
+  for _ in $(seq 1 30); do docker -H "$engine" info >/dev/null 2>&1 && break; sleep 2; done
+  docker -H "$engine" info >/dev/null 2>&1 || die "$LIVE_ENGINE didn't come up"
+  docker -H "$engine" run -d --name lab-web alpine:3.20 sleep infinity >/dev/null
+  docker -H "$engine" run -d --name lab-priv --privileged -v /:/host alpine:3.20 sleep infinity >/dev/null
+  docker -H "$engine" ps --no-trunc --format '{{.ID}} {{.Names}}' > "$seeded"
+  ok "Seeded: $(awk '{print substr($1,1,12) " " $2}' "$seeded" | tr '\n' ' ')"
+  info "Docker CLI in $VM"
+  ssh_vm "if (-not (Test-Path C:\\lab\\docker\\docker.exe)) { \$ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest -UseBasicParsing '$DOCKER_CLI_URL' -OutFile C:\\lab\\docker.zip; Expand-Archive -Force C:\\lab\\docker.zip C:\\lab; Remove-Item C:\\lab\\docker.zip }; \$env:DOCKER_HOST = 'tcp://10.0.2.2:$LIVE_PORT'; C:\\lab\\docker\\docker.exe ps --format '{{.Names}}'" \
+    | tr -d '\r' | grep -cE '^lab-(web|priv)$' | grep -qx 2 \
+    || die "$VM's docker CLI can't see the engine at 10.0.2.2:$LIVE_PORT"
+  ok "$VM sees both containers"
+  LIVE_ARGS=" -LiveContainers -DockerHost tcp://10.0.2.2:$LIVE_PORT" collect
+  ok "Expected in raw/live_containers/docker/: $(awk '{print substr($1,1,12)}' "$seeded" | tr '\n' ' ')"
+}
+
 case "$action" in
   create)
     # create always builds the lab's own VM (or a clean sibling), whatever WINDOWS_UTM_VM says
@@ -519,6 +554,7 @@ case "$action" in
   status)
     if vm_registered; then echo "$VM: $(vm_status), SSH 127.0.0.1:$PORT ($BUNDLE)"; else echo "$VM: not created"; fi ;;
   collect) collect ;;
+  live-containers) live_containers ;;
   raw-check) shift; raw_check "$@" ;;
   sensor) sensor ;;
   record) shift; record "$@" ;;
