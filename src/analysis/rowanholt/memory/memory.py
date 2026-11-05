@@ -98,6 +98,25 @@ def identify_memory_profile(
         return "Windows"
 
 
+FIVE_LEVEL_MARK = b"NUMBER(pgtable_l5_enabled)=1"
+FIVE_LEVEL_WARNING = (
+    "uses 5-level page tables (LA57), which Volatility 3 can't translate: plugins that read "
+    "kernel memory will return nothing or fail, so an empty result doesn't mean a clean host. "
+    "Physical scans (linux.psscan) still work")
+
+
+def five_level_paging(path):
+    """Whether a Linux image's kernel ran with 5-level page tables, from its VMCOREINFO note.
+    Read-only; False when the file can't be read."""
+    import mmap
+
+    try:
+        with open(path, "rb") as image, mmap.mmap(image.fileno(), 0, access=mmap.ACCESS_READ) as data:
+            return data.find(FIVE_LEVEL_MARK) != -1
+    except (OSError, ValueError):
+        return False
+
+
 def kernel_banner_os(d, artefact, memext):
     """ "Linux" or "macOS" from the kernel banner in the image (writing that OS's bundled
     symbols as the other checks do), or "" when there's neither. The process-based checks need
@@ -340,5 +359,19 @@ def process_memory(
             vssimage,
             memtimeline,
         )
+
+    # A Linux image with no process list is where 5-level page tables show; the image is read
+    # for the kernel's note only then (a full read of a large image off a USB disk takes minutes)
+    no_pslist = not any(
+        os.path.exists(p) and os.path.getsize(p) > 0
+        for p in (os.path.join(output_directory + mempath, name)
+                  for name in ("memory_linux.pslist.PsList.json", "linux.pslist.PsList.json")))
+    if profileplatform == "Linux" and no_pslist and five_level_paging(artefact + memext):
+        entry, prnt = "{},processing,{},5-level page tables\n".format(
+            datetime.now().isoformat(), artefact.split("/")[-1]
+        ), " -> {} -> WARNING: '{}' {}".format(
+            datetime.now().isoformat().replace("T", " "), artefact.split("/")[-1], FIVE_LEVEL_WARNING
+        )
+        write_audit_log_entry(verbosity, output_directory, entry, prnt)
 
     return profile, vssmem

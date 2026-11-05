@@ -31,3 +31,12 @@ def test_a_darwin_banner_is_macos(monkeypatch, tmp_path) -> None:
 def test_windows_still_wins_first(monkeypatch, tmp_path) -> None:
     info = "Kernel Base\t0xf80002a5c000\nWindows\tntkrnlmp.pdb\nwindows 7"
     assert identify(monkeypatch, tmp_path, {"windows.info.Info": info, "banners.Banners": LINUX_BANNER}) == "Windows"
+
+
+def test_five_level_paging_is_read_from_vmcoreinfo(tmp_path) -> None:
+    on, off = tmp_path / "on.mem", tmp_path / "off.mem"
+    on.write_bytes(b"\0" * 4096 + b"OSRELEASE=6.8.0-147-generic\nNUMBER(pgtable_l5_enabled)=1\n" + b"\0" * 4096)
+    off.write_bytes(b"\0" * 4096 + b"NUMBER(pgtable_l5_enabled)=0\n")
+    assert memory.five_level_paging(str(on))
+    assert not memory.five_level_paging(str(off))
+    assert not memory.five_level_paging(str(tmp_path / "missing.mem"))
