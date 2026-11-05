@@ -1,4 +1,8 @@
 {
+  "env": {
+    "MAX_THINKING_TOKENS": "10000",
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "50"
+  },
   "permissions": {
     "allow": [
       "Read",
@@ -38,7 +42,6 @@
       "Bash(exec:*)",
       "Bash(sudo:*)",
       "Bash(chmod 777:*)",
-      "Bash(ssh:*)",
       "Bash(scp:*)",
       "Bash(nc:*)",
       "Bash(ncat:*)",
@@ -101,9 +104,5 @@
         ]
       }
     ]
-  },
-  "env": {
-    "MAX_THINKING_TOKENS": "10000",
-    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "50"
   }
 }
