@@ -74,7 +74,8 @@ def test_python_collector_and_elrond(tmp_path, monkeypatch):
     for name in ("inspect.json", "top.txt"):
         (raw / name).write_bytes((host / "artefacts" / "live_containers" / "docker" / CID[:12] / name).read_bytes())
     assert la.process_linux_artefact("", "'HOST'", str(out) + "/", "HOST::Linux", "/", "processing", str(raw / "top.txt"))
-    assert not la.is_linux_artefact(str(raw / "inspect.json"))
+    # inspect.json is read too, for a docker_containers.csv row where the case has no config.v2.json
+    assert la.is_linux_artefact(str(raw / "inspect.json"))
     with open(out / "HOST" / "artefacts" / "cooked" / "container_processes.csv", newline="") as fh:
         rows = list(csv.DictReader(fh))
     assert [(r["PID"], r["Name"], r["Image"], r["Flag"]) for r in rows] == [
@@ -105,3 +106,43 @@ def test_rootless_podman_asked_as_its_user(tmp_path, monkeypatch):
     assert collector.live_sources() == [("podman", None), ("podman", "alice")]
     assert collector.as_user(None, ["podman", "ps"]) == ["podman", "ps"]
     assert collector.as_user("alice", ["podman", "top", CID]) == ["runuser", "-l", "alice", "-c", f"podman top {CID}"]
+
+
+INSPECT = """[{"Id": "%s", "Name": "/lab-priv", "Created": "2026-11-05T14:52:15Z", "Path": "sleep", "Args": ["infinity"],
+  "State": {"Running": true, "StartedAt": "2026-11-05T14:52:15Z"}, "Config": {"Image": "alpine:3.20", "User": ""},
+  "HostConfig": {"Privileged": %s, "Binds": %s, "NetworkMode": "bridge"},
+  "Mounts": [%s]}]"""
+
+
+def live_inspect(tmp_path: Path, privileged: bool, linux_config: bool = False) -> str:
+    raw = tmp_path / "CASE" / "LAB-WIN11" / "artefacts" / "raw"
+    folder = raw / "live_containers" / "docker" / CID[:12]
+    folder.mkdir(parents=True)
+    mount = '{"Source": "/", "Destination": "/host", "RW": true}' if privileged else ""
+    (folder / "inspect.json").write_text(INSPECT % (CID, str(privileged).lower(), '["/:/host"]' if privileged else "null",
+                                                    mount))
+    if linux_config:
+        (raw / "linux").mkdir()
+        (raw / "linux" / f"var+lib+docker+containers+{CID}+config.v2.json").write_text("{}")
+    return str(folder / "inspect.json")
+
+
+def test_live_inspect_is_a_container_row(tmp_path):
+    """A Windows host's Docker Desktop keeps config.v2.json in its WSL VM: `docker inspect` from the live
+    capture is the only record of what a container may reach (found on the lab's Windows VM, 5 November 2026)."""
+    out, rows, _, techniques = la._route_live_inspect(live_inspect(tmp_path, privileged=True))
+    assert out == "docker_containers.csv" and techniques == ["T1611"]
+    row = rows[0]
+    assert (row["Container"], row["Name"], row["Runtime"], row["Privileged"]) == (CID[:12], "lab-priv", "docker (live)", "True")
+    assert row["Flag"] == "privileged; host path mounted read-write (/)"
+    assert row["Mounts"] == "/:/host" and row["Command"] == "sleep infinity"
+
+
+def test_live_inspect_of_a_plain_container(tmp_path):
+    out, rows, _, techniques = la._route_live_inspect(live_inspect(tmp_path, privileged=False))
+    assert rows[0]["Flag"] == "" and techniques == []
+
+
+def test_live_inspect_leaves_linux_hosts_to_config_v2(tmp_path):
+    out, rows, _, _ = la._route_live_inspect(live_inspect(tmp_path, privileged=True, linux_config=True))
+    assert (out, rows) == ("", [])

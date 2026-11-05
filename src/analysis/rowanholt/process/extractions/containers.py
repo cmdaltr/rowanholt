@@ -14,7 +14,9 @@ routes them here).
 - /var/lib/containers/storage/db.sql (Podman 4.8 on, SQLite) or libpod/bolt_state.db (bbolt, before):
   Podman's record of its containers, with the same OCI spec inside, Runtime "podman"
 - raw/live_containers/<runtime>/<id>/top.txt (Gandalf -l/-L only, with inspect.json and export.tar
-  beside it): the processes running in each container when it was collected
+  beside it): the processes running in each container when it was collected; inspect.json gives the
+  container's docker_containers.csv row, Runtime "docker (live)", where the case has no config.v2.json
+  for it (a Windows host's Docker Desktop keeps that in its WSL VM)
 
 Every function returns rows; techniques are decided from the rows by the *_techniques functions,
 only where a row justifies one.
@@ -114,6 +116,27 @@ def docker_container_row(path: str, hostconfig: Optional[str] = None) -> Optiona
     if not config.get("ID"):
         return None
     host = _load_json(hostconfig) if hostconfig and os.path.isfile(hostconfig) else {}
+    return _docker_row(config, host)
+
+
+def docker_inspect_row(path: str) -> Optional[Dict[str, str]]:
+    """One container from `docker inspect` (Gandalf's live capture, raw/live_containers/docker/<id>/inspect.json):
+    the only record of a container's settings from a Windows host, whose Docker Desktop keeps
+    config.v2.json inside its WSL VM. The same fields as config.v2.json and hostconfig.json, shaped
+    differently: Id for ID, a Mounts list for MountPoints, HostConfig inline."""
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        data = json.load(fh)
+    inspect = data[0] if isinstance(data, list) and data else data
+    if not isinstance(inspect, dict) or not inspect.get("Id"):
+        return None
+    config = dict(inspect, ID=inspect["Id"],
+                  MountPoints={str(n): m for n, m in enumerate(inspect.get("Mounts") or []) if isinstance(m, dict)})
+    row = _docker_row(config, inspect.get("HostConfig") or {})
+    row["Runtime"] = "docker (live)"
+    return row
+
+
+def _docker_row(config: Dict, host: Dict) -> Dict[str, str]:
     state = config.get("State") or {}
     settings = config.get("Config") or {}
     mounts = [{"Source": m.get("Source", ""), "Destination": m.get("Destination", ""), "RW": bool(m.get("RW"))}

@@ -28,6 +28,8 @@ logger = logging.getLogger(__name__)
 LINUX_RAW = re.compile(r"/artefacts/raw/linux/")
 # Gandalf -l/-L: a running container's processes, as its runtime listed them
 LIVE_TOP = re.compile(r"/artefacts/raw/live_containers/(docker|podman)/([0-9a-f]{12})/top\.txt$")
+# and what Docker said about it: a docker_containers.csv row where the case has no config.v2.json for it
+LIVE_INSPECT = re.compile(r"/artefacts/raw/live_containers/docker/([0-9a-f]{12})/inspect\.json$")
 USER_FILES = ("viminfo", "lesshst", "python_history", "mysql_history", "psql_history", "wget-hsts", "recently-used.xbel",
               "db.sql", "bolt_state.db")  # the last two: rootless Podman
 
@@ -627,6 +629,18 @@ def _route_live(artefact: str) -> Tuple[str, List[Dict], str, List[str]]:
     return "container_processes.csv", rows, "running container processes", []
 
 
+def _route_live_inspect(artefact: str) -> Tuple[str, List[Dict], str, List[str]]:
+    """A container's settings from `docker inspect`, unless raw/linux/ has its config.v2.json (Linux hosts),
+    which already gives the row: Windows hosts, whose Docker Desktop keeps that file in its WSL VM."""
+    container = LIVE_INSPECT.search(artefact).group(1)
+    linux = os.path.join(artefact[:artefact.index("/artefacts/raw/") + len("/artefacts/raw/")], "linux")
+    if os.path.isdir(linux) and any(container in n and n.endswith("config.v2.json") for n in os.listdir(linux)):
+        return "", [], "", []
+    row = containers.docker_inspect_row(artefact)
+    rows = [row] if row else []
+    return "docker_containers.csv", rows, "Docker container (live)", containers.container_techniques(rows)
+
+
 def _route_user(artefact: str) -> Tuple[str, List[Dict], str, List[str]]:
     """(cooked csv, rows, description, techniques) for one extra user_profiles/<user>+<file>."""
     name = os.path.basename(artefact)
@@ -650,7 +664,7 @@ def _route_user(artefact: str) -> Tuple[str, List[Dict], str, List[str]]:
 
 def is_linux_artefact(artefact: str) -> bool:
     """Whether one of these processors reads this file (process/select.py uses it too)."""
-    if LINUX_RAW.search(artefact) or LIVE_TOP.search(artefact):
+    if LINUX_RAW.search(artefact) or LIVE_TOP.search(artefact) or LIVE_INSPECT.search(artefact):
         return True
     name = os.path.basename(artefact)
     return "+" in name and name.rpartition("+")[2] in USER_FILES
@@ -661,7 +675,8 @@ def process_linux_artefact(verbosity, vssimage, output_directory, img, vss_path_
     if not is_linux_artefact(artefact):
         return False
     try:
-        route = _route_linux if LINUX_RAW.search(artefact) else _route_live if LIVE_TOP.search(artefact) else _route_user
+        route = (_route_linux if LINUX_RAW.search(artefact) else _route_live if LIVE_TOP.search(artefact)
+                 else _route_live_inspect if LIVE_INSPECT.search(artefact) else _route_user)
         out, rows, what, techniques = route(artefact)
         if not out:
             return True  # collected for the analyst (web server configs, rotated logs) with nothing to parse
