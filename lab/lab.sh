@@ -317,7 +317,7 @@ cmd_windows_vm() {
     start) vagrant up win ;;
     stop) vagrant halt win ;;
     provision) vagrant provision win ;;
-    gui) VBoxManage startvm rowanholt-lab-win11 --type separate 2>/dev/null || open -a VirtualBox ;;
+    gui) VBoxManage startvm rowan-lab-win11 --type separate 2>/dev/null || open -a VirtualBox ;;
     delete) confirm "Destroy the Windows VM?" n && vagrant destroy -f win ;;
     status) vagrant status win ;;
   esac
@@ -382,21 +382,44 @@ cmd_gandalf_collect() {
 }
 
 # stacking-eval: the Linux stacking targets collected afresh, Elrond over all four as one case, and
-# stacking.csv scored against the plants (lib/stacking_eval.py), with a row added to README.md
+# stacking.csv scored against the plants (lib/stacking_eval.py), with a row added to README.md.
+# --reuse [CASE-ID] skips the collection and runs Elrond over an earlier case's (the latest by
+# default): enough when only Elrond changed, not Gandalf or the seeded targets.
 cmd_stacking_eval() {
+  local reuse=""
+  case "${1:-}" in
+    "") ;;
+    --reuse) reuse="${2:-latest}" ;;
+    *) die "Usage: ./lab.sh stacking-eval [--reuse [STACKEVAL-<date>]]" ;;
+  esac
   pick_docker_context
-  require_password
   docker ps --format '{{.Names}}' | grep -qx rowanholt-celery-worker || die "Rowanholt isn't running: ./rowanholt start"
-  local root="${TEST_IMAGES_PATH:-$LAB_DATA_DIR}" case_id dest acq
+  local root="${TEST_IMAGES_PATH:-$LAB_DATA_DIR}" case_id dest acq src
   docker exec rowanholt-celery-worker test -d "$root" || die "Rowanholt's worker can't see $root: run ./lab.sh rowanholt-env"
   case_id="STACKEVAL-$(date +%Y%m%d-%H%M)"
   dest="$root/stacking-eval/$case_id"
-  # A collection of its own, so hosts left from earlier runs aren't stacked with these
-  ACQ_ROOT="$dest/gandalf"
-  acq="$ACQ_ROOT/python_collection/acquisitions/"
-  mkdir -p "$ACQ_ROOT" "$dest/elrond"
-  cmd_linux_targets stacking || return 1
-  GANDALF_WORKAROUNDS=0 cmd_gandalf_collect python "lab-ubuntu lab-rocky lab-ubuntu-clean1 lab-ubuntu-clean2" || return 1
+  if [ -n "$reuse" ]; then
+    if [ "$reuse" = latest ]; then
+      for src in $(ls -dt "$root"/stacking-eval/STACKEVAL-* 2>/dev/null); do
+        [ -n "$(ls "$src/gandalf/python_collection/acquisitions/" 2>/dev/null)" ] && break
+        src=""
+      done
+    else
+      src="$root/stacking-eval/$reuse"
+    fi
+    acq="${src:+$src/gandalf/python_collection/acquisitions/}"
+    [ -n "$acq" ] && [ -n "$(ls "$acq" 2>/dev/null)" ] || die "No earlier collection to reuse under $root/stacking-eval"
+    info "Reusing $(basename "$src")'s collection: $(ls "$acq" | tr '\n' ' ')"
+    mkdir -p "$dest/elrond"
+  else
+    require_password
+    # A collection of its own, so hosts left from earlier runs aren't stacked with these
+    ACQ_ROOT="$dest/gandalf"
+    acq="$ACQ_ROOT/python_collection/acquisitions/"
+    mkdir -p "$ACQ_ROOT" "$dest/elrond"
+    cmd_linux_targets stacking || return 1
+    GANDALF_WORKAROUNDS=0 cmd_gandalf_collect python "lab-ubuntu lab-rocky lab-ubuntu-clean1 lab-ubuntu-clean2" || return 1
+  fi
   step "Elrond over the four hosts as $case_id"
   docker exec rowanholt-celery-worker sh -c 'cd "${ELROND_HOME:-/opt/elrond}" && python3 elrond.py "$@"' elrond \
     "$case_id" "$acq" "$dest/elrond" --Gandalf --Process --Analysis || return 1
@@ -706,6 +729,7 @@ Usage: ./lab.sh [command]
   windows-vm [create|start|stop|provision|gui|delete|status]
   gandalf-collect [bash|python|powershell|all] ["targets"]
   stacking-eval       Collect the Linux stacking targets, run Elrond, score stacking.csv (adds a row to README.md)
+                      --reuse [CASE-ID]: Elrond over an earlier case's collection, no collecting
   mordor-download [test paths...]   e.g. apt29/day1 atomic/persistence
   mordor-sensor       Sysmon + Atomic Red Team in the Windows VM
   mordor-capture      Run atomics and export a dataset
@@ -777,7 +801,7 @@ case "${1:-}" in
   macos-vm) shift; cmd_macos_vm "$@" ;;
   windows-vm) shift; cmd_windows_vm "$@" ;;
   gandalf-collect) shift; cmd_gandalf_collect "$@" ;;
-  stacking-eval) cmd_stacking_eval ;;
+  stacking-eval) shift; cmd_stacking_eval "$@" ;;
   mordor-download) shift; cmd_mordor_download "$@" ;;
   mordor-sensor) cmd_mordor_sensor ;;
   mordor-capture) shift; cmd_mordor_capture "$@" ;;

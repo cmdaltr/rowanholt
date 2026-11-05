@@ -131,8 +131,8 @@ function LabBuilder() {
   // Gandalf targets: the Linux containers and the lab VMs; Windows is PowerShell's, on its own
   const gandalfTargets = [
     ...(state.linux_containers || []).map((t) => ({ name: t, os: 'linux', up: running(t) })),
-    ...(tart ? [{ name: 'lab-macos', os: 'macos', up: running('rowanholt-lab-macos') },
-      { name: 'lab-linuxvm', os: 'linux', up: running('rowanholt-lab-linux') }] : []),
+    ...(tart ? [{ name: 'lab-macos', os: 'macos', up: running('rowan-lab-macos') },
+      { name: 'lab-linuxvm', os: 'linux', up: running('rowan-lab-linux') }] : []),
   ];
   const recordable = machines.filter((m) => m.os);
   const picked = recordable.find((m) => `${m.engine}/${m.name}` === machine) || recordable[0];

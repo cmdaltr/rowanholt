@@ -19,7 +19,7 @@ from .templates import BY_ID
 
 # The lab's own Windows VM (lab.conf WINDOWS_UTM_VM); set by the lab agent. Its set-up and
 # recording go through ./lab.sh over SSH, which it's built for, rather than utmctl exec.
-LAB_WINDOWS_VM = "rowanholt-lab-win11"
+LAB_WINDOWS_VM = "rowan-lab-win11"
 # Machines on this host the page never shows (lab.conf LAB_HIDDEN_MACHINES), such as another
 # project's UTM VM; set by the lab agent.
 HIDDEN: Set[str] = set()
@@ -29,7 +29,7 @@ def lab_machine(engine: str, name: str) -> bool:
     """One of the lab's own machines (./lab.sh builds and deletes those, not this page)."""
     if engine == "docker":
         return name.startswith("lab-")
-    return name.startswith("rowanholt-lab-") or (engine == "utm" and name == LAB_WINDOWS_VM)
+    return name.startswith("rowan-lab-") or (engine == "utm" and name == LAB_WINDOWS_VM)
 
 
 def is_lab_windows(engine: str, name: str) -> bool:

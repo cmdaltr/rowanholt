@@ -188,12 +188,12 @@ if [ -d "$OLD_LAB" ] && [ ! -e "$NEW_LAB" ]; then
       if command -v tart &>/dev/null; then
           for vm in $(tart list --format json 2>/dev/null | grep -o '"Name" *: *"rivendell-lab-[^"]*"' | sed 's/.*"\(rivendell-lab-[^"]*\)"/\1/'); do
               tart stop "$vm" &>/dev/null || true
-              tart rename "$vm" "rowanholt-lab-${vm#rivendell-lab-}" && say "lab: Tart VM $vm renamed"
+              tart rename "$vm" "rowan-lab-${vm#rivendell-lab-}" && say "lab: Tart VM $vm renamed"
           done
       fi
       if command -v VBoxManage &>/dev/null; then
           for vm in $(VBoxManage list vms | sed -n 's/^"\(rivendell-lab-[^"]*\)".*/\1/p'); do
-              VBoxManage modifyvm "$vm" --name "rowanholt-lab-${vm#rivendell-lab-}" && say "lab: VirtualBox VM $vm renamed"
+              VBoxManage modifyvm "$vm" --name "rowan-lab-${vm#rivendell-lab-}" && say "lab: VirtualBox VM $vm renamed"
           done
       fi )
     utm=$(ls -d "$(sed -n 's/^LAB_VM_DIR=//p' "$NEW_LAB/lab.conf" 2>/dev/null | tr -d '"')"/utm/rivendell-lab-*.utm 2>/dev/null || true)

@@ -149,8 +149,8 @@ load_config() {
   WINDOWS_VM_MEMORY_MB="${WINDOWS_VM_MEMORY_MB:-6144}"
   WINDOWS_VM_CPUS="${WINDOWS_VM_CPUS:-2}"
   LINUX_VM_MEMORY_MB="${LINUX_VM_MEMORY_MB:-2048}"
-  WINDOWS_UTM_VM="${WINDOWS_UTM_VM:-rowanholt-lab-win11}"  # Apple silicon: the UTM VM the lab drives
-  WINDOWS_CLEAN_PREFIX="${WINDOWS_CLEAN_PREFIX:-rowanholt-lab-win11-clean}"  # its clean siblings, <prefix><n>
+  WINDOWS_UTM_VM="${WINDOWS_UTM_VM:-rowan-lab-win11}"  # Apple silicon: the UTM VM the lab drives
+  WINDOWS_CLEAN_PREFIX="${WINDOWS_CLEAN_PREFIX:-rowan-lab-win11-clean}"  # its clean siblings, <prefix><n>
   LAB_TART_HOME="${LAB_TART_HOME:-}"  # Tart VMs elsewhere than LAB_VM_DIR (e.g. the internal SSD)
   LAB_HIDDEN_MACHINES="${LAB_HIDDEN_MACHINES:-}"  # VMs on this host the web UI leaves out (yours, not the lab's)
   # shellcheck disable=SC1090
@@ -168,7 +168,7 @@ load_config() {
 set_vm_homes() {
   if [ -n "${LAB_TART_HOME:-}" ]; then
     export TART_HOME="${TART_HOME:-$LAB_TART_HOME}"
-  elif ls -d "$HOME/.tart/vms/rowanholt-lab-"* >/dev/null 2>&1; then
+  elif ls -d "$HOME/.tart/vms/rowan-lab-"* >/dev/null 2>&1; then
     export TART_HOME="${TART_HOME:-$HOME/.tart}"
   else
     export TART_HOME="${TART_HOME:-$LAB_VM_DIR/tart}"
@@ -178,7 +178,7 @@ set_vm_homes() {
   else
     export VAGRANT_HOME="${VAGRANT_HOME:-$LAB_VM_DIR/vagrant.d}"
   fi
-  if VBoxManage list vms 2>/dev/null | grep -q rowanholt-lab-; then
+  if VBoxManage list vms 2>/dev/null | grep -q rowan-lab-; then
     :  # existing lab VMs registered in the user's VirtualBox: leave them there
   else
     # A lab-only VirtualBox home, so lab VMs don't touch the user's own VirtualBox setup.

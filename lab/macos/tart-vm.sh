@@ -17,7 +17,7 @@ case "$kind" in
   macos) IMAGE="${TART_MACOS_IMAGE:-ghcr.io/cirruslabs/macos-sequoia-base:latest}"; PORT=2231; MEM=4096; CPU=4 ;;
   *) die "kind must be linux or macos" ;;
 esac
-VM="rowanholt-lab-$kind"
+VM="rowan-lab-$kind"
 mkdir -p "$TART_HOME"
 RUN_DIR="$LAB_CONFIG_DIR/run"; mkdir -p "$RUN_DIR"
 SSH="$LAB_ROOT/lib/ssh.exp"

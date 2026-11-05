@@ -212,12 +212,12 @@ def test_listing_leaves_out_hidden_machines(monkeypatch, tmp_path):
     monkeypatch.setattr("src.mordor.lab.registry._PATH", str(tmp_path / "machines.json"))
     monkeypatch.setattr(engines.UTM, "list", lambda self: [
         {"engine": "utm", "name": "archer-win11", "kind": "vm", "image": "", "os": "", "state": "stopped", "detail": ""},
-        {"engine": "utm", "name": "rowanholt-lab-win11", "kind": "vm", "image": "", "os": "", "state": "stopped", "detail": ""},
+        {"engine": "utm", "name": "rowan-lab-win11", "kind": "vm", "image": "", "os": "", "state": "stopped", "detail": ""},
     ])
     monkeypatch.setattr(machines, "HIDDEN", {"archer-win11"})
-    assert [m["name"] for m in machines.listing(["utm"])] == ["rowanholt-lab-win11"]
+    assert [m["name"] for m in machines.listing(["utm"])] == ["rowan-lab-win11"]
     monkeypatch.setattr(machines, "HIDDEN", set())
-    assert [m["name"] for m in machines.listing(["utm"])] == ["archer-win11", "rowanholt-lab-win11"]
+    assert [m["name"] for m in machines.listing(["utm"])] == ["archer-win11", "rowan-lab-win11"]
 
 def test_all_host_names_includes_vms_outside_archer(monkeypatch):
     # For clash-free naming: every name on the host, Archer's and not
@@ -333,18 +333,18 @@ def test_utm_engine_is_detected_on_macos(monkeypatch):
 
 def test_the_labs_own_machines_are_listed_with_their_os(monkeypatch, tmp_path):
     monkeypatch.setattr("src.mordor.lab.registry._PATH", str(tmp_path / "m.json"))
-    monkeypatch.setattr(machines, "LAB_WINDOWS_VM", "rowanholt-lab-win11")
+    monkeypatch.setattr(machines, "LAB_WINDOWS_VM", "rowan-lab-win11")
     monkeypatch.setattr(engines.Docker, "list", lambda self: [
         {"engine": "docker", "name": "lab-ubuntu", "kind": "container", "image": "", "os": "linux", "state": "running", "detail": ""}])
     monkeypatch.setattr(engines.Tart, "list", lambda self: [
-        {"engine": "tart", "name": "rowanholt-lab-macos", "kind": "vm", "image": "", "os": "", "state": "stopped", "detail": ""}])
+        {"engine": "tart", "name": "rowan-lab-macos", "kind": "vm", "image": "", "os": "", "state": "stopped", "detail": ""}])
     monkeypatch.setattr(engines.UTM, "list", lambda self: [
-        {"engine": "utm", "name": "rowanholt-lab-win11", "uuid": "u", "kind": "vm", "image": "", "os": "", "state": "stopped", "detail": ""}])
+        {"engine": "utm", "name": "rowan-lab-win11", "uuid": "u", "kind": "vm", "image": "", "os": "", "state": "stopped", "detail": ""}])
     rows = {m["name"]: m for m in machines.listing()}
     assert {n: (m["os"], m["lab"], m["deletable"]) for n, m in rows.items()} == {
-        "lab-ubuntu": ("linux", True, False), "rowanholt-lab-macos": ("macos", True, False),
-        "rowanholt-lab-win11": ("windows", True, False)}
-    assert machines.is_lab_windows("utm", "rowanholt-lab-win11")
+        "lab-ubuntu": ("linux", True, False), "rowan-lab-macos": ("macos", True, False),
+        "rowan-lab-win11": ("windows", True, False)}
+    assert machines.is_lab_windows("utm", "rowan-lab-win11")
 
 
 def test_delete_refuses_the_labs_machines_and_ones_rowanholt_didnt_make(monkeypatch, tmp_path):
@@ -354,7 +354,7 @@ def test_delete_refuses_the_labs_machines_and_ones_rowanholt_didnt_make(monkeypa
     monkeypatch.setattr(engines.Docker, "delete", lambda self, name: deleted.append(name))
     import src.mordor.lab.registry as reg
     reg.record("utm", "archer-win11", "utm-vm", "windows", "")  # Set OS on someone else's VM
-    for engine, name in (("utm", "archer-win11"), ("utm", "rowanholt-lab-win11"), ("docker", "lab-ubuntu"), ("utm", "unknown")):
+    for engine, name in (("utm", "archer-win11"), ("utm", "rowan-lab-win11"), ("docker", "lab-ubuntu"), ("utm", "unknown")):
         with pytest.raises(LabError):
             machines.delete(engine, name)
     reg.record("docker", "rowanholt-ubuntu-1", "ubuntu-container", "linux", "ubuntu:24.04", created=True)

@@ -36,7 +36,7 @@ Vagrant.configure("2") do |config|
     w.vm.synced_folder ACQ_ROOT, "C:/lab/acquisitions"
     w.vm.synced_folder MORDOR_ROOT, "C:/lab/mordor"
     w.vm.provider "virtualbox" do |vb|
-      vb.name = "rowanholt-lab-win11"
+      vb.name = "rowan-lab-win11"
       vb.memory = WIN_MEM
       vb.cpus = WIN_CPUS
       vb.gui = false
@@ -54,7 +54,7 @@ Vagrant.configure("2") do |config|
     l.vm.synced_folder ".", "/vagrant", disabled: true
     l.vm.synced_folder File.join(REPO_ROOT, "lab", "linux-targets"), "/lab", type: "rsync"
     l.vm.provider "virtualbox" do |vb|
-      vb.name = "rowanholt-lab-linux"
+      vb.name = "rowan-lab-linux"
       vb.memory = LINUX_MEM
       vb.cpus = 2
     end
