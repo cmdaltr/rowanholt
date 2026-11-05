@@ -236,6 +236,16 @@ class GandalfIngestTests(unittest.TestCase):
         self.assertTrue((cooked / "kept.csv").exists())
         self.assertFalse((self.out / "lab-rocky" / "artefacts" / "raw" / "passwd.1").exists())
 
+    def test_not_an_acquisitions_folder_fails_the_run(self):
+        """Exit 0 here read as success: a job over a host's own folder 'completed' with an empty
+        case (found standing up the team server, 5 November 2026)."""
+        host = self.acq / "lab-rocky"
+        host.mkdir(parents=True)
+        with self.assertRaises(SystemExit) as stopped:
+            gandalf.assess_gandalf(False, True, False, False, False, False, {}, str(host) + "/", os.getcwd(),
+                                   False, [], str(self.out) + "/", "", {}, {}, "", False, False)
+        self.assertEqual(stopped.exception.code, 1)
+
     def test_host_info_formats(self):
         self.assertEqual(parse_gandalf_host_info("h::Linux"), ("h", "Linux"))
         self.assertEqual(parse_gandalf_host_info("Linux h 7.0 #1 SMP aarch64"), ("h", "Linux"))

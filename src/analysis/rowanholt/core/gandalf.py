@@ -476,7 +476,7 @@ def assess_gandalf(
                 d.strip("/")
             )
         )
-        sys.exit()
+        sys.exit(1)
     staging_root = os.path.join(output_directory, STAGING_DIR)
     for groot, dirs, gfiles in os.walk(d):
         dirs[:] = [x for x in dirs if os.path.join(groot, x) != staging_root.rstrip("/")]

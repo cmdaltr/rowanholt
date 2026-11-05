@@ -474,14 +474,14 @@ def main(
                                             os.path.join(output_directory, f)
                                         )
                                     )
-                                    sys.exit()
+                                    sys.exit(1)
                             else:
                                 print(
                                     "\n    '{}' already exists in '{}'\n     Please remove it before trying again.\n\n\n".format(
                                         f, output_directory
                                     )
                                 )
-                                sys.exit()
+                                sys.exit(1)
         for (
             foundimg
         ) in (

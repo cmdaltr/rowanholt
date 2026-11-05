@@ -51,7 +51,7 @@ def collect_artefacts(
         print(
             "  ----------------------------------------\n  No disk images exist in the provided directory.\n   If you are confident there are valid images in this directory, maybe try with the Memory flag (-M)?\n   Otherwise review the path location and ensure the images are supported by elrond.\n  ----------------------------------------\n\n\n"
         )
-        sys.exit()
+        sys.exit(1)
     else:
         if vss:
             for _, image in imgs.items():
@@ -82,7 +82,7 @@ def collect_artefacts(
                     print(
                         "     If you wish to utilise the NSRL hash database, run the '.../elrond/tools/scripts/nsrl.sh' script, before running elrond and try again.\n\n"
                     )
-                    sys.exit()
+                    sys.exit(1)
         if not metacollected:
             print(
                 "\n\n  -> \033[1;36mCommencing Metadata Phase...\033[1;m\n  ----------------------------------------"

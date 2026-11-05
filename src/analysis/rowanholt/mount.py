@@ -111,7 +111,7 @@ def unmount_images(elrond_mount, ewf_mount):
             print(
                 "\n   Error: Unable to unmount locations. Are you running elrond as root?\n\n"
             )
-            sys.exit()
+            sys.exit(1)
         except OSError as e:
             # Handle read-only file system errors gracefully
             if e.errno == 30:  # EROFS - Read-only file system
@@ -856,7 +856,7 @@ def mount_images(
                     elrond_mount[0], disk_file.split("::")[0]
                 )
             )
-            sys.exit()
+            sys.exit(1)
     if len(os.listdir(elrond_mount[0])) != 0:
         elrond_mount.pop(0)
         allimgs, partitions = mount_images(
@@ -889,7 +889,7 @@ def mount_images(
                             ewf_mount[0], disk_file.split("::")[0]
                         )
                     )
-                    sys.exit()
+                    sys.exit(1)
             if len(os.listdir(ewf_mount[0])) != 0:
                 ewf_mount.pop(0)
                 allimgs, partitions = mount_images(
