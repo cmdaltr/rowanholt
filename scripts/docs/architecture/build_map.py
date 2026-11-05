@@ -46,7 +46,7 @@ def P(ix, iy):
 PLACES = {
     "shire": P(300, 330), "bree": P(372, 322), "rowanholt": P(468, 326), "moria": P(492, 442),
     "isengard": P(446, 560), "minas": P(612, 640), "mordor": P(850, 612), "erebor": P(690, 112),
-    "havens": P(192, 332),
+    "havens": P(98, 335),
 }
 
 parts = []
