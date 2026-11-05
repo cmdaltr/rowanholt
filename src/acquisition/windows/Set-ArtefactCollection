@@ -35,40 +35,46 @@ function Get-LiveContainers {
     $NoBom = New-Object System.Text.UTF8Encoding $false
     ForEach ($Id in @(& $Docker ps -q --no-trunc 2>$null)) {
         if ($Id -notmatch '^[0-9a-f]{12,}$') { continue }
-        $Folder = Join-Path "$OutputDirectory\$Hostnames\artefacts\artefacts\raw\live_containers\docker" $Id.Substring(0, 12)
-        New-Item -Path $Folder -ItemType Directory -Force > $null
-        $Inspect = (& $Docker inspect $Id 2>$null) -join "`n"
-        if ($LASTEXITCODE -eq 0) {
-            [IO.File]::WriteAllText((Join-Path $Folder "inspect.json"), $Inspect, $NoBom)
-            Add-RanEntry $OutputDirectory $Hostnames "docker inspect $Id"
+        # one container's failure mustn't end the acquisition
+        try {
+            $Folder = Join-Path "$OutputDirectory\$Hostnames\artefacts\artefacts\raw\live_containers\docker" $Id.Substring(0, 12)
+            # the full path: .NET's file calls below resolve a relative one against the process's
+            # directory, not PowerShell's location, and $OutputDirectory is relative
+            $Folder = (New-Item -Path $Folder -ItemType Directory -Force).FullName
+            $Inspect = (& $Docker inspect $Id 2>$null) -join "`n"
+            if ($LASTEXITCODE -eq 0) {
+                [IO.File]::WriteAllText((Join-Path $Folder "inspect.json"), $Inspect, $NoBom)
+                Add-RanEntry $OutputDirectory $Hostnames "docker inspect $Id"
+            }
+            if ($OsType -eq "windows") {
+                $Top = (& $Docker top $Id 2>$null) -join "`n"; $TopFile = "top-windows.txt"
+            }
+            else {
+                $Top = (& $Docker top $Id -eo pid,ppid,user,etime,args 2>$null) -join "`n"; $TopFile = "top.txt"
+            }
+            if ($LASTEXITCODE -eq 0) {
+                [IO.File]::WriteAllText((Join-Path $Folder $TopFile), $Top + "`n", $NoBom)
+                Add-RanEntry $OutputDirectory $Hostnames "docker top $Id"
+            }
+            if ($Limit -le 0) { continue }
+            # Streamed, not piped: a PowerShell pipeline would turn the tar's bytes into text
+            $Start = New-Object System.Diagnostics.ProcessStartInfo $Docker, "export $Id"
+            $Start.RedirectStandardOutput = $true; $Start.RedirectStandardError = $true; $Start.UseShellExecute = $false
+            $Export = [System.Diagnostics.Process]::Start($Start)
+            $Out = [IO.File]::Create((Join-Path $Folder "export.tar"))
+            $Buffer = New-Object byte[] 1048576; [int64]$Taken = 0
+            while ($Taken -lt $Limit) {
+                $Read = $Export.StandardOutput.BaseStream.Read($Buffer, 0, [int][Math]::Min([int64]$Buffer.Length, $Limit - $Taken))
+                if ($Read -le 0) { break }
+                $Out.Write($Buffer, 0, $Read); $Taken += $Read
+            }
+            $Out.Close()
+            if (-Not $Export.HasExited) { $Export.Kill() }
+            $Export.WaitForExit()
+            if ($Taken -ge $Limit) { Add-RanEntry $OutputDirectory $Hostnames "docker export $Id (cut at $Limit bytes)" }
+            else { Add-RanEntry $OutputDirectory $Hostnames "docker export $Id" }
         }
-        if ($OsType -eq "windows") {
-            $Top = (& $Docker top $Id 2>$null) -join "`n"; $TopFile = "top-windows.txt"
-        }
-        else {
-            $Top = (& $Docker top $Id -eo pid,ppid,user,etime,args 2>$null) -join "`n"; $TopFile = "top.txt"
-        }
-        if ($LASTEXITCODE -eq 0) {
-            [IO.File]::WriteAllText((Join-Path $Folder $TopFile), $Top + "`n", $NoBom)
-            Add-RanEntry $OutputDirectory $Hostnames "docker top $Id"
-        }
-        if ($Limit -le 0) { continue }
-        # Streamed, not piped: a PowerShell pipeline would turn the tar's bytes into text
-        $Start = New-Object System.Diagnostics.ProcessStartInfo $Docker, "export $Id"
-        $Start.RedirectStandardOutput = $true; $Start.RedirectStandardError = $true; $Start.UseShellExecute = $false
-        $Export = [System.Diagnostics.Process]::Start($Start)
-        $Out = [IO.File]::Create((Join-Path $Folder "export.tar"))
-        $Buffer = New-Object byte[] 1048576; [int64]$Taken = 0
-        while ($Taken -lt $Limit) {
-            $Read = $Export.StandardOutput.BaseStream.Read($Buffer, 0, [int][Math]::Min([int64]$Buffer.Length, $Limit - $Taken))
-            if ($Read -le 0) { break }
-            $Out.Write($Buffer, 0, $Read); $Taken += $Read
-        }
-        $Out.Close()
-        if (-Not $Export.HasExited) { $Export.Kill() }
-        $Export.WaitForExit()
-        if ($Taken -ge $Limit) { Add-RanEntry $OutputDirectory $Hostnames "docker export $Id (cut at $Limit bytes)" }
-        else { Add-RanEntry $OutputDirectory $Hostnames "docker export $Id" }
+        catch { Write-Host "       Couldn't collect container $($Id.Substring(0, 12)): $($_.Exception.Message)" -ForegroundColor Yellow }
     }
     $Message = "asked Docker about its running containers on '$Hostnames'"
     Add-LogEntry $ShowProgress $OutputDirectory $Hostnames "live_containers" $Message
