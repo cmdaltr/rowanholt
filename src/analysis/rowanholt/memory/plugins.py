@@ -81,13 +81,14 @@ def extract_memory_artefacts(
 
     if volver == "3":  # volatility3
         if not artefact.endswith("hiberfil.sys"):
+            # The profile, not "Windows": the audit log recorded every image as Windows
             print_extraction(
                 verbosity,
                 output_directory,
                 artefact,
                 volprefix,
                 mesginsrt,
-                "Windows",
+                profile or "Windows",
                 "symbol table",
                 vssimage,
             )

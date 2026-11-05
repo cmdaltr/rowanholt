@@ -67,6 +67,10 @@ def identify_memory_profile(
         ):
             return "Windows"
 
+        banner_os = kernel_banner_os(d, artefact_path, memext)
+        if banner_os:
+            return banner_os
+
         # Check macOS
         if macOS1 is not None and macOS2 is not None:
             ziphexdump1, ziphexdump2 = macOS1(), macOS2()
@@ -92,6 +96,23 @@ def identify_memory_profile(
         traceback.print_exc()
         # Always return a valid profile even on error
         return "Windows"
+
+
+def kernel_banner_os(d, artefact, memext):
+    """ "Linux" or "macOS" from the kernel banner in the image (writing that OS's bundled
+    symbols as the other checks do), or "" when there's neither. The process-based checks need
+    something that happens to be running (sudo for Linux): a Linux image without it was called
+    Windows."""
+    banners = vol3_check_os(artefact, memext, "banners.Banners")
+    if "Linux version" in banners:
+        if Linux is not None:
+            dump_vol3_ziphex(d, "Linux", Linux())
+        return "Linux"
+    if "Darwin Kernel Version" in banners:
+        if macOS1 is not None and macOS2 is not None:
+            dump_vol3_ziphex(d, "macOS", macOS1() + macOS2())
+        return "macOS"
+    return ""
 
 
 def vol3_check_os(artefact, memext, plugin):
@@ -190,12 +211,13 @@ def process_memory(
 
     # Volatility 3 processing
     vol3oscheck = vol3_check_os(artefact, memext, "windows.info.Info")
-    if (
-        "Windows" in vol3oscheck
-        and "windows" in vol3oscheck
-        and "ntkrnl" in vol3oscheck
-    ) or (vssmem and vssmem.startswith("Win")):
+    windows = ("Windows" in vol3oscheck and "windows" in vol3oscheck and "ntkrnl" in vol3oscheck) or (
+        vssmem and vssmem.startswith("Win"))
+    banner_os = "" if windows else kernel_banner_os(d, artefact, memext)
+    if windows:
         profile, profileplatform = "Windows", "Windows"
+    elif banner_os:
+        profile, profileplatform = banner_os, banner_os
     else:
         # Check if macOS profile helpers are available
         if macOS1 is not None and macOS2 is not None:

@@ -333,16 +333,13 @@ def main(
             )
         )
         sys.exit(1)
-    elif not gandalf and len(os.listdir(d)) > 0 and (  # Gandalf directories hold host folders, not images
-        ".e01" not in str(os.listdir(d)).lower()
-        and ".vmdk" not in str(os.listdir(d)).lower()
-        and ".dd" not in str(os.listdir(d)).lower()
-        and ".raw" not in str(os.listdir(d)).lower()
-        and ".img" not in str(os.listdir(d)).lower()
-        and ".001" not in str(os.listdir(d)).lower()
+    elif not gandalf and len(os.listdir(d)) > 0 and not any(  # Gandalf directories hold host folders, not images
+        # Memory dumps too: AVML and LiME write .mem and .lime, which is_memory_image knows
+        ext in str(os.listdir(d)).lower()
+        for ext in (".e01", ".vmdk", ".dd", ".raw", ".img", ".001", ".mem", ".vmem", ".lime", ".dmp", ".aff4")
     ):
         print(
-            "\n  [directory] - '{}' does not contain any valid files (.E01/.VMDK/.dd/.raw/.img/.001)\n   for elrond to assess.\n   Please ensure you are referencing the correct directory path and try again.\n\n\n".format(
+            "\n  [directory] - '{}' does not contain any valid files (.E01/.VMDK/.dd/.raw/.img/.001, or memory: .mem/.vmem/.lime/.dmp/.aff4)\n   for elrond to assess.\n   Please ensure you are referencing the correct directory path and try again.\n\n\n".format(
                 d
             )
         )
