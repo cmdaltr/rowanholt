@@ -81,6 +81,8 @@ shadowfax.key
 
 # Docker
 .env
+# copies of .env with its keys (the migration's .env.rivendell-backup)
+.env.*-backup
 docker-compose.override.yml
 
 # Database

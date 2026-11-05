@@ -207,6 +207,17 @@ The day v2.3 was merged (PR #2, merge commit `a9c118b`). Bug numbers are in `tes
 | The PR #2 review's ten findings: an `eru-mcp` token may ask Eru; tokens can't set passwords or make accounts; one sign-in lockout per account; the Navigator layer check can't be skipped with `//` or `../`; Eru reads every job, not the newest 50, and the job asked for (`job_id`), not the first with its case number; only a job's owner or an admin can delete, archive or wipe it; one finding per row (Alembic `c71d4e9a2b58`); a fresh restart's wipe isn't kept for the next one | P19 |
 | Lab: a VM cloned from the same image as another project's shared its MAC, so `tart ip` sent provisioning and collection to that VM; start refuses a clash and clones get their own MAC. A stopped VM is started by its state, not its IP | L30 |
 
+## Done 5 November 2026
+
+| What | Where |
+|---|---|
+| Linux memory images are identified by their kernel banner, not by a running `sudo`; a folder of memory images alone is accepted; the audit log records the real profile | `memory/memory.py`, `main.py` |
+| A Linux image with 5-level page tables (LA57), which Volatility 3 can't walk, is named in the audit log rather than passing as a clean host; a 5-level layer is a feature request in the plugins repo's plan | `memory/memory.py` |
+| `linux.zsh` and `linux.containers` tested on an x86_64 Ubuntu VM's memory: all six zsh commands it had read, both Docker containers | |
+| The CLI banner says Rowanholt, with a rowan in it; the banner quotes are the books' words, each credited, no film dialogue | `src/cli/rowanholt.py`, Gandalf, `passkey_decrypt.py` |
+| Lab VMs are `rowan-lab-*`; `./lab.sh stacking-eval --reuse` scores Elrond over a saved collection; the stacking table names each row's case; `rowanholt elrond process-one` processes one raw file | `lab/`, `src/analysis/process_one.py` |
+| The architecture map is drawn on a new parchment map | `scripts/docs/architecture/` |
+
 ## Decisions (Ben, 29 October 2026)
 
 1. **The `mcp` package: yes,** in its own `requirements/mcp.txt`, installed only where the MCP server runs, not in the worker or backend images.
