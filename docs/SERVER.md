@@ -47,6 +47,9 @@ Sign in at `https://rowanholt.dfir.example.org` as `admin` with the printed pass
 | `internal` (default) | Caddy's own CA | Trust its root: `rowanholt server ca > rowanholt-root.crt`, then distribute it (MDM, Group Policy, `update-ca-certificates`) |
 | `you@example.org` | Let's Encrypt | Nothing to do; the name must reach the host on 80 and 443 |
 | `files` | `deploy/server/certs/rowanholt.crt` and `rowanholt.key` (your PKI) | Whatever already trusts your PKI |
+| `tailscale` | Tailscale's (Let's Encrypt) for the server's MagicDNS name | Nothing to do on the tailnet |
+
+On a tailnet, name the server by its MagicDNS name (`rowanholt.<tailnet>.ts.net`) and use `--tls tailscale`, with HTTPS certificates turned on for the tailnet (admin console, DNS). Caddy hands `*.ts.net` names to a Tailscale daemon its container can't reach, so `internal` or an email address there would serve no certificate at all; `server init` refuses them. The certificate lasts 90 days: `rowanholt server cert` renews it when it's due and restarts the proxy, and weekly from cron is enough (`17 4 * * 1 /path/to/rowanholt server cert`). Other apps on the same tailnet node serve the same certificate and need their own restart.
 
 ### Evidence
 

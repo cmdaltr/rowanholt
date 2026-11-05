@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # Set this Rowanholt up as a team's shared server (writes the server settings into .env)
 #
-#   rowanholt server init <hostname> [--tls internal|<acme-email>|files]
+#   rowanholt server init <hostname> [--tls internal|<acme-email>|files|tailscale]
 #
 # <hostname> is the name people will open, e.g. rowanholt.dfir.example.org. --tls picks
 # the certificate: Caddy's own CA (internal, the default), Let's Encrypt for a public
-# name (an email address), or your organisation's own (files: deploy/server/certs/
-# rowanholt.crt and rowanholt.key). Afterwards `rowanholt start` runs the server profile.
+# name (an email address), your organisation's own (files: deploy/server/certs/
+# rowanholt.crt and rowanholt.key), or, for a server on a tailnet named by MagicDNS
+# (<host>.<tailnet>.ts.net), Tailscale's (tailscale; renew with rowanholt server cert).
+# Afterwards `rowanholt start` runs the server profile.
 #
 # Secrets are generated once and kept: SECRET_KEY, the first admin's password (printed
 # once), and the Postgres, Elastic and Splunk passwords for stores that don't exist yet.
@@ -21,17 +23,30 @@ TLS="internal"
 while [ $# -gt 0 ]; do
     case "$1" in
         --tls) TLS="$2"; shift ;;
-        -h|--help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*) echo "Error: unknown option: $1" >&2; exit 1 ;;
         *) HOSTNAME_ARG="$1" ;;
     esac
     shift
 done
-[ -n "$HOSTNAME_ARG" ] || { echo "Usage: rowanholt server init <hostname> [--tls internal|<acme-email>|files]" >&2; exit 1; }
+[ -n "$HOSTNAME_ARG" ] || { echo "Usage: rowanholt server init <hostname> [--tls internal|<acme-email>|files|tailscale]" >&2; exit 1; }
 [[ "$HOSTNAME_ARG" =~ ^[A-Za-z0-9.-]+$ ]] || { echo "Error: '$HOSTNAME_ARG' isn't a hostname" >&2; exit 1; }
+# Caddy hands *.ts.net names to the Tailscale daemon, which its container can't reach: with
+# internal or an email address it serves no certificate at all (TLS alert 80)
+case "$HOSTNAME_ARG:$TLS" in
+    *.ts.net:internal|*.ts.net:*@*)
+        echo "Error: $HOSTNAME_ARG is a Tailscale name: use --tls tailscale (or files)" >&2; exit 1 ;;
+esac
 
+TLS_SOURCE=""
 case "$TLS" in
     internal) TLS_VALUE="internal" ;;
+    tailscale)
+        [[ "$HOSTNAME_ARG" == *.ts.net ]] || { echo "Error: --tls tailscale is for the server's MagicDNS name (<host>.<tailnet>.ts.net)" >&2; exit 1; }
+        command -v tailscale >/dev/null || { echo "Error: tailscale isn't installed on this host" >&2; exit 1; }
+        TLS_VALUE="/certs/rowanholt.crt /certs/rowanholt.key"
+        TLS_SOURCE="tailscale"
+        ;;
     files)
         TLS_VALUE="/certs/rowanholt.crt /certs/rowanholt.key"
         for f in rowanholt.crt rowanholt.key; do
@@ -39,7 +54,7 @@ case "$TLS" in
         done
         ;;
     *@*) TLS_VALUE="$TLS" ;;
-    *) echo "Error: --tls is internal, an email address (Let's Encrypt) or files" >&2; exit 1 ;;
+    *) echo "Error: --tls is internal, an email address (Let's Encrypt), files or tailscale" >&2; exit 1 ;;
 esac
 
 umask 077
@@ -62,6 +77,8 @@ store_exists() { docker volume ls -q 2>/dev/null | grep -qE "(^|_)$1\$"; }
 set_value ROWANHOLT_DEPLOYMENT server
 set_value ROWANHOLT_HOSTNAME "$HOSTNAME_ARG"
 set_value ROWANHOLT_TLS "$TLS_VALUE"
+set_value ROWANHOLT_TLS_SOURCE "$TLS_SOURCE"
+[ "$TLS_SOURCE" = tailscale ] && bash "$ROOT/scripts/server/server-cert.sh" --no-restart
 
 key="$(current SECRET_KEY)"
 case "$key" in ""|change-this-to-a-random-secret-key|your-secret-key-change-in-production) set_value SECRET_KEY "$(secret)$(secret)" ;; esac
@@ -97,9 +114,12 @@ if [ ${#kept[@]} -gt 0 ]; then
     echo "  Kept the existing passwords of: ${kept[*]} (their data stores already exist)."
     echo ""
 fi
-case "$TLS_VALUE" in
-    internal) echo "  Certificates: Caddy's own CA. After 'rowanholt start', 'rowanholt server ca' prints its root to trust on clients." ;;
-    /certs/*) echo "  Certificates: deploy/server/certs/rowanholt.crt and rowanholt.key." ;;
+case "$TLS_SOURCE:$TLS_VALUE" in
+    tailscale:*)
+        echo "  Certificates: Tailscale's (Let's Encrypt, 90 days), trusted by every client on the tailnet."
+        echo "  Renew with 'rowanholt server cert'; weekly from cron is enough: 17 4 * * 1 $ROOT/rowanholt server cert" ;;
+    *:internal) echo "  Certificates: Caddy's own CA. After 'rowanholt start', 'rowanholt server ca' prints its root to trust on clients." ;;
+    *:/certs/*) echo "  Certificates: deploy/server/certs/rowanholt.crt and rowanholt.key." ;;
     *) echo "  Certificates: Let's Encrypt for $TLS_VALUE; $HOSTNAME_ARG must reach this host on ports 80 and 443." ;;
 esac
 echo ""
