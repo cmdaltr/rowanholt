@@ -10,12 +10,12 @@ routes them here).
 - /etc/kubernetes/manifests/*.yaml: static pods, which the kubelet runs with no API server involved
 - /var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db: containerd's own record of every
   container (a Kubernetes node's, through the CRI, or ctr's), read with the stdlib bbolt reader
-  into the same docker_containers.csv rows, Runtime "containerd"
+  into the same docker_containers rows, Runtime "containerd"
 - /var/lib/containers/storage/db.sql (Podman 4.8 on, SQLite) or libpod/bolt_state.db (bbolt, before):
   Podman's record of its containers, with the same OCI spec inside, Runtime "podman"
 - raw/live_containers/<runtime>/<id>/top.txt (Gandalf -l/-L only, with inspect.json and export.tar
   beside it): the processes running in each container when it was collected; inspect.json gives the
-  container's docker_containers.csv row, Runtime "docker (live)", where the case has no config.v2.json
+  container's docker_containers row, Runtime "docker (live)", where the case has no config.v2.json
   for it (a Windows host's Docker Desktop keeps that in its WSL VM)
 
 Every function returns rows; techniques are decided from the rows by the *_techniques functions,
@@ -59,13 +59,13 @@ PERSISTENCE_FILES = (
 )
 
 HEADERS = {
-    "docker_containers.csv": ["Container", "Name", "Image", "Command", "Created", "Started", "Finished", "Running",
+    "docker_containers": ["Container", "Name", "Image", "Command", "Created", "Started", "Finished", "Running",
                               "User", "Privileged", "PidMode", "NetworkMode", "IpcMode", "CapAdd", "SecurityOpt",
                               "Mounts", "Runtime", "Flag"],
-    "container_logs.csv": ["Runtime", "Container", "Pod", "Namespace", "Stream", "LastWriteTime", "Message"],
-    "container_changes.csv": ["Container", "Path", "Size", "Mode", "Kind", "SHA256", "LastWriteTime", "Flag"],
-    "static_pods.csv": ["Source", "Name", "Namespace", "Images", "Command", "Flag"],
-    "container_processes.csv": ["Runtime", "Container", "Name", "Image", "PID", "PPID", "User", "Elapsed", "Command",
+    "container_logs": ["Runtime", "Container", "Pod", "Namespace", "Stream", "LastWriteTime", "Message"],
+    "container_changes": ["Container", "Path", "Size", "Mode", "Kind", "SHA256", "LastWriteTime", "Flag"],
+    "static_pods": ["Source", "Name", "Namespace", "Images", "Command", "Flag"],
+    "container_processes": ["Runtime", "Container", "Name", "Image", "PID", "PPID", "User", "Elapsed", "Command",
                                 "Flag"],
 }
 
@@ -220,7 +220,7 @@ def _host_namespace(namespaces: List[Dict], kind: str) -> bool:
 
 
 def oci_spec_fields(spec: Dict, privileged: Optional[bool] = None) -> Dict[str, str]:
-    """The docker_containers.csv columns an OCI runtime spec decides, flagged as Docker's are.
+    """The docker_containers fields an OCI runtime spec decides, flagged as Docker's are.
     `privileged` when the runtime records it (Podman); otherwise read from the spec."""
     process = spec.get("process") or {}
     linux = spec.get("linux") or {}

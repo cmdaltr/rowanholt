@@ -10,6 +10,7 @@ from pathlib import Path
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
+from rowanholt.core.records import check_file, own_fields, read_records  # noqa: E402
 from rowanholt.process import mac_artefacts as ma  # noqa: E402
 
 
@@ -24,8 +25,11 @@ def run(out, artefact):
 
 
 def rows(out, name):
-    with open(Path(out) / "HOST" / "artefacts" / "cooked" / name, newline="") as fh:
-        return list(csv.DictReader(fh))
+    """A cooked table's rows as Elrond wrote them (JSON Lines), without the envelope; every record
+    checked for it first."""
+    path = Path(out) / "HOST" / "artefacts" / "cooked" / f"{name}.jsonl"
+    assert check_file(path) == []
+    return [own_fields(r) for _, r in read_records(path)]
 
 
 def techniques(out):
@@ -103,7 +107,7 @@ def test_btm_items(tmp_path):
     name = "private+var+db+com.apple.backgroundtaskmanagement+BackgroundItems-v13.btm"
     (macos / name).write_bytes(a.dump(store))
     assert run(out, macos / name) is True
-    found = rows(out, "btm_items.csv")
+    found = rows(out, "btm_items")
     assert [(r["Identifier"], r["Enabled"], r["Flag"]) for r in found] == [
         ("com.apple.Siri.agent", "yes", ""), ("com.lab.updater", "yes", "third party; suspicious path"),
         ("com.lab.helper", "no", "third party")]
@@ -119,7 +123,7 @@ def test_shared_file_list(tmp_path):
     name = "Users+bob+Library+Application Support+com.apple.sharedfilelist+com.apple.LSSharedFileList.RecentDocuments.sfl3"
     (macos / name).write_bytes(a.dump(root))
     run(out, macos / name)
-    found = rows(out, "shared_file_lists.csv")
+    found = rows(out, "shared_file_lists")
     assert found == [{"Source": "/Users/bob/Library/Application Support/com.apple.sharedfilelist/"
                                 "com.apple.LSSharedFileList.RecentDocuments.sfl3",
                       "List": "com.apple.LSSharedFileList.RecentDocuments.sfl3", "Name": "plan.pdf",
@@ -148,7 +152,7 @@ def test_notifications_read_the_wal(tmp_path):
     target = copy / db_path.name
     run(out, target)
     assert run(out, Path(str(target) + "-wal")) is True
-    found = rows(out, "notifications.csv")
+    found = rows(out, "notifications")
     assert len(found) == 1 and found[0]["App"] == "com.tinyspeck.slackmacgap" and found[0]["Body"] == "the VPN creds"
     assert found[0]["LastWriteTime"].startswith("2025-")
 
@@ -168,9 +172,9 @@ def test_policy_databases(tmp_path):
     db.commit(); db.close()
     run(out, exec_db)
     run(out, kext_db)
-    assert rows(out, "execpolicy_executable_measurements_v2.csv")[0]["file_identifier"] == "/Users/bob/Downloads/x"
+    assert rows(out, "execpolicy_executable_measurements_v2")[0]["file_identifier"] == "/Users/bob/Downloads/x"
     assert not (Path(out) / "HOST" / "artefacts" / "cooked" / "execpolicy_settings.csv").exists()
-    assert rows(out, "kextpolicy_kext_load_history_v3.csv")[0]["bundle_id"] == "com.lab.kext"
+    assert rows(out, "kextpolicy_kext_load_history_v3")[0]["bundle_id"] == "com.lab.kext"
     assert "T1547.006" in techniques(out)
 
 
@@ -185,10 +189,10 @@ def test_emond_and_periodic(tmp_path):
     for name in ("private+etc+emond.d+rules+lab.plist", "private+etc+emond.d+rules+SampleRules.plist",
                  "private+etc+daily.local", "private+etc+periodic+daily+999.lab"):
         run(out, macos / name)
-    emond = rows(out, "emond_rules.csv")
+    emond = rows(out, "emond_rules")
     assert [(r["Name"], r["Flag"]) for r in emond] == [("lab", "runs on an event"), ("s", "")]
     assert emond[0]["Actions"] == "RunCommand: /tmp/.x/update.sh -q" and emond[0]["Source"] == "/etc/emond.d/rules/lab.plist"
-    assert [r["Flag"] for r in rows(out, "periodic.csv")] == ["runs on a schedule or at boot", "suspicious command"]
+    assert [r["Flag"] for r in rows(out, "periodic")] == ["runs on a schedule or at boot", "suspicious command"]
     assert "T1546.014" in techniques(out)
 
 
@@ -200,7 +204,7 @@ def test_unified_log_export(tmp_path):
               {"count": 1, "finished": 1}]
     (macos / "gandalf+unifiedlog.ndjson").write_text("\n".join(json.dumps(e) for e in events) + "\nnot json\n")
     run(out, macos / "gandalf+unifiedlog.ndjson")
-    found = rows(out, "unified_log.csv")
+    found = rows(out, "unified_log")
     assert len(found) == 1 and found[0]["Process"] == "/usr/bin/sudo" and "COMMAND=/bin/sh" in found[0]["Message"]
 
 

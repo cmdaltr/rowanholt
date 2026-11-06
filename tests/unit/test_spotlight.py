@@ -10,6 +10,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
+from rowanholt.core.records import own_fields, read_records  # noqa: E402
 from rowanholt.process import mac_artefacts as ma  # noqa: E402
 from rowanholt.process.extractions import spotlight as sp  # noqa: E402
 
@@ -191,10 +192,9 @@ def test_router_reads_a_collected_store(tmp_path):
     # the shadow copy and the maps are read with store.db, not on their own
     for other in (raw / f"{prefix}.store.db", raw / f"{prefix}dbStr-1.map.data"):
         assert ma.process_mac_artefact("", "'HOST'", out, "HOST::macOS", "/", "processing", str(other)) is True
-    with open(tmp_path / "out" / "HOST" / "artefacts" / "cooked" / "spotlight.csv") as fh:
-        lines = fh.read().splitlines()
-    assert lines[0] == ",".join(ma.HEADERS["spotlight.csv"]) and len(lines) == 6
-    assert any("/Users/Downloads/setup.exe" in line and "Store-V2/6A1B2C3D" in line for line in lines)
+    records = [r for _, r in read_records(tmp_path / "out" / "HOST" / "artefacts" / "cooked" / "spotlight.jsonl")]
+    assert len(records) == 5 and all(list(own_fields(r)) == ma.HEADERS["spotlight"] for r in records)
+    assert any("/Users/Downloads/setup.exe" in str(r) and "Store-V2/6A1B2C3D" in str(r) for r in records)
 
 
 def test_router_warns_when_the_maps_werent_collected(tmp_path, caplog):

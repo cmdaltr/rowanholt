@@ -1,6 +1,6 @@
 """Artefacts Gandalf collects that Elrond's other processors leave alone.
 
-Each file is routed to a parser in process/extractions/ and written to cooked/<name>.csv:
+Each file is routed to a parser in process/extractions/ and written to cooked/<name>.jsonl:
 
   Windows   thumbcache/iconcache databases, $LogFile, paging files (strings),
             PSReadLine history, Amcache.hve (Artemis)
@@ -44,23 +44,23 @@ DOWNLOAD = re.compile(rb"\b(curl|wget|fetch)\b[^\n]{0,200}\bhttps?://|invoke-web
 SSH_KEY_TECHNIQUE_FLAGS = ("forced command", "sets environment", "comment names another host", "key for root")
 
 HEADERS = {
-    "thumbcache.csv": thumbcache.HEADER,
-    "ntfs_logfile.csv": ntfs_logfile.HEADER,
-    "paged_strings.csv": paged_strings.HEADER,
-    "powershell_history.csv": powershell_history.HEADER,
-    "cron.csv": unix_config.CRON_HEADER,
-    "at_jobs.csv": unix_config.AT_HEADER,
-    "ssh_keys.csv": unix_config.KEY_HEADER,
-    "sshd_config.csv": unix_config.SSHD_HEADER,
-    "accounts.csv": unix_config.ACCOUNT_HEADER,
-    "sudoers.csv": LINUX_HEADERS["sudoers.csv"],
-    "tcc.csv": macos_databases.TCC_HEADER,
-    "knowledgec.csv": macos_databases.KNOWLEDGE_HEADER,
-    "quarantine_events.csv": macos_databases.QUARANTINE_HEADER,
-    "biome.csv": biome.HEADER,
-    "asl.csv": asl_store.HEADER,
-    "fsevents.csv": fsevents.HEADER,
-    "staged_files.csv": ["Source", "Size", "SHA256", "Hidden", "Flag", "LastWriteTime"],
+    "thumbcache": thumbcache.HEADER,
+    "ntfs_logfile": ntfs_logfile.HEADER,
+    "paged_strings": paged_strings.HEADER,
+    "powershell_history": powershell_history.HEADER,
+    "cron": unix_config.CRON_HEADER,
+    "at_jobs": unix_config.AT_HEADER,
+    "ssh_keys": unix_config.KEY_HEADER,
+    "sshd_config": unix_config.SSHD_HEADER,
+    "accounts": unix_config.ACCOUNT_HEADER,
+    "sudoers": LINUX_HEADERS["sudoers"],
+    "tcc": macos_databases.TCC_HEADER,
+    "knowledgec": macos_databases.KNOWLEDGE_HEADER,
+    "quarantine_events": macos_databases.QUARANTINE_HEADER,
+    "biome": biome.HEADER,
+    "asl": asl_store.HEADER,
+    "fsevents": fsevents.HEADER,
+    "staged_files": ["Source", "Size", "SHA256", "Hidden", "Flag", "LastWriteTime"],
 }
 Route = Tuple[str, List[Dict], str, List[str]]
 
@@ -89,15 +89,15 @@ def _route_windows(rel: str, name: str, artefact: str, cooked: str) -> Optional[
     if rel.startswith("thumbcache/") and lower.endswith(".db"):
         stem = os.path.splitext(name.split("+")[-1])[0]
         rows = thumbcache.thumbcache_rows(artefact, os.path.join(cooked, "thumbcache", stem))
-        return "thumbcache.csv", rows, "thumbnail cache", []
+        return "thumbcache", rows, "thumbnail cache", []
     if rel == "$LogFile" or rel.endswith("/$LogFile"):
         rows, _ = ntfs_logfile.logfile_rows(artefact)
-        return "ntfs_logfile.csv", rows, "NTFS $LogFile", []
+        return "ntfs_logfile", rows, "NTFS $LogFile", []
     if lower in PAGING_FILES:
-        return "paged_strings.csv", paged_strings.paged_strings(artefact), "paging file strings", []
+        return "paged_strings", paged_strings.paged_strings(artefact), "paging file strings", []
     if rel.startswith("powershell/") and "consolehost_history" in lower:
         rows, techniques = powershell_history.powershell_history_rows(artefact, powershell_history.history_user(name))
-        return "powershell_history.csv", rows, "PowerShell history", techniques
+        return "powershell_history", rows, "PowerShell history", techniques
     return None
 
 
@@ -105,44 +105,44 @@ def _route_unix(rel: str, name: str, artefact: str, host: str) -> Optional[Route
     folder = rel.split("/")[0] if "/" in rel else ""
     if rel == "crontab":
         rows = unix_config.cron_rows(artefact, "/etc/crontab")
-        return "cron.csv", rows, "crontab", ["T1053.003"] if any(r["Flag"] for r in rows) else []
+        return "cron", rows, "crontab", ["T1053.003"] if any(r["Flag"] for r in rows) else []
     if folder == "at_jobs" or (folder == "cron_jobs" and name.startswith("atjobs+")) or \
             re.search(r"spool\+(cron\+)?at(jobs)?\+", name):
         if name.endswith(".SEQ") or "+spool+" in name.lower():
             return "", [], "", []
         spool = "/var/spool/cron/" if folder == "cron_jobs" else "/var/spool/at/" if folder == "at_jobs" else "/"
         rows = unix_config.at_rows(artefact, spool + name.replace("+", "/"))
-        return "at_jobs.csv", rows, "at job", ["T1053.002"] if rows else []
+        return "at_jobs", rows, "at job", ["T1053.002"] if rows else []
     if folder == "cron_jobs" or name.endswith("+crontab") or re.search(r"spool\+cron|cron\+tabs|crontabs\+", name):
         # a user's crontab: /var/spool/cron/[crontabs/]<user>, or macOS cron/<user>+crontab
         user = name[:-len("+crontab")] if name.endswith("+crontab") else name.rpartition("+")[2]
         rows = unix_config.cron_rows(artefact, "crontab of " + user, user=user)
-        return "cron.csv", rows, "user crontab", ["T1053.003"] if any(r["Flag"] for r in rows) else []
+        return "cron", rows, "user crontab", ["T1053.003"] if any(r["Flag"] for r in rows) else []
     if folder == "cron":
         # bash takes /etc/cron.d flat; gandalf.py names each <dir>+<file> (cron.d+x, cron.daily+x)
         source = "/etc/" + name.replace("+", "/", 1) if "+" in name else "/etc/cron.d/" + name
         rows = unix_config.cron_rows(artefact, source)
-        return "cron.csv", rows, "cron job", ["T1053.003"] if any(r["Flag"] for r in rows) else []
+        return "cron", rows, "cron job", ["T1053.003"] if any(r["Flag"] for r in rows) else []
     if name.endswith(("authorized_keys", "authorized_keys2", "known_hosts")):
         kind = "known_hosts" if name.endswith("known_hosts") else "authorized_keys"
         user = "root" if folder == "root" else _user_file(name)[0]
         rows = unix_config.ssh_key_rows(artefact, user, kind, host)
         tagged = kind == "authorized_keys" and any(
             flag in r["Flag"] for r in rows for flag in SSH_KEY_TECHNIQUE_FLAGS)
-        return "ssh_keys.csv", rows, kind, ["T1098.004"] if tagged else []
+        return "ssh_keys", rows, kind, ["T1098.004"] if tagged else []
     if name.endswith("sshd_config") or "sshd_config.d+" in name:
-        return "sshd_config.csv", unix_config.sshd_config_rows(artefact, "/" + name.replace("+", "/")), "sshd_config", []
+        return "sshd_config", unix_config.sshd_config_rows(artefact, "/" + name.replace("+", "/")), "sshd_config", []
     if folder == "conf" and re.match(r"^etc\+sudoers(\+|$)|^etc\+sudoers\.d\+", name):
         twin = artefact.replace("/raw/conf/", "/raw/linux/")
         if os.path.exists(twin):
             return "", [], "", []  # raw/linux/ has the same file and linux_artefacts parses it
         rows = sudoers_rows(artefact)
-        return "sudoers.csv", rows, "sudoers rules", ["T1548.003"] if any(r["Flag"] for r in rows) else []
+        return "sudoers", rows, "sudoers rules", ["T1548.003"] if any(r["Flag"] for r in rows) else []
     if rel == "passwd":
         shadow = os.path.join(os.path.dirname(artefact), "shadow")
         rows = unix_config.account_rows(artefact, shadow)
         odd = any("UID 0" in r["Flag"] for r in rows)
-        return "accounts.csv", rows, "local accounts", ["T1136.001"] if odd else []
+        return "accounts", rows, "local accounts", ["T1136.001"] if odd else []
     return None
 
 
@@ -150,19 +150,19 @@ def _route_macos(rel: str, name: str, artefact: str) -> Optional[Route]:
     folder = rel.split("/")[0] if "/" in rel else ""
     if folder == "tcc" and name.endswith("TCC.db"):
         rows = macos_databases.tcc_rows(sqlite_tables(artefact, ["access"]), name)
-        return "tcc.csv", rows, "TCC database", macos_databases.techniques(rows)
+        return "tcc", rows, "TCC database", macos_databases.techniques(rows)
     if name.endswith("knowledgeC.db"):
         tables = sqlite_tables(artefact, ["ZOBJECT", "ZSOURCE"])
-        return "knowledgec.csv", macos_databases.knowledgec_rows(tables), "KnowledgeC database", []
+        return "knowledgec", macos_databases.knowledgec_rows(tables), "KnowledgeC database", []
     if folder == "user_profiles" and name.endswith("+QuarantineEventsV2"):
         rows = macos_databases.quarantine_rows(sqlite_tables(artefact, ["LSQuarantineEvent"]), _user_file(name)[0])
-        return "quarantine_events.csv", rows, "quarantine events", ["T1105"] if any(r["Flag"] for r in rows) else []
+        return "quarantine_events", rows, "quarantine events", ["T1105"] if any(r["Flag"] for r in rows) else []
     if folder == "macos" and re.search(r"biome\+streams\+", name, re.I):
-        return "biome.csv", biome.biome_rows(artefact, name), "Biome stream", []
+        return "biome", biome.biome_rows(artefact, name), "Biome stream", []
     if name.endswith(".asl"):
-        return "asl.csv", asl_store.asl_rows(artefact, name), "ASL log", []
+        return "asl", asl_store.asl_rows(artefact, name), "ASL log", []
     if folder == "fseventsd" and name != "fseventsd-uuid":
-        return "fsevents.csv", fsevents.fsevents_rows(artefact), "FSEvents page", []
+        return "fsevents", fsevents.fsevents_rows(artefact), "FSEvents page", []
     return None
 
 
@@ -189,7 +189,7 @@ def _route_staging(rel: str, artefact: str) -> Optional[Route]:
         source = {"tmp": "/tmp", "shared": "/Users/Shared", "var_tmp": "/var/tmp", "dev_shm": "/dev/shm"}[folder]
     row = {"Source": source + "/" + "/".join(parts), "Size": os.path.getsize(artefact), "SHA256": _sha256(artefact),
            "Hidden": "yes" if hidden else "no", "Flag": "; ".join(flags), "LastWriteTime": unix_config.mtime(artefact)}
-    return "staged_files.csv", [row], "staged file", techniques
+    return "staged_files", [row], "staged file", techniques
 
 
 def is_extra_artefact(artefact: str) -> bool:
@@ -252,7 +252,7 @@ def process_extra_artefact(verbosity, vssimage, output_directory, img, vss_path_
         if not route or not route[0]:
             return handled
         out, rows, what, techniques = route
-        if _append_rows(os.path.join(cooked, out), HEADERS[out], rows):
+        if _append_rows(os.path.join(cooked, out), HEADERS[out], rows, img, artefact, techniques):
             _audit(verbosity, output_directory, img, stage, vssimage, what, artefact)
             _techniques(output_directory, techniques)
     except Exception as e:

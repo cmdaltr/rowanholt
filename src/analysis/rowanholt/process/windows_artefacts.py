@@ -2,7 +2,7 @@
 
 Artemis parses the recycle bin, scheduled tasks, BITS, Windows Search and shortcuts;
 the rest (Startup folders, Defender, PCA, WER, hosts, Notepad tabs) are parsed here
-into cooked/*.csv with a LastWriteTime column where the artefact has a time, so
+into cooked/*.jsonl with a LastWriteTime field where the artefact has a time, so
 Splunk, Elastic and the timeline read them like the others.
 """
 
@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, Iterable, List, Optional
 
 from rowanholt.audit import write_audit_log_entry
+from rowanholt.process.linux_artefacts import _append_rows
 from rowanholt.process.extractions import artemis
 
 logger = logging.getLogger(__name__)
@@ -45,18 +46,6 @@ def _cooked(output_directory: str, img: str, vss_path_insert: str) -> str:
     os.makedirs(path, exist_ok=True)
     return path
 
-
-def _append_rows(path: str, header: List[str], rows: Iterable[Dict]) -> int:
-    rows = list(rows)
-    if not rows:
-        return 0
-    new = not os.path.exists(path)
-    with open(path, "a", newline="", encoding="utf-8") as out:
-        writer = csv.DictWriter(out, fieldnames=header, extrasaction="ignore")
-        if new:
-            writer.writeheader()
-        writer.writerows(rows)
-    return len(rows)
 
 
 def _audit(verbosity, output_directory, img, stage, vssimage, what, artefact):
@@ -249,14 +238,14 @@ def notepad_row(path: str) -> Optional[Dict[str, str]]:
 
 
 HEADERS = {
-    "startup_items.csv": ["User", "Item", "Target", "Arguments", "WorkingDirectory", "Size", "SHA256", "Technique"],
-    "defender_mplog.csv": ["LastWriteTime", "Category", "Message", "LogFile"],
-    "defender_detections.csv": ["ThreatName", "Resources", "User", "DetectionFile"],
-    "pca.csv": ["LastWriteTime", "Path", "RunStatus", "ExecutableType", "ProductName", "CompanyName", "ProductVersion",
+    "startup_items": ["User", "Item", "Target", "Arguments", "WorkingDirectory", "Size", "SHA256", "Technique"],
+    "defender_mplog": ["LastWriteTime", "Category", "Message", "LogFile"],
+    "defender_detections": ["ThreatName", "Resources", "User", "DetectionFile"],
+    "pca": ["LastWriteTime", "Path", "RunStatus", "ExecutableType", "ProductName", "CompanyName", "ProductVersion",
                 "ProgramId", "ExitMessage", "Source"],
-    "wer.csv": ["LastWriteTime", "EventType", "AppName", "AppPath", "FaultModule", "Signature", "ReportFile"],
-    "hosts.csv": ["Address", "Hostnames", "NonDefault"],
-    "notepad_tabs.csv": ["User", "TabFile", "Text"],
+    "wer": ["LastWriteTime", "EventType", "AppName", "AppPath", "FaultModule", "Signature", "ReportFile"],
+    "hosts": ["Address", "Hostnames", "NonDefault"],
+    "notepad_tabs": ["User", "TabFile", "Text"],
 }
 
 
@@ -271,30 +260,33 @@ def process_windows_artefact(verbosity, vssimage, output_directory, img, vss_pat
             process_artemis_artefact(verbosity, vssimage, output_directory, img, vss_path_insert, stage, artefact, folder)
             return True
         cooked = _cooked(output_directory, img, vss_path_insert)
+        techniques: List[str] = []
         if name == "hosts":
-            out, rows, what = "hosts.csv", hosts_rows(artefact), "hosts file"
+            out, rows, what = "hosts", hosts_rows(artefact), "hosts file"
         elif folder == "startup":
             if name.lower().endswith("desktop.ini"):
                 return True
-            out, rows, what = "startup_items.csv", [startup_item(artefact)], "startup item"
-            artemis._record_techniques(os.path.join(output_directory, "mitre_techniques.txt"), ["T1547.001"])
+            out, rows, what = "startup_items", [startup_item(artefact)], "startup item"
+            techniques = ["T1547.001"]
         elif folder == "defender" and "/detectionhistory/" in artefact.lower():
             row = detection_history_row(artefact)
-            out, rows, what = "defender_detections.csv", [row] if row else [], "Defender detection"
+            out, rows, what = "defender_detections", [row] if row else [], "Defender detection"
         elif folder == "defender" and name.lower().startswith(("mplog", "mpdetection")):
-            out, rows, what = "defender_mplog.csv", mplog_rows(artefact), "Defender log"
+            out, rows, what = "defender_mplog", mplog_rows(artefact), "Defender log"
         elif folder == "pca" and name.lower().endswith(".txt"):
-            out, rows, what = "pca.csv", pca_rows(artefact), "PCA record"
+            out, rows, what = "pca", pca_rows(artefact), "PCA record"
         elif folder == "wer" and name.lower().endswith("report.wer"):
             row = wer_row(artefact)
-            out, rows, what = "wer.csv", [row] if row else [], "error report"
+            out, rows, what = "wer", [row] if row else [], "error report"
         elif folder == "notepad":
             row = notepad_row(artefact)
-            out, rows, what = "notepad_tabs.csv", [row] if row else [], "Notepad tab"
+            out, rows, what = "notepad_tabs", [row] if row else [], "Notepad tab"
         else:
             return True  # collected for the analyst (logs, caches) with nothing to parse
-        if _append_rows(os.path.join(cooked, out), HEADERS[out], rows):
+        if _append_rows(os.path.join(cooked, out), HEADERS[out], rows, img, artefact, techniques):
             _audit(verbosity, output_directory, img, stage, vssimage, what, artefact)
+            if techniques:
+                artemis._record_techniques(os.path.join(output_directory, "mitre_techniques.txt"), techniques)
     except Exception as e:
         logger.warning("could not process '%s' for %s: %s", name, vssimage, e)
     return True

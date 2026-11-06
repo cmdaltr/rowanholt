@@ -11,6 +11,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
+from rowanholt.core.records import own_fields, read_records  # noqa: E402
 from rowanholt.process import mac_artefacts as ma  # noqa: E402
 from rowanholt.process.extractions import tracev3 as t  # noqa: E402
 
@@ -145,10 +146,9 @@ def test_router_keeps_what_the_live_export_would(tmp_path):
     # format strings and timesync are read with the tracev3 files, not on their own
     timesync_file = raw / "unified_log_store" / "diagnostics" / "timesync" / "0000000000000001.timesync"
     assert ma.process_mac_artefact("", "'HOST'", out, "HOST::macOS", "/", "processing", str(timesync_file)) is True
-    with open(tmp_path / "out" / "HOST" / "artefacts" / "cooked" / "unified_log_store.csv") as fh:
-        lines = fh.read().splitlines()
-    assert lines[0] == ",".join(ma.HEADERS["unified_log_store.csv"]) and len(lines) == 3
-    assert "COMMAND=/bin/sh" in lines[1]
+    records = [r for _, r in read_records(tmp_path / "out" / "HOST" / "artefacts" / "cooked" / "unified_log_store.jsonl")]
+    assert len(records) == 2 and list(own_fields(records[0])) == ma.HEADERS["unified_log_store"]
+    assert "COMMAND=/bin/sh" in records[0]["Message"] and records[0]["timestamp"].endswith("Z")
 
 
 def test_kept_processes_match_gandalfs_predicate():

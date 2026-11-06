@@ -5,7 +5,7 @@ Files in raw/linux/ are named after their path on the host with '/' as '+'
 (etc+pam.d+sshd, var+log+wtmp, home+bob+.config+autostart+x.desktop), which is
 how Gandalf (gandalf.sh, gandalf.py) and Elrond's own image collection both write
 them. Gandalf's generated listings are gandalf+<name>.csv. Each parser writes a
-cooked/*.csv; persistence and credential-access findings carry a Flag column and
+cooked/*.jsonl table; persistence and credential-access findings carry a Flag field and
 tag their ATT&CK technique where the finding justifies it.
 """
 
@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from rowanholt.audit import write_audit_log_entry
+from rowanholt.core.records import SUFFIX, write_records
 from rowanholt.process.extractions import artemis, containers, k8s_audit
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ logger = logging.getLogger(__name__)
 LINUX_RAW = re.compile(r"/artefacts/raw/linux/")
 # Gandalf -l/-L: a running container's processes, as its runtime listed them
 LIVE_TOP = re.compile(r"/artefacts/raw/live_containers/(docker|podman)/([0-9a-f]{12})/top\.txt$")
-# and what Docker said about it: a docker_containers.csv row where the case has no config.v2.json for it
+# and what Docker said about it: a docker_containers row where the case has no config.v2.json for it
 LIVE_INSPECT = re.compile(r"/artefacts/raw/live_containers/docker/([0-9a-f]{12})/inspect\.json$")
 USER_FILES = ("viminfo", "lesshst", "python_history", "mysql_history", "psql_history", "wget-hsts", "recently-used.xbel",
               "db.sql", "bolt_state.db")  # the last two: rootless Podman
@@ -82,25 +83,25 @@ FAILLOG_RECORD = struct.Struct("<hh12sqq")  # 32 bytes, indexed by UID
 FAILED_LOGIN_THRESHOLD = 10
 
 HEADERS = {
-    "login_records.csv": ["Source", "Type", "User", "Terminal", "Host", "Address", "PID", "LastWriteTime"],
-    "lastlog.csv": ["Source", "UID", "User", "Terminal", "Host", "LastWriteTime"],
-    "faillog.csv": ["Source", "UID", "User", "Failures", "Maximum", "Terminal", "LastWriteTime"],
-    "preload.csv": ["Source", "Library", "Flag"],
-    "shell_init.csv": ["Source", "LineNumber", "Line", "Flag"],
-    "pam.csv": ["Source", "Type", "Control", "Module", "Arguments", "Flag"],
-    "sudoers.csv": ["Source", "LineNumber", "Line", "Flag"],
-    "autostart.csv": ["Source", "Kind", "Name", "Command", "Flag"],
-    "udev_rules.csv": ["Source", "LineNumber", "Rule", "Command", "Flag"],
-    "generators.csv": ["Source", "Size", "SHA256"],
-    "kernel_modules.csv": ["Name", "Size", "Instances", "State", "Taint", "Path", "SHA256", "Flag"],
-    "tmp_executables.csv": ["Path", "Size", "Mode", "UID", "Kind", "SHA256", "LastWriteTime"],
-    "webshells.csv": ["Source", "Size", "SHA256", "Indicators", "LastWriteTime"],
-    "shell_histories.csv": ["User", "History", "Command"],
-    "viminfo.csv": ["User", "Kind", "Value"],
-    "wget_hsts.csv": ["User", "Host", "Port", "IncludeSubdomains", "Created"],
-    "recently_used.csv": ["User", "URI", "Applications", "Added", "Modified", "Visited"],
+    "login_records": ["Source", "Type", "User", "Terminal", "Host", "Address", "PID", "LastWriteTime"],
+    "lastlog": ["Source", "UID", "User", "Terminal", "Host", "LastWriteTime"],
+    "faillog": ["Source", "UID", "User", "Failures", "Maximum", "Terminal", "LastWriteTime"],
+    "preload": ["Source", "Library", "Flag"],
+    "shell_init": ["Source", "LineNumber", "Line", "Flag"],
+    "pam": ["Source", "Type", "Control", "Module", "Arguments", "Flag"],
+    "sudoers": ["Source", "LineNumber", "Line", "Flag"],
+    "autostart": ["Source", "Kind", "Name", "Command", "Flag"],
+    "udev_rules": ["Source", "LineNumber", "Rule", "Command", "Flag"],
+    "generators": ["Source", "Size", "SHA256"],
+    "kernel_modules": ["Name", "Size", "Instances", "State", "Taint", "Path", "SHA256", "Flag"],
+    "tmp_executables": ["Path", "Size", "Mode", "UID", "Kind", "SHA256", "LastWriteTime"],
+    "webshells": ["Source", "Size", "SHA256", "Indicators", "LastWriteTime"],
+    "shell_histories": ["User", "History", "Command"],
+    "viminfo": ["User", "Kind", "Value"],
+    "wget_hsts": ["User", "Host", "Port", "IncludeSubdomains", "Created"],
+    "recently_used": ["User", "URI", "Applications", "Added", "Modified", "Visited"],
     **containers.HEADERS,
-    "k8s_audit.csv": k8s_audit.HEADER,
+    "k8s_audit": k8s_audit.HEADER,
 }
 DOCKER_CONTAINERS = "/var/lib/docker/containers/"
 CONTAINERD_META = "/var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db"
@@ -115,17 +116,26 @@ def _cooked(output_directory: str, img: str, vss_path_insert: str) -> str:
     return path
 
 
-def _append_rows(path: str, header: List[str], rows: Iterable[Dict]) -> int:
-    rows = list(rows)
-    if not rows:
-        return 0
-    new = not os.path.exists(path)
-    with open(path, "a", newline="", encoding="utf-8") as out:
-        writer = csv.DictWriter(out, fieldnames=header, extrasaction="ignore")
-        if new:
-            writer.writeheader()
-        writer.writerows(rows)
-    return len(rows)
+# A table's time, the first of these its fields have (core/records.py makes it the record's timestamp)
+TIME_FIELDS = ("LastWriteTime", "Time", "RecordTime", "Start", "Created", "Modified", "LastModified", "PageModified",
+               "PasswordChanged", "Added")
+
+
+def _append_rows(path: str, header: List[str], rows: Iterable[Dict], img: str, artefact: str,
+                 techniques: Iterable[str] = ()) -> int:
+    """Append rows to a cooked table as JSON Lines (path: the cooked folder and the table's name):
+    the header's fields in its order, behind the envelope. The route's techniques go on each row, or
+    only on the flagged ones in a table with a Flag field; a row's own Technique(s) field adds to them."""
+    route = list(techniques)
+    flagged = "Flag" in header
+    time_field = next((f for f in TIME_FIELDS if f in header), None)
+    raw = artefact.find("/artefacts/")
+    return write_records(
+        path + SUFFIX, ({k: row.get(k, "") for k in header} for row in rows),
+        host=img.split("::")[0], artefact=os.path.basename(path), source_path=artefact[raw + 1:] if raw >= 0 else artefact,
+        time_field=time_field,
+        techniques=lambda row: (route if not flagged or row.get("Flag") else [])
+        + [str(row.get("Technique") or ""), str(row.get("Techniques") or "")])
 
 
 def _audit(verbosity, output_directory, img, stage, vssimage, what, artefact):
@@ -533,18 +543,18 @@ def _route_linux(artefact: str) -> Tuple[str, List[Dict], str, List[str]]:
     if base.endswith(("/utmp", "/wtmp", "/btmp")):
         rows = utmp_rows(artefact)
         techniques = ["T1110.001"] if base.endswith("/btmp") and failed_login_sources(rows) else []
-        return "login_records.csv", rows, "login records", techniques
+        return "login_records", rows, "login records", techniques
     if path == "/var/lib/wtmpdb/wtmp.db":
-        return "login_records.csv", wtmpdb_rows(artefact), "login records", []
+        return "login_records", wtmpdb_rows(artefact), "login records", []
     if path == "/var/lib/lastlog/lastlog2.db":
-        return "lastlog.csv", lastlog2_rows(artefact), "lastlog", []
+        return "lastlog", lastlog2_rows(artefact), "lastlog", []
     if base == "/var/log/lastlog":
-        return "lastlog.csv", lastlog_rows(artefact, _users_by_uid(artefact)), "lastlog", []
+        return "lastlog", lastlog_rows(artefact, _users_by_uid(artefact)), "lastlog", []
     if base == "/var/log/faillog":
-        return "faillog.csv", faillog_rows(artefact, _users_by_uid(artefact)), "faillog", []
+        return "faillog", faillog_rows(artefact, _users_by_uid(artefact)), "faillog", []
     if path == "/etc/ld.so.preload" or path == "/etc/ld.so.conf" or path.startswith("/etc/ld.so.conf.d/"):
         rows = preload_rows(artefact)
-        return "preload.csv", rows, "dynamic linker configuration", ["T1574.006"] if any(r["Flag"] for r in rows) else []
+        return "preload", rows, "dynamic linker configuration", ["T1574.006"] if any(r["Flag"] for r in rows) else []
     if path in ("/etc/environment", "/etc/profile", "/etc/bash.bashrc", "/etc/bashrc", "/etc/rc.local") or \
             path.startswith(("/etc/profile.d/", "/etc/update-motd.d/")):
         rows = shell_init_rows(artefact)
@@ -555,59 +565,59 @@ def _route_linux(artefact: str) -> Tuple[str, List[Dict], str, List[str]]:
             techniques.append("T1037.004")
         if any(r["Flag"] == "suspicious command" for r in rows):
             techniques.append("T1037.004" if path == "/etc/rc.local" else "T1546.004")
-        return "shell_init.csv", rows, "shell startup script", techniques
+        return "shell_init", rows, "shell startup script", techniques
     if path.startswith("/etc/pam.d/"):
         rows = pam_rows(artefact)
-        return "pam.csv", rows, "PAM configuration", ["T1556.003"] if any(r["Flag"] for r in rows) else []
+        return "pam", rows, "PAM configuration", ["T1556.003"] if any(r["Flag"] for r in rows) else []
     if path == "/etc/sudoers" or path.startswith("/etc/sudoers.d/"):
         rows = sudoers_rows(artefact)
         flagged = any(r["Flag"] for r in rows) and not path.endswith("cloud-init-users")
-        return "sudoers.csv", rows, "sudoers rules", ["T1548.003"] if flagged else []
+        return "sudoers", rows, "sudoers rules", ["T1548.003"] if flagged else []
     if "/autostart/" in path and path.endswith(".desktop"):
         row = desktop_row(artefact)
         rows = [row] if row else []
         tagged = [r for r in rows if r["Kind"] == "user autostart" or "suspicious" in r["Flag"]]
-        return "autostart.csv", rows, "autostart entry", ["T1547.013"] if tagged else []
+        return "autostart", rows, "autostart entry", ["T1547.013"] if tagged else []
     if "/.config/systemd/user/" in path and path.endswith((".service", ".timer")):
         row = user_unit_row(artefact)
-        return "autostart.csv", [row] if row else [], "systemd user unit", ["T1543.002"] if row else []
+        return "autostart", [row] if row else [], "systemd user unit", ["T1543.002"] if row else []
     if "/udev/rules.d/" in path and path.endswith(".rules"):
         rows = udev_rows(artefact)
-        return "udev_rules.csv", rows, "udev rules", ["T1546.017"] if any("suspicious" in r["Flag"] for r in rows) else []
+        return "udev_rules", rows, "udev rules", ["T1546.017"] if any("suspicious" in r["Flag"] for r in rows) else []
     if "/systemd/system-generators/" in path or "/systemd/user-generators/" in path:
         row = {"Source": path, "Size": os.path.getsize(artefact), "SHA256": _sha256(artefact)}
-        return "generators.csv", [row], "systemd generator", ["T1543.002"]
+        return "generators", [row], "systemd generator", ["T1543.002"]
     if name == "gandalf+kernel_modules.csv":
         rows = kernel_module_rows(artefact)
         odd = any("no module file" in r["Flag"] or "outside" in r["Flag"] for r in rows)
-        return "kernel_modules.csv", rows, "kernel module list", ["T1547.006"] if odd else []
+        return "kernel_modules", rows, "kernel module list", ["T1547.006"] if odd else []
     if name == "gandalf+tmp_executables.csv":
-        return "tmp_executables.csv", tmp_executable_rows(artefact), "temporary-directory executables", []
+        return "tmp_executables", tmp_executable_rows(artefact), "temporary-directory executables", []
     if path.startswith(DOCKER_CONTAINERS):
         return _route_docker(artefact, path)
     if path == CONTAINERD_META:
         rows = containers.containerd_rows(artefact)
-        return "docker_containers.csv", rows, "containerd containers", containers.container_techniques(rows)
+        return "docker_containers", rows, "containerd containers", containers.container_techniques(rows)
     if path in (PODMAN_SQLITE, PODMAN_BOLT):
         rows = containers.podman_sqlite_rows(artefact) if path == PODMAN_SQLITE else containers.podman_bolt_rows(artefact)
-        return "docker_containers.csv", rows, "Podman containers", containers.container_techniques(rows)
+        return "docker_containers", rows, "Podman containers", containers.container_techniques(rows)
     if path.startswith("/var/log/pods/") and re.search(r"\.log(?:\.\d+)?$", path):
         parts = path.split("/")  # /var/log/pods/<namespace>_<pod>_<uid>/<container>/<n>.log
         if len(parts) >= 7:
-            return "container_logs.csv", containers.cri_log_rows(artefact, parts[4], parts[5]), "pod log", []
+            return "container_logs", containers.cri_log_rows(artefact, parts[4], parts[5]), "pod log", []
     if name == "gandalf+container_changes.csv":
         rows = containers.container_change_rows(artefact)
-        return "container_changes.csv", rows, "container writable layers", containers.change_techniques(rows)
+        return "container_changes", rows, "container writable layers", containers.change_techniques(rows)
     if path.startswith("/etc/kubernetes/manifests/") and path.endswith((".yaml", ".yml", ".json")):
         row = containers.static_pod_row(artefact, path)
         rows = [row] if row else []
-        return "static_pods.csv", rows, "static pod manifest", containers.static_pod_techniques(rows)
+        return "static_pods", rows, "static pod manifest", containers.static_pod_techniques(rows)
     if path.startswith(("/var/log/kubernetes/", "/var/log/kube-apiserver")) and k8s_audit.looks_like_audit_log(artefact):
         rows = k8s_audit.audit_rows(artefact)
-        return "k8s_audit.csv", rows, "Kubernetes audit log", k8s_audit.audit_techniques(rows)
+        return "k8s_audit", rows, "Kubernetes audit log", k8s_audit.audit_techniques(rows)
     if name.startswith(WEB_ROOTS) and name.lower().endswith(WEB_SCRIPTS):
         row = webshell_row(artefact)
-        return "webshells.csv", [row] if row else [], "web script", ["T1505.003"] if row else []
+        return "webshells", [row] if row else [], "web script", ["T1505.003"] if row else []
     return "", [], "", []
 
 
@@ -617,16 +627,16 @@ def _route_docker(artefact: str, path: str) -> Tuple[str, List[Dict], str, List[
     if path.endswith("/config.v2.json"):
         row = containers.docker_container_row(artefact, artefact.replace("config.v2.json", "hostconfig.json"))
         rows = [row] if row else []
-        return "docker_containers.csv", rows, "Docker container", containers.container_techniques(rows)
+        return "docker_containers", rows, "Docker container", containers.container_techniques(rows)
     if re.search(r"-json\.log(?:\.\d+)?$", path):
-        return "container_logs.csv", containers.docker_log_rows(artefact, container), "container log", []
+        return "container_logs", containers.docker_log_rows(artefact, container), "container log", []
     return "", [], "", []  # hostconfig.json, read with config.v2.json
 
 
 def _route_live(artefact: str) -> Tuple[str, List[Dict], str, List[str]]:
     runtime, container = LIVE_TOP.search(artefact).groups()
     rows = containers.live_process_rows(artefact, runtime, container, SUSPICIOUS_COMMAND)
-    return "container_processes.csv", rows, "running container processes", []
+    return "container_processes", rows, "running container processes", []
 
 
 def _route_live_inspect(artefact: str) -> Tuple[str, List[Dict], str, List[str]]:
@@ -638,7 +648,7 @@ def _route_live_inspect(artefact: str) -> Tuple[str, List[Dict], str, List[str]]
         return "", [], "", []
     row = containers.docker_inspect_row(artefact)
     rows = [row] if row else []
-    return "docker_containers.csv", rows, "Docker container (live)", containers.container_techniques(rows)
+    return "docker_containers", rows, "Docker container (live)", containers.container_techniques(rows)
 
 
 def _route_user(artefact: str) -> Tuple[str, List[Dict], str, List[str]]:
@@ -647,18 +657,18 @@ def _route_user(artefact: str) -> Tuple[str, List[Dict], str, List[str]]:
     user, _, kind = name.rpartition("+")
     user = user.split("+")[0]
     if kind in ("python_history", "mysql_history", "psql_history", "lesshst"):
-        return "shell_histories.csv", history_rows(artefact, user, kind), kind, []
+        return "shell_histories", history_rows(artefact, user, kind), kind, []
     if kind == "viminfo":
-        return "viminfo.csv", viminfo_rows(artefact, user), kind, []
+        return "viminfo", viminfo_rows(artefact, user), kind, []
     if kind == "wget-hsts":
-        return "wget_hsts.csv", wget_hsts_rows(artefact, user), kind, []
+        return "wget_hsts", wget_hsts_rows(artefact, user), kind, []
     if kind == "recently-used.xbel":
-        return "recently_used.csv", recently_used_rows(artefact, user), kind, []
+        return "recently_used", recently_used_rows(artefact, user), kind, []
     if kind in ("db.sql", "bolt_state.db"):
         rows = containers.podman_sqlite_rows(artefact) if kind == "db.sql" else containers.podman_bolt_rows(artefact)
         for row in rows:
             row["Runtime"] = f"podman (rootless, {user})"
-        return "docker_containers.csv", rows, "rootless Podman containers", containers.container_techniques(rows)
+        return "docker_containers", rows, "rootless Podman containers", containers.container_techniques(rows)
     return "", [], "", []
 
 
@@ -680,7 +690,8 @@ def process_linux_artefact(verbosity, vssimage, output_directory, img, vss_path_
         out, rows, what, techniques = route(artefact)
         if not out:
             return True  # collected for the analyst (web server configs, rotated logs) with nothing to parse
-        if _append_rows(os.path.join(_cooked(output_directory, img, vss_path_insert), out), HEADERS[out], rows):
+        if _append_rows(os.path.join(_cooked(output_directory, img, vss_path_insert), out), HEADERS[out], rows, img,
+                        artefact, techniques):
             _audit(verbosity, output_directory, img, stage, vssimage, what, artefact)
             _techniques(output_directory, techniques)
     except Exception as e:
