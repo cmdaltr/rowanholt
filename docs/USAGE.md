@@ -295,21 +295,21 @@ Output goes to the job's `destination_path`. Under Docker on macOS, use a path o
 └── <image>/
     ├── artefacts/
     │   ├── raw/               # collected files
-    │   ├── cooked/            # parsed artefacts: registry/, evt/, browsers/, journal_mft.json …
-    │   └── plaso_timeline.csv # if Timeline enabled
-    ├── analysis/              # analysis.csv, iocs.csv, keyword_matches.csv, yara.csv
+    │   ├── cooked/            # parsed artefacts: registry/, evt/, browsers/, journal_mft.jsonl …
+    │   └── plaso_timeline.jsonl # if Timeline enabled
+    ├── analysis/              # analysis.jsonl, iocs.jsonl, keyword_matches.jsonl, yara.jsonl
     └── carved/                # if carving enabled
 ```
 
-Memory images get one JSON file per Volatility 3 plugin under `<destination>/<memory image>/`.
+Memory images get one table per Volatility 3 plugin, `memory_<plugin>.jsonl`, under `<destination>/<memory image>/`. Every table is JSON Lines with the same five leading fields (`host`, `artefact`, `source_path`, `timestamp` in UTC, `techniques`); the case browser's **Download as CSV** gives one as a spreadsheet. See `docs/CLI.md` (Output Structure) and `docs/OUTPUT_FORMAT.md`.
 
 ### Common Result Files
 
 ```bash
-cat /output/CASE-001/*/analysis/analysis.csv
-cat /output/CASE-001/*/analysis/iocs.csv
+cat /output/CASE-001/*/analysis/analysis.jsonl
+cat /output/CASE-001/*/analysis/iocs.jsonl
 ls  /output/CASE-001/*/artefacts/cooked/registry/
-cat /output/CASE-001/*/artefacts/plaso_timeline.csv | head
+cat /output/CASE-001/*/artefacts/plaso_timeline.jsonl | head
 ```
 
 ---

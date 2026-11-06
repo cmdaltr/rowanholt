@@ -60,7 +60,7 @@ claude mcp add rowanholt --env ROWANHOLT_MCP_PYTHON=$HOME/.rowanholt-mcp/bin/pyt
 | `ask_offline(job_id, question)` | One of the fixed questions above, by id or wording, with the rows the answer came from (each with its `cite`); an unknown one returns the list |
 | `ask_eru`, `case_summary`, `suggestions` | Eru's model (Ollama); when it isn't available they say why and point to `ask_offline` |
 | `check_indicator(value)` | What the imported threat intelligence says about one value |
-| `rare_across_hosts(job_id)` | The top of `stacking.csv`, each row with the host row it was read from (`Host`, `Artefact`, `Row`) |
+| `rare_across_hosts(job_id)` | The top of `stacking.jsonl`, each row with the host row it was read from (`Host`, `Artefact`, `Row`) |
 | `findings`, `report`, `navigator_layer` | Analysts' findings (with whether each row is still intact), the Markdown report, the confirmed-findings layer |
 
 The server tells the host to start from a job id, cite file and row for every claim, and treat a stacking row or a threat intelligence match as a lead, not a verdict. It can't start, restart or delete jobs, run Gandalf, import or delete threat intelligence, assign hosts, or change or remove findings.

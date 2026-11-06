@@ -114,13 +114,13 @@ parser.add_argument(
     metavar="FILE",
     help="Match the case against threat intelligence: the Iran APT workbook (XLSX), STIX 2.1 bundles "
     "(JSON), MITRESaw's mitre_procedures.csv, Rowanholt's indicator CSV or a text watchlist; writes "
-    "<host>/analysis/threat_intel_matches.csv and threat_groups.csv. Example: --threatIntel iran_apt.xlsx feed.json",
+    "<host>/analysis/threat_intel_matches.jsonl and threat_groups.jsonl. Example: --threatIntel iran_apt.xlsx feed.json",
 )
 parser.add_argument(
     "--stackBaseline",
     nargs=1,
     metavar="FILE",
-    help="A baseline of clean hosts for stacking (Analysis on a case of two or more hosts writes stacking.csv; rarity needs three of an OS); "
+    help="A baseline of clean hosts for stacking (Analysis on a case of two or more hosts writes stacking.jsonl; rarity needs three of an OS); "
     "values absent from it score higher. Build one with python3 -m rowanholt.analysis.stacking --baseline OUT CASE...",
 )
 parser.add_argument(
@@ -132,7 +132,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--ClamAV",
-    help="Scan the collected files and the image's user-writable folders with ClamAV (commodity malware and known tools); detections go to analysis.csv",
+    help="Scan the collected files and the image's user-writable folders with ClamAV (commodity malware and known tools); detections go to analysis.jsonl",
     action="store_const",
     const=True,
     default=False,
@@ -942,7 +942,7 @@ if __name__ == "__main__":
             else:
                 entry, prnt = "{},{},stacking,{} hosts; {} values; {} rare\n".format(
                     datetime.now().isoformat(), case, stacked["hosts"], stacked["values"], stacked["rows"]
-                ), " -> {} -> stacked {} values across {} hosts: {} rare, in stacking.csv".format(
+                ), " -> {} -> stacked {} values across {} hosts: {} rare, in stacking.jsonl".format(
                     datetime.now().isoformat().replace("T", " "), stacked["values"], stacked["hosts"], stacked["rows"]
                 )
                 write_audit_log_entry(verbosity, output_directory, entry, prnt)

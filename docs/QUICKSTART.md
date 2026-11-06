@@ -235,7 +235,7 @@ To use an existing Splunk or Elasticsearch instead, set these on the worker:
 ```bash
 cd src/acquisition && sudo python3 python/gandalf.py None Local -O /evidence/TRIAGE-001 && cd -
 python3 src/analysis/elrond.py TRIAGE-001 /evidence/TRIAGE-001 /output/TRIAGE-001 --Gandalf --Process --Analysis
-cat /output/TRIAGE-001/*/analysis/analysis.csv
+cat /output/TRIAGE-001/*/analysis/analysis.jsonl
 ```
 
 ### Workflow 2: Full Investigation with SIEM
@@ -325,7 +325,7 @@ lsof -iTCP:5687 -iTCP:5688 -sTCP:LISTEN
     ├── artefacts/
     │   ├── raw/          # collected files
     │   └── cooked/       # parsed artefacts (JSON/CSV)
-    └── analysis/         # analysis.csv, iocs.csv, keyword_matches.csv, yara.csv
+    └── analysis/         # analysis.jsonl, iocs.jsonl, keyword_matches.jsonl, yara.jsonl
 ```
 
 ## 💡 Pro Tips

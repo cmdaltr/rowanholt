@@ -164,7 +164,7 @@ lock_icon(1530, 480)
 text(1530, 568, ["Encrypted archive", "None · Password · Key", "key: &lt;host&gt;.shadowfax.key"])
 arrow("M 1530 752 L 1530 640", "archived", 1530, 700)
 image(png("flow-elrond.png"), 1530, 150, 104, 150)
-text(1530, 254, ["Elrond", "decrypts, re-hashes every file", "gandalf_integrity.csv"])
+text(1530, 254, ["Elrond", "decrypts, re-hashes every file", "gandalf_integrity.jsonl"])
 arrow("M 1530 416 L 1530 322", "scp · PSRemoting · copy", 1530, 372)
 
 page = f"""<!doctype html>

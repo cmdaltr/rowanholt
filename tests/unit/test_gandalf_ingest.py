@@ -116,8 +116,10 @@ class GandalfIngestTests(unittest.TestCase):
         write_tarball(self.acq / "lab-rocky" / "lab-rocky.tar.gz", files)
         self.assess()
 
-        with open(self.out / "lab-rocky" / "gandalf_integrity.csv", newline="") as f:
-            status = {row["file_path"]: row["status"] for row in csv.DictReader(f)}
+        from rowanholt.core.records import check_file, read_records
+        integrity = self.out / "lab-rocky" / "gandalf_integrity.jsonl"
+        self.assertEqual(check_file(integrity), [])
+        status = {row["file_path"]: row["status"] for _, row in read_records(integrity)}
         self.assertEqual(status["artefacts/etc+passwd"], "verified")
         self.assertEqual(status["artefacts/user/gandalf/.bash_history"], "MISMATCH")
         self.assertEqual(status["artefacts/gone,with a comma"], "missing")
@@ -128,7 +130,7 @@ class GandalfIngestTests(unittest.TestCase):
         (self.acq / "lab-rocky").mkdir(parents=True)
         write_tarball(self.acq / "lab-rocky" / "lab-rocky.tar.gz", files)
         self.assess()
-        self.assertFalse((self.out / "lab-rocky" / "gandalf_integrity.csv").exists())
+        self.assertFalse((self.out / "lab-rocky" / "gandalf_integrity.jsonl").exists())
 
     def test_zsh_extended_history(self):
         from rowanholt.process.nix import parse_zsh_history

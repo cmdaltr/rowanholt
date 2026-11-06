@@ -1,6 +1,6 @@
 # Plan: one output format (JSON Lines)
 
-Status: **approved, 6 November 2026** (decisions at the end). Being built on `feat/jsonl-output`.
+Status: **approved, 6 November 2026** (decisions at the end); built on `feat/jsonl-output` (what changed from the plan while building it is in "As built", before the decisions).
 
 Elrond's output today is two formats chosen by whichever parser wrote the file: about 30 writers produce JSON (Artemis, registry, browsers, plists, journalctl, Linux logs and services, mail, clipboard, USB) and about 70 file names are CSV (the native parsers in `process/windows_artefacts.py`, `linux_artefacts.py`, `mac_artefacts.py`, `extra_artefacts.py`, plus bash and zsh history, `group` and UAL). No artefact gets both, and nothing converts between them. Readers cope unevenly: the case browser reads both, stacking mostly JSON, Eru's context search CSV only, so Eru never sees Artemis, registry, event log, browser or journal output.
 
@@ -44,7 +44,7 @@ Flat rather than nesting the artefact's fields under a key, because Splunk's tra
 | Case-level `stacking`, `threat_groups`, `<host>/gandalf_integrity` | CSV | `.jsonl` |
 | `artefacts/plaso_timeline` | CSV via a regex | `.jsonl` from psteal's own `json_line` output |
 | `artefacts/LastAccessTimes` | CSV | `.jsonl` |
-| Volatility `memory_<plugin>` | JSON | `.jsonl` (Volatility 3's `-r jsonl`) |
+| Volatility `memory_<plugin>` | JSON | `.jsonl` (from Volatility 3's `-r json`, which the parsers already read) |
 | `raw/` | as collected | **unchanged** (chain of custody) |
 | `mitre_techniques.txt` | a list of IDs | unchanged: not records |
 | Navigator layer, Splunk and Kibana content | their own formats | unchanged formats, updated searches |
@@ -126,6 +126,17 @@ It replaces the two copies of `_append_rows` (`windows_artefacts.py:49`, `linux_
 2. The Linux and Windows stacking evals and `verify-expected` on the branch, compared with step 0's baseline: the same planted items found, the same stacking ranks, every file passing the format check. A difference is a bug in this change, not a finding.
 3. One case each from Splunk and Elastic: every artefact indexed, with its time.
 4. Eru asked about something only in Windows JSON (a service, a scheduled task, an event) to show the context search now finds it.
+
+## As built
+
+- **The writers share one function**, `write_records` in `rowanholt/core/records.py` (`write_cooked` for a table under `cooked/`, which takes the host and name from the path). A writer names its time field, or candidates tried in order (Artemis's `timestamp`, `last_run_time`, `modified` and so on); a row's own `timestamp` is used when it parses and kept as `orig_timestamp` when it doesn't.
+- **Techniques per record.** A router's techniques go on every row of the route, or only on the flagged rows when the schema has a `Flag` column, plus the row's own `Technique` or `Techniques`. Artemis's event logs are tagged per record; tasks, services and WMI persistence only where the item isn't Windows's own. Bash and zsh lines tag **T1059.004** only when suspicious, systemd units **T1543.002** only when unusual. MITRE enrichment (`post/mitre/enrichment.py`) adds what it matches to `techniques` as well as the `mitre_*` fields.
+- **Case-level tables** (`stacking`, `threat_groups`) have `host` `""`: their rows are about several hosts, named in their own fields.
+- **Not records, so not JSON Lines:** the paging files' `.strings` dumps (text, fed to the paged-strings table), `mitre_techniques.txt`, `rowanholt_audit.log`, and the stacking baseline you supply (CSV, your input).
+- **Volatility** keeps `-r json`: the three parsers in `memory/volatility3/plugins/` already read it, and the subprocess call is unchanged. The output name is `memory_<plugin>.jsonl` in the host's folder, which the existing guard, enrichment and SIEM readers already expected (the writer used to write `<plugin>.json`, so the guard never matched).
+- **Times are UTC.** Chrome's history query converted to local time and Firefox and Safari used naive local times; all three are UTC now. Times a source records without a zone (setupapi's, the analysis rows' own) are recorded as written and marked UTC: check them against the host's time zone.
+- **Splunk** uses one sourcetype, `rowanholt_jsonl`; a record with a null `timestamp` gets the index time and `time_source=indexed` so a timeline can leave it out. **Elastic** sets no `@timestamp` on such a record, so it's missing from Kibana's time-filtered views.
+- **The lab** reads either format (`lab/verify-expected.py`, `lab/lib/stacking_eval.py`) and checks every `.jsonl` for the envelope (the "JSON Lines format" row).
 
 ## Decisions (Ben, 6 November 2026)
 

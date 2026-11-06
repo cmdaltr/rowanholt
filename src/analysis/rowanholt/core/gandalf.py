@@ -11,6 +11,7 @@ from zipfile import ZipFile
 
 from rowanholt.audit import write_audit_log_entry
 from rowanholt.core import event_dataset
+from rowanholt.core.records import SUFFIX, write_records
 from rowanholt.core.identify import identify_gandalf_host
 from rowanholt.core.identify import identify_memory_image
 
@@ -289,10 +290,8 @@ def ingest_gandalf_archive(archive, output_directory, verbosity, allimgs):
         if integrity is not None:
             rows, counts = integrity
             os.makedirs(host_dir, exist_ok=True)
-            with open(os.path.join(host_dir, "gandalf_integrity.csv"), "w", newline="") as out:
-                writer = csv.DictWriter(out, fieldnames=["file_path", "expected_sha256", "actual_sha256", "status"])
-                writer.writeheader()
-                writer.writerows(rows)
+            write_records(os.path.join(host_dir, "gandalf_integrity" + SUFFIX), rows, host=gandalf_host,
+                          artefact="gandalf_integrity", source_path="log.meta")
             summary = ", ".join("{} {}".format(n, s) for s, n in counts.items() if n)
             print("   Checked '{}' against Gandalf's hashes: {}".format(gandalf_host, summary))
             entry, prnt = (
