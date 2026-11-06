@@ -74,6 +74,27 @@ def test_tailscale_mode_needs_a_ts_net_name(tmp_path):
     assert done.returncode == 1 and "MagicDNS" in done.stderr
 
 
+def test_https_port_moves_rowanholt_off_443_and_is_kept(tmp_path):
+    # The homelab server's front door (homelab-proxy) holds 80 and 443; Rowanholt moves aside
+    root, env = tree(tmp_path)
+    assert run(root, env, "init", NAME, "--tls", "tailscale").returncode == 0
+    assert (setting(root, "ROWANHOLT_HTTPS_PORT"), setting(root, "ROWANHOLT_HTTP_PUBLISH"),
+            setting(root, "ROWANHOLT_PUBLIC_URL")) == ("443", "80", f"https://{NAME}")
+    secret_key = setting(root, "SECRET_KEY")
+
+    done = run(root, env, "init", NAME, "--tls", "tailscale", "--https-port", "8443")
+    assert done.returncode == 0, done.stderr
+    assert (setting(root, "ROWANHOLT_HTTPS_PORT"), setting(root, "ROWANHOLT_HTTP_PUBLISH"),
+            setting(root, "ROWANHOLT_PUBLIC_URL")) == ("8443", "127.0.0.1:8080", f"https://{NAME}:8443")
+    assert setting(root, "SECRET_KEY") == secret_key and "First admin" not in done.stdout
+
+    # init again without the option keeps the port
+    assert run(root, env, "init", NAME, "--tls", "tailscale").returncode == 0
+    assert setting(root, "ROWANHOLT_PUBLIC_URL") == f"https://{NAME}:8443"
+    for bad in ("80", "5601", "http"):
+        assert run(root, env, "init", NAME, "--tls", "tailscale", "--https-port", bad).returncode == 1
+
+
 def test_cert_refused_on_a_server_not_using_tailscale(tmp_path):
     root, env = tree(tmp_path)
     assert run(root, env, "init", "rowanholt.dfir.example.org").returncode == 0

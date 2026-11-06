@@ -15,13 +15,16 @@ services:
     container_name: rowanholt-proxy
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      # 80 only redirects to 443; with the web app on another port (--https-port) it's kept
+      # off the network, on the host's loopback
+      - "${ROWANHOLT_HTTP_PUBLISH:-80}:80"
+      - "${ROWANHOLT_HTTPS_PORT:-443}:${ROWANHOLT_HTTPS_PORT:-443}"
       - "7755:7755" # Splunk
       - "5601:5601" # Kibana
       - "5602:5602" # ATT&CK Navigator
     environment:
       - ROWANHOLT_HOSTNAME=${ROWANHOLT_HOSTNAME:?Run rowanholt server init first}
+      - ROWANHOLT_HTTPS_PORT=${ROWANHOLT_HTTPS_PORT:-443}
       - ROWANHOLT_TLS=${ROWANHOLT_TLS:-internal}
     volumes:
       - ./deploy/server/Caddyfile:/etc/caddy/Caddyfile:ro
@@ -40,7 +43,7 @@ services:
     command: uvicorn main:app --host 0.0.0.0 --port 5688 --proxy-headers --forwarded-allow-ips=*
     environment:
       - ROWANHOLT_SERVER_MODE=true
-      - ROWANHOLT_PUBLIC_URL=https://${ROWANHOLT_HOSTNAME:?Run rowanholt server init first}
+      - ROWANHOLT_PUBLIC_URL=${ROWANHOLT_PUBLIC_URL:-https://${ROWANHOLT_HOSTNAME:?Run rowanholt server init first}}
       - SECRET_KEY=${SECRET_KEY:?Run rowanholt server init first}
       - ROWANHOLT_ADMIN_PASSWORD=${ROWANHOLT_ADMIN_PASSWORD:?Run rowanholt server init first}
       - ROWANHOLT_LOCAL_LOGIN=${ROWANHOLT_LOCAL_LOGIN:-true}
@@ -65,7 +68,7 @@ services:
     environment:
       - ERU_MCP_ARGS=${ERU_MCP_ARGS:-}
       - ROWANHOLT_API=http://backend:5688
-      - ROWANHOLT_PUBLIC_URL=https://${ROWANHOLT_HOSTNAME:?Run rowanholt server init first}
+      - ROWANHOLT_PUBLIC_URL=${ROWANHOLT_PUBLIC_URL:-https://${ROWANHOLT_HOSTNAME:?Run rowanholt server init first}}
     depends_on:
       - backend
     networks:

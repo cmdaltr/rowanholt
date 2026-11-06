@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Set this Rowanholt up as a team's shared server (writes the server settings into .env)
 #
-#   rowanholt server init <hostname> [--tls internal|<acme-email>|files|tailscale]
+#   rowanholt server init <hostname> [--tls internal|<acme-email>|files|tailscale] [--https-port N]
 #
 # <hostname> is the name people will open, e.g. rowanholt.dfir.example.org. --tls picks
 # the certificate: Caddy's own CA (internal, the default), Let's Encrypt for a public
 # name (an email address), your organisation's own (files: deploy/server/certs/
 # rowanholt.crt and rowanholt.key), or, for a server on a tailnet named by MagicDNS
 # (<host>.<tailnet>.ts.net), Tailscale's (tailscale; renew with rowanholt server cert).
+# --https-port serves Rowanholt on another port than 443 and leaves 80 free, for a host where
+# something else is the front door; once given it's kept until given again (443 to go back).
 # Afterwards `rowanholt start` runs the server profile.
 #
 # Secrets are generated once and kept: SECRET_KEY, the first admin's password (printed
@@ -20,10 +22,12 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 ENV_FILE="$ROOT/.env"
 HOSTNAME_ARG=""
 TLS="internal"
+HTTPS_PORT=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --tls) TLS="$2"; shift ;;
-        -h|--help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --https-port) HTTPS_PORT="$2"; shift ;;
+        -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*) echo "Error: unknown option: $1" >&2; exit 1 ;;
         *) HOSTNAME_ARG="$1" ;;
     esac
@@ -31,6 +35,11 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$HOSTNAME_ARG" ] || { echo "Usage: rowanholt server init <hostname> [--tls internal|<acme-email>|files|tailscale]" >&2; exit 1; }
 [[ "$HOSTNAME_ARG" =~ ^[A-Za-z0-9.-]+$ ]] || { echo "Error: '$HOSTNAME_ARG' isn't a hostname" >&2; exit 1; }
+if [ -n "$HTTPS_PORT" ]; then
+    [[ "$HTTPS_PORT" =~ ^[0-9]+$ ]] && [ "$HTTPS_PORT" -ge 1 ] && [ "$HTTPS_PORT" -le 65535 ] \
+        || { echo "Error: --https-port takes a port number" >&2; exit 1; }
+    case "$HTTPS_PORT" in 80|5601|5602|7755) echo "Error: port $HTTPS_PORT is already the proxy's" >&2; exit 1 ;; esac
+fi
 # Caddy hands *.ts.net names to the Tailscale daemon, which its container can't reach: with
 # internal or an email address it serves no certificate at all (TLS alert 80)
 case "$HOSTNAME_ARG:$TLS" in
@@ -80,6 +89,18 @@ set_value ROWANHOLT_TLS "$TLS_VALUE"
 set_value ROWANHOLT_TLS_SOURCE "$TLS_SOURCE"
 [ "$TLS_SOURCE" = tailscale ] && bash "$ROOT/scripts/server/server-cert.sh" --no-restart
 
+HTTPS_PORT="${HTTPS_PORT:-$(current ROWANHOLT_HTTPS_PORT)}"
+HTTPS_PORT="${HTTPS_PORT:-443}"
+set_value ROWANHOLT_HTTPS_PORT "$HTTPS_PORT"
+if [ "$HTTPS_PORT" = 443 ]; then
+    PUBLIC_URL="https://$HOSTNAME_ARG"
+    set_value ROWANHOLT_HTTP_PUBLISH 80
+else
+    PUBLIC_URL="https://$HOSTNAME_ARG:$HTTPS_PORT"
+    set_value ROWANHOLT_HTTP_PUBLISH 127.0.0.1:8080  # its redirect isn't wanted; 80 stays free
+fi
+set_value ROWANHOLT_PUBLIC_URL "$PUBLIC_URL"
+
 key="$(current SECRET_KEY)"
 case "$key" in ""|change-this-to-a-random-secret-key|your-secret-key-change-in-production) set_value SECRET_KEY "$(secret)$(secret)" ;; esac
 
@@ -103,7 +124,7 @@ for pair in POSTGRES_PASSWORD:postgres_data ELASTIC_PASSWORD:elastic_data KIBANA
     fi
 done
 
-echo "Rowanholt is set up as a server for https://$HOSTNAME_ARG"
+echo "Rowanholt is set up as a server for $PUBLIC_URL"
 echo ""
 if [ -n "$ADMIN_PASSWORD" ]; then
     echo "  First admin:  admin / $ADMIN_PASSWORD"

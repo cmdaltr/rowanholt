@@ -122,9 +122,10 @@ ensure_docker() {
 print_urls() {
     echo ""
     if $SERVER; then
-        local host
+        local host url
         host="$(sed -n 's/^ROWANHOLT_HOSTNAME=//p' "$ROOT/.env" | tail -1)"
-        echo "  Rowanholt:     https://$host"
+        url="$(sed -n 's/^ROWANHOLT_PUBLIC_URL=//p' "$ROOT/.env" | tail -1)"
+        echo "  Rowanholt:     ${url:-https://$host}"
         echo "  Splunk, Kibana, Navigator (with COMPOSE_PROFILES=siem): https://$host:7755, :5601, :5602"
         echo ""
         echo "  Users: 'rowanholt server users list'. Nothing else is published."

@@ -51,6 +51,8 @@ Sign in at `https://rowanholt.dfir.example.org` as `admin` with the printed pass
 
 On a tailnet, name the server by its MagicDNS name (`rowanholt.<tailnet>.ts.net`) and use `--tls tailscale`, with HTTPS certificates turned on for the tailnet (admin console, DNS). Caddy hands `*.ts.net` names to a Tailscale daemon its container can't reach, so `internal` or an email address there would serve no certificate at all; `server init` refuses them. The certificate lasts 90 days: `rowanholt server cert` renews it when it's due and restarts the proxy, and weekly from cron is enough (`17 4 * * 1 /path/to/rowanholt server cert`). Other apps on the same tailnet node serve the same certificate and need their own restart.
 
+When something else on the host is the front door on 443, `--https-port <port>` (for example `8443`) serves Rowanholt there instead: the web app, API and Eru's MCP server move to `https://<host>:<port>`, 80 is left free (the proxy's redirect listens on the host's loopback only), and Splunk, Kibana and the Navigator keep their ports. Running `server init` again keeps the port; `--https-port 443` goes back. MCP clients registered at the old URL need registering again at the new one.
+
 ### Evidence
 
 Paths in Rowanholt are paths on the server. Mount your evidence storage on the host and make it visible to the containers with a `docker-compose.local.yml` beside `docker-compose.yml` (the launcher adds it when it exists; it's gitignored):
