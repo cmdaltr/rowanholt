@@ -454,5 +454,19 @@ class EruMcpTest(BackendCase):
         self.assertTrue(all(p.startswith("/api/") for p in self.calls), self.calls)
 
 
+@unittest.skipIf(Client is None, "requirements/mcp.txt not installed")
+class TransportSecurityTest(unittest.TestCase):
+    def test_other_addresses_are_allowed_beside_the_public_one(self):
+        # server init --service: the Tailscale Service name is public, the host-and-port address stays open
+        security = eru_mcp.transport_security("https://rowanholt.tail1234.ts.net/",
+                                              "https://homelab.tail1234.ts.net:8443, ", "0.0.0.0:5690")
+        self.assertEqual(security.allowed_hosts,
+                         ["rowanholt.tail1234.ts.net", "homelab.tail1234.ts.net:8443", "0.0.0.0:5690"])
+        self.assertEqual(security.allowed_origins,
+                         ["https://rowanholt.tail1234.ts.net", "https://homelab.tail1234.ts.net:8443"])
+        alone = eru_mcp.transport_security("https://rowanholt.example.org", "", "0.0.0.0:5690")
+        self.assertEqual(alone.allowed_hosts, ["rowanholt.example.org", "0.0.0.0:5690"])
+
+
 if __name__ == "__main__":
     unittest.main()

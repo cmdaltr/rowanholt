@@ -53,6 +53,29 @@ On a tailnet, name the server by its MagicDNS name (`rowanholt.<tailnet>.ts.net`
 
 When something else on the host is the front door on 443, `--https-port <port>` (for example `8443`) serves Rowanholt there instead: the web app, API and Eru's MCP server move to `https://<host>:<port>`, 80 is left free (the proxy's redirect listens on the host's loopback only), and Splunk, Kibana and the Navigator keep their ports. Running `server init` again keeps the port; `--https-port 443` goes back. MCP clients registered at the old URL need registering again at the new one.
 
+### A name of its own on a tailnet
+
+On a tailnet node that hosts other apps too, `--service <name>` gives Rowanholt its own address with no port, `https://<name>.<tailnet>.ts.net`, as a [Tailscale Service](https://tailscale.com/kb/1552/tailscale-services):
+
+```bash
+rowanholt server init homelab.tail180683.ts.net --tls tailscale --https-port 8443 --service rowanholt
+rowanholt start
+```
+
+Tailscale terminates TLS for the name with a certificate of its own and hands each request to the proxy over plain HTTP on the host's loopback (`deploy/server/Caddyfile.service`, published on `127.0.0.1:5680`–`5683` by `docker-compose.service.yml`, which `rowanholt start` adds while `.env` sets `ROWANHOLT_SERVICE`). The name's 443 is the web app, API and Eru's MCP server; its 7755, 5601 and 5602 are Splunk, Kibana and the Navigator. The name becomes `ROWANHOLT_PUBLIC_URL`; the host-and-port address keeps working (`ROWANHOLT_OTHER_URLS`, an allowed origin for the backend and Eru's MCP server), and the node's certificate and `server cert` are unchanged.
+
+Before the first `--service`, in the tailnet's admin console or through its API:
+
+1. Tag the server (only a tagged device can host a Service), e.g. `tag:homelab`, with Tailscale 1.86 or later on it and on every client.
+2. In the policy file, auto-approve the Service for that tag and let the people who use Rowanholt reach its ports:
+   ```json
+   "autoApprovers": { "services": { "svc:rowanholt": ["tag:homelab"] } },
+   "grants": [ { "src": ["autogroup:member"], "dst": ["svc:rowanholt"], "ip": ["443", "7755", "5601", "5602"] } ]
+   ```
+3. If `server init` says Tailscale doesn't know the Service, define it once under Services with endpoints `tcp:443, tcp:7755, tcp:5601, tcp:5602`.
+
+Afterwards register MCP clients again at the name, and for single sign-on add `https://<name>.<tailnet>.ts.net/api/auth/oidc/callback` as a redirect URI. Sign-in cookies belong to the address they were made at, so a browser signs in once at each address it uses; Splunk, Kibana and the Navigator send it to the sign-in page at the address it's on. `--service off` drops the name and puts the port address back as the public URL.
+
 ### Evidence
 
 Paths in Rowanholt are paths on the server. Mount your evidence storage on the host and make it visible to the containers with a `docker-compose.local.yml` beside `docker-compose.yml` (the launcher adds it when it exists; it's gitignored):

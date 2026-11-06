@@ -92,6 +92,9 @@ class Settings(BaseSettings):
     rowanholt_admin_password: str = ""
     # The URL people open, e.g. https://rowanholt.example.org (CORS, cookies, OIDC redirects)
     rowanholt_public_url: str = ""
+    # Other addresses the same server answers on, separated by commas: allowed origins too
+    # (server init --service keeps the host-and-port address beside the Service name)
+    rowanholt_other_urls: str = ""
     # Online lookups (threat_intel_lookup.py): off unless both are set. "virustotal" is the only provider
     rowanholt_online_lookups: str = ""
     virustotal_api_key: str = ""
@@ -195,7 +198,8 @@ if settings.secret_key in ("", DEFAULT_SECRET_KEY):
 
 # A server answers only its own origin; a local stack keeps the localhost list
 if settings.rowanholt_server_mode and settings.rowanholt_public_url:
-    settings.cors_origins = [settings.rowanholt_public_url.rstrip("/")]
+    settings.cors_origins = [url.strip().rstrip("/") for url in
+                             [settings.rowanholt_public_url, *settings.rowanholt_other_urls.split(",")] if url.strip()]
 
 # Create necessary directories
 settings.upload_dir.mkdir(parents=True, exist_ok=True)

@@ -23,8 +23,11 @@ def tree(tmp_path: Path) -> tuple:
                     "-keyout", str(tmp_path / "issued.key"), "-out", str(tmp_path / "issued.crt")],
                    check=True, capture_output=True)
     stand_ins = {
-        # tailscale cert --cert-file C --key-file K NAME: hands over the "issued" pair
-        "tailscale": f'[ "$1" = cert ] || exit 0\ncp "{tmp_path}/issued.crt" "$3"\ncp "{tmp_path}/issued.key" "$5"\n',
+        # tailscale cert --cert-file C --key-file K NAME: hands over the "issued" pair; serve is logged,
+        # and refused while TS_REFUSE is set (an untagged device, say)
+        "tailscale": (f'[ "$1" = cert ] || {{ echo "$*" >> "{tmp_path}/tailscale.log"; '
+                      '[ -z "$TS_REFUSE" ] || { echo "$TS_REFUSE" >&2; exit 1; }; exit 0; }\n'
+                      f'cp "{tmp_path}/issued.crt" "$3"\ncp "{tmp_path}/issued.key" "$5"\n'),
         "sudo": 'exec "$@"\n',
         "docker": "exit 1\n",
     }
@@ -100,3 +103,59 @@ def test_cert_refused_on_a_server_not_using_tailscale(tmp_path):
     assert run(root, env, "init", "rowanholt.dfir.example.org").returncode == 0
     done = run(root, env, "cert")
     assert done.returncode == 1 and "isn't Tailscale's" in done.stderr
+
+
+def served(tmp_path: Path) -> list:
+    log = tmp_path / "tailscale.log"
+    lines = log.read_text().splitlines() if log.exists() else []
+    log.unlink(missing_ok=True)
+    return lines
+
+
+def test_service_name_becomes_the_public_url(tmp_path):
+    # homelab: Rowanholt at https://rowanholt.<tailnet>.ts.net, beside homelab.<tailnet>.ts.net:8443
+    root, env = tree(tmp_path)
+    server = "homelab.tail1234.ts.net"
+    done = run(root, env, "init", server, "--tls", "tailscale", "--https-port", "8443", "--service", "rowanholt")
+    assert done.returncode == 0, done.stderr
+    assert (setting(root, "ROWANHOLT_SERVICE"), setting(root, "ROWANHOLT_PUBLIC_URL"),
+            setting(root, "ROWANHOLT_OTHER_URLS")) == ("rowanholt", "https://rowanholt.tail1234.ts.net",
+                                                        f"https://{server}:8443")
+    assert served(tmp_path) == [
+        "serve --service=svc:rowanholt --https=443 http://127.0.0.1:5680",
+        "serve --service=svc:rowanholt --https=7755 http://127.0.0.1:5681",
+        "serve --service=svc:rowanholt --https=5601 http://127.0.0.1:5682",
+        "serve --service=svc:rowanholt --https=5602 http://127.0.0.1:5683",
+    ]
+    assert setting(root, "ROWANHOLT_HOSTNAME") == server  # its certificate and ports are unchanged
+
+    # kept on the next init, and served again
+    assert run(root, env, "init", server, "--tls", "tailscale").returncode == 0
+    assert setting(root, "ROWANHOLT_PUBLIC_URL") == "https://rowanholt.tail1234.ts.net"
+    assert len(served(tmp_path)) == 4
+
+    done = run(root, env, "init", server, "--tls", "tailscale", "--service", "off")
+    assert done.returncode == 0, done.stderr
+    assert (setting(root, "ROWANHOLT_SERVICE"), setting(root, "ROWANHOLT_PUBLIC_URL"),
+            setting(root, "ROWANHOLT_OTHER_URLS")) == ("", f"https://{server}:8443", "")
+    assert served(tmp_path) == ["serve drain svc:rowanholt", "serve clear svc:rowanholt"]
+
+
+def test_service_refused_changes_nothing(tmp_path):
+    root, env = tree(tmp_path)
+    server = "homelab.tail1234.ts.net"
+    assert run(root, env, "init", server, "--tls", "tailscale").returncode == 0
+    done = run(root, {**env, "TS_REFUSE": "service hosts must be tagged nodes"},
+               "init", server, "--tls", "tailscale", "--service", "rowanholt")
+    assert done.returncode == 1 and "tagged" in done.stderr
+    assert (setting(root, "ROWANHOLT_SERVICE"), setting(root, "ROWANHOLT_PUBLIC_URL")) == ("", f"https://{server}")
+
+
+def test_service_needs_tailscale_and_a_label_of_its_own(tmp_path):
+    root, env = tree(tmp_path)
+    done = run(root, env, "init", "rowanholt.dfir.example.org", "--service", "rowanholt")
+    assert done.returncode == 1 and "--tls tailscale" in done.stderr
+    for bad in ("Rowanholt", "-x", "a.b", "rowanholt"):  # rowanholt: the server's own name
+        done = run(root, env, "init", NAME, "--tls", "tailscale", "--service", bad)
+        assert done.returncode == 1, bad
+    assert not served(tmp_path)

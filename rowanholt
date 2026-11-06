@@ -122,11 +122,17 @@ ensure_docker() {
 print_urls() {
     echo ""
     if $SERVER; then
-        local host url
+        local host url other
         host="$(sed -n 's/^ROWANHOLT_HOSTNAME=//p' "$ROOT/.env" | tail -1)"
         url="$(sed -n 's/^ROWANHOLT_PUBLIC_URL=//p' "$ROOT/.env" | tail -1)"
+        other="$(sed -n 's/^ROWANHOLT_OTHER_URLS=//p' "$ROOT/.env" | tail -1)"
         echo "  Rowanholt:     ${url:-https://$host}"
-        echo "  Splunk, Kibana, Navigator (with COMPOSE_PROFILES=siem): https://$host:7755, :5601, :5602"
+        [ -n "$other" ] && echo "  also at:       $other"
+        if [ -n "$other" ]; then
+            echo "  Splunk, Kibana, Navigator (with COMPOSE_PROFILES=siem): ${url%/}:7755, :5601, :5602"
+        else
+            echo "  Splunk, Kibana, Navigator (with COMPOSE_PROFILES=siem): https://$host:7755, :5601, :5602"
+        fi
         echo ""
         echo "  Users: 'rowanholt server users list'. Nothing else is published."
         echo ""
@@ -181,6 +187,10 @@ stack() {
     if $SERVER; then
         server_preflight
         COMPOSE_FILES="$COMPOSE_FILES -f deploy/server/docker-compose.server.yml"
+        # A Tailscale Service name (server init --service): the proxy's loopback sites for it
+        if [ -n "$(sed -n 's/^ROWANHOLT_SERVICE=//p' "$ROOT/.env" | tail -1)" ]; then
+            COMPOSE_FILES="$COMPOSE_FILES -f deploy/server/docker-compose.service.yml"
+        fi
     fi
     # Evidence folders added in the desktop app's setup (gitignored, so a pull never touches it)
     if [ -f "$ROOT/docker-compose.local.yml" ]; then

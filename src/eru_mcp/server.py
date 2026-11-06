@@ -396,6 +396,14 @@ def http_refusal(api: RowanholtAPI, public_url: str) -> Optional[str]:
     return None
 
 
+def transport_security(public: str, others: str, listen: str) -> TransportSecuritySettings:
+    """The Hosts and Origins the HTTP transport accepts: the public URL's, the other addresses the
+    server answers on (ROWANHOLT_OTHER_URLS, comma-separated), and its own listening address."""
+    origins = [url.strip().rstrip("/") for url in [public, *others.split(",")] if url.strip()]
+    hosts = [urllib.parse.urlsplit(url).netloc for url in origins]
+    return TransportSecuritySettings(allowed_hosts=[*hosts, listen], allowed_origins=origins)
+
+
 def serve_http(options: argparse.Namespace) -> int:
     """Streamable HTTP, behind the team server's Caddy (deploy/server): each request's own token."""
     if os.environ.get("ROWANHOLT_TOKEN"):
@@ -407,9 +415,8 @@ def serve_http(options: argparse.Namespace) -> int:
         logger.error(refusal)
         return 2
     host, _, port = options.http.rpartition(":")
-    public_host = urllib.parse.urlsplit(public).netloc
     # Caddy passes the public Host and Origin through; nothing else may reach it (DNS rebinding)
-    security = TransportSecuritySettings(allowed_hosts=[public_host, f"{host}:{port}"], allowed_origins=[public])
+    security = transport_security(public, options.other_urls, f"{host}:{port}")
     mode = f"leads and notes for eru-mcp tokens, up to {options.max_writes} each" if options.allow_writes else "read-only"
     logger.info(f"Serving Rowanholt at {options.api} over HTTP on {options.http}, for {public}/mcp ({mode})")
     server = build_server(api, writes=options.allow_writes, max_writes=max(options.max_writes, 0),
@@ -427,6 +434,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                           "each request sends its analyst's API token")
     cli.add_argument("--public-url", default=os.environ.get("ROWANHOLT_PUBLIC_URL", ""),
                      help="with --http: the server's URL as analysts open it (ROWANHOLT_PUBLIC_URL)")
+    cli.add_argument("--other-urls", default=os.environ.get("ROWANHOLT_OTHER_URLS", ""),
+                     help="with --http: other addresses the server answers on, comma-separated (ROWANHOLT_OTHER_URLS)")
     cli.add_argument("--allow-writes", action="store_true",
                      help="add flag_lead and add_note (leads and notes, recorded as Eru's); read-only without it")
     cli.add_argument("--max-writes", type=int, default=MAX_WRITES,

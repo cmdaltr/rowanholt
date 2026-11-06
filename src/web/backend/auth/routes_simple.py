@@ -9,7 +9,7 @@ in server mode, user administration for admins in place of open sign-up.
 import logging
 from datetime import datetime, timedelta
 from typing import Optional
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
@@ -254,6 +254,17 @@ async def session_from_cookie(request: Request, response: Response):
     return _session(response, load_users()[user["id"]])
 
 
+def _sign_in_url(request: Request) -> str:
+    """The sign-in page at whichever of the server's addresses the browser is on (the proxy's
+    X-Forwarded-Host), since its cookies belong to that address; the public URL otherwise."""
+    host = (request.headers.get("X-Forwarded-Host") or "").rsplit(":", 1)[0].lower()
+    for url in [settings.rowanholt_public_url, *settings.rowanholt_other_urls.split(",")]:
+        url = url.strip().rstrip("/")
+        if url and host and urlsplit(url).hostname == host:
+            return f"{url}/login"
+    return f"{settings.rowanholt_public_url.rstrip('/')}/login"
+
+
 @router.get("/verify")
 async def verify(request: Request, response: Response, login_redirect: bool = False,
                  service: Optional[str] = None):
@@ -264,7 +275,7 @@ async def verify(request: Request, response: Response, login_redirect: bool = Fa
     proxy sends the URI it's asking about in X-Forwarded-Uri."""
     user = access.user_from_request(request)
     if not user and login_redirect and settings.rowanholt_public_url:
-        return RedirectResponse(f"{settings.rowanholt_public_url.rstrip('/')}/login", status_code=302)
+        return RedirectResponse(_sign_in_url(request), status_code=302)
     if not user:
         raise HTTPException(status_code=401, detail="Sign in required")
     if service == "navigator" and not access.layer_allowed(user, request.headers.get("X-Forwarded-Uri", "/")):

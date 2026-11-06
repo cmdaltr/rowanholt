@@ -24,8 +24,7 @@
 	}
 }
 
-(hardened) {
-	tls {$ROWANHOLT_TLS}
+(headers) {
 	encode gzip
 	header {
 		Strict-Transport-Security "max-age=31536000"
@@ -35,12 +34,20 @@
 	}
 }
 
-{$ROWANHOLT_HOSTNAME}:{$ROWANHOLT_HTTPS_PORT:443} {
-	import hardened
+(hardened) {
+	tls {$ROWANHOLT_TLS}
+	import headers
+}
+
+# The web app, API and Eru's MCP server. Every address people open is https, including a
+# Tailscale Service name (Caddyfile.service), which reaches here over plain HTTP from Tailscale
+# on the host's loopback: the backend is told so, or its redirects would point at http://
+(app) {
 	header X-Frame-Options SAMEORIGIN
 
 	handle /api/* {
 		reverse_proxy backend:5688 {
+			header_up X-Forwarded-Proto https
 			# Evidence uploads and long analyses
 			transport http {
 				read_timeout 30m
@@ -51,14 +58,23 @@
 	# Eru's MCP server (the "mcp" profile; 502 when it isn't running) and the metadata MCP
 	# clients read when it answers 401
 	handle /mcp* {
-		reverse_proxy eru-mcp:5690
+		reverse_proxy eru-mcp:5690 {
+			header_up X-Forwarded-Proto https
+		}
 	}
 	handle /.well-known/oauth-protected-resource* {
-		reverse_proxy eru-mcp:5690
+		reverse_proxy eru-mcp:5690 {
+			header_up X-Forwarded-Proto https
+		}
 	}
 	handle {
 		reverse_proxy frontend:80
 	}
+}
+
+{$ROWANHOLT_HOSTNAME}:{$ROWANHOLT_HTTPS_PORT:443} {
+	import hardened
+	import app
 }
 
 {$ROWANHOLT_HOSTNAME}:7755 {
@@ -78,3 +94,7 @@
 	import signed_in navigator
 	reverse_proxy navigator:4200
 }
+
+# A Tailscale Service name for the server (server init --service): mounted only then, by
+# deploy/server/docker-compose.service.yml; a glob that matches nothing imports nothing
+import /etc/caddy/service*.caddy

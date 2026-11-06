@@ -278,6 +278,18 @@ class ServerAccessTest(BackendCase):
         self.assertEqual(self.client.get("/api/auth/verify").status_code, 401)
         resp = self.client.get("/api/auth/verify?login_redirect=1", follow_redirects=False)
         self.assertEqual(resp.headers["location"], "https://rowanholt.test/login")
+        # server init --service: back to the sign-in page at the address the browser is on, and
+        # only ever one of the server's own
+        self.settings.rowanholt_other_urls = "https://homelab.test:8443"
+        try:
+            for forwarded, location in (("homelab.test:7755", "https://homelab.test:8443/login"),
+                                        ("rowanholt.test:7755", "https://rowanholt.test/login"),
+                                        ("evil.example:7755", "https://rowanholt.test/login")):
+                resp = self.client.get("/api/auth/verify?login_redirect=1", follow_redirects=False,
+                                       headers={"X-Forwarded-Host": forwarded})
+                self.assertEqual(resp.headers["location"], location, forwarded)
+        finally:
+            self.settings.rowanholt_other_urls = ""
         resp = self.client.get("/api/auth/verify", headers=self.bob)
         self.assertEqual(resp.headers["X-Rowanholt-User"], "bob")
 

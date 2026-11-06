@@ -44,6 +44,7 @@ services:
     environment:
       - ROWANHOLT_SERVER_MODE=true
       - ROWANHOLT_PUBLIC_URL=${ROWANHOLT_PUBLIC_URL:-https://${ROWANHOLT_HOSTNAME:?Run rowanholt server init first}}
+      - ROWANHOLT_OTHER_URLS=${ROWANHOLT_OTHER_URLS:-}
       - SECRET_KEY=${SECRET_KEY:?Run rowanholt server init first}
       - ROWANHOLT_ADMIN_PASSWORD=${ROWANHOLT_ADMIN_PASSWORD:?Run rowanholt server init first}
       - ROWANHOLT_LOCAL_LOGIN=${ROWANHOLT_LOCAL_LOGIN:-true}
@@ -69,6 +70,7 @@ services:
       - ERU_MCP_ARGS=${ERU_MCP_ARGS:-}
       - ROWANHOLT_API=http://backend:5688
       - ROWANHOLT_PUBLIC_URL=${ROWANHOLT_PUBLIC_URL:-https://${ROWANHOLT_HOSTNAME:?Run rowanholt server init first}}
+      - ROWANHOLT_OTHER_URLS=${ROWANHOLT_OTHER_URLS:-}
     depends_on:
       - backend
     networks:

@@ -1,0 +1,28 @@
+# Rowanholt under a Tailscale Service name, https://<service>.<tailnet>.ts.net (rowanholt server
+# init --service). Tailscale terminates TLS for the name with its own certificate and hands each
+# request to one of these sites over plain HTTP, on the host's loopback only
+# (docker-compose.service.yml publishes them on 127.0.0.1). Imported at the end of the Caddyfile,
+# so its snippets are already defined.
+
+http://:5680 {
+	import headers
+	import app
+}
+
+http://:5681 {
+	import headers
+	import signed_in splunk
+	reverse_proxy splunk:8000
+}
+
+http://:5682 {
+	import headers
+	import signed_in kibana
+	reverse_proxy kibana:5601
+}
+
+http://:5683 {
+	import headers
+	import signed_in navigator
+	reverse_proxy navigator:4200
+}

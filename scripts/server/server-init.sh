@@ -2,6 +2,7 @@
 # Set this Rowanholt up as a team's shared server (writes the server settings into .env)
 #
 #   rowanholt server init <hostname> [--tls internal|<acme-email>|files|tailscale] [--https-port N]
+#                                    [--service <name>|off]
 #
 # <hostname> is the name people will open, e.g. rowanholt.dfir.example.org. --tls picks
 # the certificate: Caddy's own CA (internal, the default), Let's Encrypt for a public
@@ -10,6 +11,9 @@
 # (<host>.<tailnet>.ts.net), Tailscale's (tailscale; renew with rowanholt server cert).
 # --https-port serves Rowanholt on another port than 443 and leaves 80 free, for a host where
 # something else is the front door; once given it's kept until given again (443 to go back).
+# --service, with --tls tailscale, also gives the server a Tailscale Service name of its own,
+# https://<name>.<tailnet>.ts.net with no port, which becomes the URL people open; the
+# host-and-port address keeps working. Kept like --https-port; --service off drops it.
 # Afterwards `rowanholt start` runs the server profile.
 #
 # Secrets are generated once and kept: SECRET_KEY, the first admin's password (printed
@@ -23,11 +27,13 @@ ENV_FILE="$ROOT/.env"
 HOSTNAME_ARG=""
 TLS="internal"
 HTTPS_PORT=""
+SERVICE_ARG=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --tls) TLS="$2"; shift ;;
         --https-port) HTTPS_PORT="$2"; shift ;;
-        -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --service) SERVICE_ARG="$2"; shift ;;
+        -h|--help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*) echo "Error: unknown option: $1" >&2; exit 1 ;;
         *) HOSTNAME_ARG="$1" ;;
     esac
@@ -81,6 +87,47 @@ set_value() {
     rm -f "$tmp"
 }
 secret() { od -An -N24 -tx1 /dev/urandom | tr -d ' \n'; }
+
+# A Tailscale Service: Tailscale terminates TLS for the name and hands each port to one of the
+# proxy's loopback sites (deploy/server/Caddyfile.service): the web app, Splunk, Kibana, the Navigator
+SERVICE_PORTS="443:5680 7755:5681 5601:5682 5602:5683"
+SUDO=""
+[ "$(id -u)" -eq 0 ] || SUDO="sudo"
+serve_service() {
+    local pair err
+    err="$(mktemp)"
+    for pair in $SERVICE_PORTS; do
+        if ! $SUDO tailscale serve --service="svc:$1" --https="${pair%%:*}" "http://127.0.0.1:${pair#*:}" \
+                </dev/null >/dev/null 2>"$err"; then
+            echo "Error: Tailscale won't serve svc:$1: $(head -3 "$err")" >&2
+            echo "  The server must be a tagged device, and the tailnet policy must auto-approve svc:$1 for its" >&2
+            echo "  tag and grant it ports 443, 7755, 5601 and 5602 (docs/SERVER.md, A name of its own)." >&2
+            rm -f "$err"
+            return 1
+        fi
+    done
+    rm -f "$err"
+}
+unserve_service() {
+    { $SUDO tailscale serve drain "svc:$1"; $SUDO tailscale serve clear "svc:$1"; } </dev/null >/dev/null 2>&1 || true
+}
+
+OLD_SERVICE="$(current ROWANHOLT_SERVICE)"
+case "$SERVICE_ARG" in
+    off) SERVICE="" ;;
+    "") SERVICE="$OLD_SERVICE" ;;
+    *) SERVICE="$SERVICE_ARG" ;;
+esac
+if [ -n "$SERVICE" ]; then
+    [[ "$SERVICE" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]] \
+        || { echo "Error: --service takes a DNS label (lower case letters, digits and hyphens), or off" >&2; exit 1; }
+    [ "$TLS_SOURCE" = tailscale ] \
+        || { echo "Error: --service is for a server on a tailnet with --tls tailscale (or --service off)" >&2; exit 1; }
+    [ "$SERVICE.${HOSTNAME_ARG#*.}" != "$HOSTNAME_ARG" ] \
+        || { echo "Error: the Service needs a name of its own, not the server's ($SERVICE)" >&2; exit 1; }
+    serve_service "$SERVICE" || exit 1
+fi
+if [ -n "$OLD_SERVICE" ] && [ "$OLD_SERVICE" != "$SERVICE" ]; then unserve_service "$OLD_SERVICE"; fi
 store_exists() { docker volume ls -q 2>/dev/null | grep -qE "(^|_)$1\$"; }
 
 set_value ROWANHOLT_DEPLOYMENT server
@@ -98,6 +145,13 @@ if [ "$HTTPS_PORT" = 443 ]; then
 else
     PUBLIC_URL="https://$HOSTNAME_ARG:$HTTPS_PORT"
     set_value ROWANHOLT_HTTP_PUBLISH 127.0.0.1:8080  # its redirect isn't wanted; 80 stays free
+fi
+set_value ROWANHOLT_SERVICE "$SERVICE"
+if [ -n "$SERVICE" ]; then
+    set_value ROWANHOLT_OTHER_URLS "$PUBLIC_URL"
+    PUBLIC_URL="https://$SERVICE.${HOSTNAME_ARG#*.}"
+else
+    set_value ROWANHOLT_OTHER_URLS ""
 fi
 set_value ROWANHOLT_PUBLIC_URL "$PUBLIC_URL"
 
@@ -126,6 +180,14 @@ done
 
 echo "Rowanholt is set up as a server for $PUBLIC_URL"
 echo ""
+if [ -n "$SERVICE" ]; then
+    echo "  Tailscale Service svc:$SERVICE; also at $(current ROWANHOLT_OTHER_URLS). Splunk, Kibana and the"
+    echo "  Navigator are on the name's 7755, 5601 and 5602. MCP clients and an SSO redirect URI move to the name."
+    echo ""
+elif [ -n "$OLD_SERVICE" ]; then
+    echo "  Tailscale Service svc:$OLD_SERVICE dropped: MCP clients and an SSO redirect URI move back to $PUBLIC_URL."
+    echo ""
+fi
 if [ -n "$ADMIN_PASSWORD" ]; then
     echo "  First admin:  admin / $ADMIN_PASSWORD"
     echo "  (shown once; it's also ROWANHOLT_ADMIN_PASSWORD in .env until you change it after signing in)"
