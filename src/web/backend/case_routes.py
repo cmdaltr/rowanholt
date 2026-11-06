@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -309,6 +309,19 @@ async def rows(job_id: str, host: str, path: str, q: str = "", offset: int = Que
         return case_files.page(_file(job_id, host, path), q, offset, limit)
     except case_files.CaseFileError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/rows.csv")
+async def rows_csv(job_id: str, host: str, path: str, q: str = ""):
+    """A table (its filtered rows, with q) as CSV, for a spreadsheet: the case keeps JSON Lines."""
+    table = _file(job_id, host, path)
+    try:  # a broken table is refused before the response starts
+        next(case_files.records(table), None)
+    except case_files.CaseFileError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    name = re.sub(r"[^\w.+-]", "_", f"{'' if host == case_files.CASE_HOST else host + '_'}{Path(path).stem}") + ".csv"
+    return StreamingResponse(case_files.csv_export(table, q), media_type="text/csv",
+                             headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
 # ---- findings ----

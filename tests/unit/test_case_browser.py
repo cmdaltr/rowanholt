@@ -114,6 +114,28 @@ def test_rows_are_paged_and_filtered(client):
     assert refused.status_code == 404
 
 
+def test_download_as_csv(client):
+    import csv
+    import io
+    sys.path.append(str(REPO / "src" / "analysis"))
+    from rowanholt.core.records import write_records
+    api, case = client
+    write_records(case / "LAB-UBUNTU" / "artefacts" / "cooked" / "startup.jsonl",
+                  [{"Item": "a,b", "Command": "=cmd|' /c calc'!A0"}, {"Item": "c", "Sources": ["x", "y"]}],
+                  host="LAB-UBUNTU", artefact="startup")
+    got = api.get(f"/api/jobs/{JOB}/case/rows.csv", params={"host": "LAB-UBUNTU", "path": "artefacts/cooked/startup.jsonl"})
+    assert got.status_code == 200 and 'filename="LAB-UBUNTU_startup.csv"' in got.headers["content-disposition"]
+    rows = list(csv.DictReader(io.StringIO(got.text)))
+    assert [r["row"] for r in rows] == ["1", "2"] and rows[0]["Item"] == "a,b"
+    assert rows[0]["Command"] == "'=cmd|' /c calc'!A0"  # opens as text, not a formula
+    assert rows[1]["Sources"] == '["x", "y"]' and rows[1]["Command"] == "" and rows[0]["host"] == "LAB-UBUNTU"
+    filtered = api.get(f"/api/jobs/{JOB}/case/rows.csv", params={"host": "LAB-UBUNTU", "q": "CURL",
+                                                                "path": "artefacts/cooked/linux/cron.csv"})
+    assert filtered.text.splitlines()[1].startswith("3,")
+    assert api.get(f"/api/jobs/{JOB}/case/rows.csv", params={"host": "LAB-UBUNTU",
+                                                            "path": "artefacts/raw/secret.csv"}).status_code == 404
+
+
 def test_findings_notes_and_output(client):
     api, case = client
     base = f"/api/jobs/{JOB}/case"

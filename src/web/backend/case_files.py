@@ -12,6 +12,7 @@ processed before that are CSV and JSON arrays, read the same way.
 import csv
 import hashlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -176,3 +177,38 @@ def find_row(path: Path, ref: str) -> Optional[Dict[str, str]]:
         if current == ref:
             return row
     return None
+
+
+SPREADSHEET_FORMULA = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _cell(value: str) -> str:
+    """A spreadsheet runs a cell that starts with = + - or @ as a formula: an evidential value such
+    as =HYPERLINK(...) or a command line is prefixed with ' so it opens as text."""
+    return "'" + value if value.startswith(SPREADSHEET_FORMULA) and value != "-" else value
+
+
+def csv_export(path: Path, query: str = "") -> Iterator[str]:
+    """The table as CSV, rows matching `query` as page() matches them: a header of every field any
+    record has (a JSON Lines table's records needn't share them), nested values as JSON text, the
+    row reference first. Read twice, for the header and then the rows."""
+    needle = query.lower()
+
+    def matching() -> Iterator[Tuple[str, Dict[str, str]]]:
+        for ref, row in records(path):
+            if not needle or any(needle in (v or "").lower() for v in row.values()):
+                yield ref, row
+
+    columns: Dict[str, None] = {}
+    for _, row in matching():
+        columns.update(dict.fromkeys(row))
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["row", *columns])
+    for count, (ref, row) in enumerate(matching(), 1):
+        writer.writerow([ref, *(_cell(row.get(c) or "") for c in columns)])
+        if count % 1000 == 0:
+            yield buffer.getvalue()
+            buffer.seek(0)
+            buffer.truncate()
+    yield buffer.getvalue()
