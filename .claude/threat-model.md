@@ -68,6 +68,17 @@ Re-review if lookups are made automatic, offered to Eru or Elrond, sent to anoth
 
 Found in the accuracy review: Elrond ran `host` on every domain and IPv4 address it extracted (`analysis/iocs.py`, the `resolvable` column of `iocs.csv`), always on. That is an automatic online lookup, and each one tells the domain's nameserver someone is asking. Ben chose to gate it: it runs only when `ROWANHOLT_ONLINE_LOOKUPS` lists `dns` (a comma list now, beside `virustotal`), and the column reads `not checked` otherwise. The worker is given the setting; Pippin's VirusTotal lookup still needs `virustotal` and its key.
 
+## Review: a Tailscale Service name (6 November 2026, Ben)
+
+Approved as built (`028b5ed`). What changed: `server init --service <name>` (with `--tls tailscale`) gives the server a name of its own, `https://<name>.<tailnet>.ts.net`, through `tailscale serve --service`. tailscaled in the VM ends TLS for the name with Tailscale's certificate and hands each request to Caddy on `127.0.0.1:5680` (5681–5683 for Splunk, Kibana and the Navigator), published by `docker-compose.service.yml` on the VM's loopback only. Caddy's `Caddyfile.service` sites import the same `(app)` routes and `signed_in` gates as the main site. The old address (`:8443`) keeps working.
+
+1. **Plain HTTP on the VM's loopback: accepted.** The only unencrypted hop is tailscaled to Caddy inside the VM. Watching it needs a shell on the VM, which already reaches `.env` and the case store. Nothing is published to the LAN or the tailnet beyond the Service's own address.
+2. **`X-Forwarded-Proto: https` set unconditionally on the service sites: accepted.** Caddy sees plain HTTP from tailscaled, so the backend would otherwise build `http://` redirects and login URLs. A process on the VM calling 5680 directly is taken as HTTPS too, but still has to sign in; it gains nothing it doesn't already have.
+3. **Other URLs accepted (`ROWANHOLT_OTHER_URLS`, the `:8443` address): accepted.** They're added to the backend's CORS and websocket origins, eru-mcp's allowed Hosts and Origins (DNS rebinding protection), and the SIEM `/verify` redirect, which picks the sign-in URL matching `X-Forwarded-Host` among the configured URLs and otherwise falls back to the public URL, so it can't be steered off them. Every MCP request still needs an eru-mcp token; full tokens and JWTs are still refused.
+4. **Who can reach the name: the tailnet policy.** The Service has its own address (the VIP), defined in the admin console, approved for tagged hosts (`autoApprovers.services`) and reachable only through the grants `tailscale-setup.py` writes, per port.
+
+Re-review if the Service is shared outside the tailnet (Funnel or a shared node), if the loopback ports are published beyond `127.0.0.1`, or if `ROWANHOLT_OTHER_URLS` takes an address that isn't the server's own.
+
 ## Chain of custody note
 
 Evidence packages are SHA256-hashed at acquisition time. Do not modify anything under `evidence/` or `cases/<CASE-ID>/raw/`. Processed output under `cases/<CASE-ID>/output/` is writable.
