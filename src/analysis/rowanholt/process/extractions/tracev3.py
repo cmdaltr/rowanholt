@@ -77,14 +77,21 @@ def _dashed(raw: bytes) -> str:
 # ---- LZ4 -----------------------------------------------------------------------
 
 
-def lz4_block(src: bytes, size: int) -> bytes:
-    """One raw LZ4 block, decompressed to at most size bytes."""
+def lz4_block(src: bytes, size: int, history: bytes = b"") -> bytes:
+    """One raw LZ4 block, decompressed to at most size bytes.
+
+    history is what the stream's earlier blocks decompressed to: Apple's bv41 blocks match back
+    into it (up to 64 KiB), so a block decoded on its own fails ("match before the start").
+    """
+    history = history[-65536:]
     if _lz4_block is not None:
         try:
-            return _lz4_block.decompress(src, uncompressed_size=size)
+            return _lz4_block.decompress(src, uncompressed_size=size, dict=history) if history \
+                else _lz4_block.decompress(src, uncompressed_size=size)
         except Exception as e:  # lz4.block.LZ4BlockError
             raise TraceError(f"LZ4 block: {e}") from e
-    out = bytearray()
+    size += len(history)
+    out = bytearray(history)
     i, n = 0, len(src)
     try:
         while i < n:
@@ -126,7 +133,7 @@ def lz4_block(src: bytes, size: int) -> bytes:
                 raise TraceError("LZ4 block larger than its header says")
     except IndexError as e:
         raise TraceError("LZ4 block cut short") from e
-    return bytes(out)
+    return bytes(out[len(history):])
 
 
 # LZBITMAP (macOS 27's chunksets): after zbm_decompress in libzbitmap (MIT, Corellium LLC, Ernesto A.
@@ -272,7 +279,7 @@ def chunkset(data: bytes) -> bytes:
             break
         if magic == b"bv41":
             size, compressed = struct.unpack_from("<II", data, i + 4)
-            out += lz4_block(data[i + 12:i + 12 + compressed], size)
+            out += lz4_block(data[i + 12:i + 12 + compressed], size, bytes(out[-65536:]))
             i += 12 + compressed
         elif magic == b"bv4-":
             (size,) = struct.unpack_from("<I", data, i + 4)

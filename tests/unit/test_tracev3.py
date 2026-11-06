@@ -171,6 +171,19 @@ def test_lz4_matches_and_overlaps():
         t._lz4_block = saved
 
 
+def test_lz4_blocks_match_into_the_previous_one():
+    # Seen in lab-macos's Spotlight store: a bv41 block's match reaches back into the block before
+    first = bytes([0x50]) + b"hello"
+    second = bytes([0x11]) + b"!" + struct.pack("<H", 6)  # "!" then "hello", 6 back: in the first block
+    data = b"bv41" + struct.pack("<II", 5, len(first)) + first + \
+        b"bv41" + struct.pack("<II", 6, len(second)) + second + b"bv4$"
+    saved, t._lz4_block = t._lz4_block, None
+    try:
+        assert t.chunkset(data) == b"hello!hello"
+    finally:
+        t._lz4_block = saved
+
+
 def zbm_compressed(version: int) -> bytes:
     """16 bytes, "ab" then 14 copies at period 2: an explicit bitmap (2 literals, 6 copies) and an all-copy bitmap."""
     body = bytearray(b"ab")
