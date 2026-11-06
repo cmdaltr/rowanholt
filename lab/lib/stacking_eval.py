@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 """
-Score a case's stacking.csv against the values the lab planted, and record the result.
+Score a case's stacking table (stacking.jsonl) against the values the lab planted, and record the result.
 
     lab/lib/stacking_eval.py <elrond output dir> <acquisitions dir> [--readme lab/README.md] [--label TEXT]
 
 The plants are the "stacking" values in each target's expected.json (a substring of a row's
 Value or Example, as precision_at_k matches them). Prints precision at 4, 8 and 20 and where
 each plant ranked, and with --readme appends a row to the table between the stacking-eval
-markers there. Exits 1 when a plant isn't in stacking.csv at all.
+markers there. Exits 1 when a plant isn't in the stacking table at all.
 """
 import argparse
-import csv
 import importlib.util
 import json
 import sys
@@ -20,16 +19,26 @@ from typing import Dict, List, Optional
 
 REPO = Path(__file__).resolve().parents[2]
 STACKING = REPO / "src" / "analysis" / "rowanholt" / "analysis" / "stacking.py"
+RECORDS = REPO / "src" / "analysis" / "rowanholt" / "core" / "records.py"
 KS = (4, 8, 20)
 TABLE_END = "<!-- stacking-eval: rows above -->"
 
 
-def precision_at_k():
-    """stacking.precision_at_k, loaded by path: the analysis package isn't installed on the host."""
-    spec = importlib.util.spec_from_file_location("stacking", STACKING)
+def load(name: str, path: Path):
+    """A Rowanholt module, loaded by path: the analysis package isn't installed on the host."""
+    spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.precision_at_k
+    return module
+
+
+def precision_at_k():
+    return load("stacking", STACKING).precision_at_k
+
+
+def rows_of(stacking: Path) -> list:
+    """The stacking table's rows (stacking.jsonl, or an older case's stacking.csv)."""
+    return [record for _, record in load("records", RECORDS).read_records(stacking)]
 
 
 def plants(acquisitions: Path) -> Dict[str, List[str]]:
@@ -47,12 +56,11 @@ def plants(acquisitions: Path) -> Dict[str, List[str]]:
 
 def ranks(stacking_csv: Path, needles: List[str]) -> Dict[str, Optional[int]]:
     """The first rank at which each planted value appears, or None."""
-    with open(stacking_csv, newline="", encoding="utf-8") as fh:
-        rows = list(csv.DictReader(fh))
+    rows = rows_of(stacking_csv)
     first = {}
     for needle in needles:
         first[needle] = next((int(r["Rank"]) for r in rows
-                              if needle in r["Value"] or needle in r["Example"].lower()), None)
+                              if needle in str(r["Value"]) or needle in str(r["Example"]).lower()), None)
     return first
 
 
@@ -71,9 +79,9 @@ def main() -> int:
     cli.add_argument("--label", default="", help="what was stacked, for the table (default: the hosts)")
     options = cli.parse_args()
 
-    found = sorted(options.output.rglob("stacking.csv"))
+    found = sorted(options.output.rglob("stacking.jsonl")) or sorted(options.output.rglob("stacking.csv"))
     if not found:
-        print(f"No stacking.csv under {options.output}: Elrond needs --Analysis and two or more hosts.")
+        print(f"No stacking table under {options.output}: Elrond needs --Analysis and two or more hosts.")
         return 1
     stacking_csv = found[0]
     planted = plants(options.acquisitions)
@@ -81,8 +89,7 @@ def main() -> int:
         print(f"No \"stacking\" values in the expected.json files under {options.acquisitions}.")
         return 1
     needles = sorted({n for values in planted.values() for n in values})
-    with open(stacking_csv, newline="", encoding="utf-8") as fh:
-        total = sum(1 for _ in csv.DictReader(fh))
+    total = len(rows_of(stacking_csv))
     score = precision_at_k()
     precisions = {k: score(str(stacking_csv), needles, k) for k in KS}
     where = ranks(stacking_csv, needles)
