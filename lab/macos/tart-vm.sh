@@ -37,7 +37,9 @@ wait_ip() {
 start_forward() {
   local ip="$1" pidf="$RUN_DIR/forward-$PORT.pid"
   [ -f "$pidf" ] && kill "$(cat "$pidf")" 2>/dev/null || true
-  nohup python3 "$LAB_ROOT/lib/forward.py" "$PORT" "$ip" 22 >"$RUN_DIR/forward-$PORT.log" 2>&1 &
+  # Perl, not Python: a Python forwarder is refused the VM's address by macOS's Local Network
+  # permission (see forward.pl), and SSH "never answers"
+  nohup /usr/bin/perl "$LAB_ROOT/lib/forward.pl" "$PORT" "$ip" 22 >"$RUN_DIR/forward-$PORT.log" 2>&1 &
   echo $! > "$pidf"
   ok "$VM SSH on 127.0.0.1:$PORT (-> $ip:22)"
 }
