@@ -24,12 +24,10 @@ try:
 except ImportError:
     LANGCHAIN_AVAILABLE = False
 
-try:
-    import pandas as pd
+from rowanholt.core.records import ENVELOPE, TABLE_SUFFIXES, read_records, table_path
 
-    PANDAS_AVAILABLE = True
-except ImportError:
-    PANDAS_AVAILABLE = False
+MAX_ROWS_PER_TABLE = 5000  # embedding runs on the CPU: an MFT or a busy event log would take days
+MAX_FIELD = 300
 
 
 class ForensicDataIndexer:
@@ -60,9 +58,6 @@ class ForensicDataIndexer:
                 "LangChain required for AI indexing. Install with: "
                 "pip install langchain chromadb sentence-transformers"
             )
-
-        if not PANDAS_AVAILABLE:
-            raise ImportError("pandas required. Install with: pip install pandas")
 
         self.case_id = case_id
         self.output_dir = output_dir
@@ -110,11 +105,11 @@ class ForensicDataIndexer:
             return 0
 
         try:
-            df = pd.read_csv(timeline_csv)
-            self.logger.info(f"Indexing {len(df)} timeline events...")
+            rows = self._rows(timeline_csv)
+            self.logger.info(f"Indexing {len(rows)} timeline events...")
 
             documents = []
-            for _, row in df.iterrows():
+            for row in rows:
                 # Create document text
                 doc_text = f"""
 Timestamp: {row.get('timestamp', 'N/A')}
@@ -164,26 +159,25 @@ File: {row.get('file', row.get('filename', row.get('path', 'N/A')))}
             return 0
 
         try:
-            df = pd.read_csv(iocs_csv)
-            self.logger.info(f"Indexing {len(df)} IOCs...")
+            rows = self._rows(iocs_csv)
+            self.logger.info(f"Indexing {len(rows)} IOCs...")
 
             documents = []
-            for _, row in df.iterrows():
+            for row in rows:
                 doc_text = f"""
-IOC Type: {row.get('type', row.get('ioc_type', 'N/A'))}
-Value: {row.get('value', 'N/A')}
-Context: {row.get('context', row.get('description', 'N/A'))}
-Severity: {row.get('severity', 'N/A')}
-First Seen: {row.get('first_seen', 'N/A')}
-Last Seen: {row.get('last_seen', 'N/A')}
-Source: {row.get('source', 'N/A')}
+IOC Type: {row.get('indicator_type', 'N/A')}
+Value: {row.get('ioc', 'N/A')}
+Found In: {row.get('Filename', 'N/A')} line {row.get('line_number', 'N/A')}
+Host: {row.get('host', row.get('hostname', 'N/A'))}
+Resolvable: {row.get('resolvable', 'N/A')}
+Watchlist: {row.get('watchlist_match') or 'none'}
 """
 
                 metadata = {
                     "type": "ioc",
-                    "ioc_type": str(row.get("type", row.get("ioc_type", "N/A"))),
-                    "value": str(row.get("value", "N/A")),
-                    "severity": str(row.get("severity", "N/A")),
+                    "ioc_type": str(row.get("indicator_type", "N/A")),
+                    "value": str(row.get("ioc", "N/A")),
+                    "severity": "watchlist" if row.get("watchlist_match") else "unknown",
                     "case_id": self.case_id,
                 }
 
@@ -215,11 +209,11 @@ Source: {row.get('source', 'N/A')}
             return 0
 
         try:
-            df = pd.read_csv(processes_csv)
-            self.logger.info(f"Indexing {len(df)} processes...")
+            rows = self._rows(processes_csv)
+            self.logger.info(f"Indexing {len(rows)} processes...")
 
             documents = []
-            for _, row in df.iterrows():
+            for row in rows:
                 doc_text = f"""
 Process Name: {row.get('name', row.get('process_name', 'N/A'))}
 PID: {row.get('pid', 'N/A')}
@@ -265,11 +259,11 @@ Start Time: {row.get('start_time', row.get('creation_time', 'N/A'))}
             return 0
 
         try:
-            df = pd.read_csv(network_csv)
-            self.logger.info(f"Indexing {len(df)} network connections...")
+            rows = self._rows(network_csv)
+            self.logger.info(f"Indexing {len(rows)} network connections...")
 
             documents = []
-            for _, row in df.iterrows():
+            for row in rows:
                 doc_text = f"""
 Local Address: {row.get('local_address', row.get('src_ip', 'N/A'))}
 Local Port: {row.get('local_port', row.get('src_port', 'N/A'))}
@@ -316,11 +310,11 @@ PID: {row.get('pid', 'N/A')}
             return 0
 
         try:
-            df = pd.read_csv(registry_csv)
-            self.logger.info(f"Indexing {len(df)} registry keys...")
+            rows = self._rows(registry_csv)
+            self.logger.info(f"Indexing {len(rows)} registry keys...")
 
             documents = []
-            for _, row in df.iterrows():
+            for row in rows:
                 doc_text = f"""
 Registry Key: {row.get('key', row.get('path', 'N/A'))}
 Value Name: {row.get('value_name', row.get('name', 'N/A'))}
@@ -363,11 +357,11 @@ Last Modified: {row.get('last_modified', row.get('modified', 'N/A'))}
             return 0
 
         try:
-            df = pd.read_csv(files_csv)
-            self.logger.info(f"Indexing {len(df)} files...")
+            rows = self._rows(files_csv)
+            self.logger.info(f"Indexing {len(rows)} files...")
 
             documents = []
-            for _, row in df.iterrows():
+            for row in rows:
                 doc_text = f"""
 File Path: {row.get('path', row.get('file_path', 'N/A'))}
 File Name: {row.get('name', row.get('filename', 'N/A'))}
@@ -488,49 +482,90 @@ Request: {json.dumps(proto_payload.get('request', {}))}
 Response: {json.dumps(proto_payload.get('response', {}))}
 """
 
-    def index_all(self, artifacts_dir: str) -> Dict[str, int]:
+    def _rows(self, path: str) -> List[Dict[str, Any]]:
+        """A table's records (JSON Lines, or an old case's CSV or JSON), up to MAX_ROWS_PER_TABLE."""
+        rows = []
+        for _, record in read_records(path):
+            if len(rows) >= MAX_ROWS_PER_TABLE:
+                self.logger.warning(f"{path}: indexed the first {MAX_ROWS_PER_TABLE} records only")
+                break
+            rows.append(record)
+        return rows
+
+    def index_table(self, path: str, host: str, artefact: str) -> int:
+        """Index one of Elrond's tables, one document per record: its own fields as text, with the
+        host, artefact, row and time as metadata (so an answer can name where it came from)."""
+        try:
+            documents = []
+            for ref, record in read_records(path):
+                if len(documents) >= MAX_ROWS_PER_TABLE:
+                    self.logger.warning(f"{path}: indexed the first {MAX_ROWS_PER_TABLE} records only")
+                    break
+                fields = []
+                for key, value in record.items():
+                    if key in ENVELOPE or value in (None, "", [], {}):
+                        continue
+                    text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, default=str)
+                    fields.append(f"{key}: {text[:MAX_FIELD]}")
+                if not fields:
+                    continue
+                metadata = {
+                    "type": artefact,
+                    "host": host,
+                    "file": path,
+                    "row_ref": ref,
+                    "timestamp": str(record.get("timestamp") or "N/A"),
+                    "techniques": ", ".join(record.get("techniques") or []),
+                    "case_id": self.case_id,
+                }
+                documents.append(Document(page_content=f"{artefact} on {host}\n" + "\n".join(fields), metadata=metadata))
+            if documents:
+                self.vectorstore.add_documents(documents)
+                self.vectorstore.persist()
+            return len(documents)
+        except Exception as e:
+            self.logger.error(f"Error indexing {path}: {e}")
+            return 0
+
+    def index_all(self, case_dir: str) -> Dict[str, int]:
         """
-        Index all available artifacts.
+        Index an Elrond case: every host's analysis tables (IOCs as IOCs), its cooked artefacts and its
+        Plaso timeline, and the case's own tables (stacking, threat groups).
 
         Args:
-            artifacts_dir: Directory containing artifact files
+            case_dir: The case's output directory (holding a folder per host), or one host's folder
 
         Returns:
-            Dictionary with counts of indexed artifacts by type
+            Dictionary with counts of indexed documents by artefact
         """
-        self.logger.info(f"Indexing all artifacts from {artifacts_dir}...")
+        self.logger.info(f"Indexing all artifacts from {case_dir}...")
+        root = Path(case_dir)
+        hosts = [root] if (root / "artefacts").is_dir() else sorted(
+            d for d in root.iterdir() if d.is_dir() and (d / "artefacts").is_dir())
+        counts: Dict[str, int] = {}
 
-        counts = {}
+        def add(name: str, count: int) -> None:
+            if count:
+                counts[name] = counts.get(name, 0) + count
 
-        # Timeline
-        timeline_path = os.path.join(artifacts_dir, "timeline", "timeline.csv")
-        if os.path.exists(timeline_path):
-            counts["timeline"] = self.index_timeline(timeline_path)
-
-        # IOCs
-        iocs_path = os.path.join(artifacts_dir, "analysis", "iocs.csv")
-        if os.path.exists(iocs_path):
-            counts["iocs"] = self.index_iocs(iocs_path)
-
-        # Processes
-        processes_path = os.path.join(artifacts_dir, "processed", "processes.csv")
-        if os.path.exists(processes_path):
-            counts["processes"] = self.index_processes(processes_path)
-
-        # Network
-        network_path = os.path.join(artifacts_dir, "processed", "network.csv")
-        if os.path.exists(network_path):
-            counts["network"] = self.index_network(network_path)
-
-        # Registry
-        registry_path = os.path.join(artifacts_dir, "processed", "registry.csv")
-        if os.path.exists(registry_path):
-            counts["registry"] = self.index_registry(registry_path)
-
-        # Files
-        files_path = os.path.join(artifacts_dir, "processed", "files.csv")
-        if os.path.exists(files_path):
-            counts["files"] = self.index_files(files_path)
+        for host in hosts:
+            iocs = table_path(host / "analysis", "iocs")
+            if iocs.is_file():
+                add("iocs", self.index_iocs(str(iocs)))
+            for folder, prefix in ((host / "analysis", "analysis/"), (host / "artefacts" / "cooked", "")):
+                for path in sorted(folder.rglob("*")) if folder.is_dir() else []:
+                    if path.suffix.lower() not in TABLE_SUFFIXES or path.stem == "iocs" or not path.is_file():
+                        continue
+                    artefact = prefix + str(path.relative_to(folder).with_suffix(""))
+                    add(artefact, self.index_table(str(path), host.name, artefact))
+            timeline = table_path(host / "artefacts", "plaso_timeline")
+            if timeline.is_file():
+                add("plaso_timeline", self.index_table(str(timeline), host.name, "plaso_timeline"))
+        if root not in hosts:
+            for name in ("stacking", "threat_groups"):
+                table = table_path(root, name)
+                if table.is_file():
+                    add(name, self.index_table(str(table), "(case)", name))
 
         self.logger.info(f"Indexing complete. Total counts: {counts}")
         return counts

@@ -1,11 +1,11 @@
 """A whole case against threat intelligence, once Elrond's analysis is done.
 
-Per host, every text field of every cooked artefact and of analysis/iocs.csv is matched
-(threat_intel/index.py), into <host>/analysis/threat_intel_matches.csv: one row per evidential
+Per host, every text field of every cooked artefact and of analysis/iocs is matched
+(threat_intel/index.py), into <host>/analysis/threat_intel_matches.jsonl: one row per evidential
 element found in a field, with the groups, techniques and sources behind it. IOCs that match get
-their watchlist_match filled in iocs.csv.
+their watchlist_match filled in iocs.
 
-For the case, threat_groups.csv ranks the groups whose evidence turned up: first by how many
+For the case, threat_groups.jsonl ranks the groups whose evidence turned up: first by how many
 atomic indicators (IPs, domains, hashes, URLs) specific to it matched, then distinct elements specific
 to few groups (an element more than COMMON_BREADTH groups use says little about who), then by how
 many of the group's techniques the case has. The Basis column says which of those the rank rests on,
@@ -22,13 +22,10 @@ import re
 from collections import defaultdict
 from typing import Dict, Iterable, Iterator, List, Optional, Tuple
 
+from rowanholt.core.records import ENVELOPE, TABLE_SUFFIXES, RecordsError, read_records, table_path, write_records
 from rowanholt.threat_intel.index import COMMON_BREADTH, ThreatIntelIndex, by_element
 from rowanholt.threat_intel.schema import Indicator
 
-MATCH_HEADER = ["Artefact", "Record", "Field", "Value", "Element", "Kind", "Groups Using", "Common", "Groups",
-                "Techniques", "Sources", "Reference URL"]
-GROUP_HEADER = ["Rank", "Group", "Basis", "Atomic Elements", "Specific Elements", "Common Elements", "Elements",
-                "Techniques In Case", "Group Techniques", "Overlap"]
 MAX_ROWS_PER_ELEMENT = 50  # per host: the rest are counted, not listed
 MAX_JSON_BYTES = 256 << 20
 MAX_FIELD = 20000
@@ -42,24 +39,18 @@ SNIPPET = 300
 
 
 def _records(path: str) -> Iterator[Tuple[str, Dict[str, str]]]:
-    """(record label, {field: text}) for each row of a CSV or record of a JSON artefact."""
-    if path.endswith(".csv"):
-        with open(path, newline="", encoding="utf-8", errors="replace") as fh:
-            for number, row in enumerate(csv.DictReader(fh), start=2):
-                yield str(number), {k or "": v or "" for k, v in row.items() if isinstance(v, str)}
+    """(record label, {field: text}) for each record of a cooked table: its row reference, and its
+    text fields with nested ones flattened (data.Event.EventData.CommandLine). The envelope's host,
+    artefact and source path are Rowanholt's own words, not evidence, so they aren't matched."""
+    try:
+        for ref, record in read_records(path, max_json_bytes=MAX_JSON_BYTES):
+            fields: Dict[str, str] = {}
+            for key, value in record.items():
+                if key not in ENVELOPE:
+                    _flatten(value, str(key), fields)
+            yield ref, fields
+    except RecordsError:
         return
-    if os.path.getsize(path) > MAX_JSON_BYTES:
-        return
-    with open(path, encoding="utf-8", errors="replace") as fh:
-        try:
-            data = json.load(fh)
-        except ValueError:
-            return
-    records = data if isinstance(data, list) else [data]
-    for number, record in enumerate(records):
-        fields: Dict[str, str] = {}
-        _flatten(record, "", fields)
-        yield f"#{number}", fields
 
 
 def _flatten(value, prefix: str, out: Dict[str, str]) -> None:
@@ -96,11 +87,11 @@ def _artefacts(host_dir: str) -> Iterable[str]:
     cooked = os.path.join(host_dir, "artefacts", "cooked")
     for root, _, files in os.walk(cooked):
         for name in sorted(files):
-            if name.endswith((".csv", ".json")):
+            if name.endswith(TABLE_SUFFIXES):
                 yield os.path.join(root, name)
-    iocs = os.path.join(host_dir, "analysis", "iocs.csv")
-    if os.path.isfile(iocs):
-        yield iocs
+    iocs = table_path(os.path.join(host_dir, "analysis"), "iocs")
+    if iocs.is_file():
+        yield str(iocs)
 
 
 def hosts(output_directory: str) -> List[str]:
@@ -118,7 +109,7 @@ def match_host(host_dir: str, index: ThreatIntelIndex) -> Tuple[List[Dict[str, s
         relative = os.path.relpath(path, host_dir)
         records: Iterable[Tuple[str, Dict[str, str]]] = _records(path)
         blocks: set = set()
-        if path.endswith(".json") and "powershell" in os.path.basename(path).lower():
+        if not path.endswith(".csv") and "powershell" in os.path.basename(path).lower():
             records = list(records)
             blocks = _collector_blocks(records)
         for record, fields in records:
@@ -148,28 +139,49 @@ def match_host(host_dir: str, index: ThreatIntelIndex) -> Tuple[List[Dict[str, s
 
 
 def _fill_watchlist(host_dir: str, elements: Dict[str, Dict]) -> int:
-    """watchlist_match in iocs.csv for each IOC that's an evidential element."""
-    path = os.path.join(host_dir, "analysis", "iocs.csv")
+    """watchlist_match in iocs for each IOC that's an evidential element."""
+    path = str(table_path(os.path.join(host_dir, "analysis"), "iocs"))
     if not os.path.isfile(path) or not elements:
         return 0
-    with open(path, newline="", encoding="utf-8", errors="replace") as fh:
-        reader = csv.DictReader(fh)
-        header, rows = reader.fieldnames or [], list(reader)
+    if path.endswith(".csv"):  # a case processed before JSON Lines
+        with open(path, newline="", encoding="utf-8", errors="replace") as fh:
+            reader = csv.DictReader(fh)
+            header, rows = reader.fieldnames or [], list(reader)
+    else:
+        rows = [record for _, record in read_records(path)]
+        header = list(rows[0]) if rows else []
     if "watchlist_match" not in header:
         return 0
     filled = 0
     for row in rows:
-        entry = elements.get((row.get("ioc") or "").strip().lower())
+        entry = elements.get(str(row.get("ioc") or "").strip().lower())
         if entry and not row.get("watchlist_match"):
             groups = ", ".join(entry["groups"][:3]) or "; ".join(entry["sources"][:2])
             row["watchlist_match"] = f"threat intel: {groups}"
             filled += 1
     if filled:
-        with open(path, "w", newline="", encoding="utf-8") as out:
-            writer = csv.DictWriter(out, fieldnames=header)
-            writer.writeheader()
-            writer.writerows(rows)
+        with open(path + ".new", "w", newline="", encoding="utf-8") as out:
+            if path.endswith(".csv"):
+                writer = csv.DictWriter(out, fieldnames=header)
+                writer.writeheader()
+                writer.writerows(rows)
+            else:
+                out.writelines(json.dumps(row, ensure_ascii=False, default=str) + "\n" for row in rows)
+        os.replace(path + ".new", path)
     return filled
+
+
+def _techniques_in(field: str):
+    """A row's techniques, from its comma-separated technique field."""
+    return lambda row: [t.strip() for t in str(row.get(field) or "").split(",")]
+
+
+def _write(path: str, rows: List[Dict[str, str]], host: str, artefact: str, technique_field: str) -> None:
+    """Replace a table this phase writes (a re-run starts it again)."""
+    for old in (path, path[: -len(".jsonl")] + ".csv"):
+        if os.path.exists(old):
+            os.remove(old)
+    write_records(path, rows, host=host, artefact=artefact, techniques=_techniques_in(technique_field))
 
 
 def _case_techniques(output_directory: str) -> set:
@@ -230,11 +242,8 @@ def match_case(output_directory: str, indicators: List[Indicator], log=None) -> 
     for host_dir in hosts(output_directory):
         rows, elements, collector = match_host(host_dir, index)
         totals["collector"] += collector
-        os.makedirs(os.path.join(host_dir, "analysis"), exist_ok=True)
-        with open(os.path.join(host_dir, "analysis", "threat_intel_matches.csv"), "w", newline="", encoding="utf-8") as out:
-            writer = csv.DictWriter(out, fieldnames=MATCH_HEADER)
-            writer.writeheader()
-            writer.writerows(rows)
+        _write(os.path.join(host_dir, "analysis", "threat_intel_matches.jsonl"), rows, os.path.basename(host_dir),
+               "threat_intel_matches", "Techniques")
         totals["iocs"] += _fill_watchlist(host_dir, elements)
         totals["hosts"] += 1
         totals["matches"] += sum(e["hits"] for e in elements.values())
@@ -244,9 +253,6 @@ def match_case(output_directory: str, indicators: List[Indicator], log=None) -> 
             log(f"{os.path.basename(host_dir)}: {len(elements)} threat intelligence elements matched")
     totals["elements"] = len(case_elements)
     groups = rank_groups(index.indicators, case_elements, _case_techniques(output_directory))
-    with open(os.path.join(output_directory, "threat_groups.csv"), "w", newline="", encoding="utf-8") as out:
-        writer = csv.DictWriter(out, fieldnames=GROUP_HEADER)
-        writer.writeheader()
-        writer.writerows(groups)
+    _write(os.path.join(output_directory, "threat_groups.jsonl"), groups, "", "threat_groups", "Techniques In Case")
     totals["groups"] = len(groups)
     return totals

