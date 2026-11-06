@@ -123,6 +123,7 @@ def process_usb(
         jsondict,
         jsonlist,
         setupdata,
+        artefact,
     )
 
 

@@ -6,6 +6,7 @@ import subprocess
 from datetime import datetime
 
 from rowanholt.audit import write_audit_log_entry
+from rowanholt.core.records import SUFFIX, write_records
 
 # Try to import volatility plugins - they may not be installed
 try:
@@ -42,6 +43,15 @@ def vol3_failure(stderr: str) -> str:
 
 
 
+# Volatility 3's own time columns, then the timeliner's
+VOLATILITY_TIME_FIELDS = ("CreateTime", "Start", "Created", "LastWriteTime", "CreatedTime", "Time")
+
+
+def volatility_table(output_directory: str, mempath: str, plugin: str, suffix: str = SUFFIX) -> str:
+    """A plugin's output: memory_<plugin>.jsonl in the host's (or the memory image's) folder."""
+    return os.path.join(output_directory + mempath, "memory_" + plugin + suffix)
+
+
 def use_plugins(
     output_directory,
     verbosity,
@@ -53,7 +63,8 @@ def use_plugins(
     profile,
     plugin,
 ):
-    if not os.path.exists(output_directory + mempath + "/memory_" + plugin + ".json"):
+    if not any(os.path.exists(volatility_table(output_directory, mempath, plugin, suffix))
+               for suffix in (SUFFIX, ".json")):
         (
             jsondict,
             voldict,
@@ -700,106 +711,111 @@ def use_plugins(
                     else:
                         voljsonlist.append(json.dumps(eachjson))
         if len(voljsonlist) > 0:
-            with open(
-                output_directory + mempath + "/" + plugin + ".json", "w"
-            ) as voljson:
-                # For Volatility 3, jsonlist already contains clean JSON strings
-                # Skip the legacy string replacement chain designed for Vol2 text output
-                if volver == "3":
-                    # Write clean JSON array directly
-                    vol_data = "[" + ", ".join(voljsonlist) + "]"
-                    voljson.write(vol_data)
-                else:
-                    # Volatility 2.6 - use legacy replacement chain
-                    vol_data = re.sub(
-                    r'("[^"]+": \[\{"[^"]+": "[^"]+", "[^\{\]]+\})(, \{"VolatilityVersion")',
-                    r"\1]}\2",
+            # For Volatility 3, jsonlist already contains clean JSON strings
+            # Skip the legacy string replacement chain designed for Vol2 text output
+            if volver == "3":
+                records = [json.loads(j) for j in voljsonlist]
+            else:
+                # Volatility 2.6 - use legacy replacement chain
+                vol_data = re.sub(
+                r'("[^"]+": \[\{"[^"]+": "[^"]+", "[^\{\]]+\})(, \{"VolatilityVersion")',
+                r"\1]}\2",
+                re.sub(
+                    r'(\[\{"[^\[\]]+\})(, \{"VolatilityVersion": ")',
+                    r"\1}]\2",
                     re.sub(
-                        r'(\[\{"[^\[\]]+\})(, \{"VolatilityVersion": ")',
-                        r"\1}]\2",
+                        r'("\}\])"(\}\]$)',
+                        r"\1\2",
                         re.sub(
-                            r'("\}\])"(\}\]$)',
-                            r"\1\2",
-                            re.sub(
-                                r'(\[\{"[^\[\]]+\})(, \{"VolatilityVersion": ")',
-                                r"\1}]\2",
-                                str(voljsonlist)
-                                .replace('\\\\"', '"')
-                                .replace("['\"", "[")
-                                .replace("\"']", "]")
-                                .replace("}\"', '\"{", "}, {")
-                                .replace("'", '"')
-                                .replace('\\\\"', '"')
-                                .replace('"}", "{"', '"}, {"')
-                                .replace(', "{}"', "")
-                                .replace('": "\\\\n', '": "')
-                                .replace('"}"]', '"}]')
-                                .replace('["{"', '[{"')
-                                .replace('"[{"', '"[{"')
-                                .replace(']}"]}', "]}]}")
-                                .replace('"[{"', '[{"')
-                                .replace('"}], ', '"}], "')
-                                .replace('"["{}"], ', '["{}"], "')
-                                .replace('"}", "{"', '"}, {"')
-                                .replace("\\\\\\\\", "\\")
-                                .replace('"["{}", "{"', '[{"')
-                                .replace('}"], ', '"}], "')
-                                .replace('": ["{"}], ""', '": [], "')
-                                .replace(']"}]', "]}]")
-                                .replace('": "[]}]}]', '": []}]}]')
-                                .replace(', "Item": "GNOME_KEYRING_PID=', "")
-                                .replace('":_"', '": "')
-                                .replace(": : ", ": ")
-                                .replace('"----------"', "--")
-                                .replace('"--------"', "--")
-                                .replace('"------"', "--")
-                                .replace('"----"', "--")
-                                .replace('""', '"')
-                                .replace('", ", "', '", "')
-                                .replace('": "-", "\\"', '": "')
-                                .replace('": "; ,  ', '": "-", "')
-                                .replace('": --, "', '": "--", "')
-                                .replace('": ", "', '": "--", "')
-                                .replace(', "', '", "')
-                                .replace('""', '"')
-                                .replace('"}]", "', '"}], "')
-                                .replace('\\"}, {"', '}", {"')
-                                .replace('\\", ",', '",')
-                                .replace('}",', '"},')
-                                .replace(',}, {"', '"}, {"')
-                                .replace(', ", "', '", "')
-                                .replace(",}, {", '"}, {')
-                                .replace('": "}, {"', '": "-"}, {"')
-                                .replace('}, {"', '"}, {"')
-                                .replace('""', '"')
-                                .replace('"}]}]", "', '"}]}], "')
-                                .replace('"}, "', '"}, {"')
-                                .replace('\\", \\"\\"]", "', '", "')
-                                .replace('""', '"')
-                                .replace('\\",_\\"\\"]}', '"}')
-                                .replace('"}]"}, {"', '"}, {"')
-                                .replace('"}, "', '"}, {"')
-                                .replace('": "}]', '": ""}]')
-                                .replace('"}]"}, {"', '"}]}, {"')
-                                .replace("}]", '"}]')
-                                .replace('""', '"')
-                                .replace('"}]", "', '"}], "'),
-                            ),
-                        )
-                        .replace('"}}], {"', '"}, {"')
-                        .replace('",", "', '", "')
-                        .replace('"}]"}], "', '"}]}], "'),
+                            r'(\[\{"[^\[\]]+\})(, \{"VolatilityVersion": ")',
+                            r"\1}]\2",
+                            str(voljsonlist)
+                            .replace('\\\\"', '"')
+                            .replace("['\"", "[")
+                            .replace("\"']", "]")
+                            .replace("}\"', '\"{", "}, {")
+                            .replace("'", '"')
+                            .replace('\\\\"', '"')
+                            .replace('"}", "{"', '"}, {"')
+                            .replace(', "{}"', "")
+                            .replace('": "\\\\n', '": "')
+                            .replace('"}"]', '"}]')
+                            .replace('["{"', '[{"')
+                            .replace('"[{"', '"[{"')
+                            .replace(']}"]}', "]}]}")
+                            .replace('"[{"', '[{"')
+                            .replace('"}], ', '"}], "')
+                            .replace('"["{}"], ', '["{}"], "')
+                            .replace('"}", "{"', '"}, {"')
+                            .replace("\\\\\\\\", "\\")
+                            .replace('"["{}", "{"', '[{"')
+                            .replace('}"], ', '"}], "')
+                            .replace('": ["{"}], ""', '": [], "')
+                            .replace(']"}]', "]}]")
+                            .replace('": "[]}]}]', '": []}]}]')
+                            .replace(', "Item": "GNOME_KEYRING_PID=', "")
+                            .replace('":_"', '": "')
+                            .replace(": : ", ": ")
+                            .replace('"----------"', "--")
+                            .replace('"--------"', "--")
+                            .replace('"------"', "--")
+                            .replace('"----"', "--")
+                            .replace('""', '"')
+                            .replace('", ", "', '", "')
+                            .replace('": "-", "\\"', '": "')
+                            .replace('": "; ,  ', '": "-", "')
+                            .replace('": --, "', '": "--", "')
+                            .replace('": ", "', '": "--", "')
+                            .replace(', "', '", "')
+                            .replace('""', '"')
+                            .replace('"}]", "', '"}], "')
+                            .replace('\\"}, {"', '}", {"')
+                            .replace('\\", ",', '",')
+                            .replace('}",', '"},')
+                            .replace(',}, {"', '"}, {"')
+                            .replace(', ", "', '", "')
+                            .replace(",}, {", '"}, {')
+                            .replace('": "}, {"', '": "-"}, {"')
+                            .replace('}, {"', '"}, {"')
+                            .replace('""', '"')
+                            .replace('"}]}]", "', '"}]}], "')
+                            .replace('"}, "', '"}, {"')
+                            .replace('\\", \\"\\"]", "', '", "')
+                            .replace('""', '"')
+                            .replace('\\",_\\"\\"]}', '"}')
+                            .replace('"}]"}, {"', '"}, {"')
+                            .replace('"}, "', '"}, {"')
+                            .replace('": "}]', '": ""}]')
+                            .replace('"}]"}, {"', '"}]}, {"')
+                            .replace("}]", '"}]')
+                            .replace('""', '"')
+                            .replace('"}]", "', '"}], "'),
+                        ),
                     )
-                    .replace('": ""]", "', '": "-", "')
                     .replace('"}}], {"', '"}, {"')
-                    .replace('": ""]", "', '": "-", "'),
-                ).replace('\\", "', '", "')
-                    vol_data = re.sub(
-                        r'(, "ControlFlags": \[[^\[]+"\})(, \{"VolatilityVersion)',
-                        r"\1]}\2",
-                        str(vol_data),
-                    )
-                    voljson.write(vol_data)
+                    .replace('",", "', '", "')
+                    .replace('"}]"}], "', '"}]}], "'),
+                )
+                .replace('": ""]", "', '": "-", "')
+                .replace('"}}], {"', '"}, {"')
+                .replace('": ""]", "', '": "-", "'),
+            ).replace('\\", "', '", "')
+                vol_data = re.sub(
+                    r'(, "ControlFlags": \[[^\[]+"\})(, \{"VolatilityVersion)',
+                    r"\1]}\2",
+                    str(vol_data),
+                )
+                vol_text = vol_data
+            if volver != "3":
+                try:
+                    records = json.loads(vol_text)
+                except ValueError:  # what the replacement chain couldn't repair, kept whole
+                    records = [{"unparsed": vol_text}]
+                records = [r if isinstance(r, dict) else {"value": r}
+                           for r in (records if isinstance(records, list) else [records])]
+            write_records(volatility_table(output_directory, mempath, plugin), records,
+                          host=mempath.strip("/").split("/")[-1], artefact="memory_" + plugin,
+                          source_path=os.path.basename(artefact + memext), time_field=VOLATILITY_TIME_FIELDS)
             entry, prnt = "{},{},extracted {},{} ({})\n".format(
                 datetime.now().isoformat(),
                 vssimage,

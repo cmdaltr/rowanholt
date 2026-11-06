@@ -11,7 +11,7 @@ from rowanholt.collect.collect import collect_artefacts
 from rowanholt.core.identify import process_deferred_memory, load_memory_profiles
 # Reorganise functionality removed - redundant
 from rowanholt.process.select import select_pre_process_artefacts
-from rowanholt.process.timeline import create_plaso_timeline
+from rowanholt.process.timeline import convert_plaso_timeline, create_plaso_timeline
 from rowanholt.utils import safe_input, safe_listdir, safe_iterdir
 
 
@@ -263,17 +263,11 @@ def collect_process_keyword_analysis_timeline(
                     timelinepath = safe_input("    Please provide the full file path of the timeline: "
                     )
                     timelinefile = doTimelineFile(timelinepath)
-                    if os.path.exists(".plaso"):
-                        shutil.rmtree("./.plaso")
                     with open(timelinefile) as tlf:
                         firstline = tlf.readline()
-                    if "Message" not in firstline and "Artefact" not in firstline:
-                        os.mkdir(".plaso")
-                        shutil.copy2(timelinefile, "./.plaso/plaso_timeline.csvtmp")
-                        create_plaso_timeline(
-                            verbosity, output_directory, stage, img, d, timelineimage
-                        )
-                    else:
+                    if firstline.lstrip().startswith("{"):  # psteal's json_line output
+                        convert_plaso_timeline(verbosity, output_directory, stage, img, timelinefile)
+                    else:  # a CSV timeline, read as it is
                         shutil.copy2(
                             timelinefile,
                             output_directory

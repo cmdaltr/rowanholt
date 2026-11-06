@@ -2,6 +2,8 @@
 import json
 import re
 
+from rowanholt.core.records import write_cooked
+
 
 def extract_usb(
     output_directory,
@@ -10,7 +12,9 @@ def extract_usb(
     jsondict,
     jsonlist,
     setupdata,
+    source="",
 ):
+    """setupapi.dev.log's device installs, one record per section, into cooked/usb.log.jsonl."""
     for session in setupdata.split("[Boot Session: ")[0][21:-14].split("     "):
         for eachkv in re.findall(r"^(?P<k>[^\=]+)\ \=\ (?P<v>[\S]+)", session):
             kv = list(eachkv)
@@ -71,60 +75,12 @@ def extract_usb(
                     if len(jsondict) > 8:
                         jsonlist.append(json.dumps(jsondict))
                         jsondict.clear()
-    if len(jsonlist) > 0:
-        with open(
-            output_directory
-            + img.split("::")[0]
-            + "/artefacts/cooked"
-            + vss_path_insert
-            + "usb.log.json",
-            "a",
-        ) as usbjson:
-            usbout = (
-                str(jsonlist)
-                .replace("'{", "{")
-                .replace("}'", "}")
-                .replace("'[", "[")
-                .replace("]'", "]")
-                .replace("\\\\n", "")
-                .replace("\\\\", "\\")
-            )
-            usbjson.write("[{")
-            for eachinfo in usbout.split("}, {"):
-                usbsd, usbst = re.findall(
-                    r"\"StartDate\"\:\ \"([^\"]+)", eachinfo
-                ), re.findall(r"\"StartTime\"\:\ \"([^\"]+)", eachinfo)
-                if len(usbsd) == 1 and len(usbst) == 1:
-                    usb_json = str(
-                        re.sub(
-                            r"([^,:] )\"",
-                            r"\1",
-                            str(
-                                re.sub(
-                                    r"\"( )",
-                                    r"\1",
-                                    "}, {"
-                                    + str(
-                                        re.sub(
-                                            r"(, \"StartTime\": \"[^\"]+\")",
-                                            r"\1, \"LastWriteTime\": "
-                                            + '"'
-                                            + usbsd[0]
-                                            + " "
-                                            + usbst[0]
-                                            + '"',
-                                            eachinfo,
-                                        )
-                                    ).replace('\\"', '"'),
-                                )
-                            ),
-                        )
-                    ).replace(' , "', '" , "')
-                    usb_json = re.sub(
-                        r"([^\\]\\)([^\\])",
-                        r"\1\\\2",
-                        usb_json.replace('": ""', '": "')
-                        .replace('"", "', '", "')
-                        .replace('="', "="),
-                    )
-                    usbjson.write(usb_json)
+    records = []
+    for each in jsonlist:
+        record = json.loads(each)
+        if record.get("StartDate") and record.get("StartTime"):
+            record["LastWriteTime"] = f"{record['StartDate']} {record['StartTime']}"
+        records.append(record)
+    jsonlist.clear()
+    write_cooked(output_directory + img.split("::")[0] + "/artefacts/cooked" + vss_path_insert + "usb.log",
+                 records, source, "LastWriteTime")

@@ -5,13 +5,14 @@ import subprocess
 from datetime import datetime
 
 from rowanholt.audit import write_audit_log_entry
+from rowanholt.core.records import SUFFIX, read_records, write_records
 from rowanholt.mount import obtain_offset
 
 
 def rip_i30(output_directory, img, offset):
-    if not os.path.exists(
-        output_directory + img.split("::")[0] + "/" + "artefacts/I30_" + offset + ".csv"
-    ):
+    """INDXRipper's I30 entries for one partition, as artefacts/I30_<offset>.jsonl (it writes CSV)."""
+    table = output_directory + img.split("::")[0] + "/" + "artefacts/I30_" + offset
+    if not os.path.exists(table + SUFFIX):
         indxripper_result = subprocess.Popen(
             [
                 "sudo",
@@ -32,6 +33,11 @@ def rip_i30(output_directory, img, offset):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         ).communicate()
+        if os.path.exists(table + ".csv"):
+            write_records(table + SUFFIX, (r for _, r in read_records(table + ".csv")),
+                          host=img.split("::")[0], artefact="I30_" + offset, source_path=img.split("::")[0],
+                          time_field=("LastModified", "Modified", "Created"))
+            os.remove(table + ".csv")
     else:
         indxripper_result = ["", ""]
     return indxripper_result

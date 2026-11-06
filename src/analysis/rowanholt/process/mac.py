@@ -1,10 +1,10 @@
 #!/usr/bin/env python3 -tt
-import json
 import os
 import plistlib
 from datetime import datetime
 
 from rowanholt.audit import write_audit_log_entry
+from rowanholt.core.records import SUFFIX, write_records
 from rowanholt.process.extractions.mitre_tagger import launchd_technique, tag_mitre_technique
 
 
@@ -39,54 +39,32 @@ def plist_record(plistdata):
 def process_plist(
     verbosity, vssimage, output_directory, img, vss_path_insert, stage, artefact
 ):
-    if not os.path.exists(
-        output_directory
-        + img.split("::")[0]
-        + "/artefacts/cooked"
-        + vss_path_insert
-        + "plists/"
-        + artefact.split("/")[-1]
-        + ".json"
-    ):
-        try:
-            os.makedirs(
-                output_directory
-                + img.split("::")[0]
-                + "/artefacts/cooked"
-                + vss_path_insert
-                + "plists"
-            )
-        except:
-            pass
-        with open(
-            output_directory
-            + img.split("::")[0]
-            + "/artefacts/cooked"
-            + vss_path_insert
-            + "plists/"
-            + artefact.split("/")[-1]
-            + ".json",
-            "a",
-        ) as plistjson:
-            try:
-                with open(artefact, "rb") as plist:
-                    plistdata = plistlib.load(plist)
-                entry, prnt = "{},{},{},'{}' plist file\n".format(
-                    datetime.now().isoformat(),
-                    vssimage.replace("'", ""),
-                    stage,
-                    artefact.split("/")[-1].split("+")[-1],
-                ), " -> {} -> {} plist file '{}' from {}".format(
-                    datetime.now().isoformat().replace("T", " "),
-                    stage,
-                    artefact.split("/")[-1].split("+")[-1],
-                    vssimage,
-                )
-                write_audit_log_entry(verbosity, output_directory, entry, prnt)
-                plistjson.write(json.dumps([plist_record(plistdata)]))
-                # A launch agent or daemon that isn't Apple's; not every plist on a Mac
-                technique = launchd_technique(artefact, plistdata)
-                if technique:
-                    tag_mitre_technique(output_directory, img, "plist", technique)
-            except (plistlib.InvalidFileException, ValueError, OSError):
-                pass  # not a parseable plist; the empty output is cleaned up later
+    table = (output_directory + img.split("::")[0] + "/artefacts/cooked" + vss_path_insert + "plists/"
+             + artefact.split("/")[-1])
+    if os.path.exists(table + SUFFIX):
+        return
+    try:
+        with open(artefact, "rb") as plist:
+            plistdata = plistlib.load(plist)
+    except (plistlib.InvalidFileException, ValueError, OSError):
+        return  # not a parseable plist
+    entry, prnt = "{},{},{},'{}' plist file\n".format(
+        datetime.now().isoformat(),
+        vssimage.replace("'", ""),
+        stage,
+        artefact.split("/")[-1].split("+")[-1],
+    ), " -> {} -> {} plist file '{}' from {}".format(
+        datetime.now().isoformat().replace("T", " "),
+        stage,
+        artefact.split("/")[-1].split("+")[-1],
+        vssimage,
+    )
+    write_audit_log_entry(verbosity, output_directory, entry, prnt)
+    # A launch agent or daemon that isn't Apple's; not every plist on a Mac
+    technique = launchd_technique(artefact, plistdata)
+    raw = artefact.find("/artefacts/")
+    write_records(table + SUFFIX, [plist_record(plistdata)], host=img.split("::")[0],
+                  artefact="plists/" + artefact.split("/")[-1], source_path=artefact[raw + 1:] if raw >= 0 else artefact,
+                  techniques=[technique] if technique else [])
+    if technique:
+        tag_mitre_technique(output_directory, img, "plist", technique)

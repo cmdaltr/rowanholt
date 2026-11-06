@@ -1,11 +1,26 @@
 #!/usr/bin/env python3 -tt
-import json
 import os
 import re
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from rowanholt.audit import write_audit_log_entry
+from rowanholt.core.records import SUFFIX, write_cooked
+
+
+def _rewrite(table, rows, artefact):
+    """Replace a browser table (path without its suffix): each run reads the whole database again."""
+    Path(table + SUFFIX).unlink(missing_ok=True)
+    write_cooked(table, rows, artefact, techniques=lambda r: [r.get("mitre_technique_id", "")])
+
+
+def _webkit_time(value):
+    """Chrome's times: microseconds since 1601-01-01 UTC, as ISO 8601."""
+    try:
+        return (datetime(1601, 1, 1, tzinfo=timezone.utc) + timedelta(microseconds=int(value))).isoformat() if value else ""
+    except (TypeError, ValueError, OverflowError):
+        return str(value)
 
 # Track which browser directories have been processed to avoid duplicates
 _processed_browser_dirs = set()
@@ -78,7 +93,7 @@ def process_browser_index(
             ie_output_dir = os.path.join(browsers_output_dir, "ie")
             os.makedirs(ie_output_dir, exist_ok=True)
 
-            output_file = os.path.join(ie_output_dir, f"{indexuser}+index.dat.json")
+            output_file = os.path.join(ie_output_dir, f"{indexuser}+index.dat")
 
             history_entries = []
             try:
@@ -180,9 +195,7 @@ def process_browser_index(
                 if verbosity != "":
                     print(f"     Warning: Error processing index.dat: {e}")
 
-            # Write JSON output
-            with open(output_file, "w") as f:
-                json.dump(history_entries, f, indent=2)
+            _rewrite(output_file, history_entries, artefact)
 
             # Write technique ID to techniques file for Navigator at CASE level
             if history_entries:
@@ -267,7 +280,7 @@ def process_browser(
             try:
                 cursor.execute(
                     """SELECT urls.id, urls.url, urls.title, urls.visit_count,
-                       datetime(urls.last_visit_time / 1000000 + (strftime('%s', '1601-01-01')), 'unixepoch', 'localtime')
+                       datetime(urls.last_visit_time / 1000000 + (strftime('%s', '1601-01-01')), 'unixepoch')
                        FROM urls;"""
                 )
                 url_items = cursor.fetchall()
@@ -312,8 +325,8 @@ def process_browser(
                     download_entries.append({
                         "url": url or "",
                         "file_path": (path or "").replace("\\", "/"),
-                        "start_time": str(start_time) if start_time else "",
-                        "end_time": str(end_time) if end_time else "",
+                        "start_time": _webkit_time(start_time),
+                        "end_time": _webkit_time(end_time),
                         "received_bytes": received or 0,
                         "total_bytes": total or 0,
                         "browser": browser_name,
@@ -357,7 +370,7 @@ def process_browser(
                     timestamp = ""
                     if last_visit:
                         try:
-                            timestamp = str(datetime.fromtimestamp(float(last_visit) / 1000000))
+                            timestamp = datetime.fromtimestamp(float(last_visit) / 1000000, timezone.utc).isoformat()
                         except:
                             pass
 
@@ -440,7 +453,7 @@ def process_browser(
                     visit_time = visit_info.get("visit_time")
                     if visit_time:
                         try:
-                            timestamp = str(datetime.fromtimestamp(int(visit_time) + 978307200))
+                            timestamp = datetime.fromtimestamp(int(visit_time) + 978307200, timezone.utc).isoformat()
                         except:
                             pass
 
@@ -469,9 +482,7 @@ def process_browser(
             print(f"     Warning: Error processing browser database: {e}")
 
     # Write history JSON
-    history_output = os.path.join(browser_output_dir, f"{user_profile}+{artifact_name}.json")
-    with open(history_output, "w") as f:
-        json.dump(history_entries, f, indent=2)
+    _rewrite(os.path.join(browser_output_dir, f"{user_profile}+{artifact_name}"), history_entries, artefact)
 
     # Write technique IDs to techniques file for Navigator at CASE level
     techniques_file_path = os.path.join(
@@ -489,6 +500,6 @@ def process_browser(
 
     # Write downloads JSON if there are any
     if download_entries:
-        downloads_output = os.path.join(browser_output_dir, f"{user_profile}+{artifact_name}_downloads.json")
-        with open(downloads_output, "w") as f:
-            json.dump(download_entries, f, indent=2)
+        Path(os.path.join(browser_output_dir, f"{user_profile}+{artifact_name}_downloads") + SUFFIX).unlink(missing_ok=True)
+        write_cooked(os.path.join(browser_output_dir, f"{user_profile}+{artifact_name}_downloads"), download_entries,
+                     artefact, ("start_time", "date_added"), lambda r: [r.get("mitre_technique_id", "")])

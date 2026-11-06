@@ -10,6 +10,7 @@ Stdlib only: the web backend loads this module from Elrond's source tree too.
 
 import csv
 import json
+import re
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -26,6 +27,7 @@ _FORMATS = (
     "%Y-%m-%d %H:%M:%S",
     "%Y-%m-%d %H:%M",
     "%Y-%m-%d",
+    "%Y/%m/%d %H:%M:%S.%f",
     "%Y/%m/%d %H:%M:%S",
     "%d/%m/%Y %H:%M:%S",
     "%a %b %d %H:%M:%S %Y",
@@ -79,8 +81,9 @@ def iso_timestamp(value: Any) -> Optional[str]:
     if text.isdigit() and len(text) not in (8, 14):
         return _from_epoch(int(text))
     candidate = text[:-1] + "+00:00" if text.endswith(("Z", "z")) else text
-    if " UTC" in candidate:
-        candidate = candidate.replace(" UTC", "+00:00")
+    # " UTC", or Volatility 2's " UTC+0000"
+    candidate = re.sub(r" UTC(?:([+-]\d{2}):?(\d{2}))?$",
+                       lambda m: f"{m.group(1)}:{m.group(2)}" if m.group(1) else "+00:00", candidate)
     try:
         return _iso(datetime.fromisoformat(candidate))
     except ValueError:
@@ -215,6 +218,20 @@ def write_records(path: Union[str, Path], rows: Iterable[Dict[str, Any]], *, hos
         if out is not None:
             out.close()
     return written
+
+
+def write_cooked(path: Union[str, Path], rows: Iterable[Dict[str, Any]], source: str = "",
+                 time_field: TimeField = None, techniques: Techniques = None) -> int:
+    """write_records for a table under a host's artefacts/cooked/ (path without the suffix): the
+    host, the table's name and the source's path in the host's folder come from the paths."""
+    path = str(path)
+    at = path.find("/artefacts/cooked")
+    host = path[:at].rstrip("/").split("/")[-1] if at >= 0 else ""
+    name = re.sub(r"^vss\d+/", "", path[at + len("/artefacts/cooked"):].lstrip("/")) if at >= 0 else Path(path).name
+    raw = source.find("/artefacts/")
+    return write_records(path + SUFFIX, rows, host=host, artefact=name.replace("//", "/"),
+                         source_path=source[raw + 1:] if raw >= 0 else source, time_field=time_field,
+                         techniques=techniques)
 
 
 def table_path(folder: Union[str, Path], name: str) -> Path:
