@@ -68,3 +68,10 @@ def test_memory_outputs_are_found_beside_artefacts(tmp_path):
     (tmp_path / "memory_pslist.json").write_text("[]")
     (tmp_path / "artefacts").mkdir()
     assert [Path(p).name for p in siem.memory_outputs(str(tmp_path))] == ["memory_pslist.json"]
+
+
+def test_memory_outputs_in_json_lines_too(tmp_path):
+    (tmp_path / "memory_pslist.jsonl").write_text('{"PID": 4}\n')
+    (tmp_path / "memory_netscan.json").write_text("[]")
+    assert [Path(p).name for p in siem.memory_outputs(str(tmp_path))] == [
+        "memory_netscan.json", "memory_pslist.jsonl"]

@@ -6,6 +6,7 @@ from datetime import datetime
 from zipfile import ZipFile
 
 from rowanholt.audit import write_audit_log_entry
+from rowanholt.core.records import SUFFIX, read_records
 
 
 def archive_artefacts(verbosity, output_directory):
@@ -174,9 +175,21 @@ def output_folder_name(key, value):
     return str(entry).split("::")[0].rstrip("/").split("/")[-1]
 
 
+def has_no_records(path: str, max_empty_size: int = 100) -> bool:
+    """Whether a processed file holds nothing: a JSON Lines or CSV table with no records (a
+    one-record JSON Lines file can be under 100 bytes, so size alone won't do), or any other
+    file of ``max_empty_size`` bytes or less (an old case's [] or {})."""
+    if path.lower().endswith((SUFFIX, ".csv")):
+        try:
+            return next(iter(read_records(path)), None) is None
+        except (OSError, ValueError):
+            return False
+    return os.stat(path).st_size <= max_empty_size
+
+
 def tidy_processed_output(img_output_dir, max_empty_size=100):
-    """Tidy one host's processed output at the end of a run: drop near-empty files
-    (just [] or {}) from cooked/ and analysis/, and lift a lone file out of its
+    """Tidy one host's processed output at the end of a run: drop tables with no records
+    (and other near-empty files) from cooked/ and analysis/, and lift a lone file out of its
     cooked/ subdirectory as cooked/<subdirectory><ext>. Collected artefacts under
     raw/ are evidence, whatever their size, and aren't touched."""
     cooked_dir = os.path.join(img_output_dir, "artefacts", "cooked")
@@ -185,7 +198,7 @@ def tidy_processed_output(img_output_dir, max_empty_size=100):
             for name in files:
                 path = os.path.join(root, name)
                 try:
-                    if os.stat(path).st_size <= max_empty_size:
+                    if has_no_records(path, max_empty_size):
                         os.remove(path)
                 except OSError:
                     pass
@@ -197,7 +210,7 @@ def tidy_processed_output(img_output_dir, max_empty_size=100):
             continue
         entries = os.listdir(subdir_path)
         if len(entries) == 1 and os.path.isfile(os.path.join(subdir_path, entries[0])):
-            ext = os.path.splitext(entries[0])[1] or ".json"
+            ext = os.path.splitext(entries[0])[1] or SUFFIX
             dst = os.path.join(cooked_dir, subdir + ext)
             if not os.path.exists(dst):
                 try:

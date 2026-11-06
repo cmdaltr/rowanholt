@@ -1,8 +1,115 @@
 #!/usr/bin/env python3 -tt
+import glob
 import os
 from datetime import datetime
+from typing import List, Optional
 
 from rowanholt.audit import write_audit_log_entry
+from rowanholt.post.siem import memory_outputs, siem_hosts
+
+# Every table Rowanholt writes is JSON Lines with the same envelope (docs/OUTPUT_FORMAT.md), so
+# one sourcetype takes them all
+SOURCETYPE = "rowanholt_jsonl"
+TABLES = r"\.jsonl$"
+
+# TIME_FORMAT is left unset: the envelope's timestamp is ISO 8601 UTC with or without a fraction
+# (2026-10-29T14:03:11Z, 2026-10-29T14:03:11.25Z), which Splunk recognises by itself, where one
+# strptime format would miss whichever shape it didn't name. MAX_DAYS_AGO and _HENCE are at
+# Splunk's limits: evidence years old would otherwise be refused its own time.
+# TRUNCATE = 0: a nested event log record is longer than the default 10,000 bytes, and a cut
+# record isn't JSON any more.
+PROPS = (
+    "[" + SOURCETYPE + "]\n"
+    "INDEXED_EXTRACTIONS = json\n"
+    "KV_MODE = none\n"
+    "AUTO_KV_JSON = false\n"
+    "SHOULD_LINEMERGE = false\n"
+    "LINE_BREAKER = ([\\r\\n]+)\n"
+    "TRUNCATE = 0\n"
+    "TIMESTAMP_FIELDS = timestamp\n"
+    "TZ = UTC\n"
+    "MAX_DAYS_AGO = 10951\n"
+    "MAX_DAYS_HENCE = 10950\n"
+    "NO_BINARY_CHECK = true\n"
+    "TRANSFORMS-rowanholt_time = rowanholt_time\n"
+    "{reports}\n"
+    "category = Structured\n"
+    "description = Rowanholt's tables: JSON Lines, one record per line, envelope first\n"
+    "disabled = false\n"
+    "pulldown_type = true\n\n"
+)
+
+# A record with no time (timestamp null: startup items, sudoers, hosts) would otherwise take the
+# time of the record before it in the same file; it's given the time it was indexed instead, and
+# time_source says which, so a timeline can leave those records out. The envelope is written
+# first and in order, so null followed by the techniques list is the envelope's own timestamp.
+TIME_TRANSFORM = (
+    "[rowanholt_time]\n"
+    "INGEST_EVAL = time_source=if(match(_raw, \"\\\"timestamp\\\": null, \\\"techniques\\\": [[]\"), "
+    "\"indexed\", \"record\"), _time=if(time_source==\"indexed\", time(), _time)\n\n"
+)
+
+# logtype comes from the envelope's artefact (evt/Security, registry/SYSTEM, logs/syslog) rather
+# than the source path, where the case's or host's own folder names (a "log" or "memory" in
+# them) matched first. Records with no artefact (an older case's memory output, the audit log)
+# are named from the source; an artefact the list doesn't name is its own logtype.
+LOGTYPE_TRANSFORM = (
+    "[logtype_make]\n"
+    "REGEX = (?<logtype>(?:registry|evt|shimcache|jumplists|usb|log|plist|service|journal|browser|analysis|timeline|memory|audit))\n"
+    "SOURCE_KEY = artefact\n\n"
+)
+LOGTYPE_EVAL = (
+    "EVAL-logtype = case(match(source, \"/analysis/\"), \"analysis\", isnotnull(logtype), logtype, "
+    "match(source, \"memory_\"), \"memory\", match(source, \"audit\"), \"audit\", true(), artefact)"
+)
+
+
+def monitor_stanza(path: str, host: str, index: str, sourcetype: str, whitelist: Optional[str] = None) -> str:
+    """One inputs.conf monitor stanza; a directory with a whitelist is monitored recursively."""
+    lines = [f"[monitor://{path}]", "disabled = false", "crcSalt = <SOURCE>", f"host = {host}",
+             f"sourcetype = {sourcetype}", f"index = {index}"]
+    if whitelist:
+        lines.append(f"whitelist = {whitelist}")
+    return "\n".join(lines) + "\n\n"
+
+
+def host_monitors(host_dir: str, host: str, index: str) -> List[str]:
+    """The monitors for one host's tables: artefacts/cooked/ and analysis/ recursively for every
+    .jsonl (so each artefact is indexed, not only those named one by one), the Plaso timeline,
+    and Volatility's memory_* output beside artefacts/ (.jsonl, or an older case's .json).
+
+    host is the host's own name, which is also every record's host field.
+    """
+    host_dir = host_dir.rstrip("/")
+    stanzas = []
+    for folder in ("artefacts/cooked", "analysis"):
+        if os.path.isdir(f"{host_dir}/{folder}"):
+            stanzas.append(monitor_stanza(f"{host_dir}/{folder}", host, index, SOURCETYPE, TABLES))
+    if os.path.isfile(f"{host_dir}/artefacts/plaso_timeline.jsonl"):
+        stanzas.append(monitor_stanza(f"{host_dir}/artefacts/plaso_timeline.jsonl", host, index, SOURCETYPE))
+    memory = memory_outputs(host_dir)
+    if any(path.endswith(".jsonl") for path in memory):
+        stanzas.append(monitor_stanza(f"{host_dir}/memory_*.jsonl", host, index, SOURCETYPE))
+    elif memory:
+        stanzas.append(monitor_stanza(f"{host_dir}/memory_*.json", host, index, "json"))
+    if glob.glob(f"{host_dir}/artefacts/cooked/memory/*.json"):
+        stanzas.append(monitor_stanza(f"{host_dir}/artefacts/cooked/memory/*.json", host, index, "json"))
+    return stanzas
+
+
+def indexed_tables(host_dir: str) -> List[str]:
+    """What host_monitors will index for a host, relative to its folder, for the audit log."""
+    host_dir = host_dir.rstrip("/")
+    found = []
+    for folder in ("artefacts/cooked", "analysis"):
+        for root, dirs, files in os.walk(f"{host_dir}/{folder}"):
+            dirs.sort()
+            found.extend(os.path.relpath(os.path.join(root, name), host_dir)
+                         for name in sorted(files) if name.endswith(".jsonl"))
+    if os.path.isfile(f"{host_dir}/artefacts/plaso_timeline.jsonl"):
+        found.append("artefacts/plaso_timeline.jsonl")
+    found.extend(os.path.basename(path) for path in memory_outputs(host_dir))
+    return found
 
 
 def ingest_splunk_data(
@@ -13,13 +120,10 @@ def ingest_splunk_data(
     allimgs,
     postpath,
 ):
-    imgs_to_index = []
-    for _, img in allimgs.items():
-        if img not in imgs_to_index:
-            imgs_to_index.append(img)
-    for img in imgs_to_index:
+    seen = set()
+    for img_name, img in siem_hosts(allimgs):
         if "vss" in img.split("::")[1]:
-            vssimage, vsstext = "'" + img.split("::")[0] + "' (" + img.split("::")[
+            vssimage, vsstext = "'" + img_name + "' (" + img.split("::")[
                 1
             ].split("_")[1].replace(
                 "vss", "volume shadow copy #"
@@ -35,11 +139,11 @@ def ingest_splunk_data(
                 "vss", "volume shadow copy #"
             )
         else:
-            vssimage, vsstext = "'" + img.split("::")[0] + "'", ""
+            vssimage, vsstext = "'" + img_name + "'", ""
         print()
         print("     Indexing artefacts into Splunk for {}...".format(vssimage))
         entry, prnt = "{},{}{},{},indexing\n".format(
-            datetime.now().isoformat(), img.split("::")[0], vsstext, stage
+            datetime.now().isoformat(), img_name, vsstext, stage
         ), " -> {} -> indexing artfacts into {} for {}{}".format(
             datetime.now().isoformat().replace("T", " "),
             stage,
@@ -47,269 +151,52 @@ def ingest_splunk_data(
             vsstext,
         )
         write_audit_log_entry(verbosity, output_directory, entry, prnt)
+        host_dir = os.path.realpath(output_directory + img_name)
+        # A host's shadow copies are in its own cooked/ (cooked/vssN/): monitored once, with it
+        first = img_name not in seen
+        seen.add(img_name)
         with open(
             "/" + postpath + "splunk/etc/apps/elrond/default/inputs.conf", "a"
         ) as inputsconf:
-            if not os.path.exists(
-                "/" + postpath + "splunk/etc/apps/elrond/default/inputs.conf"
-            ):
-                inputsconf.write("\n")
-            if not img.split("::")[-1].startswith("memory"):
-                for atftfile in os.listdir(
-                    os.path.realpath(output_directory + img.split("::")[0])
-                ):
+            if first and os.path.isdir(host_dir):
+                for atftfile in sorted(os.listdir(host_dir)):
                     if atftfile.endswith(".audit"):
                         inputsconf.write(
                             "[monitor://{}]\ndisabled = false\nhost = {}\nsourcetype = elrondCSV\nindex = {}\n\n".format(
-                                os.path.realpath(output_directory + img.split("::")[0])
-                                + "/"
-                                + atftfile,
-                                img.split("::")[0],
+                                host_dir + "/" + atftfile,
+                                img_name,
                                 case,
                             )
                         )
-                for atftroot, atftdirs, atftfiles in os.walk(
-                    os.path.realpath(
-                        output_directory + img.split("::")[0] + "/artefacts/cooked/"
-                    )
-                ):
-                    for atftfile in atftfiles:
-                        if os.path.isfile(os.path.join(atftroot, atftfile)):
-                            if str(img.split("::")[-1])[1:].startswith("indows"):
-                                if atftfile.endswith(
-                                    "shimcache.csv"
-                                ) or atftfile.endswith("jumplists.csv"):
-                                    sourcetype = "elrondCSV_noTime"
-                                elif (
-                                    atftfile.endswith("mft.csv")
-                                    or atftfile.endswith("usn.csv")
-                                    or atftfile.endswith("sqlite.csv")
-                                ):
-                                    sourcetype = "elrondCSV"
-                                elif (
-                                    (
-                                        atftfile.endswith(".json")
-                                        and "windows." not in atftfile
-                                        and "memory_" not in atftfile
-                                        and "/memory/" not in atftroot
-                                    )
-                                    and "registry" not in atftroot
-                                    and "evt" not in atftroot
-                                ):
-                                    sourcetype = "json"
-                                else:
-                                    sourcetype = ""
-                            elif str(img.split("::")[-1])[1:].startswith("ac"):
-                                if (
-                                    (
-                                        atftfile.endswith(".json")
-                                        and "macos." not in atftfile
-                                        and "memory_" not in atftfile
-                                        and "/memory/" not in atftroot
-                                    )
-                                    and "logs" not in atftroot
-                                    and "plists" not in atftroot
-                                ):
-                                    sourcetype = "json"
-                                elif atftfile.endswith("History.db.csv"):
-                                    sourcetype = "elrondCSV"
-                                else:
-                                    sourcetype = ""
-                            elif str(img.split("::")[-1])[1:].startswith("inux"):
-                                if (
-                                    (
-                                        atftfile.endswith(".json")
-                                        and "linux." not in atftfile
-                                        and "memory_" not in atftfile
-                                        and "/memory/" not in atftroot
-                                    )
-                                    and "logs" not in atftroot
-                                    and "services" not in atftroot
-                                ):
-                                    sourcetype = "json_noTime"
-                                elif atftfile.endswith("sqlite.csv"):
-                                    sourcetype = "elrondCSV"
-                                else:
-                                    sourcetype = ""
-                            else:
-                                sourcetype = ""
-                            if sourcetype != "":
-                                inputsconf.write(
-                                    "[monitor://{}]\ndisabled = false\nhost = {}\nsourcetype = {}\nindex = {}\n\n".format(
-                                        os.path.join(atftroot, atftfile),
-                                        img.split("::")[0],
-                                        sourcetype,
-                                        case,
-                                    )
-                                )
-                    for atftdir in atftdirs:
-                        if os.path.isdir(os.path.join(atftroot, atftdir)):
-                            if str(img.split("::")[-1])[1:].startswith("indows"):
-                                if len(
-                                    os.listdir(os.path.join(atftroot, atftdir))
-                                ) > 0 and (atftdir == "registry" or atftdir == "evt"):
-                                    inputsconf.write(
-                                        "[monitor://{}/*.json]\ndisabled = false\ncrcSalt = <SOURCE>\nhost = {}\nsourcetype = json\nindex = {}\n\n".format(
-                                            os.path.join(atftroot, atftdir),
-                                            str(img.split("::")[0]),
-                                            case,
-                                        )
-                                    )
-                                elif len(
-                                    os.listdir(os.path.join(atftroot, atftdir))
-                                ) > 0 and (atftdir == "IE"):
-                                    inputsconf.write(
-                                        "[monitor://{}/*.csv]\ndisabled = false\ncrcSalt = <SOURCE>\nhost = {}\nsourcetype = elrondCSV_noTime\nindex = {}\n\n".format(
-                                            os.path.join(atftroot, atftdir),
-                                            str(img.split("::")[0]),
-                                            case,
-                                        )
-                                    )
-                                elif len(
-                                    os.listdir(os.path.join(atftroot, atftdir))
-                                ) > 0 and (atftdir == "chrome"):
-                                    inputsconf.write(
-                                        "[monitor://{}/*.csv]\ndisabled = false\ncrcSalt = <SOURCE>\nhost = {}\nsourcetype = elrondCSV\nindex = {}\n\n".format(
-                                            os.path.join(atftroot, atftdir),
-                                            str(img.split("::")[0]),
-                                            case,
-                                        )
-                                    )
-                            if str(img.split("::")[-1])[1:].startswith("ac"):
-                                if len(
-                                    os.listdir(os.path.join(atftroot, atftdir))
-                                ) > 0 and (atftdir == "logs" or atftdir == "plists"):
-                                    inputsconf.write(
-                                        "[monitor://{}/*.json]\ndisabled = false\ncrcSalt = <SOURCE>\nhost = {}\nsourcetype = json\nindex = {}\n\n".format(
-                                            os.path.join(atftroot, atftdir),
-                                            str(img.split("::")[0]),
-                                            case,
-                                        )
-                                    )
-                            if str(img.split("::")[-1])[1:].startswith("inux"):
-                                if len(
-                                    os.listdir(os.path.join(atftroot, atftdir))
-                                ) > 0 and (atftdir == "logs" or atftdir == "services"):
-                                    inputsconf.write(
-                                        "[monitor://{}/*.json]\ndisabled = false\ncrcSalt = <SOURCE>\nhost = {}\nsourcetype = json\nindex = {}\n\n".format(
-                                            os.path.join(atftroot, atftdir),
-                                            str(img.split("::")[0]),
-                                            case,
-                                        )
-                                    )
-                if os.path.isdir(
-                    os.path.realpath(output_directory + img.split("::")[0])
-                    + "/artefacts/cooked/memory/"
-                ):
-                    inputsconf.write(
-                        "[monitor://{}/artefacts/cooked/memory/*.json]\ndisabled = false\ncrcSalt = <SOURCE>\nhost = {}\nsourcetype = json\nindex = {}\n\n".format(
-                            os.path.realpath(output_directory + img.split("::")[0]),
-                            img.split("::")[0],
-                            case,
-                        )
-                    )
-                    if os.path.exists(
-                        str(os.path.realpath(output_directory + img.split("::")[0]))
-                        + "/artefacts/cooked/memory/timeliner.csv"
-                    ):
+                # cooked/, analysis/ and Volatility's output, whatever the host is
+                for stanza in host_monitors(host_dir, img_name, case):
+                    inputsconf.write(stanza)
+                for memory_dir in (host_dir, host_dir + "/artefacts/cooked/memory"):
+                    if os.path.exists(memory_dir + "/timeliner.csv"):
                         inputsconf.write(
-                            "[monitor://{}/artefacts/cooked/memory/timeliner.csv]\ndisabled = false\nhost = {}\nsourcetype = elrondCSV\nindex = {}\n\n".format(
-                                os.path.realpath(output_directory + img.split("::")[0]),
-                                img.split("::")[0],
+                            "[monitor://{}/timeliner.csv]\ndisabled = false\nhost = {}\nsourcetype = elrondCSV\nindex = {}\n\n".format(
+                                memory_dir,
+                                img_name,
                                 case,
                             )
                         )
-                    if os.path.exists(
-                        str(os.path.realpath(output_directory + img.split("::")[0]))
-                        + "/artefacts/cooked/memory/iehistory"
-                    ):
+                    if os.path.exists(memory_dir + "/iehistory"):
                         inputsconf.write(
-                            "[monitor://{}/artefacts/cooked/memory/iehistory]\ndisabled = false\nhost = {}\nsourcetype = elrond_\nindex = {}\n\n".format(
-                                os.path.realpath(output_directory + img.split("::")[0]),
-                                img.split("::")[0],
+                            "[monitor://{}/iehistory]\ndisabled = false\nhost = {}\nsourcetype = elrond_\nindex = {}\n\n".format(
+                                memory_dir,
+                                img_name,
                                 case,
                             )
                         )
-                for atftroot, atftdirs, atftfiles in os.walk(
-                    os.path.realpath(
-                        output_directory + img.split("::")[0] + "/analysis/"
-                    )
-                ):
-                    for atftfile in atftfiles:
-                        if img.split("::")[0] in atftroot and os.path.isfile(
-                            os.path.join(atftroot, atftfile)
-                        ):
-                            if (
-                                atftfile.endswith("analysis.csv")
-                                or atftfile.endswith("iocs.csv")
-                                or atftfile.endswith("keyword_matches.csv")
-                                or atftfile.endswith("yara.csv")
-                            ):
-                                inputsconf.write(
-                                    "[monitor://{}/*.csv]\ndisabled = false\ncrcSalt = <SOURCE>\nhost = {}\nsourcetype = elrondCSV\nindex = {}\n\n".format(
-                                        atftroot,
-                                        str(img.split("::")[0]),
-                                        case,
-                                    )
-                                )
-                for timeroot, _, timefiles in os.walk(
-                    os.path.realpath(
-                        output_directory + img.split("::")[0] + "/artefacts/"
-                    )
-                ):
-                    for timefile in timefiles:
-                        if img.split("::")[0] in timeroot and os.path.isfile(
-                            os.path.join(timeroot, timefile)
-                        ):
-                            if timefile.endswith("plaso_timeline.csv"):
-                                inputsconf.write(
-                                    "[monitor://{}]\ndisabled = false\nhost = {}\nsourcetype = elrondCSV\nindex = {}\n\n".format(
-                                        os.path.join(timeroot, timefile),
-                                        str(img.split("::")[0]),
-                                        case,
-                                    )
-                                )
-            elif img.split("::")[-1].startswith("memory") and ".json" in str(
-                os.listdir(os.path.realpath(output_directory + img.split("::")[0]))
-            ):
-                inputsconf.write(
-                    "[monitor://{}/*.json]\ndisabled = false\ncrcSalt = <SOURCE>\nhost = {}\nsourcetype = json\nindex = {}\n\n".format(
-                        os.path.realpath(output_directory + img.split("::")[0]),
-                        img.split("::")[0],
-                        case,
-                    )
-                )
-                if os.path.exists(
-                    str(os.path.realpath(output_directory + img.split("::")[0]))
-                    + "/timeliner.csv"
-                ):
-                    inputsconf.write(
-                        "[monitor://{}/timeliner.csv]\ndisabled = false\nhost = {}\nsourcetype = elrondCSV\nindex = {}\n\n".format(
-                            os.path.realpath(output_directory + img.split("::")[0]),
-                            img.split("::")[0],
-                            case,
-                        )
-                    )
-                if os.path.exists(
-                    str(os.path.realpath(output_directory + img.split("::")[0]))
-                    + "/iehistory"
-                ):
-                    inputsconf.write(
-                        "[monitor://{}/iehistory]\ndisabled = false\nhost = {}\nsourcetype = elrond_\nindex = {}\n\n".format(
-                            os.path.realpath(output_directory + img.split("::")[0]),
-                            img.split("::")[0],
-                            case,
-                        )
-                    )
         with open(
             "/" + postpath + "splunk/etc/apps/elrond/default/tags.conf", "a"
         ) as tagsconf:
             if (
-                img.split("::")[0].endswith(".E01")
-                or img.split("::")[0].endswith(".e01")
-                or img.split("::")[0].endswith(".VMDK.raw")
-                or img.split("::")[0].endswith(".vmdk.raw")
-                or img.split("::")[0].endswith(".dd.raw")
+                img_name.endswith(".E01")
+                or img_name.endswith(".e01")
+                or img_name.endswith(".VMDK.raw")
+                or img_name.endswith(".vmdk.raw")
+                or img_name.endswith(".dd.raw")
             ):
                 imgtype = "\ndisk = enabled"
             else:
@@ -320,7 +207,7 @@ def ingest_splunk_data(
                 imgtype = imgtype + "\nmacOS = enabled\n\n"
             elif "Linux" in img.split("::")[1]:
                 imgtype = imgtype + "\nLinux = enabled\n\n"
-            tagsconf.write("[host={}]{}".format(img.split("::")[0], imgtype))
+            tagsconf.write("[host={}]{}".format(img_name, imgtype))
         output_directory = os.path.dirname(output_directory) + "/"
         if os.path.exists(
             "/" + postpath + "splunk/etc/apps/elrond/default/tags.conf.orig.pre41"

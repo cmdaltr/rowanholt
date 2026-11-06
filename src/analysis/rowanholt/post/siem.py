@@ -79,5 +79,7 @@ def siem_hosts(allimgs) -> list:
 
 
 def memory_outputs(host_dir: str) -> list:
-    """Volatility's JSON for a host: <host>/memory_<plugin>.json, beside artefacts/."""
-    return sorted(glob.glob(os.path.join(host_dir, "memory_*.json")))
+    """Volatility's output for a host: <host>/memory_<plugin>.jsonl (or an older case's .json),
+    beside artefacts/."""
+    found = glob.glob(os.path.join(host_dir, "memory_*.jsonl")) + glob.glob(os.path.join(host_dir, "memory_*.json"))
+    return sorted(found)
