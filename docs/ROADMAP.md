@@ -8,6 +8,7 @@ Plans for four of the README's v2.3 items: what already exists, what each one ne
 | Threat intelligence | Built (see below) | Done | 2 |
 | Collaborative investigation | Built (see below) | Done | 3 |
 | ML-based anomaly detection | Stacking, features and baseline built and measured in the lab; no learned model | Done | 4 |
+| Azure, tested in a lab | Acquisition and Activity Log code from v2.1, never run against a tenant or tested | **Parked: needs paid Azure resources** (below) | — |
 
 Container forensics goes first because half of it is written. ML goes last because it needs multi-host cases and the lab's ground truth to measure it against, and an unmeasured anomaly score is worse than none.
 
@@ -111,6 +112,20 @@ Container forensics goes first because half of it is written. ML goes last becau
 - **No learned model (Ben, 29 October 2026).** An isolation forest was considered and dropped, with `scikit-learn`, because stacking found every plant in the lab. The note below is kept for the record.
 - **The isolation forest, as considered.** It would score how unusual each host's values are, not only how many hosts have them, catching what counting can't, such as a process every host runs but with an odd parent or command line on one. Against: `scikit-learn` (with numpy and scipy, about 30–40 MB) in the worker image, which the dependency rule needs agreed, and a score that's harder to explain than stacking's named reasons. Stacking found every plant with no noise on the lab case, so there was nothing for a forest to improve on.
 - **Eru's "What's rare in this case?"** (built 30 October). An offline question over `stacking.csv`: persistence rows first, then programs and process pairs, each with its hosts and reasons, and the reminder that a row is a lead, not a verdict.
+
+## Azure, tested in a lab (parked, 6 November 2026)
+
+**Parked: it needs paid Azure resources** (a VM, disk snapshots, storage, a key vault), so it waits until that's worth paying for. It would test Rowanholt's cloud side, not host anything: the homelab stays on the tailnet server.
+
+**There now.** `src/analysis/rowanholt/cloud/azure/` dates from v2.1, reached through `python3 -m src.analysis.rowanholt.cloud.cli azure …` (`docs/CLI.md`): `vm.py` lists VMs, acquires a disk through a snapshot, storage and logs, and reviews NSG rules; `activity_log.py` pulls the Activity Log and maps operations to ATT&CK. None of it has a unit test or is known to have run against a tenant. Its Azure SDKs are optional imports in no `requirements/` file, and it doesn't read Entra ID sign-in or audit logs.
+
+**The plan, if it's picked up**, the way the Linux and Windows lab targets work:
+1. **A lab target** (`lab/azure/`): one resource group with the cheapest Linux VM, a storage account and a key vault; `create`, `seed`, `collect`, `teardown`. The seed does attacker-like things with their expected results: a role assignment (**T1098**), a key vault secret read (**T1555.006**), Run Command (**T1651**), an NSG opened to the internet (**T1562.007**), a disk snapshot (**T1578.001**) and its export URL (**T1537**), a storage account's keys listed (**T1552**).
+2. **The existing code made to pass** against it, with unit tests over recorded API responses.
+3. **Entra ID logs** as new artefacts, through `docs/FEATURE_REQUESTS.md` first.
+4. **Archer**: the same activity as the test set for Sentinel and KQL queries.
+
+Guardrails: its own resource group or subscription with a budget alert set first; a least-privilege service principal, its secret out of the repo; the seed run as a separate "attacker" identity; teardown after every run; no real case data. Decisions then: separate subscription or not; the SDKs in a `requirements/cloud.txt` or not at all; whether the tenant has Entra ID P1/P2 (sign-in and audit logs past 7 days).
 
 ## Plan for what's left (29 October 2026)
 
