@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.append(str(ROOT / "src" / "analysis"))
 
 from rowanholt.collect import linux as collect  # noqa: E402
+from rowanholt.core.records import read_records  # noqa: E402
 from rowanholt.process import extra_artefacts as ex  # noqa: E402
 
 CID = "4f1c9e2ab3d7" + "0" * 52
@@ -69,8 +70,7 @@ def test_container_layer_files_are_staged_files(tmp_path):
     artefact = str(layer / "tmp+.x+miner")
     assert ex.is_extra_artefact(artefact)
     assert ex.process_extra_artefact("", "'HOST'", out, "HOST::Linux", "/", "processing", artefact)
-    with open(tmp_path / "out" / "HOST" / "artefacts" / "cooked" / "staged_files.csv", newline="") as fh:
-        [row] = list(csv.DictReader(fh))
+    [(_, row)] = list(read_records(tmp_path / "out" / "HOST" / "artefacts" / "cooked" / "staged_files.jsonl"))
     assert row["Source"] == f"container {CID[:12]}:/tmp/.x/miner"
     assert row["Hidden"] == "yes" and "executable" in row["Flag"]
 

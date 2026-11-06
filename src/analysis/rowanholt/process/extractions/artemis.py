@@ -21,6 +21,7 @@ from datetime import datetime
 from typing import Optional, Dict, List
 
 from rowanholt.audit import write_audit_log_entry
+from rowanholt.core.records import SUFFIX, iter_json, write_records
 from rowanholt.process.extractions.mitre_tagger import presence_technique
 
 ARTEMIS_PATH = "/usr/local/bin/artemis"
@@ -307,6 +308,46 @@ def _not_windows_own(artifact_type: str, record: dict) -> bool:
 
 
 PERSISTENCE_ARTEFACTS = {"tasks": "T1053.005", "services": "T1543.003", "wmipersist": "T1546.003"}
+# A record's time: the first of these it has (Artemis names them per artefact)
+TIME_FIELDS = ("timestamp", "last_run_time", "last_run", "last_execution", "last_modified", "modified", "created",
+               "deleted", "last_write_time", "update_time")
+
+
+def record_techniques(artifact_type: str):
+    """Each record's own techniques, where the record shows one: an event log record by its event
+    and command line, a task, service or WMI subscription that isn't Windows' own."""
+    kind = artifact_type.lower()
+    if kind == "eventlogs":
+        return lambda record: eventlog_techniques([record])
+    if kind in PERSISTENCE_ARTEFACTS:
+        def persistence(record):
+            items = record.get("tasks") if isinstance(record.get("tasks"), list) else [record]
+            mine = any(isinstance(i, dict) and _not_windows_own(kind, i) for i in items)
+            return [PERSISTENCE_ARTEFACTS[kind]] if mine else []
+        return persistence
+    return None
+
+
+def to_json_lines(json_path: str, cooked_root: str, img: str, source: str, artifact_type: str) -> Optional[str]:
+    """Rewrite one Artemis output file as a JSON Lines table beside it, streamed (an MFT is several
+    GB), with the envelope; the table's path, or None when it held no records. The .json goes."""
+    table = json_path[: -len(".json")] + SUFFIX
+    building = table + ".new"
+    if os.path.exists(building):
+        os.remove(building)
+    raw = source.find("/artefacts/")
+    with open(json_path, encoding="utf-8", errors="replace") as fh:
+        written = write_records(
+            building, (r if isinstance(r, dict) else {"value": r} for r in iter_json(fh)),
+            host=img.split("::")[0],
+            artefact=os.path.relpath(table, cooked_root)[: -len(SUFFIX)].replace(os.sep, "/"),
+            source_path=source[raw + 1:] if raw >= 0 else source, time_field=TIME_FIELDS,
+            techniques=record_techniques(artifact_type))
+    os.remove(json_path)
+    if not written:
+        return None
+    os.replace(building, table)
+    return table
 
 
 def enrich_with_mitre(json_path: str, artifact_type: str) -> bool:
@@ -361,16 +402,9 @@ def enrich_with_mitre(json_path: str, artifact_type: str) -> bool:
 
         # Base technique for artifact type
         if artifact_type.lower() == "eventlogs":
-            # Artemis writes each log as one JSON array; tag what the records show,
-            # not the mere presence of a log.
-            try:
-                with open(json_path, errors="ignore") as f:
-                    records = json.load(f)
-            except (OSError, ValueError):
-                records = None
-            if isinstance(records, list):
-                _record_techniques(techniques_file_path, eventlog_techniques(records))
-                return True
+            # Tag what the records show, not the mere presence of a log
+            _record_techniques(techniques_file_path, eventlog_techniques(_records(json_path)))
+            return True
 
         base_technique = ARTEFACT_MITRE_MAPPING.get(artifact_type.lower(), {}).get("technique_id")
         if base_technique and not presence_technique(base_technique):
@@ -1080,16 +1114,24 @@ def extract_with_artemis(
         )
         return False
 
-    # MITRE ATT&CK enrichment of the JSON this Artemis run wrote. Enriching every
-    # JSON in cooked_dir re-read all earlier output after each call, which made
+    # What this run wrote, as JSON Lines, then its MITRE ATT&CK enrichment. Enriching every
+    # table in cooked_dir re-read all earlier output after each call, which made
     # event-log processing quadratic per shadow copy.
+    source = artifact_file or artifact_dir or ""
     for json_file, mtime in _json_mtimes(cooked_dir).items():
         if before.get(json_file) == mtime:
             continue
         try:
-            enrich_with_mitre(json_file, artifact_type)
+            table = to_json_lines(json_file, cooked_base, img, source, artifact_type)
+        except (OSError, ValueError) as e:
+            print(f"    WARNING: couldn't convert {os.path.basename(json_file)}: {e}", flush=True)
+            continue
+        if not table:
+            continue
+        try:
+            enrich_with_mitre(table, artifact_type)
         except Exception as e:
-            print(f"    WARNING: MITRE enrichment failed for {os.path.basename(json_file)}: {e}", flush=True)
+            print(f"    WARNING: MITRE enrichment failed for {os.path.basename(table)}: {e}", flush=True)
 
     return True
 

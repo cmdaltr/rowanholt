@@ -4,8 +4,10 @@ import re
 import subprocess
 import time
 from datetime import datetime
+from typing import Dict, List
 
 from rowanholt.audit import write_audit_log_entry
+from rowanholt.core.records import SUFFIX, write_records
 from rowanholt.process.extractions.artemis import _record_techniques
 from rowanholt.process.linux_artefacts import WEB_ROOTS, WEB_SCRIPTS
 from rowanholt.utils import safe_input
@@ -31,6 +33,17 @@ def rule_techniques(yara_file):
         if found:
             techniques[name] = found
     return techniques
+
+
+YARA_FIELDS = ("yara_rule", "yara_file", "file", "path", "offset", "signature_name", "matched_data")
+
+
+def match_techniques(row: Dict[str, str], by_rule: Dict[str, List[str]]) -> List[str]:
+    """One yara table row's techniques: its rule's, and T1505.003 for a script in a web root."""
+    found = list(by_rule.get(row["yara_rule"], []))
+    if web_script(f"{row['path']}/{row['file']}"):
+        found.append("T1505.003")
+    return found
 
 
 def web_script(path):
@@ -62,7 +75,7 @@ def validate_yara(verbosity, output_directory, img, yara_file, binary_dir):
 def yara_rows(yara_output):
     """(rule, file, offset, string, data) rows from yara -s output, and the (rule, file) matches.
     A rule that matched on its condition alone (filesize, pe.*) prints no string lines; it still
-    gets a row, with "-" for the string, where it used to be left out of yara.csv."""
+    gets a row, with "-" for the string, where it used to be left out of the yara table."""
     rows, matched, current, had_strings = [], [], None, False
     for line in yara_output.split("\n"):
         line = line.strip()
@@ -108,31 +121,21 @@ def invoke_yara(verbosity, output_directory, img, yara_file, binary_dir):
         print(f"       No evidence found based on '{yara_rule_name}'.")
         return
 
-    # Create analysis directory if needed
-    analysis_dir = os.path.join(output_directory, img_name, "analysis")
-    if not os.path.exists(analysis_dir):
-        os.makedirs(analysis_dir)
-
-    # Write CSV header if file doesn't exist
-    csv_path = os.path.join(analysis_dir, "yara.csv")
-    if not os.path.exists(csv_path):
-        with open(csv_path, "w") as f:
-            f.write("yara_rule,yara_file,file,path,offset,signature_name,matched_data\n")
-
     rows, matched = yara_rows(yara_output)
-    with open(csv_path, "a") as f:
-        for rule, path, offset, sig_name, matched_data in rows:
-            file_name, file_path = path.split("/")[-1], "/".join(path.split("/")[:-1])
-            f.write(",".join(v.replace(",", "%2C").replace("\n", "\\n") for v in (
-                rule, yara_file, file_name, file_path, offset, sig_name, matched_data)) + "\n")
-            entry = f"{datetime.now().isoformat()},{img_name},yara,rule '{rule}' (${sig_name}) matched in '{file_name}'\n"
-            prnt = f" -> {datetime.now().isoformat().replace('T', ' ')} -> YARA rule '{rule}' matched in '{file_name}'"
-            write_audit_log_entry(verbosity, output_directory, entry, prnt)
-    matches_found = len(rows)
-
     # A rule's meta can name the techniques it detects; any hit on a web-root script
     # is a likely web shell
     by_rule = rule_techniques(yara_file)
+    records = []
+    for rule, path, offset, sig_name, matched_data in rows:
+        file_name, file_path = path.split("/")[-1], "/".join(path.split("/")[:-1])
+        records.append(dict(zip(YARA_FIELDS, (rule, yara_file, file_name, file_path, offset, sig_name, matched_data))))
+        entry = f"{datetime.now().isoformat()},{img_name},yara,rule '{rule}' (${sig_name}) matched in '{file_name}'\n"
+        prnt = f" -> {datetime.now().isoformat().replace('T', ' ')} -> YARA rule '{rule}' matched in '{file_name}'"
+        write_audit_log_entry(verbosity, output_directory, entry, prnt)
+    write_records(os.path.join(output_directory, img_name, "analysis", f"yara{SUFFIX}"), records, host=img_name,
+                  artefact="yara", techniques=lambda row: match_techniques(row, by_rule))
+    matches_found = len(rows)
+
     techniques = {t for rule, _ in matched for t in by_rule.get(rule, [])}
     if any(web_script(path) for _, path in matched):
         techniques.add("T1505.003")

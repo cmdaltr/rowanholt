@@ -46,6 +46,8 @@ def test_envelope_names_in_a_row_are_kept_aside():
     record = envelope({"host": "other", "timestamp": "2026-01-02T03:04:05Z", "x": 1}, host="h", artefact="a")
     assert record["host"] == "h" and record["orig_host"] == "other"
     assert record["timestamp"] == "2026-01-02T03:04:05Z" and "orig_timestamp" not in record
+    record = envelope({"timestamp": "boot +3s"}, host="h", artefact="a")
+    assert record["timestamp"] is None and record["orig_timestamp"] == "boot +3s"  # not a time: kept, not lost
     record = envelope({"timestamp": "junk", "When": 1793990000}, host="h", artefact="a", time_field="When")
     assert record["timestamp"] == "2026-11-06T18:33:20Z" and record["orig_timestamp"] == "junk"
 
@@ -55,6 +57,7 @@ def test_timestamps():
     assert iso_timestamp("2026-10-29T15:03:11+01:00") == "2026-10-29T14:03:11Z"
     assert iso_timestamp("Thu Oct 29 14:03:11 2026") == "2026-10-29T14:03:11Z"
     assert iso_timestamp("2026-10-29 14:03:11 UTC") == "2026-10-29T14:03:11Z"
+    assert iso_timestamp("Thu, 29 Oct 2026 15:03:11 +0100") == "2026-10-29T14:03:11Z"
     assert iso_timestamp(1793990000) == iso_timestamp(1793990000000) == "2026-11-06T18:33:20Z"
     assert iso_timestamp({"#attributes": {"SystemTime": "2026-10-29T14:03:11.000000Z"}}) == "2026-10-29T14:03:11Z"
     for nothing in (None, "", "-", "0000-00-00T00:00:00", "1601-01-01 00:00:00", "not a time", 7, True):

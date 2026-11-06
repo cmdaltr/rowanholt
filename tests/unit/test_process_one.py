@@ -24,7 +24,7 @@ def test_cooks_one_file_without_touching_the_case(tmp_path, monkeypatch, capsys)
     monkeypatch.setattr(sys, "argv", ["process_one.py", str(crontab)])
     assert process_one.main() == 0
     out = capsys.readouterr().out
-    assert "== cron.csv" in out and "2 rows" in out
+    assert "== cron.jsonl" in out and "2 rows" in out
     assert sorted(p.name for p in (tmp_path / "CASE").rglob("*")) == before
 
 

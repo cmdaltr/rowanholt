@@ -11,6 +11,7 @@ Stdlib only: the web backend loads this module from Elrond's source tree too.
 import csv
 import json
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, Union
 
@@ -97,7 +98,10 @@ def iso_timestamp(value: Any) -> Optional[str]:
             return _iso(datetime.strptime(text, fmt))
         except ValueError:
             continue
-    return None
+    try:  # an email's Date: header (RFC 2822)
+        return _iso(parsedate_to_datetime(text))
+    except (TypeError, ValueError, IndexError):
+        return None
 
 
 def _technique_list(row: Dict[str, Any], techniques: Techniques) -> List[str]:
@@ -111,10 +115,16 @@ def _technique_list(row: Dict[str, Any], techniques: Techniques) -> List[str]:
     return out
 
 
+TimeField = Union[None, str, Sequence[str]]
+
+
 def envelope(row: Dict[str, Any], *, host: str, artefact: str, source_path: str = "",
-             time_field: Optional[str] = None, techniques: Techniques = None) -> Dict[str, Any]:
-    """``row`` with the envelope fields in front. A row field with an envelope name is kept as
+             time_field: TimeField = None, techniques: Techniques = None) -> Dict[str, Any]:
+    """``row`` with the envelope fields in front. ``time_field`` names the row's time, or lists
+    candidates (the first the row has a value in). A row field with an envelope name is kept as
     ``orig_<name>``, except a ``timestamp`` that is the row's own time."""
+    if time_field is not None and not isinstance(time_field, str):
+        time_field = next((f for f in time_field if row.get(f) not in (None, "")), None)
     if time_field is None and "timestamp" in row:
         time_field = "timestamp"
     record: Dict[str, Any] = {
@@ -127,15 +137,63 @@ def envelope(row: Dict[str, Any], *, host: str, artefact: str, source_path: str 
     for key, value in row.items():
         key = str(key)
         if key in record:
-            if key == "timestamp" and time_field == "timestamp":
-                continue
+            if key == "timestamp" and time_field == "timestamp" and (record["timestamp"] or value in (None, "")):
+                continue  # the row's own time, now in the envelope (kept aside only if it wasn't a time)
             key = f"orig_{key}"
         record[key] = value
     return record
 
 
+def iter_json(f, chunk: int = 1 << 20) -> Iterator[Any]:
+    """Records from a JSON array or JSON Lines file, without loading it whole
+    (an Artemis MFT export is several GB)."""
+    first = f.read(chunk)
+    if not first.lstrip().startswith("["):
+        rest = first
+        while True:
+            lines = rest.split("\n")
+            rest = lines.pop()
+            for line in lines:
+                if line.strip():
+                    try:
+                        yield json.loads(line)
+                    except ValueError:
+                        pass
+            more = f.read(chunk)
+            if not more:
+                if rest.strip():
+                    try:
+                        yield json.loads(rest)
+                    except ValueError:
+                        pass
+                return
+            rest += more
+    decoder = json.JSONDecoder()
+    buf, eof = first.lstrip()[1:], False
+    while True:
+        buf = buf.lstrip().lstrip(",").lstrip()
+        if buf.startswith("]") or (not buf and eof):
+            return
+        try:
+            record, end = decoder.raw_decode(buf)
+        except ValueError:
+            if eof:
+                return
+            more = f.read(chunk)
+            eof = not more
+            buf += more
+            continue
+        yield record
+        buf = buf[end:]
+        if len(buf) < chunk and not eof:
+            more = f.read(chunk)
+            eof = not more
+            buf += more
+
+
+
 def write_records(path: Union[str, Path], rows: Iterable[Dict[str, Any]], *, host: str, artefact: str,
-                  source_path: str = "", time_field: Optional[str] = None,
+                  source_path: str = "", time_field: TimeField = None,
                   techniques: Techniques = None) -> int:
     """Append ``rows`` to ``path`` as JSON Lines with the envelope; the number written.
 

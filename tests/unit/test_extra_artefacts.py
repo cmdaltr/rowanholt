@@ -342,5 +342,9 @@ def test_keywords_search_the_host_output_after_processing(tmp_path):
     keywords = tmp_path / "keywords.txt"
     keywords.write_text("# comment\n\napi_key\n")
     kw.prepare_keywords("", out, True, {"/mnt/HOST": "HOST::Linux"}, [], [str(keywords)], "keyword searching")
-    matches = (tmp_path / "HOST" / "analysis" / "keyword_matches.csv").read_text()
-    assert "api_key" in matches and "notes.txt" in matches
+    table = tmp_path / "HOST" / "analysis" / "keyword_matches.jsonl"
+    assert check_file(table) == []
+    row = next(record for _, record in read_records(table))
+    assert (row["host"], row["artefact"], row["keyword"], row["line_number"]) == ("HOST", "keyword_matches", "api_key", 2)
+    assert row["Filename"].endswith("notes.txt") and row["line_entry"] == "the api_key is in here"
+    assert row["timestamp"] and not (tmp_path / "HOST" / "analysis" / "keyword_matches.csv").exists()

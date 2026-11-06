@@ -8,6 +8,7 @@ from functools import lru_cache
 from urllib.parse import urlsplit
 
 from rowanholt.audit import write_audit_log_entry
+from rowanholt.core.records import SUFFIX, write_records
 
 
 # How reports defang an indicator (evil[.]com, hxxps://, 10[:]...)
@@ -150,7 +151,7 @@ def _not_encoded_data(value):
 
 def extract_line_iocs(line):
     """Every IOC on a line, as (value, type) pairs in order of appearance.
-    Types match the iocs.csv indicator_type column."""
+    Types match the iocs table's indicator_type field."""
     found = []
     for m in IPV4.finditer(line):
         if _public_ipv4(m.group(0)) and not _version_number(line, m.start(), m.end()):
@@ -226,7 +227,7 @@ def compare_iocs(
 
     watchlist = load_ioc_watchlist(watchlist_file)
     host = img.split("::")[0]
-    csv_path = output_directory + host + "/analysis/iocs.csv"
+    iocs_path = output_directory + host + f"/analysis/iocs{SUFFIX}"
     print("      Commencing IOC extraction for '{}'...\n".format(host))
     for index, iocfile in enumerate(iocfiles):
         path = iocfile.split(": ")[0]
@@ -250,33 +251,30 @@ def compare_iocs(
             continue
         if not hits:
             continue
-        filetimes = ",".join(
+        created, accessed, modified = (
             str(datetime.fromtimestamp(t(path))) for t in (os.path.getctime, os.path.getatime, os.path.getmtime)
         )
-        reported = set()
-        with open(csv_path, "a") as ioccsv:
-            for lineno, value, kind in hits:
-                if kind in ("domain", "IPv4 address"):
-                    resolve = _resolvable(value)
-                else:
-                    resolve = "-"
-                ioccsv.write(
-                    "{},{},{},{},{},{},{}\n".format(
-                        filetimes,
-                        path.replace(",", "%2C").strip(),
-                        value,
-                        kind,
-                        lineno,
-                        resolve,
-                        "YES" if watchlist_match(value, watchlist) else "",
-                    )
+        rows, reported = [], set()
+        for lineno, value, kind in hits:
+            rows.append({
+                "CreationTime": created,
+                "LastAccessTime": accessed,
+                "LastWriteTime": modified,
+                "Filename": path.strip(),
+                "ioc": value,
+                "indicator_type": kind,
+                "line_number": lineno,
+                "resolvable": _resolvable(value) if kind in ("domain", "IPv4 address") else "-",
+                # always present: threat intelligence fills it in place later (match._fill_watchlist)
+                "watchlist_match": "YES" if watchlist_match(value, watchlist) else "",
+            })
+            if value.lower() not in reported:
+                reported.add(value.lower())
+                entry, prnt = "{},{},{},IOC '{}' ({}) extracted from '{}'\n".format(
+                    datetime.now().isoformat(), host, stage, value, kind, path
+                ), " -> {} -> potential IOC '{}' ({}) extracted from '{}' for '{}'".format(
+                    datetime.now().isoformat().replace("T", " "), value, kind, path.split("/")[-1], host
                 )
-                if value.lower() not in reported:
-                    reported.add(value.lower())
-                    entry, prnt = "{},{},{},IOC '{}' ({}) extracted from '{}'\n".format(
-                        datetime.now().isoformat(), host, stage, value, kind, path
-                    ), " -> {} -> potential IOC '{}' ({}) extracted from '{}' for '{}'".format(
-                        datetime.now().isoformat().replace("T", " "), value, kind, path.split("/")[-1], host
-                    )
-                    write_audit_log_entry(verbosity, output_directory, entry, prnt)
+                write_audit_log_entry(verbosity, output_directory, entry, prnt)
+        write_records(iocs_path, rows, host=host, artefact="iocs", time_field="LastWriteTime")
     print("      IOC extraction completed for {}.\n".format(vssimage))
