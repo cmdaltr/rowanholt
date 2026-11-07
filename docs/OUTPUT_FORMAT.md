@@ -145,3 +145,9 @@ It replaces the two copies of `_append_rows` (`windows_artefacts.py:49`, `linux_
 3. **The dead extractors are removed**, in their own commit first: 13 modules in `process/extractions/` (`mft.py`, `usn.py`, `shimcache.py`, `wbem.py`, `sru.py`, `wmi_full.py`, `linux_enhanced.py`, `macos_enhanced.py`, `wmi.py`, `evtx.py`, `artifact_models.py`, `plist.py`, the empty `macos/`) that nothing imports since Artemis replaced them.
 4. **The Eru CLI indexer** (`ai/indexer.py`) is fixed: pointed at the real files through `read_records`.
 5. **Download as CSV**: the case browser gets a button that downloads the artefact being viewed as CSV (nested values as JSON text in their cell), for Excel and Timeline Explorer. Built with step 5.
+
+## Decisions while building (Ben, 7 November 2026)
+
+6. **Enrichment adds to `techniques`**: what `post/mitre/enrichment.py` matches goes into the record's `techniques` as well as its `mitre_*` fields, so `techniques` agrees with `mitre_techniques.txt`.
+7. **A JSON Lines table isn't lifted** out of a one-file `cooked/` subdirectory by `post/clean.py`: its records name it by its path there. Old CSV and JSON files still are.
+8. **`stacking` and `threat_groups` stay out of Splunk and Elastic** for now: they'd need a case-level monitor and the host taken from each record.

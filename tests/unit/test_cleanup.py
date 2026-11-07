@@ -35,7 +35,7 @@ def test_tidy_drops_empty_processed_output_but_not_raw(tmp_path):
     assert history.exists()
 
 
-def test_a_lone_file_is_lifted_with_its_own_extension(tmp_path):
+def test_a_lone_old_format_file_is_lifted_with_its_own_extension(tmp_path):
     host = tmp_path / "host"
     write(host / "artefacts" / "cooked" / "usnjrnl" / "journal.json", "[" + "1," * 100 + "1]")
     write(host / "artefacts" / "cooked" / "prefetch" / "prefetch.csv", "Filename\n" + "x" * 200 + "\n")
@@ -44,7 +44,7 @@ def test_a_lone_file_is_lifted_with_its_own_extension(tmp_path):
     cooked = host / "artefacts" / "cooked"
     assert (cooked / "usnjrnl.json").is_file()
     assert (cooked / "prefetch.csv").is_file()  # was renamed prefetch.json
-    assert (cooked / "tasks.jsonl").is_file()
+    assert (cooked / "tasks" / "tasks.jsonl").is_file()  # records say artefact "tasks/tasks": not moved
 
 
 def test_tables_with_no_records_go_however_small_the_rest(tmp_path):

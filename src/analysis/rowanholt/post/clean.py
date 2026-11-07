@@ -189,8 +189,9 @@ def has_no_records(path: str, max_empty_size: int = 100) -> bool:
 
 def tidy_processed_output(img_output_dir, max_empty_size=100):
     """Tidy one host's processed output at the end of a run: drop tables with no records
-    (and other near-empty files) from cooked/ and analysis/, and lift a lone file out of its
-    cooked/ subdirectory as cooked/<subdirectory><ext>. Collected artefacts under
+    (and other near-empty files) from cooked/ and analysis/, and lift a lone CSV or JSON file
+    out of its cooked/ subdirectory as cooked/<subdirectory><ext> (a JSON Lines table isn't
+    moved: its records' artefact is its path). Collected artefacts under
     raw/ are evidence, whatever their size, and aren't touched."""
     cooked_dir = os.path.join(img_output_dir, "artefacts", "cooked")
     for processed in (cooked_dir, os.path.join(img_output_dir, "analysis")):
@@ -209,8 +210,10 @@ def tidy_processed_output(img_output_dir, max_empty_size=100):
         if not os.path.isdir(subdir_path):
             continue
         entries = os.listdir(subdir_path)
-        if len(entries) == 1 and os.path.isfile(os.path.join(subdir_path, entries[0])):
-            ext = os.path.splitext(entries[0])[1] or SUFFIX
+        # A JSON Lines table stays where it is: its records name it by its path under cooked/
+        if (len(entries) == 1 and os.path.isfile(os.path.join(subdir_path, entries[0]))
+                and not entries[0].endswith(SUFFIX)):
+            ext = os.path.splitext(entries[0])[1]
             dst = os.path.join(cooked_dir, subdir + ext)
             if not os.path.exists(dst):
                 try:
