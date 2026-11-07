@@ -22,7 +22,12 @@ from typing import Dict, Iterator, List, Optional, Tuple
 def _load_tables():
     """rowanholt/core/records.py, loaded by path: putting Elrond's source tree on sys.path would let
     its own config and main shadow the backend's."""
-    for src in (os.environ.get("ROWANHOLT_ELROND_SRC", "/opt/elrond-src"), Path(__file__).resolve().parents[2] / "analysis"):
+    here = Path(__file__).resolve()
+    # in the backend image this file is /app/case_files.py: no repository above it to fall back on
+    sources = [os.environ.get("ROWANHOLT_ELROND_SRC", "/opt/elrond-src")]
+    if len(here.parents) > 2:
+        sources.append(here.parents[2] / "analysis")
+    for src in sources:
         path = Path(src, "rowanholt", "core", "records.py")
         if path.is_file():
             spec = importlib.util.spec_from_file_location("rowanholt_records", path)
