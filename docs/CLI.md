@@ -377,10 +377,13 @@ Memory analysis reads memory images from `SOURCE_DIR` alongside the disk images;
 | `--Splunk` | Index output into the local Splunk instance |
 | `--Elastic` | Index output into the local Elasticsearch instance |
 | `--Navigator` | Build an ATT&CK Navigator layer from the case's `mitre_techniques.txt` |
+| `--Index` | Index a case already processed into Splunk, Elastic and/or the Navigator (with the options above), without mounting, extracting or processing again; the one directory is the case's folder |
 | `--Ziparchive` | Zip raw data after processing |
 | `--Delete` | Delete raw data after processing |
 
 SIEM options fail fast if the service is unreachable. Start them with `docker compose --profile siem up -d`.
+
+`--Index` finds the case's hosts (folders holding `artefacts/cooked/`) and their platforms from the audit log, or a Gandalf host's `host.info`, and skips any host whose platform neither records. Memory-only hosts aren't indexed this way. It exits 1 if a target fails, after trying the others, and records what it indexed in the audit log.
 
 ---
 
@@ -398,6 +401,9 @@ python3 src/analysis/elrond.py CASE-001 /evidence /output/CASE-001 --Collect --P
 
 # Brisk mode
 python3 src/analysis/elrond.py CASE-001 /evidence /output/CASE-001 --Collect --Brisk
+
+# Index a case processed earlier, without processing it again
+python3 src/analysis/elrond.py CASE-001 /output/CASE-001 --Index --Splunk --Elastic --Navigator
 
 # IOC extraction and YARA
 python3 src/analysis/elrond.py CASE-001 /evidence /output/CASE-001 \

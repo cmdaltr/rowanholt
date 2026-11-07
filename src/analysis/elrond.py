@@ -83,6 +83,13 @@ parser.add_argument(
     default=False,
 )
 parser.add_argument(
+    "--Index",
+    help="Index a case Elrond has already processed into Splunk, Elastic and/or the Navigator (with --Splunk, --Elastic, --Navigator), without processing it again; the directory is the case's folder; Example syntax: elrond.py CASE /path/to/case --Index --Splunk --Elastic",
+    action="store_const",
+    const=True,
+    default=False,
+)
+parser.add_argument(
     "--Gandalf",
     help="Read artefacts acquired using gandalf",
     action="store_const",
@@ -293,6 +300,7 @@ exhaustive = args.eXhaustive
 threathunt = args.ThreatHunt
 mordor = args.Mordor  # Input type flag for Mordor datasets
 archive = args.Ziparchive
+index_only = args.Index
 
 d = directory[0]
 case = case[0]
@@ -522,6 +530,22 @@ if __name__ == "__main__":
     except SIEMUnavailableError as e:
         print(f"\n  Error: {e}\n")
         sys.exit(1)
+
+    if index_only:
+        from rowanholt.post.index_only import IndexOnlyError, index_case
+        if not (splunk or elastic or navigator):
+            print("\n  Error: --Index needs --Splunk, --Elastic or --Navigator\n")
+            sys.exit(1)
+        if len(directory) != 1 or not os.path.isdir(directory[0]):
+            print("\n  Error: --Index takes one directory, the case's folder (the one holding its host folders)\n")
+            sys.exit(1)
+        print("\n  -> \033[1;36mIndexing a processed case (nothing is mounted, extracted or processed)...\033[1;m")
+        try:
+            failed = index_case(directory[0], case, "veryverbose", splunk, elastic, navigator)
+        except IndexOnlyError as e:
+            print(f"\n  Error: {e}\n")
+            sys.exit(1)
+        sys.exit(1 if failed else 0)
 
     # Process mode is always enabled - it's the core analysis functionality
     process = True
