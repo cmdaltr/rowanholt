@@ -14,6 +14,7 @@ from rowanholt.core import event_dataset
 from rowanholt.core.records import SUFFIX, write_records
 from rowanholt.core.identify import identify_gandalf_host
 from rowanholt.core.identify import identify_memory_image
+from rowanholt.utils import safe_input
 
 
 ARCHIVE_SUFFIXES = (".zip", ".7z", ".tar.gz", ".tgz")
@@ -283,7 +284,8 @@ def ingest_gandalf_archive(archive, output_directory, verbosity, allimgs):
     gandalf_host, osplatform = identify_gandalf_host(output_directory, verbosity, host_info)
     host_dir = os.path.join(output_directory, gandalf_host)
     artefacts_dir = os.path.join(host_dir, "artefacts")
-    if os.path.isdir(os.path.join(artefacts_dir, "raw")):
+    if os.path.isdir(os.path.join(artefacts_dir, "raw")) and reuse_extraction(
+            verbosity, output_directory, gandalf_host, host_dir, artefacts_dir):
         print("   '{}' was already extracted to {}; reusing it".format(gandalf_host, artefacts_dir))
     else:
         integrity = verify_manifest(staging)
@@ -312,6 +314,28 @@ def ingest_gandalf_archive(archive, output_directory, verbosity, allimgs):
     print()
     allimgs[os.path.join(artefacts_dir, "raw")] = "{}::{}".format(gandalf_host, osplatform)
     return gandalf_host
+
+
+def reuse_extraction(verbosity, output_directory, gandalf_host, host_dir, artefacts_dir) -> bool:
+    """Whether to reuse a host this case already extracted, or extract its archive again (a newer
+    collection, or an extraction that went wrong). Asked when run interactively; a web job or
+    automation reuses it, as before. The earlier extraction is moved aside, never deleted: its
+    raw/ is evidence."""
+    answer = safe_input(
+        "   '{}' was already extracted to {}.\n   Reuse it, or extract the archive again? Y(reuse)/n(extract again) [Y] ".format(
+            gandalf_host, artefacts_dir), default="y")
+    if answer.strip().lower() not in ("n", "no"):
+        return True
+    aside = "{}.previous-{}".format(host_dir.rstrip("/"), datetime.now().strftime("%Y%m%d-%H%M%S"))
+    os.rename(host_dir, aside)
+    entry, prnt = (
+        "{},{},gandalf extraction,extracted again; the earlier extraction moved to {}\n".format(
+            datetime.now().isoformat(), gandalf_host, os.path.basename(aside)),
+        " -> {} -> extracting '{}' again; the earlier extraction is in {}".format(
+            datetime.now().isoformat().replace("T", " "), gandalf_host, aside),
+    )
+    write_audit_log_entry(verbosity, output_directory, entry, prnt)
+    return False
 
 
 def ingest_event_dataset(staging, stem, output_directory, verbosity, allimgs):

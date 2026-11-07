@@ -8,6 +8,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from unittest import mock
 import zipfile
 from pathlib import Path
 
@@ -237,6 +238,21 @@ class GandalfIngestTests(unittest.TestCase):
         self.assess()
         self.assertTrue((cooked / "kept.csv").exists())
         self.assertFalse((self.out / "lab-rocky" / "artefacts" / "raw" / "passwd.1").exists())
+
+    def test_reingest_can_extract_again_and_keeps_the_earlier_one(self):
+        (self.acq / "lab-rocky").mkdir(parents=True)
+        write_tarball(self.acq / "lab-rocky" / "lab-rocky.tar.gz", UNIX_LAYOUT)
+        self.assess()
+        (self.out / "lab-rocky" / "artefacts" / "cooked").mkdir()
+        (self.out / "lab-rocky" / "artefacts" / "cooked" / "stale.jsonl").write_text("x")
+        with mock.patch.object(gandalf, "safe_input", return_value="n"):
+            self.assess()
+        host = self.out / "lab-rocky"
+        self.assertTrue((host / "artefacts" / "raw").is_dir())
+        self.assertFalse((host / "artefacts" / "cooked" / "stale.jsonl").exists())
+        [earlier] = self.out.glob("lab-rocky.previous-*")
+        self.assertTrue((earlier / "artefacts" / "cooked" / "stale.jsonl").exists())  # moved aside, not deleted
+        self.assertIn("extracted again", (self.out / "rowanholt_audit.log").read_text())
 
     def test_not_an_acquisitions_folder_fails_the_run(self):
         """Exit 0 here read as success: a job over a host's own folder 'completed' with an empty
