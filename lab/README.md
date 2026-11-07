@@ -84,6 +84,7 @@ Stacking compares Linux hosts within their distribution family, so `lab-rocky` (
 | 2026-11-04 | `STACKEVAL-20261104-1203` | Linux containers (python collector) | 4 | 1.00 | 1.00 | 1.00 | 1, 2, 4 |
 | 2026-11-04 | `STACKEVAL-20261104-2129` | Linux containers (python collector) | 4 | 1.00 | 1.00 | 1.00 | 1, 2, 4 |
 | 2026-11-05 | `STACKEVAL-20261105-1023` | Linux containers (python collector) | 4 | 1.00 | 1.00 | 1.00 | 1, 2, 4 |
+| 2026-11-06 | `STACKEVAL-20261106-2150` | Linux containers (python collector) | 4 | 1.00 | 1.00 | 1.00 | 1, 2, 4 |
 <!-- stacking-eval: rows above -->
 
 The **Linux VM** (`linux-vm create`) is Ubuntu with a real kernel (`bento/ubuntu-24.04` under Vagrant, Cirrus Labs `ubuntu:latest` under Tart), on SSH port 2230. The **macOS VM** (`macos-vm create`, Apple silicon only) is a Cirrus Labs Sequoia image on port 2231, provisioned without prompts: a `gandalf` user, a LaunchAgent, zsh history with a download, and a hidden staging folder in `/Users/Shared`. Both collectors work against it. `gandalf.sh` runs with sudo and also gets the root-only TCC and KnowledgeC databases; `gandalf.py` collects as the SSH user, so it skips what that user can't read. On the reference run (USB HDD), first boot took about an hour, then provisioning took 2.5 minutes, the bash and Python collections about 3 and 2 minutes, and Elrond 1.5–4 minutes.
