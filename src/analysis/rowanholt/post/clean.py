@@ -142,9 +142,11 @@ def cleanup_small_files_and_empty_dirs(output_directory, min_file_size=10):
     # One bottom-up walk: a directory's files go before the directory is checked, so
     # nested empty directories fall in the same pass. Collected artefacts
     # (artefacts/raw/) are left alone: an empty .bash_history is evidence
-    # (T1070.003), not clutter.
+    # (T1070.003), not clutter. Nor is .previous/: earlier extractions, kept as they were.
     top = os.path.normpath(output_directory)
     for root, dirs, files in os.walk(top, topdown=False):
+        if os.path.relpath(root, top).split(os.sep)[0] == ".previous":
+            continue
         if "/artefacts/raw/" not in root.replace(os.sep, "/") + "/":
             for filename in files:
                 filepath = os.path.join(root, filename)
