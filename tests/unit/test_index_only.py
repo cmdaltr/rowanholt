@@ -78,3 +78,67 @@ def test_the_audit_log_header_starts_a_log_but_never_restarts_one(tmp_path):
     lines = (tmp_path / "rowanholt_audit.log").read_text().splitlines()
     assert lines[0] == HEADER.strip() and lines.count(HEADER.strip()) == 1
     assert [line.split(",")[1] for line in lines[1:]] == ["LAB-WIN11", "LAB-WINCLEAN1", "LAB-WINCLEAN2"]
+
+
+def requests(statuses):
+    """A stand-in for index_only._request answering with ``statuses`` in turn; the calls made."""
+    calls = []
+
+    def request(url, user, password, method):
+        calls.append((method, url))
+        return statuses.pop(0)
+    return request, calls
+
+
+def test_elastic_index_is_deleted_to_be_made_afresh(monkeypatch):
+    monkeypatch.setenv("ELASTICSEARCH_HOST", "elastic")
+    request, calls = requests([200])
+    assert index_only.replace_elastic_index("WINSTACK-jsonl", request) == "replaced"
+    assert calls == [("DELETE", "http://elastic:9200/winstack-jsonl")]
+    assert index_only.replace_elastic_index("WINSTACK-jsonl", requests([404])[0]) == "new"
+    with pytest.raises(index_only.IndexOnlyError, match="wouldn't delete"):
+        index_only.replace_elastic_index("WINSTACK-jsonl", requests([403])[0])
+    monkeypatch.delenv("ELASTICSEARCH_HOST")
+    assert index_only.replace_elastic_index("WINSTACK-jsonl", requests([])[0]) is None  # local: not touched
+
+
+def test_splunk_index_removal_is_waited_for(monkeypatch):
+    monkeypatch.setenv("SPLUNK_HOST", "splunk")
+    request, calls = requests([200, 200, 200, 404])
+    assert index_only.replace_splunk_index("WINSTACK-jsonl", request, sleep=lambda _: None) == "replaced"
+    assert [method for method, _ in calls] == ["DELETE", "GET", "GET", "GET"]
+    assert calls[0][1] == "https://splunk:8089/services/data/indexes/WINSTACK-jsonl"
+    with pytest.raises(index_only.IndexOnlyError, match="still removing"):
+        index_only.replace_splunk_index("WINSTACK-jsonl", requests([200] + [200] * 5)[0], wait=4, sleep=lambda _: None)
+
+
+def test_index_case_replaces_before_indexing_and_warns(tmp_path, monkeypatch, capsys):
+    case = make_case(tmp_path)
+    order = []
+    monkeypatch.setattr(index_only, "replace_elastic_index", lambda c: order.append("replace") or "replaced")
+    with mock.patch("rowanholt.post.elastic.config.configure_elastic_stack", side_effect=lambda *a: order.append("index")):
+        assert index_only.index_case(str(case), "WINSTACK", "", False, True, False) == []
+    assert order == ["replace", "index"]
+    assert "may need re-pointing" in capsys.readouterr().out
+
+
+def test_a_failed_replacement_indexes_nothing(tmp_path, monkeypatch):
+    case = make_case(tmp_path)
+
+    def refuse(case):
+        raise index_only.IndexOnlyError("no")
+    monkeypatch.setattr(index_only, "replace_elastic_index", refuse)
+    with mock.patch("rowanholt.post.elastic.config.configure_elastic_stack") as elastic:
+        assert index_only.index_case(str(case), "WINSTACK", "", False, True, False) == ["Elastic"]
+    assert not elastic.called  # not into an index that still holds the old records
+
+
+def test_splunk_reads_the_files_again_and_old_inputs_go():
+    from rowanholt.post.splunk import ingest as splunk
+    stanza = splunk.monitor_stanza("/c/h/analysis", "h", "WINSTACK", "elrond", salt=":20261107T200000")
+    assert "crcSalt = <SOURCE>:20261107T200000" in stanza
+    inputs = ("[default]\n" + splunk.INPUTS_HEADER.format("WINSTACK") + "[monitor:///c/h/a]\n\n"
+              + splunk.INPUTS_HEADER.format("OTHER") + "[monitor:///o]\n\n"
+              + splunk.INPUTS_HEADER.format("WINSTACK") + "[monitor:///c/h/b]\n\n")
+    kept = splunk.drop_case_inputs(inputs, "WINSTACK")
+    assert "/c/h/" not in kept and "[default]" in kept and "[monitor:///o]" in kept

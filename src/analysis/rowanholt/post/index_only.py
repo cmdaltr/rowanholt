@@ -3,11 +3,19 @@ mounting, extracting or processing anything again (elrond.py --Index).
 
 The hosts and their platforms come from the case folder: the audit log's "identified platform"
 entries, else a Gandalf host's artefacts/host.info. Memory-only hosts aren't indexed this way.
+
+The case's index in each SIEM is replaced, not added to: indexing again into the same index put
+every record in twice, and Elastic kept the old index's field mappings.
 """
 
+import base64
 import os
+import ssl
+import time
+import urllib.error
+import urllib.request
 from datetime import datetime
-from typing import Dict, List, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from rowanholt.audit import write_audit_log_entry
 from rowanholt.core.identify import parse_gandalf_host_info
@@ -17,6 +25,71 @@ AUDIT_LOG = "rowanholt_audit.log"
 
 class IndexOnlyError(ValueError):
     """A folder with no processed hosts to index."""
+
+
+REPOINT = ("     WARNING: anything saved against the old index (searches, dashboards, alerts, Kibana objects\n"
+           "     tied to its data) may need re-pointing at the new one")
+
+
+def _request(url: str, user: str, password: str, method: str) -> int:
+    """The HTTP status of one authenticated request (self-signed certificates accepted)."""
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    request = urllib.request.Request(url, method=method)
+    request.add_header("Authorization", "Basic " + base64.b64encode(f"{user}:{password}".encode()).decode())
+    try:
+        with urllib.request.urlopen(request, context=context, timeout=30) as response:
+            return response.status
+    except urllib.error.HTTPError as error:
+        return error.code
+
+
+def replace_elastic_index(case: str, request: Callable[[str, str, str, str], int] = _request) -> Optional[str]:
+    """Delete the case's Elasticsearch index, so it's created afresh with this version's mapping;
+    what happened, or None for a local install (not replaced)."""
+    host = os.environ.get("ELASTICSEARCH_HOST", "")
+    if not host:
+        return None
+    url = f"http://{host}:{os.environ.get('ELASTICSEARCH_PORT', '9200')}/{case.lower()}"
+    status = request(url, os.environ.get("ELASTIC_USERNAME", "elastic"), os.environ.get("ELASTIC_PASSWORD", ""), "DELETE")
+    if status == 404:
+        return "new"
+    if status >= 300:
+        raise IndexOnlyError(f"Elasticsearch wouldn't delete index '{case.lower()}' ({status})")
+    return "replaced"
+
+
+def replace_splunk_index(case: str, request: Callable[[str, str, str, str], int] = _request,
+                         wait: float = 120, sleep: Callable[[float], None] = time.sleep) -> Optional[str]:
+    """Delete the case's Splunk index and wait until Splunk has removed it (it does so in the
+    background); what happened, or None for a local install (not replaced)."""
+    host = os.environ.get("SPLUNK_HOST", "")
+    if not host:
+        return None
+    url = f"https://{host}:{os.environ.get('SPLUNK_PORT', '8089')}/services/data/indexes/{case}"
+    user, password = os.environ.get("SPLUNK_USERNAME", "admin"), os.environ.get("SPLUNK_PASSWORD", "")
+    status = request(url, user, password, "DELETE")
+    if status == 404:
+        return "new"
+    if status >= 300:
+        raise IndexOnlyError(f"Splunk wouldn't delete index '{case}' ({status})")
+    waited = 0.0
+    while request(url, user, password, "GET") != 404:
+        if waited >= wait:
+            raise IndexOnlyError(f"Splunk was still removing index '{case}' after {wait:.0f}s; run --Index again shortly")
+        sleep(2)
+        waited += 2
+    return "replaced"
+
+
+def _replace(name: str, index: str, replace: Callable[[], Optional[str]]) -> None:
+    outcome = replace()
+    if outcome == "replaced":
+        print(f"     Replaced {name} index '{index}': the old one is deleted and the case indexed afresh")
+        print(REPOINT)
+    elif outcome is None:
+        print(f"     {name} is a local install: its index '{index}' is added to, not replaced")
 
 
 def _audit_platforms(output_directory: str) -> Dict[str, str]:
@@ -76,7 +149,9 @@ def index_case(output_directory: str, case: str, verbosity: str, splunk: bool, e
     if splunk:
         print("\n  -> \033[1;36mCommencing Splunk Phase...\033[1;m\n  ----------------------------------------")
         try:
-            usercred, pswdcred = configure_splunk_stack(verbosity, output_directory, case, "splunk", allimgs)
+            _replace("Splunk", case, lambda: replace_splunk_index(case))
+            salt = datetime.now().strftime(":%Y%m%dT%H%M%S")  # Splunk reads the case's files again
+            usercred, pswdcred = configure_splunk_stack(verbosity, output_directory, case, "splunk", allimgs, salt)
         except Exception as error:  # report it and go on to the other targets
             print(f"     ERROR: Splunk indexing failed: {error}")
             failed.append("Splunk")
@@ -84,6 +159,7 @@ def index_case(output_directory: str, case: str, verbosity: str, splunk: bool, e
     if elastic:
         print("\n  -> \033[1;36mCommencing Elastic Phase...\033[1;m\n  ----------------------------------------")
         try:
+            _replace("Elastic", case.lower(), lambda: replace_elastic_index(case))
             configure_elastic_stack(verbosity, output_directory, case, "elastic", allimgs)
         except Exception as error:
             print(f"     ERROR: Elastic indexing failed: {error}")

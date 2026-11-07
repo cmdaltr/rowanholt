@@ -11,8 +11,8 @@ from tarfile import TarFile
 from rowanholt.audit import write_audit_log_entry
 from rowanholt.utils import safe_input
 from rowanholt.post.splunk.app.app import build_app_elrond
-from rowanholt.post.splunk.ingest import (LOGTYPE_EVAL, LOGTYPE_TRANSFORM, TIME_TRANSFORM, host_monitors,
-                                          indexed_tables, ingest_splunk_data)
+from rowanholt.post.splunk.ingest import (INPUTS_HEADER, LOGTYPE_EVAL, LOGTYPE_TRANSFORM, TIME_TRANSFORM,
+                                          drop_case_inputs, host_monitors, indexed_tables, ingest_splunk_data)
 from rowanholt.post.splunk.ingest import PROPS as SPLUNK_PROPS
 from rowanholt.post.siem import siem_hosts
 
@@ -209,7 +209,9 @@ def install_splunk_stack(
     return requser, request_password
 
 
-def configure_splunk_stack(verbosity, output_directory, case, stage, allimgs):
+def configure_splunk_stack(verbosity, output_directory, case, stage, allimgs, salt=""):
+    """Index the case into Splunk. ``salt`` (--Index, replacing the case's index) has Splunk read
+    the case's files again and drops the inputs an earlier run wrote for it; remote mode only."""
     # Check if we're using remote Splunk (containerized environment)
     splunk_host = os.environ.get('SPLUNK_HOST', '')
     splunk_port = os.environ.get('SPLUNK_PORT', '8089')
@@ -440,18 +442,25 @@ def configure_splunk_stack(verbosity, output_directory, case, stage, allimgs):
                         datetime.now().isoformat().replace("T", " "), table, img_name
                     )
                     write_audit_log_entry(verbosity, output_directory, entry, prnt)
-                inputs_entries.extend(host_monitors(base_path, img_name, case))
+                inputs_entries.extend(host_monitors(base_path, img_name, case, salt))
                 # Add audit log file
                 inputs_entries.append(
                     "[monitor://{}/rowanholt_audit.log]\n"
                     "disabled = false\n"
+                    "{}"
                     "host = {}\n"
                     "sourcetype = elrondCSV\n"
-                    "index = {}\n\n".format(base_path, img_name, case)
+                    "index = {}\n\n".format(base_path, "crcSalt = <SOURCE>{}\n".format(salt) if salt else "",
+                                             img_name, case)
                 )
 
+            if salt and os.path.isfile(inputs_conf_path):
+                with open(inputs_conf_path) as inputs_conf:
+                    kept = drop_case_inputs(inputs_conf.read(), case)
+                with open(inputs_conf_path, "w") as inputs_conf:
+                    inputs_conf.write(kept)
             with open(inputs_conf_path, "a") as inputs_conf:
-                inputs_conf.write("\n# Auto-generated inputs for case: {}\n".format(case))
+                inputs_conf.write(INPUTS_HEADER.format(case))
                 for entry in inputs_entries:
                     inputs_conf.write(entry)
 

@@ -383,7 +383,7 @@ Memory analysis reads memory images from `SOURCE_DIR` alongside the disk images;
 
 SIEM options fail fast if the service is unreachable. Start them with `docker compose --profile siem up -d`.
 
-`--Index` finds the case's hosts (folders holding `artefacts/cooked/`) and their platforms from the audit log, or a Gandalf host's `host.info`, and skips any host whose platform neither records. Memory-only hosts aren't indexed this way. It exits 1 if a target fails, after trying the others, and records what it indexed in the audit log.
+`--Index` finds the case's hosts (folders holding `artefacts/cooked/`) and their platforms from the audit log, or a Gandalf host's `host.info`, and skips any host whose platform neither records. Memory-only hosts aren't indexed this way. It replaces the case's index in each SIEM rather than adding to it (indexing again into the same index put every record in twice, and Elastic kept the old field mappings): Elastic's is deleted and made afresh, Splunk's is deleted and its files read again. Anything saved against the old index (searches, dashboards, alerts) may need re-pointing; it says so when it replaces one. A local, non-container SIEM install is added to, not replaced. It exits 1 if a target fails, after trying the others, and records what it indexed in the audit log.
 
 ---
 

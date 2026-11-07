@@ -64,16 +64,32 @@ LOGTYPE_EVAL = (
 )
 
 
-def monitor_stanza(path: str, host: str, index: str, sourcetype: str, whitelist: Optional[str] = None) -> str:
-    """One inputs.conf monitor stanza; a directory with a whitelist is monitored recursively."""
-    lines = [f"[monitor://{path}]", "disabled = false", "crcSalt = <SOURCE>", f"host = {host}",
+INPUTS_HEADER = "\n# Auto-generated inputs for case: {}\n"
+
+
+def monitor_stanza(path: str, host: str, index: str, sourcetype: str, whitelist: Optional[str] = None,
+                   salt: str = "") -> str:
+    """One inputs.conf monitor stanza; a directory with a whitelist is monitored recursively.
+    Splunk knows a file it has read by its path (crcSalt <SOURCE>); a new ``salt`` has it read the
+    files again, into a replaced index."""
+    lines = [f"[monitor://{path}]", "disabled = false", f"crcSalt = <SOURCE>{salt}", f"host = {host}",
              f"sourcetype = {sourcetype}", f"index = {index}"]
     if whitelist:
         lines.append(f"whitelist = {whitelist}")
     return "\n".join(lines) + "\n\n"
 
 
-def host_monitors(host_dir: str, host: str, index: str) -> List[str]:
+def drop_case_inputs(inputs: str, case: str) -> str:
+    """inputs.conf without the blocks an earlier run wrote for ``case`` (each run appends its own)."""
+    header = INPUTS_HEADER.format(case)
+    while header in inputs:
+        start = inputs.index(header)
+        following = inputs.find("\n# Auto-generated inputs for case: ", start + len(header))
+        inputs = inputs[:start] + (inputs[following:] if following >= 0 else "")
+    return inputs
+
+
+def host_monitors(host_dir: str, host: str, index: str, salt: str = "") -> List[str]:
     """The monitors for one host's tables: artefacts/cooked/ and analysis/ recursively for every
     .jsonl (so each artefact is indexed, not only those named one by one), the Plaso timeline,
     and Volatility's memory_* output beside artefacts/ (.jsonl, or an older case's .json).
@@ -84,16 +100,16 @@ def host_monitors(host_dir: str, host: str, index: str) -> List[str]:
     stanzas = []
     for folder in ("artefacts/cooked", "analysis"):
         if os.path.isdir(f"{host_dir}/{folder}"):
-            stanzas.append(monitor_stanza(f"{host_dir}/{folder}", host, index, SOURCETYPE, TABLES))
+            stanzas.append(monitor_stanza(f"{host_dir}/{folder}", host, index, SOURCETYPE, TABLES, salt=salt))
     if os.path.isfile(f"{host_dir}/artefacts/plaso_timeline.jsonl"):
-        stanzas.append(monitor_stanza(f"{host_dir}/artefacts/plaso_timeline.jsonl", host, index, SOURCETYPE))
+        stanzas.append(monitor_stanza(f"{host_dir}/artefacts/plaso_timeline.jsonl", host, index, SOURCETYPE, salt=salt))
     memory = memory_outputs(host_dir)
     if any(path.endswith(".jsonl") for path in memory):
-        stanzas.append(monitor_stanza(f"{host_dir}/memory_*.jsonl", host, index, SOURCETYPE))
+        stanzas.append(monitor_stanza(f"{host_dir}/memory_*.jsonl", host, index, SOURCETYPE, salt=salt))
     elif memory:
-        stanzas.append(monitor_stanza(f"{host_dir}/memory_*.json", host, index, "json"))
+        stanzas.append(monitor_stanza(f"{host_dir}/memory_*.json", host, index, "json", salt=salt))
     if glob.glob(f"{host_dir}/artefacts/cooked/memory/*.json"):
-        stanzas.append(monitor_stanza(f"{host_dir}/artefacts/cooked/memory/*.json", host, index, "json"))
+        stanzas.append(monitor_stanza(f"{host_dir}/artefacts/cooked/memory/*.json", host, index, "json", salt=salt))
     return stanzas
 
 
