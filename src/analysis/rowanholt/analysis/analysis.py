@@ -202,7 +202,9 @@ def analyse_artefacts(
             "Timestomp": "evidence of timestomping",
         }
 
-        def write_findings(filename, findings):
+        def write_findings(filename, findings, show=True):
+            """Each finding to the analysis table and the audit log; on screen too unless show is
+            False (a likely-benign timestomp, which the summary counts instead)."""
             short = filename.replace("\\", "/").split("/")[-1]
             write_analysis(anysd, img_name, (analysis_row(vssimage.replace("'", ""), filename, kind, value)
                                              for kind, value in findings))
@@ -213,7 +215,7 @@ def analyse_artefacts(
                 ), " -> {} -> {} found in '{}' for {}".format(
                     datetime.now().isoformat().replace("T", " "), audit_text[kind], short, vssimage
                 )
-                write_audit_log_entry(verbosity, output_directory, entry, prnt)
+                write_audit_log_entry(verbosity, output_directory, entry, prnt if show else "")
 
         # Timestomp findings wait for the whole MFT, to know which files came in a batch
         timestomps = []
@@ -231,12 +233,15 @@ def analyse_artefacts(
                         write_findings(filename, others)
             batches = bulk_timestomps([(path, created) for path, _, created in timestomps])
             for index, (filename, value, _) in enumerate(timestomps):
+                likely_benign = True
                 if value.endswith(SETUP_COPIED_NOTE):
                     benign[SETUP_COPIED_NOTE] += 1
                 elif index in batches:
                     value += "|" + BULK_TIMESTOMP_NOTE.format(batches[index])
                     benign[BULK_TIMESTOMP_NOTE] += 1
-                write_findings(filename, [("Timestomp", value)])
+                else:
+                    likely_benign = False
+                write_findings(filename, [("Timestomp", value)], show=not likely_benign)
         except (OSError, ValueError) as e:
             print(" -> {} -> warning: could not analyse MFT JSON: {}".format(
                 datetime.now().isoformat().replace("T", " "), str(e)[:100]
@@ -320,7 +325,7 @@ def analyse_artefacts(
                 output_directory + img_name + "/artefacts/cooked/",
                 "'" + img_name + "'",
             )
-        print("    Analsying artefacts for {}...".format(vssimage))
+        print("    Analysing artefacts for {}...".format(vssimage))
         entry, prnt = "{},{},{},commenced\n".format(
             datetime.now().isoformat(), vssimage.replace("'", ""), stage
         ), " -> {} -> {} artefacts for {}".format(

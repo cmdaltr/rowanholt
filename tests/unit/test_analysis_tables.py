@@ -46,6 +46,26 @@ def test_magic_bytes_and_timestomping_land_in_the_analysis_table(tmp_path) -> No
     assert timestomp["Filename"] == "/Users/a/evil.exe" and timestomp["techniques"] == ["T1070.006"]
 
 
+def test_likely_benign_timestomps_are_recorded_but_not_printed(tmp_path) -> None:
+    # A wheel's files unpacked together keep their own times: recorded and audited, not on screen
+    out = str(tmp_path / "case") + "/"
+    cooked = tmp_path / "case" / "HOST" / "artefacts" / "cooked"
+    cooked.mkdir(parents=True)
+    times = {"is_file": True, "created": "2020-01-01T00:00:00.000Z", "filename_created": "2026-01-01T00:00:00.000Z"}
+    batch = [{"full_path": f"/Users/a/AppData/Local/Programs/Python/numpy/{n}.py", **times} for n in "abcd"]
+    lone = {"full_path": "/Users/a/Downloads/evil.exe", "is_file": True,
+            "created": "2021-05-05T00:00:00.000Z", "filename_created": "2026-01-01T00:00:00.000Z"}
+    (cooked / "mft.json").write_text(json.dumps(batch + [lone]))
+    with mock.patch.object(an, "write_audit_log_entry") as audit:
+        an.analyse_artefacts("", out, "HOST::Windows", str(tmp_path / "mnt"), True, False, False, None, "'HOST'")
+    stomps = [c.args for c in audit.call_args_list if "evidence of timestomping" in c.args[2]]
+    assert len(stomps) == 5  # every one is in the audit log
+    printed = [p for *_, p in stomps if p]
+    assert len(printed) == 1 and "evil.exe" in printed[0]  # only the lone one on screen
+    rows = records(tmp_path / "case" / "HOST" / "analysis" / "analysis.jsonl")
+    assert sum(r["analysis_type"] == "Timestomp" for r in rows) == 5
+
+
 def test_likely_benign_findings_carry_no_technique() -> None:
     row = an.analysis_row("HOST", "/x", "AlternateDataStream", "Zone.Identifier (26 bytes)|likely benign: MotW")
     assert an._finding_techniques(row) == []
