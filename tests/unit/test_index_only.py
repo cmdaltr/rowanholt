@@ -84,7 +84,7 @@ def requests(statuses):
     """A stand-in for index_only._request answering with ``statuses`` in turn; the calls made."""
     calls = []
 
-    def request(url, user, password, method):
+    def request(url, user, password, method, data=None):
         calls.append((method, url))
         return statuses.pop(0)
     return request, calls
@@ -102,14 +102,36 @@ def test_elastic_index_is_deleted_to_be_made_afresh(monkeypatch):
     assert index_only.replace_elastic_index("WINSTACK-jsonl", requests([])[0]) is None  # local: not touched
 
 
-def test_splunk_index_removal_is_waited_for(monkeypatch):
+def test_splunk_index_is_recreated_only_once_its_removal_has_finished(monkeypatch):
+    """Splunk's listing says 404 before the removal has taken the stanza out of indexes.conf: an
+    index created then was erased 43 ms later (7 November 2026)."""
     monkeypatch.setenv("SPLUNK_HOST", "splunk")
-    request, calls = requests([200, 200, 200, 404])
+    # DELETE, GET (still there), GET 404, POST, GET 404 (erased by the removal), POST again, GET 200
+    request, calls = requests([200, 200, 404, 201, 404, 201, 200])
     assert index_only.replace_splunk_index("WINSTACK-jsonl", request, sleep=lambda _: None) == "replaced"
-    assert [method for method, _ in calls] == ["DELETE", "GET", "GET", "GET"]
-    assert calls[0][1] == "https://splunk:8089/services/data/indexes/WINSTACK-jsonl"
+    assert [m for m, _ in calls] == ["DELETE", "GET", "GET", "POST", "GET", "POST", "GET"]
+    assert calls[0][1] == "https://splunk:8089/services/data/indexes/winstack-jsonl"  # Splunk's lowercase name
+    assert calls[3][1] == "https://splunk:8089/services/data/indexes"
     with pytest.raises(index_only.IndexOnlyError, match="still removing"):
         index_only.replace_splunk_index("WINSTACK-jsonl", requests([200] + [200] * 5)[0], wait=4, sleep=lambda _: None)
+    with pytest.raises(index_only.IndexOnlyError, match="kept losing"):
+        index_only.replace_splunk_index("WINSTACK-jsonl", requests([404] + [201, 404] * 3)[0], sleep=lambda _: None)
+    assert index_only.replace_splunk_index("WINSTACK-jsonl", requests([404, 201, 200])[0], sleep=lambda _: None) == "new"
+
+
+def test_a_restart_without_the_index_fails_the_run(monkeypatch):
+    monkeypatch.setenv("SPLUNK_HOST", "splunk")
+
+    def down_then(statuses):
+        def request(url, user, password, method, data=None):
+            status = statuses.pop(0)
+            if status == 0:
+                raise ConnectionRefusedError()
+            return status
+        return request
+    index_only.confirm_splunk_index("WINSTACK-jsonl", down_then([0, 503, 200]), sleep=lambda _: None)
+    with pytest.raises(index_only.IndexOnlyError, match="restarted without index 'winstack-jsonl'"):
+        index_only.confirm_splunk_index("WINSTACK-jsonl", down_then([0, 404]), sleep=lambda _: None)
 
 
 def test_index_case_replaces_before_indexing_and_warns(tmp_path, monkeypatch, capsys):

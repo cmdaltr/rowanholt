@@ -13,6 +13,7 @@ import os
 import ssl
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime
 from typing import Callable, Dict, List, Optional, Tuple
@@ -31,12 +32,13 @@ REPOINT = ("     WARNING: anything saved against the old index (searches, dashbo
            "     tied to its data) may need re-pointing at the new one")
 
 
-def _request(url: str, user: str, password: str, method: str) -> int:
+def _request(url: str, user: str, password: str, method: str, data: Optional[Dict[str, str]] = None) -> int:
     """The HTTP status of one authenticated request (self-signed certificates accepted)."""
     context = ssl.create_default_context()
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
-    request = urllib.request.Request(url, method=method)
+    body = urllib.parse.urlencode(data).encode() if data else None
+    request = urllib.request.Request(url, data=body, method=method)
     request.add_header("Authorization", "Basic " + base64.b64encode(f"{user}:{password}".encode()).decode())
     try:
         with urllib.request.urlopen(request, context=context, timeout=30) as response:
@@ -60,27 +62,69 @@ def replace_elastic_index(case: str, request: Callable[[str, str, str, str], int
     return "replaced"
 
 
-def replace_splunk_index(case: str, request: Callable[[str, str, str, str], int] = _request,
-                         wait: float = 120, sleep: Callable[[float], None] = time.sleep) -> Optional[str]:
-    """Delete the case's Splunk index and wait until Splunk has removed it (it does so in the
-    background); what happened, or None for a local install (not replaced)."""
-    host = os.environ.get("SPLUNK_HOST", "")
-    if not host:
+def _splunk() -> Tuple[str, str, str]:
+    base = f"https://{os.environ['SPLUNK_HOST']}:{os.environ.get('SPLUNK_PORT', '8089')}/services/data/indexes"
+    return base, os.environ.get("SPLUNK_USERNAME", "admin"), os.environ.get("SPLUNK_PASSWORD", "")
+
+
+def replace_splunk_index(case: str, request: Callable[..., int] = _request, wait: float = 120,
+                         sleep: Callable[[float], None] = time.sleep, settle: float = 5) -> Optional[str]:
+    """Delete the case's Splunk index and create it afresh; what happened, or None for a local
+    install (not replaced).
+
+    Splunk drops a deleted index from its REST listing before it has finished removing it, and the
+    removal's last step takes the index's stanza out of indexes.conf: an index created as soon as
+    the listing said 404 was erased 43 ms later and the restart found none, so every event read was
+    dropped (7 November 2026). So the index is created here, after a pause, and only counted once
+    it is still there ``settle`` seconds later."""
+    if not os.environ.get("SPLUNK_HOST"):
         return None
-    url = f"https://{host}:{os.environ.get('SPLUNK_PORT', '8089')}/services/data/indexes/{case}"
-    user, password = os.environ.get("SPLUNK_USERNAME", "admin"), os.environ.get("SPLUNK_PASSWORD", "")
+    base, user, password = _splunk()
+    name = case.lower()  # as Splunk stores it
+    url = f"{base}/{name}"
     status = request(url, user, password, "DELETE")
-    if status == 404:
-        return "new"
-    if status >= 300:
-        raise IndexOnlyError(f"Splunk wouldn't delete index '{case}' ({status})")
+    if status >= 300 and status != 404:
+        raise IndexOnlyError(f"Splunk wouldn't delete index '{name}' ({status})")
+    outcome = "new" if status == 404 else "replaced"
     waited = 0.0
-    while request(url, user, password, "GET") != 404:
+    while outcome == "replaced" and request(url, user, password, "GET") != 404:
         if waited >= wait:
-            raise IndexOnlyError(f"Splunk was still removing index '{case}' after {wait:.0f}s; run --Index again shortly")
+            raise IndexOnlyError(f"Splunk was still removing index '{name}' after {wait:.0f}s; run --Index again shortly")
         sleep(2)
         waited += 2
-    return "replaced"
+    for _ in range(3):
+        sleep(settle)
+        created = request(base, user, password, "POST", {"name": name})
+        if created not in (201, 409):
+            raise IndexOnlyError(f"Splunk wouldn't create index '{name}' ({created})")
+        sleep(settle)
+        if request(url, user, password, "GET") == 200:
+            return outcome
+    raise IndexOnlyError(f"Splunk kept losing the new index '{name}' (its removal still finishing); run --Index again shortly")
+
+
+def confirm_splunk_index(case: str, request: Callable[..., int] = _request, wait: float = 300,
+                         sleep: Callable[[float], None] = time.sleep) -> None:
+    """After the restart that loads the case's monitors: its index is there, or the run fails
+    (Splunk drops every event for an index it doesn't have)."""
+    if not os.environ.get("SPLUNK_HOST"):
+        return
+    base, user, password = _splunk()
+    sleep(30)  # the restart was only requested; before it, the index answers from the old process
+    waited = 30.0
+    while True:
+        try:
+            status = request(f"{base}/{case.lower()}", user, password, "GET")
+        except OSError:
+            status = 0  # down while it restarts
+        if status == 200:
+            return
+        if status == 404:
+            raise IndexOnlyError(f"Splunk restarted without index '{case.lower()}': the events it reads are dropped; run --Index again")
+        if waited >= wait:  # still restarting
+            raise IndexOnlyError(f"Splunk didn't come back within {wait:.0f}s to confirm index '{case.lower()}'")
+        sleep(5)
+        waited += 5
 
 
 def _replace(name: str, index: str, replace: Callable[[], Optional[str]]) -> None:
@@ -152,6 +196,7 @@ def index_case(output_directory: str, case: str, verbosity: str, splunk: bool, e
             _replace("Splunk", case, lambda: replace_splunk_index(case))
             salt = datetime.now().strftime(":%Y%m%dT%H%M%S")  # Splunk reads the case's files again
             usercred, pswdcred = configure_splunk_stack(verbosity, output_directory, case, "splunk", allimgs, salt)
+            confirm_splunk_index(case)
         except Exception as error:  # report it and go on to the other targets
             print(f"     ERROR: Splunk indexing failed: {error}")
             failed.append("Splunk")
