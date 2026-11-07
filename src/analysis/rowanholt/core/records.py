@@ -119,6 +119,7 @@ def _technique_list(row: Dict[str, Any], techniques: Techniques) -> List[str]:
 
 
 TimeField = Union[None, str, Sequence[str]]
+Host = Union[str, Callable[[Dict[str, Any]], str]]
 
 
 def envelope(row: Dict[str, Any], *, host: str, artefact: str, source_path: str = "",
@@ -195,12 +196,13 @@ def iter_json(f, chunk: int = 1 << 20) -> Iterator[Any]:
 
 
 
-def write_records(path: Union[str, Path], rows: Iterable[Dict[str, Any]], *, host: str, artefact: str,
+def write_records(path: Union[str, Path], rows: Iterable[Dict[str, Any]], *, host: Host, artefact: str,
                   source_path: str = "", time_field: TimeField = None,
                   techniques: Techniques = None) -> int:
     """Append ``rows`` to ``path`` as JSON Lines with the envelope; the number written.
 
-    ``techniques`` is a list for every row, or a function giving each row its own.
+    ``host`` and ``techniques`` are one value for every row, or a function giving each row its
+    own (a case-wide table, such as stacking, names a host per row).
     """
     path = Path(path)
     written = 0
@@ -210,7 +212,7 @@ def write_records(path: Union[str, Path], rows: Iterable[Dict[str, Any]], *, hos
             if out is None:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 out = open(path, "a", encoding="utf-8")
-            record = envelope(row, host=host, artefact=artefact, source_path=source_path,
+            record = envelope(row, host=host(row) if callable(host) else host, artefact=artefact, source_path=source_path,
                               time_field=time_field, techniques=techniques)
             out.write(json.dumps(record, ensure_ascii=False, default=str) + "\n")
             written += 1

@@ -517,7 +517,9 @@ def stack_case(output_directory: str, baseline_path: str = "") -> Optional[Dict[
     path = os.path.join(output_directory, "stacking.jsonl")
     if os.path.exists(path):
         os.remove(path)  # a re-run replaces the case's stacking
-    write_records(path, ({k: row[k] for k in HEADER} for row in rows), host="", artefact="stacking")
+    # The envelope's host is the one the row's example was read from, as its Host column
+    write_records(path, ({k: row[k] for k in HEADER} for row in rows), host=lambda row: row["Host"],
+                  artefact="stacking")
     return {"hosts": len(host_dirs), "values": sum(len(v) for v in per_host.values()), "rows": len(rows)}
 
 

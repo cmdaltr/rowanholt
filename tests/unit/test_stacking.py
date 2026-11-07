@@ -93,6 +93,7 @@ def test_rows_point_at_the_host_row(tmp_path):
             ("diamorphine", "WEB02", "artefacts/cooked/kernel_modules.csv", "4", "Name")):
         row = rows[value]
         assert (row["Host"], row["Artefact"], row["Row"]) == (host, artefact, ref)
+        assert row["host"] == host  # the envelope's, which the SIEMs and the case browser read
         assert row["Sources"] == [[host, artefact, ref]]
         found = case_files.find_row(case_files.resolve(case, row["Host"], row["Artefact"]), row["Row"])
         assert value.endswith(found[field].lower())
