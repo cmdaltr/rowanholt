@@ -1109,6 +1109,11 @@ table input[type="checkbox"] {
   pointer-events: none;
 }
 
+/* The home page's logo: 20% smaller than the other pages' heroes */
+.hero-image--home {
+  width: 48%;
+}
+
 .journey-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));  /* two columns: Gandalf over Pippin, Elrond over Aragorn */
@@ -2298,6 +2303,10 @@ table input[type="checkbox"] {
 
   .hero-image {
     width: 100%;
+  }
+
+  .hero-image--home {
+    width: 80%;
   }
 
   .checkbox-group {

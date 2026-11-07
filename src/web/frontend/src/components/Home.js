@@ -111,7 +111,7 @@ const Home = ({ onScrollProgress }) => {
         <img
           src={heroImage}
           alt="Rowanholt"
-          className="hero-image"
+          className="hero-image hero-image--home"
           style={{
             transform: `scale(${heroScale})`,
             transformOrigin: 'center top'
