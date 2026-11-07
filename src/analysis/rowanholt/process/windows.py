@@ -522,7 +522,8 @@ def carve_wmi_subscriptions(verbosity, vssimage, output_directory, img, vss_path
     if not subscriptions:
         return
     raw = wbem_dir.find("/artefacts/")
-    write_records(cooked + "wbem" + SUFFIX, subscriptions, host=img.split("::")[0], artefact="wbem",
+    wbem_table = cooked + "wbem" + SUFFIX
+    write_records(wbem_table, subscriptions, host=img.split("::")[0], artefact="wbem",
                   source_path=os.path.join(wbem_dir[raw + 1:] if raw >= 0 else wbem_dir, "OBJECTS.DATA"),
                   techniques=lambda record: [] if "note" in record else ["T1546.003"])
     for record in subscriptions:
@@ -538,7 +539,7 @@ def carve_wmi_subscriptions(verbosity, vssimage, output_directory, img, vss_path
         write_audit_log_entry(verbosity, output_directory, entry, prnt)
     # Only a subscription Windows doesn't create itself is evidence of T1546.003
     if any("note" not in record for record in subscriptions):
-        artemis.enrich_with_mitre(wbem_json, "wmipersist")
+        artemis.enrich_with_mitre(wbem_table, "wmipersist")
 
 
 def process_sru(
