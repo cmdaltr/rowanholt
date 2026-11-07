@@ -1,10 +1,15 @@
 #!/usr/bin/env python3 -tt
 """Pre-flight reachability checks for remote SIEM export targets."""
+import base64
 import glob
 import logging
 import os
+import re
 import socket
+import ssl
 import time
+import urllib.error
+import urllib.request
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +47,28 @@ def _check_reachable(name: str, host: str, port: str, timeout: float, delays=RET
             time.sleep(delay)
 
 
+def _check_splunk_login(host: str, port: str, user: str, password: str, timeout: float) -> None:
+    """Splunk refusing the login fails the run here: its config code only warned (a 401 on every
+    call) and the run reported success with nothing indexed (7 November 2026)."""
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE  # Splunk's management port has its own self-signed certificate
+    request = urllib.request.Request(f"https://{host}:{port}/services/server/info")
+    request.add_header("Authorization", "Basic " + base64.b64encode(f"{user}:{password}".encode()).decode())
+    try:
+        urllib.request.urlopen(request, context=context, timeout=timeout).close()
+    except urllib.error.HTTPError as e:
+        if e.code not in (401, 403):
+            return  # reachable and answering; anything else is the config code's to report
+        said = re.search(r"<msg[^>]*>([^<]+)</msg>", e.read().decode("utf-8", "replace"))
+        raise SIEMUnavailableError(
+            f"Splunk export requested but Splunk refused the login for '{user}' ({e.code}"
+            f"{': ' + said.group(1).strip() if said else ''}). Check SPLUNK_USERNAME and SPLUNK_PASSWORD."
+        ) from e
+    except (OSError, ValueError):
+        return  # the connection itself was checked just before
+
+
 def ensure_remote_siem_reachable(splunk: bool, elastic: bool, timeout: float = 5.0) -> None:
     """Fail fast if a requested remote SIEM (SPLUNK_HOST / ELASTICSEARCH_HOST) is not reachable.
 
@@ -56,6 +83,9 @@ def ensure_remote_siem_reachable(splunk: bool, elastic: bool, timeout: float = 5
             os.environ.get("SPLUNK_PORT", "8089"),
             timeout,
         )
+        _check_splunk_login(os.environ["SPLUNK_HOST"], os.environ.get("SPLUNK_PORT", "8089"),
+                            os.environ.get("SPLUNK_USERNAME", "admin"), os.environ.get("SPLUNK_PASSWORD", ""),
+                            timeout)
     if elastic and os.environ.get("ELASTICSEARCH_HOST"):
         _check_reachable(
             "Elasticsearch",
