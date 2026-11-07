@@ -3,19 +3,25 @@ import os
 from datetime import datetime
 
 
-def write_audit_log_entry(verbosity, output_directory, entry, prnt):
-    if "LastWriteTime,elrond_host,elrond_stage,elrond_log_entry\n" in entry:
-        writemode = "w"
-    else:
-        writemode = "a"
+HEADER = "LastWriteTime,elrond_host,elrond_stage,elrond_log_entry\n"
 
+
+def write_audit_log_entry(verbosity, output_directory, entry, prnt):
     # Write audit log at case level (output_directory), not per-image
     audit_log_path = os.path.join(output_directory.rstrip('/'), "rowanholt_audit.log")
+    # The header starts a new log only: every Gandalf archive writes it, and opening the log for
+    # writing each time kept only the last host's entries (and a rerun wiped the case's history)
+    if HEADER in entry and os.path.isfile(audit_log_path) and os.path.getsize(audit_log_path) > 0:
+        entry = entry.replace(HEADER, "")
+    if not entry:
+        if prnt != "":
+            print(prnt)
+        return
 
     # One entry per line, even when a caller forgets the newline.
     if not entry.endswith("\n"):
         entry += "\n"
-    with open(audit_log_path, writemode) as logentry:
+    with open(audit_log_path, "a") as logentry:
         logentry.write(entry.replace("'", ""))
     if prnt != "":
         print(prnt)
