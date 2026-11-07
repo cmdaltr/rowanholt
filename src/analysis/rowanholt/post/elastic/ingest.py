@@ -144,6 +144,47 @@ def fill_technique_fields(doc: Dict[str, Any]) -> Dict[str, Any]:
     return doc
 
 
+# Every dynamically mapped value is a keyword, as when Elrond's tables were CSV and every value a
+# string: with JSON Lines' own types, the first record's type fixed a field's mapping and later
+# records were refused (journal_mft's attribute_list.data, a number then base64; an LSN past a
+# long). Only @timestamp is a date: date detection would fix a field the same way.
+INDEX_MAPPING = {
+    "mappings": {
+        "date_detection": False,
+        "dynamic_templates": [
+            {"numbers_as_keywords": {"match_mapping_type": "long", "mapping": {"type": "keyword"}}},
+            {"decimals_as_keywords": {"match_mapping_type": "double", "mapping": {"type": "keyword"}}},
+            {"booleans_as_keywords": {"match_mapping_type": "boolean", "mapping": {"type": "keyword"}}},
+        ],
+        "properties": {
+            "@timestamp": {
+                "type": "date",
+                "format": "strict_date_optional_time||yyyy-MM-dd HH:mm:ss.SSSSSS||yyyy-MM-dd HH:mm:ss||yyyy-MM-dd'T'HH:mm:ss.SSS'Z'||yyyy-MM-dd'T'HH:mm:ss||epoch_millis",
+            },
+        },
+    },
+}
+
+
+def _text_nodes(value: Any) -> Any:
+    """``value`` with each XML text node (Artemis' ``{"#text": 4097, "#attributes": {...}}``,
+    an EventID with Qualifiers) as its text, the attributes beside it as ``<field>_attributes``:
+    the same field as an object in one event and a number in the next was refused."""
+    if isinstance(value, list):
+        return [_text_nodes(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    out: Dict[str, Any] = {}
+    for key, item in value.items():
+        if isinstance(item, dict) and "#text" in item:
+            out[key] = _text_nodes(item["#text"])
+            if item.get("#attributes"):
+                out[f"{key}_attributes"] = _text_nodes(item["#attributes"])
+        else:
+            out[key] = _text_nodes(item)
+    return out
+
+
 def to_document(record: Dict[str, Any], host: str, artefact: str) -> Dict[str, Any]:
     """A record as an Elasticsearch document: hostname and artefact as the dashboards use them,
     @timestamp from the envelope's timestamp, and the technique fields filled in.
@@ -153,7 +194,7 @@ def to_document(record: Dict[str, Any], host: str, artefact: str) -> Dict[str, A
     parse as a date gets the whole document refused. An older case's record has no envelope, so
     its time is looked for as before (normalize_timestamp), and kept only when it parses.
     """
-    doc = dict(record)
+    doc = _text_nodes(dict(record))
     doc["hostname"] = record.get("host") or host
     if not doc.get("artefact"):
         doc["artefact"] = artefact
@@ -208,11 +249,8 @@ def ingest_elastic_data(
     allimgs,
 ):
     # creating index based on case name in elasticsearch
-    make_index = shlex.split(
-        'curl -X PUT "localhost:9200/{}?pretty" -H "Content-Type: application/json" -d\'{{"mappings": {{"properties": {{"@timestamp": {{"type": "date", "format": "strict_date_optional_time||yyyy-MM-dd HH:mm:ss.SSSSSS||yyyy-MM-dd HH:mm:ss||yyyy-MM-dd\'T\'HH:mm:ss.SSS\'Z\'||yyyy-MM-dd\'T\'HH:mm:ss||epoch_millis"}}}}}}}}\''.format(
-            case.lower()
-        )
-    )
+    make_index = ["curl", "-X", "PUT", "localhost:9200/{}?pretty".format(case.lower()),
+                  "-H", "Content-Type: application/json", "-d", json.dumps(INDEX_MAPPING)]
     subprocess.Popen(
         make_index,
         stdout=subprocess.PIPE,
@@ -360,16 +398,7 @@ def ingest_elastic_data_remote(
     print("     Creating Elasticsearch index '{}'...".format(case.lower()))
     try:
         index_url = "{}/{}".format(elastic_url, case.lower())
-        index_mapping = json.dumps({
-            "mappings": {
-                "properties": {
-                    "@timestamp": {
-                        "type": "date",
-                        "format": "strict_date_optional_time||yyyy-MM-dd HH:mm:ss.SSSSSS||yyyy-MM-dd HH:mm:ss||yyyy-MM-dd'T'HH:mm:ss.SSS'Z'||yyyy-MM-dd'T'HH:mm:ss||epoch_millis"
-                    }
-                }
-            }
-        }).encode('utf-8')
+        index_mapping = json.dumps(INDEX_MAPPING).encode('utf-8')
 
         req = urllib.request.Request(index_url, data=index_mapping, method='PUT')
         req.add_header('Content-Type', 'application/json')

@@ -211,3 +211,23 @@ def test_techniques_are_collected_from_jsonl(tmp_path):
     table(tmp_path / "a" / "t.jsonl", [{"Item": "a"}], techniques=["T1547.001"])
     (tmp_path / "old.json").write_text(json.dumps([{"mitre_technique_id": "T1112"}]))
     assert MitreEnrichment().collect_techniques_from_directory(str(tmp_path)) == {"T1547.001", "T1112"}
+
+
+def test_artemis_text_nodes_become_their_value():
+    """EventID as {"#text", "#attributes"} in the classic logs and a number elsewhere: Elastic
+    refused whichever came second (the Windows stacking eval, 7 November 2026)."""
+    record = {"host": "h", "artefact": "evt/Application", "source_path": "", "timestamp": None, "techniques": [],
+              "data": {"Event": {"System": {"EventID": {"#text": 4097, "#attributes": {"Qualifiers": 49152}},
+                                            "Level": 4, "Keywords": [{"#text": "0x80"}]}}}}
+    system = elastic.to_document(record, "h", "evt/Application")["data"]["Event"]["System"]
+    assert system["EventID"] == 4097 and system["EventID_attributes"] == {"Qualifiers": 49152}
+    assert system["Level"] == 4 and system["Keywords"] == [{"#text": "0x80"}]  # only a mapping's own nodes
+    assert record["data"]["Event"]["System"]["EventID"]["#text"] == 4097  # the record itself untouched
+
+
+def test_the_index_maps_numbers_as_keywords_and_only_timestamp_as_a_date():
+    mappings = elastic.INDEX_MAPPING["mappings"]
+    assert mappings["date_detection"] is False
+    assert {next(iter(t.values()))["match_mapping_type"] for t in mappings["dynamic_templates"]} == {"long", "double", "boolean"}
+    assert all(next(iter(t.values()))["mapping"] == {"type": "keyword"} for t in mappings["dynamic_templates"])
+    assert mappings["properties"]["@timestamp"]["type"] == "date"
