@@ -926,7 +926,8 @@ def main(
     if (
         len(allimgs) > 0
     ):  # Post-processing metadata, YARA, Splunk, Elastic, Archive, Deletion
-        if hashing_enabled:
+        # The analyse phase has run metadata, YARA and ClamAV already; the index phase ran them again
+        if hashing_enabled and phase != "index":
             safe_print(
                 "\n\n  -> \033[1;36mCommencing Metadata phase for proccessed artefacts...\033[1;m\n  ----------------------------------------"
             )
@@ -1015,7 +1016,7 @@ def main(
                 "  ----------------------------------------\n  -> Completed Metadata phase for proccessed artefacts.\n"
             )
             time.sleep(1)
-        if misplaced_binaries:
+        if misplaced_binaries and phase != "index":
             safe_print(
                 "\n\n  -> \033[1;36mCommencing Misplaced Binaries Detection (T1036.005)...\033[1;m\n  ----------------------------------------"
             )
@@ -1037,7 +1038,7 @@ def main(
                 "  ----------------------------------------\n  -> Completed Misplaced Binaries Phase.\n"
             )
             time.sleep(1)
-        if masquerading:
+        if masquerading and phase != "index":
             safe_print(
                 "\n\n  -> \033[1;36mCommencing Masquerading Detection (T1036)...\033[1;m\n  ----------------------------------------"
             )
@@ -1059,7 +1060,7 @@ def main(
                 "  ----------------------------------------\n  -> Completed Masquerading Detection Phase.\n"
             )
             time.sleep(1)
-        if yara:
+        if yara and phase != "index":
             safe_print(
                 "\n\n  -> \033[1;36mCommencing Yara Phase...\033[1;m\n  ----------------------------------------"
             )
@@ -1087,7 +1088,7 @@ def main(
                 "  ----------------------------------------\n  -> Completed Yara Phase.\n"
             )
             time.sleep(1)
-        if clamav:
+        if clamav and phase != "index":
             safe_print(
                 "\n\n  -> \033[1;36mCommencing ClamAV Phase...\033[1;m\n  ----------------------------------------"
             )
