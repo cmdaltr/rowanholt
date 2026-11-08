@@ -315,6 +315,31 @@ tools:
     required: false
 
   # ====================
+  # NETWORK FORENSICS
+  # ====================
+
+  zeek:
+    name: "Zeek"
+    description: "Network security monitor: PCAP to conn, dns, http, ssl and files logs (elrond.py --Network)"
+    category: "network"
+    platforms: [linux, macos]
+    executables:
+      - zeek
+    common_paths:
+      linux:
+        - /opt/zeek/bin
+        - /usr/local/zeek/bin
+        - /usr/bin
+      macos:
+        - /opt/homebrew/bin
+        - /usr/local/bin
+    install_methods:
+      linux: "Zeek's packages (security:zeek on download.opensuse.org): apt-get install zeek-7.0"
+      macos: "brew install zeek"
+    version_check: "zeek --version"
+    required: false
+
+  # ====================
   # LINUX FORENSICS
   # ====================
 
