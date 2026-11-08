@@ -17,49 +17,25 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 
 ## FR-01: Team servers on Linux beyond Ubuntu
 
-**Why.** Organisations run servers on the distributions they already support, and for many that's RHEL or one of its rebuilds. Today the server guide's tested shape is Ubuntu 24.04 with Docker's packages.
+**Built 8 November 2026, not yet run on a Rocky host.** `docs/SERVER.md` (Rocky, RHEL and Alma): SELinux through `deploy/docker-compose.selinux.yml` (`label=disable` on the services that mount host folders, so no evidence is relabelled), firewalld ports opened by `server init`, and `rowanholt start` refusing a missing Docker or Podman's `docker` with Docker's RHEL install steps.
 
-**What it takes.**
-- **SELinux.** Rocky and RHEL enforce it, and a bind mount without a label is unreadable inside a container. The stack's own mounts in `docker-compose.yml` and the evidence folders from `ROWANHOLT_EVIDENCE_PATHS` and `docker-compose.local.yml` need `:z` (or `bind: {selinux: z}` in the long form) on SELinux hosts. The Docker socket mount for Andúril needs a policy check, not just a label.
-- **firewalld.** `server init` opens 443 and 80 (redirects and ACME) and nothing else, or says exactly which `firewall-cmd` lines to run.
-- **Docker.** It comes from Docker's own RHEL repository; the distribution ships Podman. The runtime check should say so, not just "docker missing". Podman's Docker-compatible socket stays unsupported until it's tested with Andúril and the worker.
-- **The guide.** `docs/SERVER.md` gets a per-distribution set-up section.
-
-**Done when** `rowanholt server init` and `rowanholt start` bring up a working, signed-in server on Rocky 9 with SELinux enforcing, an analysis job reads evidence from a configured folder, and the same passes on Ubuntu 24.04.
+**Done when** `rowanholt server init` and `rowanholt start` bring up a working, signed-in server on Rocky 9 with SELinux enforcing, an analysis job reads evidence from a configured folder, and the same passes on Ubuntu 24.04. Then this entry goes.
 
 **Depends on** a Rocky 9 VM in the lab; headless is enough.
 
 ## FR-02: Team servers on Windows Server
 
-**Why.** Some teams only get Windows Server from IT.
+**Built 8 November 2026, not yet run on Windows Server.** `scripts/server/windows/Install-RowanholtServer.ps1` and `Start-RowanholtServer.ps1`, `docs/SERVER.md` (Windows Server): its own WSL 2 distribution with Docker Engine, the same `server init`, the certificate from the Windows store, evidence through `/mnt/<drive>`, portproxy and a firewall rule, and a boot task that needs nobody signed in. Parsed by PowerShell 7 only; Windows PowerShell 5.1, WSL and the task are untried.
 
-**What it takes.**
-- Rowanholt's images are Linux containers. Docker Desktop isn't supported or licensed for Windows Server, and Windows Server's native container runtime runs Windows containers only. The route is WSL 2 (Windows Server 2022 and 2025) with Docker Engine inside an Ubuntu distribution, or a Hyper-V Linux VM.
-- In both cases the server is really Linux, so the work is set-up and plumbing:
-  - a PowerShell `server init` that sets up WSL and Docker;
-  - evidence on Windows volumes reached through `/mnt/<drive>`, which is slow for large images (copying to the WSL filesystem is the usual answer, and the guide must say so);
-  - port forwarding from the host to WSL for 443;
-  - starting the stack at boot without a signed-in user, through a scheduled task.
-- **Certificates.** The organisation's certificate, from the Windows certificate store, exported for Caddy.
+**Done when** a Windows Server 2022 host runs the server profile through WSL 2, survives a reboot without anyone signing in, and analyses evidence from a Windows volume. Then this entry goes.
 
-**Done when** a Windows Server 2022 host runs the server profile through WSL 2, survives a reboot without anyone signing in, and analyses evidence from a Windows volume.
-
-**Depends on** FR-01's server checks; a Windows Server 2022 VM in the lab.
+**Depends on** a Windows Server 2022 VM: an x86 host, since WSL 2 needs nested virtualisation, which Apple silicon's VMs don't have.
 
 ## FR-03: Desktop app RPM for Rocky Linux 9 / RHEL 9
 
-**Why.** It completes the desktop downloads for RHEL-family desktops. That's lower value than FR-01: analysts on Linux mostly run Ubuntu, SIFT or Kali, which the `.deb` covers.
+**Built 8 November 2026.** `app/linux/package-rpm.sh` and the `linux-rpm` job in `desktop-release.yml` (built, linted, installed and removed in `rockylinux:9`); `app/README.md`.
 
-**What it takes.**
-- `app/linux/package-rpm.sh`, mirroring `package-deb.sh`:
-  - the same `/opt/rowanholt` layout, menu entry and icon;
-  - `Requires: zenity` and `Recommends: docker-ce docker-compose-plugin`.
-- Built by `rpmbuild` in a `rockylinux:9` container as a fourth job in `desktop-release.yml`, checked with `rpm -qpl` and `rpmlint`.
-- The SELinux work from FR-01, for the evidence folders setup writes.
-
-**Done when** the release attaches `rowanholt-<version>.noarch.rpm`, `dnf install` adds the menu entry, and first-run setup starts the stack on a Rocky 9 desktop.
-
-**Depends on** FR-01 (SELinux); a Rocky 9 desktop VM.
+**Done when** first-run setup starts the stack on a Rocky 9 desktop with SELinux enforcing (a desktop VM: the container check can't run the menu entry or Docker). Then this entry goes.
 
 ## FR-04: Lab VM consoles in the browser
 

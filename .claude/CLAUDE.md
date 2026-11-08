@@ -42,7 +42,7 @@ Gandalf (acquisition) → Elrond (analysis) → Eru (AI analyst)
 | `src/analysis/tools/definitions.py` | Forensic tool definitions (executables, paths, platforms) |
 | `src/web/backend/` | FastAPI (:5688): jobs, auth, `ai_routes.py` + `eru_offline.py` (fixed answers) + `eru_context.py` (the model's numbered context) (Eru), Mordor, lab, Andúril proxy |
 | `src/web/frontend/` | React (:5687); About is `components/HelpPage.js` |
-| `deploy/server/`, `scripts/server/` | Team server profile: Compose override (Caddy in front, nothing else published, production frontend), Caddyfile, `server init/users/ca`; a Tailscale Service name (`server init --service`: `Caddyfile.service` and `docker-compose.service.yml`, loopback 5680–5683); guide in `docs/SERVER.md` |
+| `deploy/server/`, `scripts/server/` | Team server profile: Compose override (Caddy in front, nothing else published, production frontend), Caddyfile, `server init/users/ca`; a Tailscale Service name (`server init --service`: `Caddyfile.service` and `docker-compose.service.yml`, loopback 5680–5683); Rocky/RHEL (`deploy/docker-compose.selinux.yml`), Windows Server through WSL 2 (`scripts/server/windows/`); guide in `docs/SERVER.md` |
 | `src/web/backend/auth/` | Sign-in: `users.py` (file store), `access.py` (the server-mode middleware: every route, job ownership and sharing via the `job_access` table), `tokens.py` (long-lived API tokens, `full` or `eru-mcp` scope), `oidc.py` (SSO), `manage_users.py` |
 | `src/common/startup_progress.py` | `rowanholt start --progress`: phases, ETA from start history, the Shire-to-Rowanholt places the apps draw |
 | `src/mordor/` | Security datasets and recorded attack telemetry |

@@ -1,4 +1,4 @@
-# Builds the desktop app for macOS (.dmg), Windows (setup .exe) and Linux (.deb), each
+# Builds the desktop app for macOS (.dmg), Windows (setup .exe) and Linux (.deb and .rpm), each
 # carrying the source tree at this commit. A v* tag attaches them to a draft release;
 # a manual run leaves them as workflow artifacts.
 #
@@ -101,6 +101,33 @@ jobs:
           name: rowanholt-linux
           path: dist/*.deb
 
+  linux-rpm:
+    needs: source
+    runs-on: ubuntu-latest
+    container: rockylinux:9
+    env:
+      VERSION: ${{ needs.source.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: source
+      - name: Build tools
+        run: dnf -q install -y rpm-build rpmlint desktop-file-utils
+      - name: Package
+        run: app/linux/package-rpm.sh --version "$VERSION" --source rowanholt-src.tar.gz dist
+      - name: Check the package
+        run: |
+          rpm -qpi dist/*.rpm
+          rpm -qpl dist/*.rpm | grep -E 'opt/rowanholt/|applications/rowanholt.desktop'
+          rpmlint -f app/linux/rpmlintrc dist/*.rpm
+          dnf -q install -y dist/*.rpm
+          desktop-file-validate /usr/share/applications/rowanholt.desktop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rowanholt-linux-rpm
+          path: dist/*.rpm
+
   windows:
     needs: source
     runs-on: windows-latest
@@ -145,7 +172,7 @@ jobs:
 
   release:
     if: github.ref_type == 'tag'
-    needs: [source, macos, linux, windows]
+    needs: [source, macos, linux, linux-rpm, windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write

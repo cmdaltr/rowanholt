@@ -21,7 +21,7 @@ Server mode is the backend setting `ROWANHOLT_SERVER_MODE`, which `deploy/server
 
 ## Setting up
 
-Requirements: a Linux host with Docker Engine and Compose 2.24 or later, and a DNS name for it. Ubuntu 24.04 with Docker's own packages is the tested shape.
+Requirements: a Linux host with Docker Engine and Compose 2.24 or later, and a DNS name for it. Ubuntu 24.04 with Docker's own packages is the tested shape; Rocky, RHEL and Alma 9 need the steps in [Rocky, RHEL and Alma](#rocky-rhel-and-alma) first, and Windows Server runs it in WSL 2 ([Windows Server](#windows-server)).
 
 ```bash
 git clone https://github.com/cmdaltr/rowanholt.git && cd rowanholt
@@ -75,6 +75,49 @@ Before the first `--service`, in the tailnet's admin console or through its API:
 3. If `server init` says Tailscale doesn't know the Service, define it once under Services with endpoints `tcp:443, tcp:7755, tcp:5601, tcp:5602`.
 
 Afterwards register MCP clients again at the name, and for single sign-on add `https://<name>.<tailnet>.ts.net/api/auth/oidc/callback` as a redirect URI. Sign-in cookies belong to the address they were made at, so a browser signs in once at each address it uses; Splunk, Kibana and the Navigator send it to the sign-in page at the address it's on. `--service off` drops the name and puts the port address back as the public URL.
+
+### Rocky, RHEL and Alma
+
+These ship Podman, not Docker, and enforce SELinux. Rowanholt needs Docker Engine from Docker's own RHEL repository; Podman's Docker-compatible socket isn't supported (Andúril and the worker are untested on it), and `rowanholt start` stops with these steps if `docker` is missing or is Podman's:
+
+```bash
+sudo dnf remove -y podman-docker podman runc
+sudo dnf install -y dnf-plugins-core
+sudo dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo
+sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo systemctl enable --now docker
+sudo usermod -aG docker "$USER"    # then sign in again
+```
+
+**SELinux** stays enforcing. When `/sys/fs/selinux/enforce` is 1, `rowanholt start` adds `deploy/docker-compose.selinux.yml` (and, on a server, `deploy/server/docker-compose.selinux.yml`), which runs the services that mount host folders (the backend, frontend, proxy, Splunk, Kibana's set-up and Andúril) with `label=disable`. The alternative, relabelling each folder with `:z`, rewrites the `security.selinux` attribute of every file under it: across an evidence store that's slow, it fails on read-only and NFS mounts, and it changes the evidence's own metadata. Nothing on the host is relabelled. The worker is privileged already (it mounts images), so it was never confined. Named volumes (Postgres, Redis, Splunk's and Elastic's data) keep Docker's own labels.
+
+**firewalld.** When it's running, `server init` opens the proxy's ports in the default zone and says which: 80 and 443 (or the `--https-port`), 7755, 5601 and 5602. Nothing else is published, so nothing else needs opening.
+
+### Windows Server
+
+Rowanholt's images are Linux containers, and Docker Desktop isn't supported or licensed on Windows Server, so on Windows Server 2022 or 2025 the server is a WSL 2 distribution of its own running Docker Engine. `scripts/server/windows/Install-RowanholtServer.ps1` sets it all up, from an administrator PowerShell on the server:
+
+```powershell
+git clone https://github.com/cmdaltr/rowanholt.git; cd rowanholt
+.\scripts\server\windows\Install-RowanholtServer.ps1 -Hostname rowanholt.dfir.example.org `
+    -CertificateThumbprint 3F2A... -EvidencePath D:\Evidence -WslPath E:\Rowanholt\wsl
+```
+
+It turns WSL 2 on (the first run may stop and ask for a reboot: run it again afterwards), imports Ubuntu 24.04's WSL image (SHA-256 checked) as a distribution named `Rowanholt` with its disk under `-WslPath`, installs Docker Engine from Docker's repository under systemd, clones Rowanholt into `/opt/rowanholt` inside it, and runs the same `rowanholt server init` as on Linux. The first admin's password is printed then, as on Linux.
+
+| Parameter | |
+|---|---|
+| `-CertificateThumbprint` | A certificate in `Cert:\LocalMachine\My` with an exportable key, exported once with a throwaway password, converted to `deploy/server/certs` inside WSL and the export deleted: `--tls files`. Without it, `-Tls internal` (the default) or an email address for Let's Encrypt |
+| `-EvidencePath` | Folders on Windows volumes, mounted as on Linux (`D:\Evidence` is `/mnt/d/Evidence`, read-only in the backend) and added to `ROWANHOLT_EVIDENCE_PATHS` |
+| `-WslPath` | Where the distribution's virtual disk goes. Cases are written inside it, so put it on a data drive |
+| `-HttpsPort` | As `--https-port` |
+| `-Credential` | The account the boot task runs as: the one running the script, since a WSL distribution belongs to a user; its password is asked for so the task runs with nobody signed in |
+
+**Reaching it.** WSL 2 sits behind its own NAT with a new address each boot. The `Rowanholt` scheduled task (at startup, as that account) runs `rowanholt start` inside WSL, points `netsh interface portproxy` at the distribution's current address for the proxy's ports (80 and 443, or the `-HttpsPort`, then 7755, 5601 and 5602), and stays attached so WSL doesn't stop the distribution. A Windows Firewall rule (group `Rowanholt`) opens the same ports. `localhostForwarding=false` in the account's `.wslconfig` keeps WSL's own loopback relay off those ports. Its log is `%ProgramData%\Rowanholt\start.log`; portproxy needs the IP Helper service, which runs by default.
+
+**Evidence on Windows volumes** goes through WSL's file sharing, which is far slower than its own disk: for large images, copy them into the distribution first (`\\wsl$\Rowanholt\srv\evidence` from Windows, mounted like any Linux folder). WSL 2 takes half the server's memory by default; set `memory=` under `[wsl2]` in the account's `.wslconfig` for more.
+
+Inside, it's a Linux server: `wsl -d Rowanholt -u root -- /opt/rowanholt/rowanholt <command>` (`status`, `server users`, `stop`), and a `git pull` there updates it. Run the script again to change the hostname, certificate or evidence folders.
 
 ### Evidence
 
@@ -191,6 +234,4 @@ The backend migrates its database on start with Alembic (`src/web/backend/alembi
 
 These are feature requests in `docs/FEATURE_REQUESTS.md`:
 
-- **FR-01:** servers on RHEL, Rocky and Alma (SELinux labels, firewalld, Docker's RHEL packages).
-- **FR-02:** servers on Windows Server, through WSL 2.
 - **FR-04:** lab VM consoles in the browser.

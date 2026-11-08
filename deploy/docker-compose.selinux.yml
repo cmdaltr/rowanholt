@@ -1,0 +1,28 @@
+# Hosts with SELinux enforcing (Rocky, RHEL, Alma, Fedora). The launcher adds this file when
+# /sys/fs/selinux/enforce is 1, for the desktop stack and the server profile alike.
+#
+# A container's process runs as container_t, which can't read a bind-mounted folder unless the
+# folder is relabelled container_file_t. Relabelling (:z) rewrites security.selinux on every file
+# under the folder: across a whole evidence store that's slow, it fails on a read-only or NFS
+# mount, and it changes the evidence's own extended attributes. So the services that bind-mount
+# host folders run unlabelled instead, with label=disable, and nothing on the host is relabelled.
+# The worker is privileged already (it mounts images), which runs it as spc_t, unconfined.
+# Andúril needs the same for the Docker socket: container_t can't connect to it at all, and the
+# socket is root-equivalent whatever its label. Named volumes are labelled by Docker as before.
+
+services:
+  backend:
+    security_opt:
+      - label=disable
+  frontend:
+    security_opt:
+      - label=disable
+  splunk:
+    security_opt:
+      - label=disable
+  kibana-setup:
+    security_opt:
+      - label=disable
+  anduril:
+    security_opt:
+      - label=disable

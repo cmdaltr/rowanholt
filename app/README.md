@@ -6,13 +6,14 @@ There are two ways to get it. The release downloads are for everyone: no git, te
 
 ## Release downloads
 
-Each `v*` tag builds three packages (`.github/workflows/desktop-release.yml`) and attaches them to a draft GitHub release with a `SHA256SUMS`. Each carries the source tree at that tag, so setup works offline.
+Each `v*` tag builds four packages (`.github/workflows/desktop-release.yml`) and attaches them to a draft GitHub release with a `SHA256SUMS`. Each carries the source tree at that tag, so setup works offline.
 
 | OS | Download | Installing it | First-run setup |
 |---|---|---|---|
 | macOS 12+ | `Rowanholt-<version>.dmg` (universal) | Drag Rowanholt to Applications | In the app's window |
 | Windows 10/11 | `Rowanholt-Setup-<version>.exe` | The installer (no admin needed) | In the installer |
 | Debian, Ubuntu | `rowanholt_<version>_all.deb` | Double-click (App Center), or `sudo apt install ./rowanholt_*.deb` | Zenity dialogs on first launch |
+| Rocky, RHEL, Alma 9 | `rowanholt-<version>-1.noarch.rpm` | `sudo dnf install ./rowanholt-*.rpm` | Zenity dialogs on first launch |
 
 Setup covers the same three things everywhere.
 
@@ -20,7 +21,7 @@ Setup covers the same three things everywhere.
 
 **Rowanholt's files.** By default they go into a `Rowanholt` folder in the home directory (`%USERPROFILE%\Rowanholt` on Windows), or another folder you choose. On macOS and Linux you can point setup at a checkout you already have instead. A copy the app unpacked carries `.rowanholt-version`: when a newer app version launches, it offers to update the files in place (`.env`, evidence mounts and cases stay), and the next `rowanholt start` rebuilds the images once. A git checkout is never overwritten, so keep it current with `git pull`. On its first start, an unpacked copy gets a `.env` with a random `SECRET_KEY`.
 
-An RPM for Rocky Linux 9 / RHEL 9 is a feature request (FR-03 in `docs/FEATURE_REQUESTS.md`).
+On Rocky, RHEL and Alma, Docker Engine comes from Docker's own repository, not the distribution's (which ships Podman, unsupported): setup says so and links Docker's RHEL guide, and the RPM only recommends `docker-ce` and `docker-compose-plugin`, so it installs without them. SELinux stays enforcing: the launcher runs the containers that mount evidence folders unlabelled rather than relabelling the evidence (`docs/SERVER.md`, Rocky, RHEL and Alma).
 
 **Evidence folders** (optional). Setup writes `docker-compose.local.yml`, which the launcher adds to the stack when it exists. The file is gitignored, so pulls never touch it. Each folder is mounted read-only in the backend and read-write in the worker. On macOS and Linux it appears at the same path inside the containers. On Windows, `D:\Cases` appears as `/mnt/d/Cases`. A `docker-compose.local.yml` you wrote by hand is left alone. To change the folders later: **Rowanholt › Set Up Rowanholt…** (macOS), the **Set Up Rowanholt** action on the menu entry (Linux), or run the installer again (Windows).
 
@@ -41,6 +42,7 @@ The packages build locally too, from a source tarball:
 app/source-tarball.sh /tmp/rowanholt-src.tar.gz
 app/macos/package.sh --version 1.4.0 --source /tmp/rowanholt-src.tar.gz dist     # on a Mac
 app/linux/package-deb.sh --version 1.4.0 --source /tmp/rowanholt-src.tar.gz dist # on Debian/Ubuntu
+app/linux/package-rpm.sh --version 1.4.0 --source /tmp/rowanholt-src.tar.gz dist # on Rocky/RHEL (rpm-build)
 ```
 
 ```powershell
