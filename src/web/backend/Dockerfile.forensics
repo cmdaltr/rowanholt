@@ -226,6 +226,30 @@ RUN pip3 install --no-cache-dir volatility3 && \
 # warns instead of failing the build; --ClamAV then says it has no signatures until a rebuild
 RUN freshclam --quiet --stdout || echo "WARNING: freshclam failed; rebuild the worker to give --ClamAV signatures"
 
+# 4h: iLEAPP and ALEAPP for phones (--Mobile, process/mobile.py), pinned to release tags.
+# Each has its own virtualenv: their pinned dependencies (numpy, protobuf, pillow, pycryptodome,
+# sqlcipher3...) stay out of Elrond's Python, and out of each other's. Both need Python 3.11+
+# and Ubuntu 22.04's python3 is 3.10, so the venvs are Python 3.12 from the deadsnakes PPA.
+# Elrond runs them as /usr/local/bin/ileapp and /usr/local/bin/aleapp (tools/definitions.py).
+# libsqlcipher-dev: ALEAPP's sqlcipher3 builds against it.
+ARG ILEAPP_VERSION=v2026.4.6
+ARG ALEAPP_VERSION=v2026.4.5
+RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common && \
+    add-apt-repository -y ppa:deadsnakes/ppa && apt-get update && \
+    apt-get install -y --no-install-recommends python3.12 python3.12-venv python3.12-dev libsqlcipher-dev && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    for leapp in "ileapp iLEAPP ${ILEAPP_VERSION}" "aleapp ALEAPP ${ALEAPP_VERSION}"; do \
+        set -- $leapp && \
+        git clone --depth 1 --branch "$3" "https://github.com/abrignoni/$2.git" "/opt/$1/src" && \
+        python3.12 -m venv "/opt/$1/venv" && \
+        "/opt/$1/venv/bin/pip" install --no-cache-dir --upgrade pip wheel && \
+        (cd "/opt/$1/src" && "/opt/$1/venv/bin/pip" install --no-cache-dir -r requirements.txt) && \
+        printf '#!/bin/sh\n# %s %s in its own virtualenv; PYTHONPATH cleared so Elrond modules stay out\nunset PYTHONPATH\nexec /opt/%s/venv/bin/python /opt/%s/src/%s.py "$@"\n' \
+            "$2" "$3" "$1" "$1" "$1" > "/usr/local/bin/$1" && \
+        chmod +x "/usr/local/bin/$1" && \
+        "/usr/local/bin/$1" --version || exit 1; \
+    done
+
 # =============================================================================
 # Step 5/5: Rowanholt source code configuration
 # - Copy elrond forensics source code (avoids OneDrive file locking issues)

@@ -1513,7 +1513,14 @@ def get_technique_data(technique_id: str) -> Optional[Dict]:
     if not technique_id.startswith("T"):
         technique_id = "T" + technique_id
 
-    return ATTACK_TECHNIQUES.get(technique_id)
+    data = ATTACK_TECHNIQUES.get(technique_id)
+    if data is None:  # the few Mobile techniques Elrond tags (phones, --Mobile)
+        try:
+            from rowanholt.post.mitre.mobile_attack import get_mobile_technique
+        except ImportError:
+            from .mobile_attack import get_mobile_technique
+        data = get_mobile_technique(technique_id)
+    return data
 
 
 def get_techniques_for_tactic(tactic: str) -> List[Dict]:

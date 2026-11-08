@@ -160,6 +160,40 @@ tools:
     required: false
 
   # ====================
+  # MOBILE (--Mobile; definitions in definitions.py)
+  # ====================
+
+  ileapp:
+    name: "iLEAPP"
+    description: "iOS backups (encrypted too) and full file system extractions"
+    category: "mobile"
+    platforms: [linux]
+    executables:
+      - ileapp
+    common_paths:
+      linux:
+        - /usr/local/bin
+    install_methods:
+      linux: "Worker image (Dockerfile.forensics 4h): iLEAPP v2026.4.6 in its own Python 3.12 venv"
+    version_check: "ileapp --version"
+    required: false
+
+  aleapp:
+    name: "ALEAPP"
+    description: "Android file system extractions, bug reports and ADB backups"
+    category: "mobile"
+    platforms: [linux]
+    executables:
+      - aleapp
+    common_paths:
+      linux:
+        - /usr/local/bin
+    install_methods:
+      linux: "Worker image (Dockerfile.forensics 4h): ALEAPP v2026.4.5 in its own Python 3.12 venv"
+    version_check: "aleapp --version"
+    required: false
+
+  # ====================
   # WINDOWS ARTIFACTS
   # ====================
 

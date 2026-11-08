@@ -9,6 +9,8 @@ from rowanholt.analysis.keywords import prepare_keywords
 from rowanholt.audit import write_audit_log_entry
 from rowanholt.collect.collect import collect_artefacts
 from rowanholt.core.identify import process_deferred_memory, load_memory_profiles
+from rowanholt.core.mobile import is_mobile_image
+from rowanholt.process.mobile import process_mobile
 # Reorganise functionality removed - redundant
 from rowanholt.process.select import select_pre_process_artefacts
 from rowanholt.process.timeline import convert_plaso_timeline, create_plaso_timeline
@@ -94,23 +96,29 @@ def collect_process_keyword_analysis_timeline(
     if phase in ("collect", "analyse"):
         pass  # Fall through to analysis section for "analyse" phase
     elif process:
-        select_pre_process_artefacts(
-            output_directory,
-            verbosity,
-            d,
-            flags,
-            stage,
-            cwd,
-            imgs,
-            f,
-            path,
-            vssmem,
-            volatility,
-            volchoice,
-            vss,
-            memtimeline,
-            collectfiles,
-        )
+        # Phones (--Mobile) branch off here: iLEAPP/ALEAPP over the evidence, not raw/'s walk
+        phones = {k: v for k, v in imgs.items() if is_mobile_image(v)}
+        if phones:
+            process_mobile(verbosity, output_directory, phones, "processing")
+        others = {k: v for k, v in imgs.items() if k not in phones}
+        if others or not phones:
+            select_pre_process_artefacts(
+                output_directory,
+                verbosity,
+                d,
+                flags,
+                stage,
+                cwd,
+                others,
+                f,
+                path,
+                vssmem,
+                volatility,
+                volchoice,
+                vss,
+                memtimeline,
+                collectfiles,
+            )
         # NOTE: Deferred memory processing is now handled by elrond.py after all disk images
         # are processed. This ensures proper ordering of messages and separation of phases.
         if os.path.exists("/opt/elrond/elrond/tools/.profiles"):
