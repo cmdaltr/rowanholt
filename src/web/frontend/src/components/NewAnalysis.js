@@ -939,7 +939,7 @@ function NewAnalysis() {
         <h2>New Forensic Analysis</h2>
 
         <form onSubmit={handleSubmit}>
-          <div className="form-row">
+          <div className="form-row form-row--source">
             <div data-guide="elrond.case" className="form-group">
               <label htmlFor="caseNumber">
                 Case Number / Investigation ID *

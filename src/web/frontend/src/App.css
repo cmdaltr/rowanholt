@@ -344,6 +344,11 @@ small {
   margin-bottom: 1.5rem;
 }
 
+/* Elrond's case number gives way so the evidence sources sit on one line */
+.form-row--source {
+  grid-template-columns: minmax(14rem, 1fr) auto;
+}
+
 .form-row + .validation-message {
   margin-top: -0.5rem;
   margin-bottom: 2rem;

@@ -404,7 +404,8 @@ async def create_job(job_request: JobCreate, request: Request):
         if not destination_path and sanitized_source_paths:
             first_source = Path(sanitized_source_paths[0])
             # Create output directory using case number (e.g., /tmp/rowanholt/mfttesting/)
-            if first_source.is_file():
+            # Beside a Gandalf acquisitions folder, not in it: --Gandalf reads every folder there as a host
+            if first_source.is_file() or job_request.options.gandalf:
                 destination_path = str(first_source.parent / case_number)
             else:
                 destination_path = str(first_source / case_number)

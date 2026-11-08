@@ -28,3 +28,14 @@ def test_network_jobs_run_elrond_with_network(tmp_path):
 def test_other_jobs_unchanged(tmp_path):
     assert "--Collect" in command(tmp_path) and "--Network" not in command(tmp_path)
     assert "--Gandalf" in command(tmp_path, local=False, gandalf=True)
+
+
+def test_a_gandalf_case_goes_beside_its_acquisitions_not_in_them(tmp_path):
+    """--Gandalf reads every folder in acquisitions/ as a host, so the case can't be one of them."""
+    acquisitions = tmp_path / "acquisitions"
+    acquisitions.mkdir()
+    job = SimpleNamespace(case_number="WINSTACK", source_paths=[str(acquisitions)], destination_path=None,
+                          options=AnalysisOptions(local=False, gandalf=True))
+    assert tasks._resolve_destination(job) == tmp_path / "WINSTACK"
+    job.options = AnalysisOptions()
+    assert tasks._resolve_destination(job) == acquisitions / "WINSTACK"

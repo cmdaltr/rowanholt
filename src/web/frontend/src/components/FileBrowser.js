@@ -1,6 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { browsePath } from '../api';
 
+// The folders evidence is browsed from, by the browser's OS
+export function browseRoots() {
+  const isWindows = navigator.platform.toLowerCase().includes('win');
+  const isMac = navigator.platform.toLowerCase().includes('mac');
+  if (isWindows) {
+    return ['C:\\Temp\\rowanholt', 'D:\\Temp\\rowanholt', 'E:\\Temp\\rowanholt', 'F:\\Temp\\rowanholt'];
+  }
+  if (isMac) {
+    // Mac: /host/tmp/rowanholt for host /tmp access, /Volumes for external drives
+    return ['/host/tmp/rowanholt', '/Volumes'];
+  }
+  // Linux: native uses /tmp/rowanholt, Docker uses /host/tmp (for Docker on Mac)
+  return ['/Volumes', '/mnt', '/media', '/tmp/rowanholt'];
+}
+
 // allowFolders: a folder can be selected too (Mobile: an iTunes/Finder backup or an extraction is a folder)
 function FileBrowser({ onSelectFiles, selectedFiles = [], disabled = false, allowFolders = false }) {
   const [currentPath, setCurrentPath] = useState(null);
@@ -30,21 +45,7 @@ function FileBrowser({ onSelectFiles, selectedFiles = [], disabled = false, allo
 
   const fetchAllowedPaths = async () => {
     try {
-      // Detect OS and set allowed paths
-      const isWindows = navigator.platform.toLowerCase().includes('win');
-      const isMac = navigator.platform.toLowerCase().includes('mac');
-
-      let paths;
-      if (isWindows) {
-        paths = ['C:\\Temp\\rowanholt', 'D:\\Temp\\rowanholt', 'E:\\Temp\\rowanholt', 'F:\\Temp\\rowanholt'];
-      } else if (isMac) {
-        // Mac: /host/tmp/rowanholt for host /tmp access, /Volumes for external drives
-        paths = ['/host/tmp/rowanholt', '/Volumes'];
-      } else {
-        // Linux: native uses /tmp/rowanholt, Docker uses /host/tmp (for Docker on Mac)
-        paths = ['/Volumes', '/mnt', '/media', '/tmp/rowanholt'];
-      }
-
+      const paths = browseRoots();
       setAllowedPaths(paths);
 
       // Set first available path as default

@@ -461,8 +461,9 @@ def _resolve_destination(job) -> Path:
 
     if job.source_paths:
         first_source = Path(job.source_paths[0])
-        if first_source.is_file():
-            # Use case number instead of image name for output directory
+        if first_source.is_file() or getattr(job.options, "gandalf", False):
+            # Use case number instead of image name for output directory; beside a Gandalf
+            # acquisitions folder, not in it (--Gandalf reads every folder there as a host)
             return first_source.parent / job.case_number
         return first_source / job.case_number
 
