@@ -87,19 +87,27 @@ def run(argv: Sequence[str], timeout: int = 120, check: bool = True, input_text:
     return proc.stdout
 
 
-def spawn(argv: Sequence[str]):
+def spawn(argv: Sequence[str], log_path: Optional[str] = None):
     """
     Start a long-running command detached and return at once (a VM's `tart run`, which
-    blocks for the life of the VM). Its output goes nowhere; the machine's state is read back
-    separately. Patched in tests.
+    blocks for the life of the VM). Its output goes to log_path (owner-only: Tart prints its VNC
+    password there), else nowhere; the machine's state is read back separately. Patched in tests.
     """
     if which(argv[0]) is None and "/" not in argv[0]:
         raise LabError(f"{argv[0]} isn't installed")
+    out = subprocess.DEVNULL
     try:
-        subprocess.Popen(_argv(argv), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        if log_path:
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
+            out = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            os.chmod(log_path, 0o600)  # an older log may have been made with wider permissions
+        subprocess.Popen(_argv(argv), stdout=out, stderr=subprocess.STDOUT if log_path else subprocess.DEVNULL,
                          stdin=subprocess.DEVNULL, start_new_session=True, env=_env())
     except OSError as e:
         raise LabError(f"Could not start {argv[0]}", str(e))
+    finally:
+        if out is not subprocess.DEVNULL:
+            os.close(out)
 
 
 def run_ok(argv: Sequence[str], timeout: int = 20) -> bool:

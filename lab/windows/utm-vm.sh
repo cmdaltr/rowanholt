@@ -134,6 +134,7 @@ create_vm() {
   utm "delete (virtual machine named \"$VM\")"
   set_install_media "$win" "$virtio" "$CFG_ISO"
   write_port_forward
+  write_console || true
   register_vm
   ok "$VM: 127.0.0.1:$PORT -> guest port 22"
 }
@@ -153,19 +154,15 @@ register_vm() {
 # configuration record that carries a port forward (on make and on update).
 # Also make sure the VM has a display: one made through AppleScript gets none,
 # and Windows then runs headless with nothing for UTM (or anyone) to show.
-# WINDOWS_VM_VNC=1 adds a VNC server on 127.0.0.1:5959 (no password; loopback
-# only) for watching an unattended install.
 write_port_forward() {
-  python3 - "$BUNDLE/config.plist" "$PORT" "${WINDOWS_VM_VNC:-0}" <<'PY'
+  python3 - "$BUNDLE/config.plist" "$PORT" <<'PY'
 import plistlib, sys
-path, port, vnc = sys.argv[1], int(sys.argv[2]), sys.argv[3] == "1"
+path, port = sys.argv[1], int(sys.argv[2])
 with open(path, "rb") as f:
     cfg = plistlib.load(f)
 if not cfg.get("Display"):
     cfg["Display"] = [{"Hardware": "virtio-ramfb", "DynamicResolution": True, "NativeResolution": False,
                        "UpscalingFilter": "Nearest", "DownscalingFilter": "Linear"}]
-args = [a for a in cfg["QEMU"].get("AdditionalArguments", []) if a not in ("-vnc", "127.0.0.1:59")]
-cfg["QEMU"]["AdditionalArguments"] = args + (["-vnc", "127.0.0.1:59"] if vnc else [])
 fwd = {"Protocol": "TCP", "HostAddress": "127.0.0.1", "HostPort": port, "GuestAddress": "", "GuestPort": 22}
 nics = cfg.setdefault("Network", [])
 emulated = [n for n in nics if n.get("Mode") == "Emulated"]
@@ -180,9 +177,50 @@ with open(path, "wb") as f:
 PY
 }
 
+# The VM's screen over VNC on 127.0.0.1:$VNC_PORT (QEMU display $VNC_DISPLAY; no password,
+# loopback only), for the Console button on Aragorn > Lab and any VNC client on this host
+# (open vnc://127.0.0.1:5959). LAB_VM_CONSOLE=0 (or the older WINDOWS_VM_VNC=0) leaves it off.
+# Exits 0 when config.plist changed (UTM then needs to reload it), 1 when it was already so.
+VNC_DISPLAY=$((59 + ${CLEAN:-0}))
+VNC_PORT=$((5900 + VNC_DISPLAY))
+write_console() {
+  python3 - "$BUNDLE/config.plist" "$VNC_DISPLAY" "${LAB_VM_CONSOLE:-${WINDOWS_VM_VNC:-1}}" <<'PY'
+import plistlib, sys
+path, display, on = sys.argv[1], sys.argv[2], sys.argv[3] != "0"
+with open(path, "rb") as f:
+    cfg = plistlib.load(f)
+old = cfg.setdefault("QEMU", {}).get("AdditionalArguments", [])
+args, skip = [], False
+for a in old:
+    if skip:
+        skip = False
+    elif a == "-vnc":
+        skip = True
+    else:
+        args.append(a)
+args += ["-vnc", "127.0.0.1:" + display] if on else []
+if args == old:
+    sys.exit(1)
+cfg["QEMU"]["AdditionalArguments"] = args
+with open(path, "wb") as f:
+    plistlib.dump(cfg, f)
+PY
+}
+
+# Before a start: put the console in place on a VM made before consoles were (UTM only takes a
+# configuration change while the VM is stopped)
+ensure_console() {
+  [ -f "$BUNDLE/config.plist" ] && [ "$(vm_status)" = stopped ] || return 0
+  if write_console; then
+    utm "reload configuration (virtual machine named \"$VM\")" >/dev/null 2>&1 || true
+    ok "$VM: console on 127.0.0.1:$VNC_PORT"
+  fi
+}
+
 add_port_forward() {
   if [ "$(vm_status)" != stopped ]; then utmctl stop --hide "$VM" >/dev/null 2>&1 || true; sleep 3; fi
   write_port_forward
+  write_console || true
   utm "reload configuration (virtual machine named \"$VM\")" >/dev/null
   ok "$VM: 127.0.0.1:$PORT -> guest port 22"
 }
@@ -305,6 +343,7 @@ adopt_vm() {
 
 start_vm() {
   register_vm
+  ensure_console
   if [ "$(vm_status)" != started ]; then
     info "Starting $VM"
     utmctl start --hide "$VM" >/dev/null 2>&1 || true
