@@ -92,17 +92,11 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 
 ## FR-06: Network forensics (PCAP, Zeek, NetFlow)
 
-**Why.** Host evidence says what ran, and network evidence says where it talked. Today Rowanholt only sees a network through host artefacts (connections in memory, DNS caches, firewall logs).
+**Built 8 November 2026** on `feat/network-forensics`: `elrond.py --Network` (and a Network evidence source in the web app's job form) reads PCAP and PCAPNG through Zeek as a subprocess, Zeek logs (TSV or JSON) and NetFlow/IPFIX text exports (nfdump CSV, SiLK rwcut) into a case folder of their own, cooked into `artefacts/cooked/zeek/`, `netflow.jsonl` and a `network_timeline.jsonl`, through the IOC extractor, and joined to the other hosts' IOCs in `analysis/network_matches.jsonl`. Techniques **T1071** (and sub-techniques), **T1048**, **T1572**, **T1571**, **T1105** and **T1570** from rules that name what they saw. Zeek 7.0 LTS is in the worker image. See `docs/CLI.md` (Network evidence). Checked against real Zeek 7.0.5 output for a synthetic capture, alone and beside a Gandalf archive in one run.
 
-**What it takes.**
-- A new evidence type: PCAP files, Zeek logs and NetFlow/IPFIX exports.
-- PCAP goes through Zeek as a subprocess (conn, dns, http, ssl, files), and Suricata optionally for alerts.
-- Zeek's logs are cooked like any artefact and fed to the timeline and the IOC extractor, so a domain seen in PowerShell history and in DNS on the wire joins up.
-- Techniques for **T1071**, **T1048**, **T1572** and similar from the protocol logs.
+**Not yet done.** The "done when": a PCAP from the lab's Mordor recordings producing cooked Zeek logs, timeline entries and IOCs that match the host artefacts from the same run, because the lab doesn't capture traffic yet. Also left: Suricata alerts (optional in the request); binary nfcapd, NetFlow v9 and IPFIX files (nfdump as a subprocess would read them; export them as text until then).
 
-**Done when** a PCAP from the lab's Mordor recordings produces cooked Zeek logs, timeline entries and IOCs that match the host artefacts from the same run.
-
-**Depends on** the Zeek and Suricata images; PCAP capture in the lab's Mordor recordings.
+**Depends on** PCAP capture in the lab's Mordor recordings (`lab/windows/Invoke-MordorRecord.ps1` and the Linux targets: pktmon or tcpdump around each atomic, the capture copied out with the run folder); the worker image rebuilt with Zeek, and Zeek's packages checked on arm64.
 
 ## FR-07: Automated reporting
 

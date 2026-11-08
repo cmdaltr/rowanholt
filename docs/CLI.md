@@ -299,7 +299,7 @@ python3 src/analysis/elrond.py CASE_ID SOURCE_DIR [DEST_DIR] [OPTIONS]
 ```
 
 - `CASE_ID`: case or incident identifier
-- `SOURCE_DIR`: directory holding the evidence (disk and memory images, Gandalf archives or Mordor datasets)
+- `SOURCE_DIR`: directory holding the evidence (disk and memory images, Gandalf archives or Mordor datasets), or with `--Network` a capture, Zeek log or NetFlow export, or a folder of them; several sources can be given before `DEST_DIR`
 - `DEST_DIR`: output directory (default: current directory)
 
 Elrond defines long options only. argparse accepts any unambiguous prefix (`--Coll` for `--Collect`), but there are no single-letter flags. The web UI and API build the same command (`build_elrond_command` in `src/web/backend/tasks_docker.py`).
@@ -315,6 +315,26 @@ Memory analysis reads memory images from `SOURCE_DIR` alongside the disk images;
 | `--Collect` | Disk and memory images (E01, raw/dd, VMDK, VHD/VHDX); Elrond mounts them and collects artefacts |
 | `--Gandalf` | Gandalf acquisitions (`.zip`, `.7z`, `.tar.gz`) in a directory ending `acquisitions/`; each host is extracted to `DEST_DIR/<host>/artefacts/raw/` and processed like a collected disk image |
 | `--Mordor` | OTRF Mordor attack-simulation datasets |
+| `--Network` | Network evidence: PCAP and PCAPNG captures (through Zeek), Zeek logs (TSV or JSON, plain or gzipped) and NetFlow/IPFIX text exports. Each source becomes its own folder in the case; other sources in the same run still need `--Collect` or `--Gandalf` |
+
+#### Network evidence (`--Network`)
+
+A source is network evidence when it's a capture, a Zeek log or a flow export, or a folder holding them and no disk or memory image or Gandalf archive (a host's image with a capture beside it is the host's). Elrond tells them apart by content, not name: the pcap and pcapng magic numbers, Zeek's `#separator` header or its JSON lines, and a header naming source, destination and bytes. Each capture, and each folder, becomes `DEST_DIR/<name>/` (`<name>-network` when a host already has that folder); Zeek logs and exports given one by one are grouped by the folder they're in, as the web app's file browser gives them.
+
+PCAPs go through Zeek as a subprocess (`zeek -C -r <pcap> frameworks/files/hash-all-files LogAscii::use_json=T`; `-C` because offloaded checksums would otherwise lose the traffic), and its logs are kept in `artefacts/zeek/<pcap>/`. Without Zeek, each PCAP is skipped with a warning and the logs and exports are still read. Zeek's protocol logs are cooked into `artefacts/cooked/zeek/<log>.jsonl` (conn, dns, http, ssl, files and whatever else Zeek wrote, not its own bookkeeping such as `packet_filter`), with Zeek's dotted names as underscores (`id.orig_h` → `id_orig_h`), sets as lists and `ts` as the record's time. Flow exports become `cooked/netflow.jsonl`: nfdump's CSV (`nfdump -r nfcapd.* -o csv`, 1.6 and 1.7 headers), SiLK's `rwcut` and any CSV whose header names the flow fields. Binary nfcapd, NetFlow v9 and IPFIX files aren't read: export them as text first.
+
+Every event is also a line of `cooked/network_timeline.jsonl`, in time order: its time, the log it came from, a one-line description and the cooked row it summarises (`Row`, `zeek/dns:12`). With `--extractIocs`, the IOC extractor reads the cooked tables into `analysis/iocs.jsonl`, and `analysis/network_matches.jsonl` lists every IOC seen on the wire that another folder in the case has in its own `iocs.jsonl` (a domain in a host's PowerShell history and in DNS on the wire), one row per value and host, with the line on each side. The network phase runs after the hosts' analysis so their IOCs are there to match. The folder is recorded as platform `Network` in the audit log, so the SIEM phase and `--Index` index it like a host; stacking leaves it out.
+
+Techniques are tagged only where the logs show the behaviour, and each tagged row says what was seen in its `Flag` field:
+
+| Rule | Log | Technique |
+|---|---|---|
+| 20 or more distinct names with 30 or more characters before the domain, under one domain, from one client | `dns` | **T1071.004**, **T1572** |
+| 10 or more connections from one address to one address and port at a steady interval (10 s or longer, jitter 10% or less); DNS to a resolver, NTP, DHCP, NetBIOS, mDNS, SSDP and LLMNR left out | `conn`, `netflow` | **T1071.001** for HTTP and TLS, **T1071.004** DNS, **T1071.003** mail, **T1071.002** FTP; **T1071** when Zeek didn't name the protocol |
+| A protocol Zeek identified (HTTP, TLS, SSH, DNS, FTP, SMTP, RDP, SMB) on a port none of its services use | `conn` | **T1571**; SSH on 80 or 443 also **T1572** |
+| One connection or flow sending 20 MiB or more, ten times what came back (when that's known); SMB and NFS left out | `conn`, `netflow` | **T1048** |
+| An executable received over HTTP or FTP | `files` | **T1105** |
+| An executable written to an SMB share | `files` | **T1570** |
 
 ---
 
@@ -415,6 +435,13 @@ python3 src/analysis/elrond.py CASE-001 /evidence /output/CASE-001 --Collect --P
 # SIEM export with Navigator layer
 python3 src/analysis/elrond.py CASE-001 /evidence /output/CASE-001 \
   --Collect --Process --Analysis --Splunk --Elastic --Navigator
+
+# A capture through Zeek, into the case its host's Gandalf archive is in, IOCs matched to the host's
+python3 src/analysis/elrond.py CASE-001 /evidence/acquisitions/ /evidence/lab-run.pcap /output/CASE-001 \
+  --Gandalf --Network --extractIocs
+
+# A sensor's Zeek logs and an nfdump export on their own
+python3 src/analysis/elrond.py CASE-001 /evidence/zeek/sensor-1 /evidence/flows.csv /output/CASE-001 --Network
 ```
 
 ---
@@ -449,6 +476,17 @@ Taken from the October 2026 test runs:
 │   │   └── yara.jsonl             # if -Y
 │   └── carved/                    # if carving; one folder per file type plus foremost's audit.txt
 ├── stacking.jsonl                 # -A on two or more hosts
+├── <capture>/                     # --Network: one folder per capture, or folder of logs
+│   ├── artefacts/
+│   │   ├── network.info           # what the folder was made from
+│   │   ├── zeek/<pcap>/           # Zeek's own logs for each capture
+│   │   └── cooked/
+│   │       ├── zeek/              # conn.jsonl  dns.jsonl  http.jsonl  ssl.jsonl  files.jsonl ...
+│   │       ├── netflow.jsonl      # flow exports
+│   │       └── network_timeline.jsonl
+│   └── analysis/
+│       ├── iocs.jsonl             # if --extractIocs
+│       └── network_matches.jsonl  # the IOCs the case's hosts have too
 └── <memory image>/
     └── memory_windows.<plugin>.<Plugin>.jsonl   # one table per Volatility 3 plugin
 ```
