@@ -234,9 +234,12 @@ def excerpt(record: Dict) -> str:
     """The row's own fields as text, nested ones by their path, cut to EXCERPT characters."""
     own = {k: v for k, v in record.items() if k not in ENVELOPE} if isinstance(record, dict) else {"value": record}
     parts = []
-    for key, value in _leaves(own):
-        if key.endswith(("#attributes.xmlns", "Guid")):
-            continue
+    leaves = [(k, v) for k, v in _leaves(own) if "#attributes" not in k and not k.endswith("Guid")
+              and k != "orig_timestamp"]  # the time is cited beside the excerpt
+    # An event's own data says what happened; its System block is the same on every event
+    leaves.sort(key=lambda kv: 0 if ("EventData" in kv[0] or "UserData" in kv[0]) else 1)
+    for key, value in leaves:
+        key = key.replace("data.Event.", "")
         parts.append(f"{key}: {' '.join(value.split())}")
         if sum(len(p) + 2 for p in parts) > EXCERPT:
             break
