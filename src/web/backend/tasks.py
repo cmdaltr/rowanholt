@@ -774,7 +774,7 @@ def build_elrond_command(job):
     if getattr(opts, "network", False):
         # Network mode: PCAPs, Zeek logs and NetFlow exports (nothing to collect from)
         cmd.append("--Network")
-    if getattr(opts, "mobile", False):
+    elif getattr(opts, "mobile", False):
         # Phones (core/mobile.py). This legacy runner doesn't pass a backup password (tasks_docker does)
         cmd.append("--Mobile")
     elif opts.gandalf:
