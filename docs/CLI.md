@@ -338,6 +338,13 @@ Techniques are tagged only where the logs show the behaviour, and each tagged ro
 | An executable received over HTTP or FTP | `files` | **T1105** |
 | An executable written to an SMB share | `files` | **T1570** |
 
+The lab records each test's traffic beside its events (`Invoke-MordorRecord.ps1`: pktmon on Windows, tcpdump on Linux), and `./lab.sh mordor-dataset` puts the captures in the dataset's `network/` folder, next to `acquisitions/`. Run on 8 November 2026 over a Windows 11 recording of 31 Atomic Red Team tests (257,908 events, 31 captures, Zeek 7.0 in the worker): 584 records in the cooked Zeek logs and the network timeline, and 58 IOCs on the wire that the host's own rows hold (26 IPv4, 23 IPv6, 9 domains):
+
+```bash
+python3 src/analysis/elrond.py NETCAP <dataset>/acquisitions/ <dataset>/network /output/NETCAP \
+  --Gandalf --Network --extractIocs --Process --Analysis --Report
+```
+
 #### Phones (`--Mobile`)
 
 Rowanholt doesn't extract from devices: that's a different job with its own tools and legal footing. It reads what the extraction tool or `adb` produced. Each item becomes a host, `DEST_DIR/<host>/`, named from the backup's `Info.plist` (device name) or the file or folder's name, with `host.info` (`<host>::iOS` or `<host>::Android`) and `mobile_evidence.json` (what it is and where). The evidence stays where it is: `raw/` is empty.

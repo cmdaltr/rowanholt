@@ -11,8 +11,7 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 | FR-03 | Desktop app RPM for Rocky Linux 9 / RHEL 9: built, first run on a desktop untried | Desktop app |
 | FR-04 | Lab VM consoles in the browser: built, not yet run on a server | Aragorn, server |
 | FR-05 | Mobile device forensics (iOS, Android): built, needs test images | Gandalf, Elrond |
-| FR-06 | Network forensics (PCAP, Zeek, NetFlow): built, lab capture built, not yet recorded | Elrond |
-| FR-07 | Automated reporting: built, some techniques have no row to cite | Elrond, web |
+| FR-07 | Automated reporting: built, the download from the running stack untried | Elrond, web |
 
 ## FR-01: Team servers on Linux beyond Ubuntu
 
@@ -52,20 +51,10 @@ Built 8 November 2026 (`feat/mobile-forensics`): `elrond.py --Mobile` (and the j
 
 **Depends on** public test images (for example Josh Hickman's) in the lab, and a rebuild of the worker image.
 
-## FR-06: Network forensics (PCAP, Zeek, NetFlow)
-
-**Built 8 November 2026** on `feat/network-forensics`: `elrond.py --Network` (and a Network evidence source in the web app's job form) reads PCAP and PCAPNG through Zeek as a subprocess, Zeek logs (TSV or JSON) and NetFlow/IPFIX text exports (nfdump CSV, SiLK rwcut) into a case folder of their own, cooked into `artefacts/cooked/zeek/`, `netflow.jsonl` and a `network_timeline.jsonl`, through the IOC extractor, and joined to the other hosts' IOCs in `analysis/network_matches.jsonl`. Techniques **T1071** (and sub-techniques), **T1048**, **T1572**, **T1571**, **T1105** and **T1570** from rules that name what they saw. Zeek 7.0 LTS is in the worker image. See `docs/CLI.md` (Network evidence). Checked against real Zeek 7.0.5 output for a synthetic capture, alone and beside a Gandalf archive in one run.
-
-**Not yet done.** The "done when": a PCAP from the lab's Mordor recordings producing cooked Zeek logs, timeline entries and IOCs that match the host artefacts from the same run, because the lab doesn't capture traffic yet. Also left: Suricata alerts (optional in the request); binary nfcapd, NetFlow v9 and IPFIX files (nfdump as a subprocess would read them; export them as text until then).
-
-**Lab capture built 8 November 2026**: `Invoke-MordorRecord.ps1` captures each test's traffic (pktmon on Windows, to pcapng; tcpdump on Linux when installed; `-NoCapture` turns it off) and `./lab.sh mordor-dataset` copies the captures to the dataset's `network/` folder, apart from its acquisition. Left: a recording in the Windows VM, then `elrond.py` over `acquisitions/` and `network/` with `--Network --extractIocs`.
-
 ## FR-07: Automated reporting
 
 **Built 8 November 2026**: `rowanholt/report` writes the case report (hosts and timespan, techniques with their rows cited, indicators, Gandalf's integrity check, Elrond's options and tool versions) in Markdown and DOCX from the case directory, through Elrond's `--Report` or `python3 -m rowanholt.report`, and the case browser downloads the curated version, confirmed findings first and the rest as appendices (`docs/CLI.md`, Case report).
 
-**Not yet met in "Done when"** (every claim followed back to the evidence):
-- Techniques Elrond records in `mitre_techniques.txt` without tagging a row have nothing to cite: 6 of the 20 on the Windows lab case of 7 November (T1003, T1059, T1070.004, T1110, T1110.001, T1219). The report lists them apart as leads; the processors that record them need to tag the rows they come from.
-- Not run end to end: `--Report` in the worker on a fresh lab run, and the download from the running stack.
+**Not yet met in "Done when"** (every claim followed back to the evidence): the download from the running stack. A fresh run of the Windows lab case in the rebuilt worker (`--Report`, 8 November 2026) cites a row for each of its 20 techniques: Artemis's fast scan tags the rows its techniques come from, and each failed logon carries **T1110** and **T1110.001** once a Security log has enough of them.
 
 **Depends on** a rebuilt worker image (Elrond is copied into it) and a backend restart for its new mounts.
