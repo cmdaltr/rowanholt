@@ -313,19 +313,67 @@ TIME_FIELDS = ("timestamp", "last_run_time", "last_run", "last_execution", "last
                "deleted", "last_write_time", "update_time")
 
 
-def record_techniques(artifact_type: str):
+def _field_values(record, names: frozenset):
+    """Every string value, at any depth, of a field ``names`` names (lowercased)."""
+    for key, value in record.items():
+        if isinstance(value, dict):
+            yield from _field_values(value, names)
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict):
+                    yield from _field_values(item, names)
+        elif isinstance(value, str) and str(key).lower() in names:
+            yield value
+
+
+def pattern_techniques(artifact_type: str):
+    """A function giving a record the techniques its fields name by the artefact's substring
+    patterns (_get_patterns_for_artifact), or None when the artefact has none. Each row carries
+    what it matched, so the case report can cite it (FR-07: the scan recorded them for the
+    artefact as a whole)."""
+    patterns, field_pattern = _get_patterns_for_artifact(artifact_type)
+    names = re.search(r"\(\?:([^)]*)\)", field_pattern or "")
+    if not patterns or not names:
+        return None
+    fields = frozenset(n.lower() for n in names.group(1).split("|"))
+
+    def techniques(record) -> List[str]:
+        found = set()
+        for value in _field_values(record, fields):
+            lower = value.lower()
+            found.update(t for t, indicators in patterns.items() if any(i in lower for i in indicators))
+        return sorted(found)
+    return techniques
+
+
+def failed_logons(json_path: str) -> int:
+    """The Security log's failed logons (4625) in one Artemis event-log file, streamed."""
+    with open(json_path, encoding="utf-8", errors="replace") as fh:
+        return sum(1 for r in iter_json(fh) if isinstance(r, dict) and _event_fields(r)[:2] == ("security", 4625))
+
+
+def record_techniques(artifact_type: str, guessing: bool = False):
     """Each record's own techniques, where the record shows one: an event log record by its event
-    and command line, a task, service or WMI subscription that isn't Windows' own."""
+    and command line (each failed logon, when ``guessing``: the file's count of them reached
+    FAILED_LOGON_THRESHOLD), a task, service or WMI subscription that isn't Windows' own, and what
+    the record's fields name by the artefact's patterns."""
     kind = artifact_type.lower()
     if kind == "eventlogs":
-        return lambda record: eventlog_techniques([record])
+        def event(record):
+            found = eventlog_techniques([record])
+            if guessing and _event_fields(record)[:2] == ("security", 4625):
+                found |= {"T1110", "T1110.001"}
+            return sorted(found)
+        return event
+    named = pattern_techniques(kind)
     if kind in PERSISTENCE_ARTEFACTS:
         def persistence(record):
             items = record.get("tasks") if isinstance(record.get("tasks"), list) else [record]
             mine = any(isinstance(i, dict) and _not_windows_own(kind, i) for i in items)
-            return [PERSISTENCE_ARTEFACTS[kind]] if mine else []
+            own = [PERSISTENCE_ARTEFACTS[kind]] if mine else []
+            return sorted(set(own) | set(named(record) if named else []))
         return persistence
-    return None
+    return named
 
 
 def to_json_lines(json_path: str, cooked_root: str, img: str, source: str, artifact_type: str) -> Optional[str]:
@@ -336,13 +384,15 @@ def to_json_lines(json_path: str, cooked_root: str, img: str, source: str, artif
     if os.path.exists(building):
         os.remove(building)
     raw = source.find("/artefacts/")
+    # Password guessing is a count across the log, known only once it's read
+    guessing = artifact_type.lower() == "eventlogs" and failed_logons(json_path) >= FAILED_LOGON_THRESHOLD
     with open(json_path, encoding="utf-8", errors="replace") as fh:
         written = write_records(
             building, (r if isinstance(r, dict) else {"value": r} for r in iter_json(fh)),
             host=img.split("::")[0],
             artefact=os.path.relpath(table, cooked_root)[: -len(SUFFIX)].replace(os.sep, "/"),
             source_path=source[raw + 1:] if raw >= 0 else source, time_field=TIME_FIELDS,
-            techniques=record_techniques(artifact_type))
+            techniques=record_techniques(artifact_type, guessing))
     os.remove(json_path)
     if not written:
         return None
@@ -428,6 +478,9 @@ def enrich_with_mitre(json_path: str, artifact_type: str) -> bool:
             return True
 
         field_regex = re.compile(field_pattern, re.IGNORECASE)
+        # A table to_json_lines wrote has each row's techniques in its envelope already
+        # (record_techniques): those are recorded, so each one has a row to cite
+        tagged = json_path.endswith(SUFFIX)
 
         lines_processed = 0
         try:
@@ -438,6 +491,9 @@ def enrich_with_mitre(json_path: str, artifact_type: str) -> bool:
                     if lines_processed % 500000 == 0:
                         print(f"    ...scanned {lines_processed:,} lines, found {len(found_techniques)} techniques", flush=True)
 
+                    if tagged:
+                        found_techniques.update(_envelope_techniques(line))
+                        continue
                     # Extract relevant fields from this line
                     matches = field_regex.findall(line)
                     for match in matches:
@@ -469,6 +525,20 @@ def enrich_with_mitre(json_path: str, artifact_type: str) -> bool:
         print(f"    *** Full traceback:", flush=True)
         traceback.print_exc()
         return False
+
+
+_ENVELOPE_TECHNIQUES = re.compile(r'^\{"host": .*?"techniques": (\[[^\]]*\])')
+
+
+def _envelope_techniques(line: str) -> List[str]:
+    """The techniques in a table line's envelope, without decoding the rest of the line."""
+    match = _ENVELOPE_TECHNIQUES.match(line)
+    if not match:
+        return []
+    try:
+        return [t for t in json.loads(match.group(1)) if isinstance(t, str)]
+    except ValueError:
+        return []
 
 
 def _get_patterns_for_artifact(artifact_type: str):

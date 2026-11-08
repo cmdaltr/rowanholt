@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from rowanholt.process.extractions.artemis import enrich_with_mitre  # noqa: E402
+from rowanholt.process.extractions.artemis import enrich_with_mitre, to_json_lines  # noqa: E402
 from rowanholt.process.extractions.mitre_tagger import presence_technique, tag_mitre_technique  # noqa: E402
 
 
@@ -33,6 +33,39 @@ def test_a_clean_file_table_tags_nothing(tmp_path) -> None:
 def test_tools_windows_does_not_ship_still_tag(tmp_path) -> None:
     assert tagged(tmp_path, "mft", [{"full_path": ".\\Users\\a\\Downloads\\mimikatz.exe"},
                                     {"full_path": ".\\Users\\a\\Documents\\q3.xlsx.locked"}]) == {"T1003", "T1486"}
+
+
+def test_the_table_tags_the_rows_the_techniques_come_from(tmp_path) -> None:
+    """FR-07: the scan recorded an MFT's T1003 for the table as a whole, so the case report had
+    no row to cite. The rows that name it now carry it, and only theirs are recorded."""
+    cooked = tmp_path / "CASE" / "HOST" / "artefacts" / "cooked"
+    cooked.mkdir(parents=True)
+    rows = [{"full_path": ".\\Windows\\System32\\svchost.exe"},
+            {"full_path": ".\\AtomicRedTeam\\atomics\\T1003\\bin\\mimikatz.exe", "size": 1},
+            {"nested": {"filename": "AnyDesk.exe"}}]
+    (cooked / "mft.json").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    table = to_json_lines(str(cooked / "mft.json"), str(cooked), "HOST::Windows10",
+                          "/case/HOST/artefacts/raw/$MFT", "mft")
+    enrich_with_mitre(table, "mft")
+    lines = [json.loads(line) for line in Path(table).read_text().splitlines()]
+    assert [line["techniques"] for line in lines] == [[], ["T1003"], ["T1219"]]
+    assert set((tmp_path / "CASE" / "mitre_techniques.txt").read_text().split()) == {"T1003", "T1219"}
+
+
+def test_failed_logons_past_the_threshold_tag_each_one(tmp_path) -> None:
+    """FR-07: password guessing is a count across the Security log, so it was recorded for the log
+    and no row carried it. Each failed logon now does, once there are enough of them."""
+    def event(event_id):
+        return {"data": {"Event": {"System": {"Channel": "Security", "EventID": event_id}, "EventData": {}}}}
+    for count, want in ((4, []), (5, ["T1110", "T1110.001"])):
+        cooked = tmp_path / str(count) / "CASE" / "HOST" / "artefacts" / "cooked"
+        cooked.mkdir(parents=True)
+        rows = [event(4624)] + [event(4625)] * count
+        (cooked / "security.json").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+        table = to_json_lines(str(cooked / "security.json"), str(cooked), "HOST::Windows10",
+                              "/case/HOST/artefacts/raw/Security.evtx", "eventlogs")
+        lines = [json.loads(line) for line in Path(table).read_text().splitlines()]
+        assert [line["techniques"] for line in lines] == [[]] + [want] * count
 
 
 def test_registry_names_are_not_dumping_or_modification(tmp_path) -> None:

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Apple silicon only: an unattended Windows 11 ARM VM in UTM.
 #   utm-vm.sh create|adopt [bundle.utm]|start|stop|delete|status|collect|live-containers
-#   utm-vm.sh sensor | record <T1,T2> <run> <dest-dir>   (Atomic Red Team telemetry)
+#   utm-vm.sh sensor | record <T1,T2> <run> <dest-dir> | pull-recording <run> <dest-dir>   (Atomic Red Team telemetry)
 #   utm-vm.sh raw-check [dest-dir]   (reader vs RawCopy, live and off a snapshot; report per run)
 # adopt takes a Windows VM that's already installed (a .utm in $LAB_VM_DIR/utm,
 # e.g. a Vagrant/Packer build with OpenSSH): it adds the SSH port forward, logs
@@ -18,7 +18,7 @@ set -euo pipefail
 . "$(dirname "$0")/../lib/common.sh"
 load_config
 
-action="${1:?create|adopt|start|stop|delete|status|collect|live-containers|raw-check|sensor|record}"
+action="${1:?create|adopt|start|stop|delete|status|collect|live-containers|raw-check|sensor|record|pull-recording}"
 uses_tart || die "The UTM VM is for Apple silicon. On x86-64 hosts the lab uses Vagrant: ./lab.sh windows-vm"
 [ -d /Applications/UTM.app ] || die "UTM is not installed. Run: ./lab.sh install"
 
@@ -481,9 +481,19 @@ record() {
   # dozen tests, so allow two hours rather than ssh.exp's 15 minutes
   LAB_SSH_TIMEOUT="${LAB_SSH_TIMEOUT:-7200}" ssh_vm "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& C:\\lab\\scripts\\Invoke-MordorRecord.ps1 -Techniques $techniques -Run $run -Out C:\\lab\\mordor\\telemetry -Settle ${MORDOR_SETTLE:-20}\"" \
     | grep -v -i password || true
+  pull_recording "$run" "$dest"
+}
+
+# pull-recording <run> <dest-dir>: a recording's folder out of the VM into <dest>/<run>, on its own
+# when a run recorded but its copy failed (the captures make it large: allow an hour, not ssh.exp's 15 minutes)
+pull_recording() {
+  local run="${1:?run name}" dest="${2:?destination}" tmp
+  case "$run" in *[!A-Za-z0-9_.-]*) die "Run names may only use letters, digits, _ . -" ;; esac
+  require_password
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/lab-rec.XXXXXX")"
-  LAB_SSH_PASSWORD="$LAB_PASSWORD" expect "$SSH" pull gandalf 127.0.0.1 "$PORT" "C:/lab/mordor/telemetry/$run" "$tmp/" >/dev/null \
-    || die "Couldn't copy the recording out of $VM"
+  LAB_SSH_TIMEOUT="${LAB_SSH_TIMEOUT:-3600}" LAB_SSH_PASSWORD="$LAB_PASSWORD" expect "$SSH" pull gandalf 127.0.0.1 "$PORT" "C:/lab/mordor/telemetry/$run" "$tmp/" \
+    | grep -v -i password || true
+  [ -d "$tmp/$run" ] || die "Couldn't copy the recording out of $VM (it's in C:\\lab\\mordor\\telemetry\\$run; try again: ./windows/utm-vm.sh pull-recording $run <dest>)"
   [ -f "$tmp/$run/manifest.json" ] || die "Nothing was recorded (see $tmp/$run)"
   mkdir -p "$dest"
   [ -e "$dest/$run" ] && die "$dest/$run already exists (left in $tmp/$run)"
@@ -597,5 +607,6 @@ case "$action" in
   raw-check) shift; raw_check "$@" ;;
   sensor) sensor ;;
   record) shift; record "$@" ;;
+  pull-recording) shift; pull_recording "$@" ;;
   *) die "unknown action $action" ;;
 esac

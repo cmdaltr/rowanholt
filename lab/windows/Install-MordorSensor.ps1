@@ -10,12 +10,13 @@
 
   Downloads (all over HTTPS from their publishers):
     Sysmon         https://download.sysinternals.com/files/Sysmon.zip
-    sysmon-modular https://github.com/olafhartong/sysmon-modular (sysmonconfig.xml)
+    sysmon-modular https://github.com/olafhartong/sysmon-modular (sysmonconfig.xml, a release asset since
+                   July 2026; pinned to a release, as its README advises)
     Atomic Red Team https://github.com/redcanaryco/invoke-atomicredteam
 #>
 [CmdletBinding()]
 param(
-    [string]$SysmonConfigUrl = "https://raw.githubusercontent.com/olafhartong/sysmon-modular/master/sysmonconfig.xml",
+    [string]$SysmonConfigUrl = "https://github.com/olafhartong/sysmon-modular/releases/download/configs-a45dedb13a43/sysmonconfig.xml",
     [string]$AtomicRoot = "C:\AtomicRedTeam"
 )
 $ErrorActionPreference = "Stop"
