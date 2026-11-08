@@ -449,10 +449,8 @@ PATTERN_MAPPINGS = {
 }
 
 
-def whole_words(pattern: str) -> str:
-    """Each top-level alternative matched as a whole word on the sides it starts or ends with a
-    letter or digit: "tar" no longer matches inside "start", nor "dir" inside "directory", while
-    "\\.lnk" and "reg " match as before."""
+def alternatives(pattern: str) -> List[str]:
+    """A pattern's top-level alternatives."""
     parts, depth, current, i = [], 0, "", 0
     while i < len(pattern):
         char = pattern[i]
@@ -469,6 +467,50 @@ def whole_words(pattern: str) -> str:
             current += char
         i += 1
     parts.append(current)
+    return parts
+
+
+def literal_head(alternative: str) -> str:
+    """The literal text an alternative starts with, lowercased ("" when it starts with a class,
+    a group or an optional character)."""
+    head, i = "", 0
+    while i < len(alternative):
+        char = alternative[i]
+        if char == "\\":
+            following = alternative[i + 1:i + 2]
+            if not following or following.isalnum():
+                break  # \d, \s, \b: not a literal
+            char, i = following, i + 1
+        elif char in ".^$[](){}|*+?":
+            if char in "?*{":
+                head = head[:-1]  # the character before is optional
+            break
+        if alternative[i + 1:i + 2] in ("?", "*", "{"):
+            break
+        head += char
+        i += 1
+    return head.lower()
+
+
+def literal_heads(pattern: str) -> Optional[Tuple[str, ...]]:
+    """What a match of ``pattern`` has to contain, as the literal heads of its alternatives: text
+    holding none of them can't match, so the regex needn't run. None when an alternative has no
+    head."""
+    heads = tuple(literal_head(p) for p in alternatives(pattern) if p)
+    return heads if heads and all(heads) else None
+
+
+def fold(content: str) -> str:
+    """``content`` lowercased as re.IGNORECASE compares it: it also matches dotless ı to i and
+    long ſ to s."""
+    return content.lower().replace("\u0131", "i").replace("\u017f", "s")
+
+
+def whole_words(pattern: str) -> str:
+    """Each top-level alternative matched as a whole word on the sides it starts or ends with a
+    letter or digit: "tar" no longer matches inside "start", nor "dir" inside "directory", while
+    "\\.lnk" and "reg " match as before."""
+    parts = alternatives(pattern)
     # The word may end in a plural, a bitness or version, or an API's Ex/A/W: schtasks, regsvr32,
     # python3, SetWindowsHookExA
     end = "(?:s|ex|32|64|\\d)?[aw]?(?![a-z0-9])"
@@ -487,13 +529,19 @@ class MitrePatternMatcher:
     def __init__(self):
         """Initialize pattern matcher with compiled regex patterns."""
         self._compiled_patterns: Dict[str, List[Tuple[re.Pattern, List[str]]]] = {}
+        # Beside each compiled pattern, the literal heads a match needs (literal_heads), so the
+        # regex, whose leading lookbehind defeats re's own literal search, runs only on text
+        # that has one: about 20 s a megabyte otherwise
+        self._heads: Dict[str, List[Optional[Tuple[str, ...]]]] = {}
         self._compile_patterns()
 
     def _compile_patterns(self):
         """Compile all regex patterns for efficient matching."""
         for category, patterns in PATTERN_MAPPINGS.items():
             self._compiled_patterns[category] = []
+            self._heads[category] = []
             for pattern, techniques in patterns.items():
+                original = pattern
                 try:
                     # "^4624|4634$" alternates before it anchors: 4634 matched inside 14634, and
                     # "^10|12|13$" matched any value with 12 in it. An ID is the whole value
@@ -501,8 +549,10 @@ class MitrePatternMatcher:
                         pattern = "^(?:" + pattern.strip("^$").replace("$|", "|").replace("|^", "|") + ")$"
                     elif category != "Port":
                         pattern = whole_words(pattern)
+                    heads = None if category in ("EventID", "Port") else literal_heads(original)
                     compiled = re.compile(pattern, re.IGNORECASE)
                     self._compiled_patterns[category].append((compiled, techniques))
+                    self._heads[category].append(heads)
                 except re.error as e:
                     # Skip invalid patterns
                     print(f"Warning: Invalid regex pattern '{pattern}': {e}")
@@ -524,16 +574,33 @@ class MitrePatternMatcher:
 
         techniques = set()
         categories_to_check = categories or list(self._compiled_patterns.keys())
+        folded = fold(content)
 
         for category in categories_to_check:
             if category not in self._compiled_patterns:
                 continue
 
-            for pattern, technique_ids in self._compiled_patterns[category]:
+            for (pattern, technique_ids), heads in zip(self._compiled_patterns[category], self._heads[category]):
+                if heads is not None and not any(head in folded for head in heads):
+                    continue
                 if pattern.search(content):
                     techniques.update(technique_ids)
 
         return techniques
+
+    def match_positions(self, content: str) -> Set[int]:
+        """Where in ``content`` any pattern matches (each match's start), so a large table's
+        candidate lines are found in one pass over a chunk rather than one per line."""
+        positions: Set[int] = set()
+        if not content:
+            return positions
+        folded = fold(content)
+        for category, compiled in self._compiled_patterns.items():
+            for (pattern, _), heads in zip(compiled, self._heads[category]):
+                if heads is not None and not any(head in folded for head in heads):
+                    continue
+                positions.update(match.start() for match in pattern.finditer(content))
+        return positions
 
     def match_field(self, field_name: str, field_value: str) -> Set[str]:
         """

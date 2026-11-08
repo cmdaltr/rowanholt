@@ -11,9 +11,8 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 | FR-03 | Desktop app RPM for Rocky Linux 9 / RHEL 9: built, first run on a desktop untried | Desktop app |
 | FR-04 | Lab VM consoles in the browser: built, not yet run on a server | Aragorn, server |
 | FR-05 | Mobile device forensics (iOS, Android): built, needs test images | Gandalf, Elrond |
-| FR-06 | Network forensics (PCAP, Zeek, NetFlow): built, lab capture to do | Elrond |
+| FR-06 | Network forensics (PCAP, Zeek, NetFlow): built, lab capture built, not yet recorded | Elrond |
 | FR-07 | Automated reporting: built, some techniques have no row to cite | Elrond, web |
-| FR-08 | More SIEM integrations: OpenSearch/Wazuh and Timesketch (built; Wazuh untried) | Elrond output |
 
 ## FR-01: Team servers on Linux beyond Ubuntu
 
@@ -59,7 +58,7 @@ Built 8 November 2026 (`feat/mobile-forensics`): `elrond.py --Mobile` (and the j
 
 **Not yet done.** The "done when": a PCAP from the lab's Mordor recordings producing cooked Zeek logs, timeline entries and IOCs that match the host artefacts from the same run, because the lab doesn't capture traffic yet. Also left: Suricata alerts (optional in the request); binary nfcapd, NetFlow v9 and IPFIX files (nfdump as a subprocess would read them; export them as text until then).
 
-**Depends on** PCAP capture in the lab's Mordor recordings (`lab/windows/Invoke-MordorRecord.ps1` and the Linux targets: pktmon or tcpdump around each atomic, the capture copied out with the run folder); the worker image rebuilt with Zeek, and Zeek's packages checked on arm64.
+**Lab capture built 8 November 2026**: `Invoke-MordorRecord.ps1` captures each test's traffic (pktmon on Windows, to pcapng; tcpdump on Linux when installed; `-NoCapture` turns it off) and `./lab.sh mordor-dataset` copies the captures to the dataset's `network/` folder, apart from its acquisition. Left: a recording in the Windows VM, then `elrond.py` over `acquisitions/` and `network/` with `--Network --extractIocs`.
 
 ## FR-07: Automated reporting
 
@@ -70,11 +69,3 @@ Built 8 November 2026 (`feat/mobile-forensics`): `elrond.py --Mobile` (and the j
 - Not run end to end: `--Report` in the worker on a fresh lab run, and the download from the running stack.
 
 **Depends on** a rebuilt worker image (Elrond is copied into it) and a backend restart for its new mounts.
-
-## FR-08: More SIEM integrations
-
-**Built 8 November 2026: OpenSearch (and Wazuh, whose indexer is OpenSearch) and Timesketch** (`post/opensearch.py`, `post/timesketch.py`; `docs/CLI.md`, SIEM Integration). Ben chose these two; Microsoft Sentinel and Chronicle are dropped. Run against OpenSearch 2.19 with its security plugin (a 1,157,224-record Windows host: every record, searchable by host and technique) and Timesketch 20261014.
-
-**Done when** a case appears in a Wazuh deployment's dashboard (only OpenSearch itself has been tried), and Archer can generate the matching detections for Wazuh. Then this entry goes.
-
-**Depends on** a Wazuh deployment in the lab.

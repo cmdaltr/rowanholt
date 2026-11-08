@@ -18,6 +18,8 @@ For each test it records, between the test's start and end:
   Windows  events.xml      Security, System, PowerShell, Sysmon (if installed), Task Scheduler, WMI, Defender, BITS
   Linux    audit.log       auditd (/var/log/audit; auditd with ATT&CK rules, e.g. Neo23x0's)
            journal.log     the systemd journal, syslog format
+  Windows  capture.pcapng  the test's traffic (pktmon, on the network adapters), unless -NoCapture
+  Linux    capture.pcap    the test's traffic (tcpdump, if installed), unless -NoCapture
   macOS    es.ndjson       Endpoint Security events (eslogger; give the terminal Full Disk Access)
            unified.ndjson  the unified log
            plists.ndjson   launch agents, launch daemons and login hooks added, changed or removed
@@ -35,7 +37,8 @@ param(
     [int]$Settle = 20,
     [int]$Timeout = 120,
     [string]$AtomicsPath = '',
-    [switch]$NoCleanup
+    [switch]$NoCleanup,
+    [switch]$NoCapture
 )
 $ErrorActionPreference = 'Stop'
 # Windows PowerShell 5.1 has no $IsWindows; there it can only be Windows
@@ -64,6 +67,37 @@ $esEvents = 'exec', 'fork', 'create', 'rename', 'unlink', 'write', 'btm_launch_i
 if ($IsMacOS) {
     $supported = (& /usr/bin/eslogger --list-events) -split "`n" | ForEach-Object { $_.Trim() }
     $esEvents = $esEvents | Where-Object { $supported -contains $_ }
+}
+
+# The test's traffic, for Elrond's --Network (src/mordor/lab/dataset.py copies it out beside the
+# logs). pktmon writes ETL; it's converted once the capture stops
+$pktmon = $IsWindows -and -not $NoCapture -and (Get-Command pktmon.exe -ErrorAction SilentlyContinue)
+$tcpdump = if ($IsLinux -and -not $NoCapture) { (Get-Command tcpdump -ErrorAction SilentlyContinue).Source }
+if ($IsLinux -and -not $NoCapture -and -not $tcpdump) { Write-Warning 'tcpdump not installed: no capture.pcap' }
+if ($pktmon) { & pktmon.exe filter remove | Out-Null }
+
+function Start-Capture([string]$Dir) {
+    if ($pktmon) {
+        & pktmon.exe start --capture --comp nics --pkt-size 0 --file-name (Join-Path $Dir 'capture.etl') | Out-Null
+        if ($LASTEXITCODE -ne 0) { Write-Warning "pktmon didn't start ($LASTEXITCODE)" }
+    } elseif ($tcpdump) {
+        return Start-Process -FilePath $tcpdump -ArgumentList '-i', 'any', '-U', '-w', (Join-Path $Dir 'capture.pcap') -PassThru -RedirectStandardError (Join-Path $Dir 'tcpdump.log')
+    }
+}
+
+function Stop-Capture([string]$Dir, $Process) {
+    if ($pktmon) {
+        & pktmon.exe stop | Out-Null
+        $etl = Join-Path $Dir 'capture.etl'
+        if (Test-Path $etl) {
+            & pktmon.exe etl2pcap $etl --out (Join-Path $Dir 'capture.pcapng') | Out-Null
+            Remove-Item $etl -ErrorAction SilentlyContinue
+        }
+    } elseif ($Process) {
+        & kill -INT $Process.Id  # SIGINT, so tcpdump writes out what it holds
+        $Process.WaitForExit(10000) | Out-Null
+        Remove-Item (Join-Path $Dir 'tcpdump.log') -ErrorAction SilentlyContinue
+    }
 }
 
 function Get-PlistState {
@@ -116,10 +150,12 @@ foreach ($t in $Techniques) {
             $es = Start-Process -FilePath /usr/bin/eslogger -ArgumentList $esEvents -RedirectStandardOutput (Join-Path $dir 'es.ndjson') -PassThru -NoNewWindow
             Start-Sleep -Seconds 2
         }
+        $capture = Start-Capture $dir
         $start = Get-Date
         try { Invoke-AtomicTest $t -TestNumbers $i -PathToAtomicsFolder $AtomicsPath -TimeoutSeconds $Timeout } catch { Write-Warning "test: $_" }
         Start-Sleep -Seconds $Settle
         $end = Get-Date
+        Stop-Capture $dir $capture
 
         if ($IsWindows) {
             $present = Get-WinEvent -ListLog * -ErrorAction SilentlyContinue | Select-Object -ExpandProperty LogName

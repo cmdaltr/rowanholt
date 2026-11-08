@@ -13,6 +13,7 @@ Author: Rowanholt DF Acceleration Suite
 Version: 3.0.0
 """
 
+import bisect
 import json
 import os
 import logging
@@ -29,8 +30,7 @@ except ImportError:
 
 # Techniques file name - written incrementally during enrichment
 TECHNIQUES_FILE = "mitre_techniques.txt"
-# Tables under this size are rewritten with each record's ATT&CK fields; larger ones only have
-# their techniques recorded
+# Tables over this size are matched a megabyte of text at a time before any line is decoded
 LARGE_FILE_BYTES = 10 * 1024 * 1024
 TABLE_SUFFIXES = (".jsonl", ".json")
 _TECHNIQUES_MARK = '"techniques": ['
@@ -620,11 +620,11 @@ class MitreEnrichment:
     def _enrich_jsonl(self, filepath: str, techniques_file: TextIO, artefact_type: Optional[str],
                       file_size: int) -> bool:
         """Record a JSON Lines table's techniques (the envelope's and what each record's content
-        matches) and, for a table under LARGE_FILE_BYTES with an artefact type, rewrite it line
-        by line with each matching record's ATT&CK fields, through a temporary file so a failure
-        leaves the table as it was. A large table's lines are matched as text, not decoded."""
+        matches) and, with an artefact type, rewrite it line by line with each matching record's
+        ATT&CK fields, through a temporary file so a failure leaves the table as it was. A large
+        table's lines are matched as text first and only the candidates decoded."""
         if file_size > LARGE_FILE_BYTES:
-            found = self._scan_large_jsonl(filepath)
+            found = self._enrich_large_jsonl(filepath, artefact_type)
             for tech_id in sorted(found):
                 techniques_file.write(f"{tech_id}\n")
             techniques_file.flush()
@@ -675,28 +675,79 @@ class MitreEnrichment:
         techniques_file.flush()
         return True
 
-    def _scan_large_jsonl(self, filepath: str, chunk: int = 1 << 20) -> Set[str]:
-        """A large JSON Lines table's techniques: the envelope's, and what the records' own fields
-        match as text, a megabyte at a time (decoding an MFT's millions of lines would take
-        longer than the run)."""
+    def _enrich_large_jsonl(self, filepath: str, artefact_type: Optional[str],
+                            chunk: int = 1 << 20) -> Set[str]:
+        """A large JSON Lines table's techniques, each from a record it tags: the envelope's, and
+        what the records' own fields match. Every pattern runs once over a megabyte of lines as
+        text (decoding an MFT's millions of lines would take longer than the run); only the lines
+        a match falls in are decoded and scanned as records. Those that match are rewritten with
+        their ATT&CK fields when there's an artefact type; a table nothing matched isn't
+        rewritten at all."""
         found: Set[str] = set()
+        tags: Dict[int, Set[str]] = {}
         matcher = get_pattern_matcher() if PATTERNS_AVAILABLE else None
-        buffer: List[str] = []
-        size = 0
+        lines: List[str] = []
+        texts: List[str] = []
+        first = size = 0
+
+        def flush() -> None:
+            if matcher is None or not lines:
+                return
+            starts, offset = [], 0
+            for text in texts:
+                starts.append(offset)
+                offset += len(text)
+            for index in sorted({bisect.bisect_right(starts, pos) - 1
+                                 for pos in matcher.match_positions("".join(texts))}):
+                try:
+                    record = json.loads(lines[index])
+                except ValueError:
+                    continue
+                if isinstance(record, dict):
+                    matched = scan_json_record(scannable(record))
+                    if matched:
+                        tags[first + index] = matched
+                        found.update(matched)
+
         with open(filepath, encoding="utf-8", errors="replace") as fh:
-            for line in fh:
+            for number, line in enumerate(fh):
                 split = _split_envelope(line)
+                text = line
                 if split is not None:
-                    techniques, line = split
+                    techniques, text = split
                     found.update(techniques)
-                buffer.append(line)
-                size += len(line)
-                if matcher is not None and size >= chunk:
-                    found.update(matcher.match_content("".join(buffer)))
-                    buffer, size = [], 0
-        if matcher is not None and buffer:
-            found.update(matcher.match_content("".join(buffer)))
+                # Matched as the decoded values would be: JSON doubles backslashes and escapes quotes
+                lines.append(line)
+                texts.append(text.replace("\\\\", "\\").replace('\\"', '"'))
+                size += len(texts[-1])
+                if size >= chunk:
+                    flush()
+                    first, size, lines, texts = number + 1, 0, [], []
+        flush()
+
+        if tags and artefact_type:
+            self._tag_lines(filepath, tags)
         return found
+
+    def _tag_lines(self, filepath: str, tags: Dict[int, Set[str]]) -> None:
+        """Rewrite ``filepath`` with the ATT&CK fields on the lines ``tags`` names (by number),
+        every other line byte for byte, through a temporary file."""
+        building = f"{filepath}.enriching"
+        try:
+            with open(filepath, encoding="utf-8", errors="replace") as fh, \
+                    open(building, "w", encoding="utf-8") as out:
+                for number, line in enumerate(fh):
+                    matched = tags.get(number)
+                    if matched:
+                        record = self.apply_techniques(json.loads(line), matched)
+                        out.write(json.dumps(record, ensure_ascii=False, default=str) + "\n")
+                    else:
+                        out.write(line if line.endswith("\n") else line + "\n")
+        except BaseException:
+            if os.path.exists(building):
+                os.remove(building)
+            raise
+        os.replace(building, filepath)
 
     def _enrich_large_file(self, filepath: str, artefact_type: str) -> bool:
         """

@@ -678,7 +678,7 @@ or for a completed web job with `POST /api/jobs/{job_id}/export-siem`. Start the
 
 ### OpenSearch and Wazuh
 
-`--OpenSearch` (the job form's **OpenSearch / Wazuh**) sends Elastic's documents (the same field names, `@timestamp`, `hostname`, `artefact` and the `mitre_technique_*` fields) to an OpenSearch that's already running, into one index per case, `rowanholt-<case>`, deleted and made afresh on every export. With `OPENSEARCH_DASHBOARDS_URL` it saves an index pattern for it on `@timestamp`. Wazuh's indexer is OpenSearch: point `OPENSEARCH_URL` at it (`https://<wazuh>:9200`), with a user who may write `rowanholt-*` indices, its root CA as `OPENSEARCH_CA`, and the Wazuh dashboard as `OPENSEARCH_DASHBOARDS_URL`. Certificates are checked unless `OPENSEARCH_VERIFY=false`.
+`--OpenSearch` (the job form's **OpenSearch / Wazuh**) sends Elastic's documents (the same field names, `@timestamp`, `hostname`, `artefact` and the `mitre_technique_*` fields) to an OpenSearch that's already running, into one index per case, `rowanholt-<case>`, deleted and made afresh on every export. With `OPENSEARCH_DASHBOARDS_URL` it saves an index pattern for it on `@timestamp`. Wazuh's indexer is OpenSearch: point `OPENSEARCH_URL` at it (`https://<wazuh>:9200`), with a user who may write `rowanholt-*` indices, its root CA as `OPENSEARCH_CA`, and the Wazuh dashboard as `OPENSEARCH_DASHBOARDS_URL`. Certificates are checked unless `OPENSEARCH_VERIFY=false`. Tried against OpenSearch 2.19 and Wazuh 4.14 single-node (wazuh-docker, arm64): the three-host Windows lab case, 3,724,245 records, all indexed, searchable by host and technique, and in the Wazuh dashboard on 8 November 2026.
 
 ### Timesketch
 

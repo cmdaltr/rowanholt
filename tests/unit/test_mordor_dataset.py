@@ -80,6 +80,20 @@ def test_windows_recording_becomes_an_event_dataset_zip(tmp_path):
     assert all("T1547.001" not in json.loads(l).get("technique", "") for l in lines)
 
 
+def test_each_tests_capture_goes_to_a_network_folder_of_its_own(tmp_path):
+    """FR-06: the recorder's captures, for --Network, apart from the acquisition."""
+    tests = [{"technique": "T1105", "test": n, "name": f"t{n}", "folder": f"T1105-{n}"} for n in (1, 2, 3)]
+    run = recording(tmp_path, "windows", tests, {"T1105-1": {"events.xml": SYSMON_1, "capture.pcapng": "\n\r\r\n"},
+                                                 "T1105-2": {"capture.pcapng": ""}, "T1105-3": {}})
+    result = dataset.convert(str(run), str(tmp_path / "mordor" / "lab"))
+    network = tmp_path / "mordor" / "lab" / run.name / "network"
+    assert result["captures"] == 1 and result["network"] == str(network) + os.sep
+    assert sorted(p.name for p in network.iterdir()) == ["T1105-1.pcapng"]  # an empty capture isn't one
+    assert not list((network.parent / "acquisitions").glob("*.pcap*"))
+    assert "network" not in dataset.convert(str(recording(tmp_path / "b", "windows", tests[:1], {"T1105-1": {}})),
+                                            str(tmp_path / "b" / "out"))
+
+
 def test_linux_recording_becomes_a_gandalf_archive(tmp_path):
     tests = [{"technique": "T1053.003", "test": 1, "name": "Cron", "folder": "T1053.003-1"},
              {"technique": "T1053.003", "test": 2, "name": "Cron 2", "folder": "T1053.003-2"}]

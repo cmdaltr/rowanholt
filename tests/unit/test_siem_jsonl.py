@@ -189,22 +189,45 @@ def test_jsonl_is_rewritten_line_by_line(tmp_path):
     assert not list(tmp_path.glob("*.enriching"))
 
 
-def test_a_large_jsonl_has_its_techniques_recorded_but_is_left_alone(tmp_path, monkeypatch):
+def test_a_large_jsonl_has_its_matching_rows_tagged(tmp_path, monkeypatch):
+    """FR-07: a large table's techniques were recorded from its text with no row tagged, so the
+    report had nothing to cite for them."""
     from rowanholt.post.mitre import enrichment
     monkeypatch.setattr(enrichment, "LARGE_FILE_BYTES", 2000)  # matching runs at ~10 s a megabyte
     t = tmp_path / "mft.jsonl"
     row = {"Filename": "C:\\Users\\a\\x.txt", "pad": "x" * 100}
     table(t, [row] * 30, artefact="mft", techniques=["T1070.006"])
+    clean = t.read_text().splitlines()
     with t.open("a") as fh:
         fh.write(json.dumps({"host": "h", "artefact": "mft", "source_path": "raw/powershell.exe",
                              "timestamp": None, "techniques": [], "Args": "mimikatz.exe"}) + "\n")
-    before = t.stat().st_size
     written = io.StringIO()
     assert MitreEnrichment().enrich_json_file_streaming(str(t), written, "mft")
     found = set(written.getvalue().split())
     assert "T1070.006" in found and any(t.startswith("T1003") for t in found)
     assert "T1059.001" not in found  # powershell is only in the envelope's source path
-    assert t.stat().st_size == before
+    lines = t.read_text().splitlines()
+    assert check_file(t) == [] and lines[:30] == clean  # the rows nothing matched, byte for byte
+    tagged = json.loads(lines[30])
+    assert any(t.startswith("T1003") for t in tagged["techniques"]) and tagged["mitre_technique_id"]
+    assert not list(tmp_path.glob("*.enriching"))
+
+
+def test_a_large_jsonl_matches_across_chunks_and_only_rewrites_when_a_row_matches(tmp_path):
+    from rowanholt.post.mitre.enrichment import MitreEnrichment as Enrichment
+    t = tmp_path / "cmdline.jsonl"
+    rows = [{"Args": f"notepad.exe {n}"} for n in range(40)]
+    rows[25] = {"CommandLine": "C:\\Windows\\System32\\mimikatz.exe \"sekurlsa::logonpasswords\""}
+    table(t, rows, artefact="cmdline")
+    found = Enrichment()._enrich_large_jsonl(str(t), "cmdline", chunk=200)
+    lines = t.read_text().splitlines()
+    assert any(x.startswith("T1003") for x in found)
+    assert [n for n, line in enumerate(lines) if "mitre_technique_id" in line] == [25]
+    quiet = tmp_path / "quiet.jsonl"
+    table(quiet, [{"Args": "notepad.exe"}] * 20, artefact="cmdline")
+    before = quiet.stat().st_mtime_ns
+    assert Enrichment()._enrich_large_jsonl(str(quiet), "cmdline", chunk=200) == set()
+    assert quiet.stat().st_mtime_ns == before
 
 
 def test_techniques_are_collected_from_jsonl(tmp_path):

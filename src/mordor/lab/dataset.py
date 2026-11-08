@@ -12,6 +12,9 @@ Elrond reads acquisitions, so this writes one per run under <dest>/<run>/:
                                            under artefacts/logs/, which Elrond already reads
   all           expected.json              what ran and when (the ground truth), kept out of the
                                            events so it can't colour the analysis
+                network/<test>.pcap[ng]    each test's capture, when one was made, for Elrond's
+                                           --Network (a folder apart: beside the acquisition it
+                                           would be read as the host's)
 
 Usage: python3 -m src.mordor.lab.dataset --run <run> [--src DIR] --dest DIR
 """
@@ -22,6 +25,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import sys
 import tarfile
 import xml.etree.ElementTree as ET
@@ -36,6 +40,7 @@ EVENT = re.compile(r"<Event[\s>].*?</Event>", re.S)
 # Per-test files on Linux and macOS, and the name each takes under artefacts/logs/
 UNIX_LOGS = {"linux": ("audit.log", "journal.log"), "macos": ("unified.ndjson", "es.ndjson", "plists.ndjson")}
 PLATFORM_NAME = {"linux": "Linux", "macos": "macOS"}
+CAPTURES = ("capture.pcapng", "capture.pcap")
 
 
 def _local(tag: str) -> str:
@@ -167,6 +172,21 @@ def _unix_tarball(run_dir: str, tests: List[Dict], dest: str, host: str, platfor
     return lines
 
 
+def _captures(run_dir: str, tests: List[Dict], dest: str) -> int:
+    """Each test's capture as network/<test>.pcap[ng]; how many there were."""
+    count = 0
+    for t in tests:
+        folder = t.get("folder", "")
+        for name in CAPTURES:
+            path = os.path.join(run_dir, folder, name)
+            if os.path.isfile(path) and os.path.getsize(path):
+                os.makedirs(dest, exist_ok=True)
+                shutil.copyfile(path, os.path.join(dest, f"{safe_name(folder)}{os.path.splitext(name)[1]}"))
+                count += 1
+                break
+    return count
+
+
 def convert(run_dir: str, dest_root: str) -> Dict:
     """One recording → <dest_root>/<run>/acquisitions/ and expected.json. Returns a summary."""
     run = safe_name(os.path.basename(os.path.normpath(run_dir)))
@@ -185,10 +205,15 @@ def convert(run_dir: str, dest_root: str) -> Dict:
         count, unit = _unix_tarball(run_dir, tests, archive, host, platform), "log lines"
     else:
         raise LabError("Unknown platform in manifest.json", platform or "(none)")
+    network = os.path.join(out, "network")
+    captures = _captures(run_dir, tests, network)
     with open(os.path.join(out, "expected.json"), "w", encoding="utf-8") as fh:
         json.dump(expected(manifest, run), fh, indent=2)
-    return {"run": run, "platform": platform, "tests": len(tests), unit.replace(" ", "_"): count,
-            "acquisitions": acq + os.sep, "archive": archive}
+    result = {"run": run, "platform": platform, "tests": len(tests), unit.replace(" ", "_"): count,
+              "acquisitions": acq + os.sep, "archive": archive, "captures": captures}
+    if captures:
+        result["network"] = network + os.sep
+    return result
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -209,6 +234,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         logger.warning("%s: nothing was recorded in its %d tests", result["run"], result["tests"])
     logger.info("Dataset for Elrond: %s (%d tests, %s %s)", result["acquisitions"], result["tests"], f"{found:,}",
                 "events" if "events" in result else "log lines")
+    if result.get("network"):
+        logger.info("Captures for --Network: %s (%d)", result["network"], result["captures"])
     return 0
 
 

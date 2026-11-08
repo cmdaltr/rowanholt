@@ -6,7 +6,8 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
-from rowanholt.post.mitre.patterns import MitrePatternMatcher, whole_words  # noqa: E402
+from rowanholt.post.mitre.patterns import (PATTERN_MAPPINGS, MitrePatternMatcher, alternatives,  # noqa: E402
+                                           literal_head, literal_heads, whole_words)
 
 CLEAN = [
     {"PID": 4, "ImageFileName": "System"},
@@ -52,6 +53,32 @@ def test_whole_words_keeps_extensions_and_spaces() -> None:
     assert all(matches(s) for s in ("tar -czf a.tgz", "x.LNK", "reg add HKCU", "schtasks /create",
                                      "SetWindowsHookExA", "regsvr32 /s /i:http://x scrobj.dll"))
     assert whole_words(r"at\.(?:exe|allow|deny)") == r"(?<![a-z0-9])at\.(?:exe|allow|deny)"
+
+
+def test_literal_heads_are_what_a_match_must_contain() -> None:
+    assert literal_head("Mimikatz") == "mimikatz" and literal_head(r"\.lnk") == ".lnk"
+    assert literal_head("reg ") == "reg " and literal_head(r"c:\\windows\\temp") == "c:\\windows\\temp"
+    assert literal_head("schtasks?") == "schtask" and literal_head("net(?:s|ex)") == "net"
+    assert literal_head("ab*c") == "a" and literal_head("ab+c") == "ab" and literal_head("x{2}") == ""
+    assert literal_head(r"\d+\.exe") == "" and literal_head("[a-z]at") == "" and literal_head("(a|b)c") == ""
+    assert literal_heads(r"tar|\.lnk") == ("tar", ".lnk") and literal_heads(r"tar|\d+") is None
+
+
+def test_skipping_patterns_by_their_heads_changes_no_match() -> None:
+    """Every pattern's own words, in any case and in context, against the regexes run without
+    the prefilter: the prefilter only saves time."""
+    matcher = MitrePatternMatcher()
+
+    def every_regex(text: str) -> set:
+        return {t for compiled in matcher._compiled_patterns.values() for pattern, ids in compiled
+                if pattern.search(text) for t in ids}
+
+    words = [part.replace("\\", "") for patterns in PATTERN_MAPPINGS.values() for pattern in patterns
+             for part in alternatives(pattern)]
+    texts = [f"C:\\Users\\a\\{w} -x" for w in words] + [f"run {w.upper()}.exe" for w in words]
+    texts += [" ".join(f"{k}={v}" for k, v in r.items()) for r in CLEAN] + ["pıng 10.0.0.1", "ſchtasks /create"]
+    assert sum(bool(every_regex(t)) for t in texts) > len(words)  # the corpus does match
+    assert all(matcher.match_content(t) == every_regex(t) for t in texts)
 
 
 def test_a_clean_host_tags_nothing() -> None:
