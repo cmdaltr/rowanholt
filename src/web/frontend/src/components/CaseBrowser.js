@@ -15,6 +15,7 @@ import {
   getCaseActivity,
   caseLiveUrl,
   getCaseReport,
+  getCaseFullReport,
   getConfirmedLayer,
   getAuthConfig,
   getUserDirectory,
@@ -58,6 +59,7 @@ function CaseBrowser() {
   const [caseNote, setCaseNote] = useState('');
   const [findingNote, setFindingNote] = useState({});
   const [people, setPeople] = useState([]);
+  const [building, setBuilding] = useState(''); // the case report's format while it's being built
 
   const loadOverview = useCallback(async () => {
     try {
@@ -150,6 +152,23 @@ function CaseBrowser() {
     });
   };
 
+  const caseReport = async (format) => {
+    setBuilding(format);
+    try {
+      download(`${job?.case_number || jobId}_report.${format === 'docx' ? 'docx' : 'md'}`,
+        await getCaseFullReport(jobId, format),
+        format === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'text/markdown');
+      await loadShared(); // the export is in the activity feed
+    } catch (err) {
+      // The response was asked for as a blob, so an error's detail is in one too
+      let message = err.message || 'The report failed';
+      try { message = JSON.parse(await err.response.data.text()).detail || message; } catch { /* not JSON */ }
+      setError(message);
+    } finally {
+      setBuilding('');
+    }
+  };
+
   const flaggedRefs = new Set(findings.filter((f) => selected && f.host === selected.host && f.artefact === selected.path)
     .map((f) => f.row_ref));
   const caseNotes = notes.filter((n) => n.finding_id === null);
@@ -159,7 +178,9 @@ function CaseBrowser() {
     <div className="job-list journey-detail">
       <PageHero title={title}>
         The case's cooked artefacts and analysis, read-only. Flag rows as findings, confirm or dismiss them,
-        and keep notes; the report and Navigator layer are built from confirmed findings only.
+        and keep notes; Findings and the Navigator layer are built from confirmed findings only. The case
+        report (DOCX or Markdown) puts confirmed findings first, then Elrond's own report of the case:
+        techniques with the rows behind them, indicators, Gandalf's integrity check and the method.
       </PageHero>
 
       <div className="card" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -169,7 +190,13 @@ function CaseBrowser() {
           <span key={status} style={{ color: STATUS_COLOURS[status] }}>{count} {status}</span>
         ))}
         <button type="button" onClick={() => act(async () => download(`${job?.case_number || jobId}-findings.md`,
-          await getCaseReport(jobId), 'text/markdown'))}>Report</button>
+          await getCaseReport(jobId), 'text/markdown'))}>Findings</button>
+        <span style={{ display: 'inline-flex', gap: '0.25rem', alignItems: 'center' }}>
+          {building && <span style={{ color: '#888' }}>Building the report…</span>}
+          <button type="button" disabled={!!building} title="Confirmed findings first, then Elrond's report of the case"
+            onClick={() => caseReport('docx')}>Report (DOCX)</button>
+          <button type="button" disabled={!!building} onClick={() => caseReport('markdown')}>Report (Markdown)</button>
+        </span>
         <button type="button" onClick={() => act(async () => download(`${job?.case_number || jobId}-confirmed-layer.json`,
           JSON.stringify(await getConfirmedLayer(jobId), null, 2), 'application/json'))}>Navigator layer</button>
       </div>

@@ -439,6 +439,11 @@ export const caseLiveUrl = (jobId) => {
 export const getCaseReport = async (jobId) =>
   (await api.get(`${caseBase(jobId)}/report`, { responseType: 'text' })).data;
 
+// The case report (case_routes.full_report): confirmed findings first, then Elrond's report from the
+// case. format is 'docx' or 'markdown'; a large case's first download reads all its tables
+export const getCaseFullReport = async (jobId, format) =>
+  (await api.get(`${caseBase(jobId)}/full-report`, { params: { format }, responseType: 'blob' })).data;
+
 export const getConfirmedLayer = async (jobId) => (await api.get(`${caseBase(jobId)}/layer`)).data;
 
 // How many findings a job's case has (0 when it has no output to flag yet): restarting rewrites the

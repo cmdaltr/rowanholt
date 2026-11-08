@@ -64,6 +64,14 @@ def test_timestamps():
         assert iso_timestamp(nothing) is None
 
 
+def test_long_fractions_keep_their_zone():
+    # The fallback Python 3.10 reaches for Artemis's nine-digit event times (3.11 on parses them itself)
+    from rowanholt.core.records import _long_fraction
+    assert _long_fraction("2026-10-25T17:27:05.145549000+00:00").isoformat() == "2026-10-25T17:27:05.145549+00:00"
+    assert _long_fraction("2026-10-25T18:27:05.1455490+01:00").isoformat() == "2026-10-25T18:27:05.145549+01:00"
+    assert _long_fraction("2026-10-25T17:27:05.1455490").isoformat() == "2026-10-25T17:27:05.145549"
+
+
 def test_reads_old_cases_too(tmp_path):
     (tmp_path / "old.csv").write_text("Name,Command\nsshd,/usr/sbin/sshd\n")
     (tmp_path / "old.json").write_text(json.dumps([{"a": 1}, {"a": 2}]))

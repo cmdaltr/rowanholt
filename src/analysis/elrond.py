@@ -277,8 +277,16 @@ parser.add_argument(
     const=True,
     default=False,
 )
+parser.add_argument(
+    "--Report",
+    help="Write the case's report (Markdown and DOCX) into the case folder when the run ends: hosts and timespan, ATT&CK techniques with the rows behind each, indicators, Gandalf's integrity check and this run's method. A case already processed: python3 -m rowanholt.report /path/to/case",
+    action="store_const",
+    const=True,
+    default=False,
+)
 
 args = parser.parse_args()
+run_started = datetime.now().astimezone().isoformat(timespec="seconds")
 directory = args.directory
 case = args.case
 analysis = args.Analysis
@@ -712,6 +720,19 @@ if __name__ == "__main__":
         print("\n   ERROR: nothing could be mounted from {}\n".format(", ".join(failed_sources) or "the sources"), flush=True)
         sys.exit(2)
     print("\n  ----------------------------------------\n  -> Completed Identification Phase.\n")
+
+    # The report's method: this run's options and the tools it found, recorded in each case folder
+    case_folders = sorted({data["output_directory"] for data in mounted_data.values()})
+    method_tools = None
+    try:
+        from rowanholt.report import method as run_method
+
+        method_tools = run_method.tools()
+        for folder in case_folders:
+            run_method.record(folder, case, args, sys.argv, sources, started=run_started, found=method_tools)
+    except (OSError, ValueError) as e:
+        print(f"  -> WARNING: couldn't record this run's method for the report: {e}", flush=True)
+
     print("\n  -> \033[1;36mCommencing Collection Phase...\033[1;m\n  ----------------------------------------")
 
     for idx, source in enumerate(sources):
@@ -1083,6 +1104,31 @@ if __name__ == "__main__":
         verbosity = veryverbose
 
         archive_artefacts(verbosity, output_directory)
+
+    if method_tools is not None:
+        finished = datetime.now().astimezone().isoformat(timespec="seconds")
+        for folder in case_folders:
+            try:
+                run_method.record(folder, case, args, sys.argv, sources, started=run_started, finished=finished,
+                                  found=method_tools)
+            except (OSError, ValueError) as e:
+                print(f"  -> WARNING: couldn't record this run's method for the report: {e}", flush=True)
+
+    # ========== PHASE 7: REPORT (if requested) ==========
+    if args.Report and mounted_data:
+        from rowanholt.report import write_reports
+
+        print("\n  -> \033[1;36mCommencing Report Phase...\033[1;m\n  ----------------------------------------", flush=True)
+        for folder in case_folders:
+            try:
+                for written in write_reports(folder, case_number=case,
+                                             progress=lambda m: print(f"     {m}", flush=True)):
+                    print(f"     Report: {written}", flush=True)
+                    entry, prnt = "{},{},report,{}\n".format(datetime.now().isoformat(), case, written.name), ""
+                    write_audit_log_entry(verbosity, folder, entry, prnt)
+            except (OSError, ValueError) as e:
+                print(f"  -> WARNING: the report failed: {e}", flush=True)
+        print("  ----------------------------------------\n  -> Completed Report Phase.\n", flush=True)
 
     print("\n" + "=" * 60)
     print("  ALL PHASES COMPLETE")

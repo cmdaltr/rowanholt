@@ -536,10 +536,26 @@ python3 -m rowanholt.mitre.dashboard -o /output`}
             Browse Case on a completed job opens its cooked artefacts and analysis, read-only. Flag rows as
             findings (lead, confirmed or benign), keep notes, assign hosts and follow the activity feed. A row
             someone already flagged can't be flagged twice, and a finding changed by a colleague since you
-            loaded it isn't silently overwritten. Report and Navigator layer are built from confirmed findings
+            loaded it isn't silently overwritten. Findings and Navigator layer are built from confirmed findings
             only. Every table is JSON Lines, each record starting with its host, artefact, source path, time (UTC)
             and ATT&amp;CK techniques; Download as CSV gives a table, or the rows the filter shows, as a spreadsheet.
           </p>
+
+          <h4>Case Report</h4>
+          <p>
+            Report (DOCX) and Report (Markdown) in the case browser download the case report: the case notes and
+            confirmed findings first, each with its row and whether the row is unchanged since it was flagged; then
+            the open leads and dismissed rows; then Elrond's own report of the case. That part covers the hosts
+            and the timespan of their records, every ATT&amp;CK technique with the rows behind it, the indicators,
+            Gandalf's integrity check and the method: Elrond's options and the versions of its tools. Every claim
+            is cited by host, file, row and the row's hash, so a reviewer can follow it back to the evidence. The
+            first download of a large case reads all its tables and takes a few minutes; the second format is quick.
+            Elrond's Report option writes the same report from the case alone into the case folder.
+          </p>
+          <pre className="code-block">
+{`# A case processed earlier (from src/analysis)
+python3 -m rowanholt.report /path/to/case --out ~/reports`}
+          </pre>
 
           <h4>Container Forensics</h4>
           <p>

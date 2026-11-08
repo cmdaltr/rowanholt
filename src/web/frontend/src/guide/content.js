@@ -215,7 +215,7 @@ export const GUIDE_PAGES = [
         title: 'Findings',
         what: 'Every flagged row, with who flagged it, its technique and notes. Each one points at the row by file, row and hash; "row changed" means a re-run altered it.',
         who: 'The whole team, and whoever reviews the case.',
-        when: 'Confirming or dismissing leads; Report and Navigator layer above take confirmed findings only.',
+        when: 'Confirming or dismissing leads; Findings and Navigator layer above take confirmed findings only, and Report puts them first, ahead of Elrond\'s report of the case.',
       },
       {
         id: 'case.notes',
@@ -455,7 +455,7 @@ export const TIPS = [
   { id: 'multi-host', text: 'Put several hosts\' evidence in one job: the timeline and the ATT&CK mapping then cover the whole intrusion, not one machine at a time.', to: '/elrond' },
   { id: 'pause', text: 'A job can be paused, not just cancelled. Pause a long analysis to free the machine for something urgent, then resume it where it stopped.', to: '/jobs' },
   { id: 'bulk-restart', text: 'Several jobs failed for the same reason? Filter Jobs by Failed, select them and restart them together.', to: '/jobs' },
-  { id: 'case-confirmed', text: 'Flag rows as leads in the case browser and confirm them as they hold up: the report and Navigator layer from there carry confirmed findings only, not everything Elrond tagged.', to: '/jobs' },
+  { id: 'case-confirmed', text: 'Flag rows as leads in the case browser and confirm them as they hold up: the findings and Navigator layer from there carry confirmed findings only, not everything Elrond tagged, and the case report puts them ahead of the rest.', to: '/jobs' },
   { id: 'intel-match', text: 'Tick Threat Intelligence on Elrond\'s page to match a case against Pippin\'s indicators: threat_groups.jsonl ranks the groups and says what each rank rests on, so one shared PowerShell switch never reads like attribution.', to: '/pippin' },
   { id: 'intel-check', text: 'Check a single command line or hash in Pippin before reading anything into it: an element dozens of groups use is marked common.', to: '/pippin' },
   { id: 'archive', text: 'Archive finished cases instead of deleting them: the Jobs page stays tidy and the output stays on disk.', to: '/archive' },
