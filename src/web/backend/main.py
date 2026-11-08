@@ -30,6 +30,7 @@ try:
     from . import threat_intel_store
     from . import case_routes  # The case browser, findings, notes and assignments
     from . import eru_offline
+    from . import backup_secrets  # Phone backup passwords, job form to worker
     from .models.job import (
         Job,
         JobCreate,
@@ -54,6 +55,7 @@ except ImportError:
     import threat_intel_store
     import case_routes  # The case browser, findings, notes and assignments
     import eru_offline
+    import backup_secrets  # Phone backup passwords, job form to worker
     from models.job import (
         Job,
         JobCreate,
@@ -358,6 +360,9 @@ async def create_job(job_request: JobCreate, request: Request):
                 detail=f"Case number must be no longer than 30 characters (got {len(case_number)})",
             )
 
+        if job_request.backup_password and not job_request.options.mobile:
+            raise HTTPException(status_code=400, detail="A backup password is only for Mobile jobs (phone backups)")
+
         # Validate and sanitize source paths
         sanitized_source_paths = []
         for path in job_request.source_paths:
@@ -388,6 +393,12 @@ async def create_job(job_request: JobCreate, request: Request):
 
         # Generate job ID
         job_id = str(uuid.uuid4())
+
+        # An encrypted phone backup's password goes to the worker through Redis (expiring), never
+        # the job: stashed before the job is saved, so a Redis failure leaves no job behind
+        password = job_request.backup_password.get_secret_value() if job_request.backup_password else ""
+        if password:
+            backup_secrets.stash(job_id, password)
 
         # Set destination path - if not specified, use case number as directory name
         if not destination_path and sanitized_source_paths:

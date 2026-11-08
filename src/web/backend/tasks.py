@@ -771,7 +771,10 @@ def build_elrond_command(job):
     cmd.append("--Process")
 
     # Collection mode (mutually exclusive)
-    if opts.gandalf:
+    if getattr(opts, "mobile", False):
+        # Phones (core/mobile.py). This legacy runner doesn't pass a backup password (tasks_docker does)
+        cmd.append("--Mobile")
+    elif opts.gandalf:
         # Gandalf mode: process pre-collected artifacts (no collection)
         cmd.append("--Gandalf")
     else:

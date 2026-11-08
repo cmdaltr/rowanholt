@@ -26,6 +26,7 @@ import redis
 from config import settings
 from storage import JobStorage
 from models.job import JobStatus, PendingAction
+import backup_secrets
 
 # Initialize Celery
 celery_app = Celery(
@@ -719,6 +720,12 @@ def start_analysis(self, job_id: str):
         cmd.insert(0, str(elrond_script))
         cmd.insert(0, "python3")
 
+        # An encrypted phone backup's password: taken from Redis (and removed there), written to
+        # Elrond's standard input below, never on its command line or in the job
+        backup_password = backup_secrets.take(job_id) if getattr(job.options, "mobile", False) else None
+        if backup_password:
+            cmd.append("--backupPasswordStdin")
+
         logger.info(f"Executing: {' '.join(cmd)}")
 
         # Run elrond with proper environment
@@ -731,6 +738,7 @@ def start_analysis(self, job_id: str):
 
         process = subprocess.Popen(
             cmd,
+            stdin=subprocess.PIPE if backup_password else None,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             universal_newlines=True,
@@ -742,6 +750,10 @@ def start_analysis(self, job_id: str):
             # can stop them.
             start_new_session=True,
         )
+        if backup_password:
+            process.stdin.write(backup_password + "\n")
+            process.stdin.close()
+            backup_password = None
         _register_job_process(job_id, self.request.hostname, process.pid)
         spool = JobLogSpool(os.path.join(dest_dir_str, "rowanholt_job.log"))
         last_save = time.monotonic()
@@ -1258,7 +1270,10 @@ def build_elrond_command(job):
     # No --Auto flag needed
 
     # Collection mode (mutually exclusive)
-    if opts.gandalf:
+    if getattr(opts, "mobile", False):
+        # Phones' backups and extractions: already collected, nothing to mount (core/mobile.py)
+        cmd.append("--Mobile")
+    elif opts.gandalf:
         # Gandalf mode: process pre-collected artifacts (no collection)
         cmd.append("--Gandalf")
     else:
