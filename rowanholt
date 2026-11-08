@@ -56,7 +56,37 @@ compose_cmd() {
     (cd "$ROOT" && $DC $COMPOSE_FILES "$@")
 }
 
+selinux_enforcing() {
+    [ "$(cat /sys/fs/selinux/enforce 2>/dev/null)" = 1 ]
+}
+
+# Rocky, RHEL and Alma ship Podman, and podman-docker answers to `docker`: Rowanholt needs
+# Docker Engine itself (Andúril and the worker are untested on Podman's socket)
+check_linux_docker() {
+    [[ "$(uname)" == "Linux" ]] || return 0
+    local found=""
+    if command -v docker &>/dev/null; then
+        docker --version 2>/dev/null | grep -qi podman || return 0
+        found="'docker' here is Podman (podman-docker)"
+    else
+        found="Docker isn't installed"
+    fi
+    echo "Error: $found. Rowanholt needs Docker Engine; Podman isn't supported." >&2
+    if grep -qiE '^ID(_LIKE)?=.*(rhel|fedora|centos)' /etc/os-release 2>/dev/null; then
+        echo "  From Docker's own RHEL repository (docs/SERVER.md, Rocky, RHEL and Alma):" >&2
+        echo "    sudo dnf remove -y podman-docker podman runc" >&2
+        echo "    sudo dnf install -y dnf-plugins-core" >&2
+        echo "    sudo dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo" >&2
+        echo "    sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin" >&2
+        echo "    sudo systemctl enable --now docker" >&2
+    else
+        echo "  Install it from https://docs.docker.com/engine/install/" >&2
+    fi
+    exit 1
+}
+
 detect_compose() {
+    check_linux_docker
     if docker compose version &>/dev/null; then
         DC="docker compose"
     elif command -v docker-compose &>/dev/null; then
@@ -191,6 +221,11 @@ stack() {
         if [ -n "$(sed -n 's/^ROWANHOLT_SERVICE=//p' "$ROOT/.env" | tail -1)" ]; then
             COMPOSE_FILES="$COMPOSE_FILES -f deploy/server/docker-compose.service.yml"
         fi
+    fi
+    # SELinux enforcing: the services with host folders mounted run unlabelled (the file says why)
+    if selinux_enforcing; then
+        COMPOSE_FILES="$COMPOSE_FILES -f deploy/docker-compose.selinux.yml"
+        $SERVER && COMPOSE_FILES="$COMPOSE_FILES -f deploy/server/docker-compose.selinux.yml"
     fi
     # Evidence folders added in the desktop app's setup (gitignored, so a pull never touches it)
     if [ -f "$ROOT/docker-compose.local.yml" ]; then

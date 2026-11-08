@@ -1,0 +1,7 @@
+# The server profile's own bind mounts (the Caddyfile and certificates) on a host with SELinux
+# enforcing; added after deploy/docker-compose.selinux.yml, which says why label=disable.
+
+services:
+  proxy:
+    security_opt:
+      - label=disable

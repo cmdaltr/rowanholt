@@ -21,7 +21,7 @@ Server mode is the backend setting `ROWANHOLT_SERVER_MODE`, which `deploy/server
 
 ## Setting up
 
-Requirements: a Linux host with Docker Engine and Compose 2.24 or later, and a DNS name for it. Ubuntu 24.04 with Docker's own packages is the tested shape.
+Requirements: a Linux host with Docker Engine and Compose 2.24 or later, and a DNS name for it. Ubuntu 24.04 with Docker's own packages is the tested shape; Rocky, RHEL and Alma 9 need the steps in [Rocky, RHEL and Alma](#rocky-rhel-and-alma) first.
 
 ```bash
 git clone https://github.com/cmdaltr/rowanholt.git && cd rowanholt
@@ -75,6 +75,23 @@ Before the first `--service`, in the tailnet's admin console or through its API:
 3. If `server init` says Tailscale doesn't know the Service, define it once under Services with endpoints `tcp:443, tcp:7755, tcp:5601, tcp:5602`.
 
 Afterwards register MCP clients again at the name, and for single sign-on add `https://<name>.<tailnet>.ts.net/api/auth/oidc/callback` as a redirect URI. Sign-in cookies belong to the address they were made at, so a browser signs in once at each address it uses; Splunk, Kibana and the Navigator send it to the sign-in page at the address it's on. `--service off` drops the name and puts the port address back as the public URL.
+
+### Rocky, RHEL and Alma
+
+These ship Podman, not Docker, and enforce SELinux. Rowanholt needs Docker Engine from Docker's own RHEL repository; Podman's Docker-compatible socket isn't supported (Andúril and the worker are untested on it), and `rowanholt start` stops with these steps if `docker` is missing or is Podman's:
+
+```bash
+sudo dnf remove -y podman-docker podman runc
+sudo dnf install -y dnf-plugins-core
+sudo dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo
+sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo systemctl enable --now docker
+sudo usermod -aG docker "$USER"    # then sign in again
+```
+
+**SELinux** stays enforcing. When `/sys/fs/selinux/enforce` is 1, `rowanholt start` adds `deploy/docker-compose.selinux.yml` (and, on a server, `deploy/server/docker-compose.selinux.yml`), which runs the services that mount host folders (the backend, frontend, proxy, Splunk, Kibana's set-up and Andúril) with `label=disable`. The alternative, relabelling each folder with `:z`, rewrites the `security.selinux` attribute of every file under it: across an evidence store that's slow, it fails on read-only and NFS mounts, and it changes the evidence's own metadata. Nothing on the host is relabelled. The worker is privileged already (it mounts images), so it was never confined. Named volumes (Postgres, Redis, Splunk's and Elastic's data) keep Docker's own labels.
+
+**firewalld.** When it's running, `server init` opens the proxy's ports in the default zone and says which: 80 and 443 (or the `--https-port`), 7755, 5601 and 5602. Nothing else is published, so nothing else needs opening.
 
 ### Evidence
 
@@ -191,6 +208,5 @@ The backend migrates its database on start with Alembic (`src/web/backend/alembi
 
 These are feature requests in `docs/FEATURE_REQUESTS.md`:
 
-- **FR-01:** servers on RHEL, Rocky and Alma (SELinux labels, firewalld, Docker's RHEL packages).
 - **FR-02:** servers on Windows Server, through WSL 2.
 - **FR-04:** lab VM consoles in the browser.

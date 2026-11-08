@@ -146,6 +146,19 @@ else
     PUBLIC_URL="https://$HOSTNAME_ARG:$HTTPS_PORT"
     set_value ROWANHOLT_HTTP_PUBLISH 127.0.0.1:8080  # its redirect isn't wanted; 80 stays free
 fi
+# firewalld (Rocky, RHEL, Alma): the proxy's ports open in the default zone, nothing else
+OPENED=()
+if command -v firewall-cmd >/dev/null && $SUDO firewall-cmd --state >/dev/null 2>&1; then
+    ports="$HTTPS_PORT 7755 5601 5602"
+    [ "$HTTPS_PORT" = 443 ] && ports="80 $ports"
+    for port in $ports; do
+        $SUDO firewall-cmd --query-port="$port/tcp" >/dev/null 2>&1 && continue
+        $SUDO firewall-cmd --permanent --add-port="$port/tcp" >/dev/null \
+            || { echo "Error: firewalld won't open $port/tcp" >&2; exit 1; }
+        OPENED+=("$port")
+    done
+    [ ${#OPENED[@]} -eq 0 ] || $SUDO firewall-cmd --reload >/dev/null
+fi
 set_value ROWANHOLT_SERVICE "$SERVICE"
 if [ -n "$SERVICE" ]; then
     set_value ROWANHOLT_OTHER_URLS "$PUBLIC_URL"
@@ -191,6 +204,15 @@ fi
 if [ -n "$ADMIN_PASSWORD" ]; then
     echo "  First admin:  admin / $ADMIN_PASSWORD"
     echo "  (shown once; it's also ROWANHOLT_ADMIN_PASSWORD in .env until you change it after signing in)"
+    echo ""
+fi
+if [ ${#OPENED[@]} -gt 0 ]; then
+    echo "  firewalld: opened ${OPENED[*]/%//tcp} in the default zone ($($SUDO firewall-cmd --get-default-zone))."
+    echo ""
+fi
+if [ -f /sys/fs/selinux/enforce ] && [ "$(cat /sys/fs/selinux/enforce)" = 1 ]; then
+    echo "  SELinux is enforcing: the services that mount host folders run unlabelled"
+    echo "  (deploy/docker-compose.selinux.yml), so evidence folders aren't relabelled."
     echo ""
 fi
 if [ ${#kept[@]} -gt 0 ]; then

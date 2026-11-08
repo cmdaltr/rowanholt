@@ -17,15 +17,9 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 
 ## FR-01: Team servers on Linux beyond Ubuntu
 
-**Why.** Organisations run servers on the distributions they already support, and for many that's RHEL or one of its rebuilds. Today the server guide's tested shape is Ubuntu 24.04 with Docker's packages.
+**Built 8 November 2026, not yet run on a Rocky host.** `docs/SERVER.md` (Rocky, RHEL and Alma): SELinux through `deploy/docker-compose.selinux.yml` (`label=disable` on the services that mount host folders, so no evidence is relabelled), firewalld ports opened by `server init`, and `rowanholt start` refusing a missing Docker or Podman's `docker` with Docker's RHEL install steps.
 
-**What it takes.**
-- **SELinux.** Rocky and RHEL enforce it, and a bind mount without a label is unreadable inside a container. The stack's own mounts in `docker-compose.yml` and the evidence folders from `ROWANHOLT_EVIDENCE_PATHS` and `docker-compose.local.yml` need `:z` (or `bind: {selinux: z}` in the long form) on SELinux hosts. The Docker socket mount for Andúril needs a policy check, not just a label.
-- **firewalld.** `server init` opens 443 and 80 (redirects and ACME) and nothing else, or says exactly which `firewall-cmd` lines to run.
-- **Docker.** It comes from Docker's own RHEL repository; the distribution ships Podman. The runtime check should say so, not just "docker missing". Podman's Docker-compatible socket stays unsupported until it's tested with Andúril and the worker.
-- **The guide.** `docs/SERVER.md` gets a per-distribution set-up section.
-
-**Done when** `rowanholt server init` and `rowanholt start` bring up a working, signed-in server on Rocky 9 with SELinux enforcing, an analysis job reads evidence from a configured folder, and the same passes on Ubuntu 24.04.
+**Done when** `rowanholt server init` and `rowanholt start` bring up a working, signed-in server on Rocky 9 with SELinux enforcing, an analysis job reads evidence from a configured folder, and the same passes on Ubuntu 24.04. Then this entry goes.
 
 **Depends on** a Rocky 9 VM in the lab; headless is enough.
 
