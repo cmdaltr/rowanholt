@@ -13,7 +13,7 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 | FR-05 | Mobile device forensics (iOS, Android) | Gandalf, Elrond |
 | FR-06 | Network forensics (PCAP, Zeek, NetFlow) | Elrond |
 | FR-07 | Automated reporting | Elrond, web |
-| FR-08 | More SIEM integrations | Elrond output |
+| FR-08 | More SIEM integrations: OpenSearch/Wazuh and Timesketch (built; Wazuh untried) | Elrond output |
 
 ## FR-01: Team servers on Linux beyond Ubuntu
 
@@ -124,17 +124,8 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 
 ## FR-08: More SIEM integrations
 
-**Why.** Teams use the SIEM they have. Today it's Splunk and Elastic.
+**Built 8 November 2026: OpenSearch (and Wazuh, whose indexer is OpenSearch) and Timesketch** (`post/opensearch.py`, `post/timesketch.py`; `docs/CLI.md`, SIEM Integration). Ben chose these two; Microsoft Sentinel and Chronicle are dropped. Run against OpenSearch 2.19 with its security plugin (a 1,157,224-record Windows host: every record, searchable by host and technique) and Timesketch 20261014.
 
-**What it takes.**
-- Output modules beside `post/splunk/` and `post/elastic/`:
-  - Microsoft Sentinel (Logs Ingestion API with a data collection rule);
-  - OpenSearch (close to Elastic);
-  - Wazuh;
-  - Chronicle.
-- Each sends the cooked artefacts with the same field names and technique tags, and the credentials go into `.env`, never the case.
-- Archer can generate the matching detections for each.
+**Done when** a case appears in a Wazuh deployment's dashboard (only OpenSearch itself has been tried), and Archer can generate the matching detections for Wazuh. Then this entry goes.
 
-**Done when** a case appears in each SIEM, searchable by host and technique, from a single tick box on Elrond's page.
-
-**Depends on** test tenants (Sentinel and Chronicle can't run locally).
+**Depends on** a Wazuh deployment in the lab.

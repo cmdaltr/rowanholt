@@ -365,6 +365,8 @@ function NewAnalysis() {
             hash_all: opts.hash_all || false,
             splunk: opts.splunk || false,
             elastic: opts.elastic || false,
+            opensearch: opts.opensearch || false,
+            timesketch: opts.timesketch || false,
             navigator: opts.navigator || false,
             gandalf: opts.gandalf || false,
           });

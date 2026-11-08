@@ -159,6 +159,19 @@ services:
       - ELASTICSEARCH_PORT=9200
       - ELASTIC_USERNAME=elastic
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-rowanholt}
+      # OpenSearch (or Wazuh's indexer) and Timesketch, elsewhere: --OpenSearch and --Timesketch (.env.example)
+      - OPENSEARCH_URL=${OPENSEARCH_URL:-}
+      - OPENSEARCH_USERNAME=${OPENSEARCH_USERNAME:-}
+      - OPENSEARCH_PASSWORD=${OPENSEARCH_PASSWORD:-}
+      - OPENSEARCH_CA=${OPENSEARCH_CA:-}
+      - OPENSEARCH_VERIFY=${OPENSEARCH_VERIFY:-true}
+      - OPENSEARCH_INDEX_PREFIX=${OPENSEARCH_INDEX_PREFIX:-rowanholt-}
+      - OPENSEARCH_DASHBOARDS_URL=${OPENSEARCH_DASHBOARDS_URL:-}
+      - TIMESKETCH_URL=${TIMESKETCH_URL:-}
+      - TIMESKETCH_USERNAME=${TIMESKETCH_USERNAME:-}
+      - TIMESKETCH_PASSWORD=${TIMESKETCH_PASSWORD:-}
+      - TIMESKETCH_CA=${TIMESKETCH_CA:-}
+      - TIMESKETCH_VERIFY=${TIMESKETCH_VERIFY:-true}
       # Set to 'true' to exclude cache directories from user profile copies (faster but less complete)
       - ROWANHOLT_EXCLUDE_PROFILE_CACHE=true
       # Elrond's DNS lookups of extracted IOCs: only when the list includes "dns" (.env.example)

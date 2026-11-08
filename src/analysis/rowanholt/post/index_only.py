@@ -1,4 +1,4 @@
-"""Index a case Elrond has already processed into Splunk, Elastic and the ATT&CK Navigator, without
+"""Index a case Elrond has already processed into Splunk, Elastic, OpenSearch, Timesketch and the ATT&CK Navigator, without
 mounting, extracting or processing anything again (elrond.py --Index).
 
 The hosts and their platforms come from the case folder: the audit log's "identified platform"
@@ -171,8 +171,42 @@ def case_hosts(output_directory: str) -> Tuple[Dict[str, str], List[str]]:
     return allimgs, unknown
 
 
+def export_targets(output_directory: str, case: str, verbosity: str, opensearch: bool,
+                   timesketch: bool) -> List[str]:
+    """The case's processed hosts into OpenSearch (its index replaced) and Timesketch (hosts already
+    in its sketch left alone), once for the whole case, after a run or from --Index; the targets
+    that failed."""
+    from rowanholt.post import opensearch as opensearch_export
+    from rowanholt.post import timesketch as timesketch_export
+
+    output_directory = os.path.join(output_directory, "")
+    allimgs, _ = case_hosts(output_directory)
+    failed: List[str] = []
+    for name, on, export in (("OpenSearch", opensearch, opensearch_export.export_case),
+                             ("Timesketch", timesketch, timesketch_export.export_case)):
+        if not on:
+            continue
+        print(f"\n  -> \033[1;36mCommencing {name} Phase...\033[1;m\n  ----------------------------------------")
+        try:
+            if not allimgs:
+                raise IndexOnlyError(f"no processed hosts in {output_directory}")
+            sent = export(output_directory, case, allimgs)
+            outcome = f"exported {len(sent)} host(s) to {name}"
+        except Exception as error:  # report it and go on to the other target
+            print(f"     ERROR: {name} export failed: {error}")
+            failed.append(name)
+            outcome = f"{name} export failed: {error}"
+        write_audit_log_entry(
+            verbosity, output_directory,
+            f"{datetime.now().isoformat()},{case},{name.lower()},{outcome.replace(',', ';')}\n",
+            f" -> {datetime.now().isoformat().replace('T', ' ')} -> {outcome}",
+        )
+        print(f"  ----------------------------------------\n  -> Completed {name} Phase.\n")
+    return failed
+
+
 def index_case(output_directory: str, case: str, verbosity: str, splunk: bool, elastic: bool,
-               navigator: bool) -> List[str]:
+               navigator: bool, opensearch: bool = False, timesketch: bool = False) -> List[str]:
     """Index the case's processed hosts; the targets that failed (each is tried, whatever the
     others do)."""
     from rowanholt.post.elastic.config import configure_elastic_stack
@@ -210,6 +244,7 @@ def index_case(output_directory: str, case: str, verbosity: str, splunk: bool, e
             print(f"     ERROR: Elastic indexing failed: {error}")
             failed.append("Elastic")
         print("  ----------------------------------------\n  -> Completed Elastic Phase.\n")
+    failed += export_targets(output_directory, case, verbosity, opensearch, timesketch)
     if navigator:
         print("\n  -> \033[1;36mCommencing Navigator Phase...\033[1;m\n  ----------------------------------------")
         try:
@@ -219,7 +254,8 @@ def index_case(output_directory: str, case: str, verbosity: str, splunk: bool, e
             failed.append("Navigator")
         print("  ----------------------------------------\n  -> Completed Navigator Phase.\n")
 
-    targets = [t for t, on in (("Splunk", splunk), ("Elastic", elastic), ("Navigator", navigator)) if on]
+    targets = [t for t, on in (("Splunk", splunk), ("Elastic", elastic), ("OpenSearch", opensearch),
+                               ("Timesketch", timesketch), ("Navigator", navigator)) if on]
     outcome = f"indexed into {', '.join(targets)}" + (f"; {', '.join(failed)} failed" if failed else "")
     write_audit_log_entry(
         verbosity, output_directory,

@@ -220,6 +220,8 @@ function JobDetails() {
       'threat_intel': 'Threat Intelligence',
       'splunk': 'Splunk',
       'elastic': 'Elastic',
+      'opensearch': 'OpenSearch',
+      'timesketch': 'Timesketch',
       'navigator': 'Navigator'
     };
 
