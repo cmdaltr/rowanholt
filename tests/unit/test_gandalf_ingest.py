@@ -8,6 +8,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from unittest import mock
 import zipfile
 from pathlib import Path
 
@@ -116,8 +117,10 @@ class GandalfIngestTests(unittest.TestCase):
         write_tarball(self.acq / "lab-rocky" / "lab-rocky.tar.gz", files)
         self.assess()
 
-        with open(self.out / "lab-rocky" / "gandalf_integrity.csv", newline="") as f:
-            status = {row["file_path"]: row["status"] for row in csv.DictReader(f)}
+        from rowanholt.core.records import check_file, read_records
+        integrity = self.out / "lab-rocky" / "gandalf_integrity.jsonl"
+        self.assertEqual(check_file(integrity), [])
+        status = {row["file_path"]: row["status"] for _, row in read_records(integrity)}
         self.assertEqual(status["artefacts/etc+passwd"], "verified")
         self.assertEqual(status["artefacts/user/gandalf/.bash_history"], "MISMATCH")
         self.assertEqual(status["artefacts/gone,with a comma"], "missing")
@@ -128,7 +131,7 @@ class GandalfIngestTests(unittest.TestCase):
         (self.acq / "lab-rocky").mkdir(parents=True)
         write_tarball(self.acq / "lab-rocky" / "lab-rocky.tar.gz", files)
         self.assess()
-        self.assertFalse((self.out / "lab-rocky" / "gandalf_integrity.csv").exists())
+        self.assertFalse((self.out / "lab-rocky" / "gandalf_integrity.jsonl").exists())
 
     def test_zsh_extended_history(self):
         from rowanholt.process.nix import parse_zsh_history
@@ -225,16 +228,72 @@ class GandalfIngestTests(unittest.TestCase):
         self.assertFalse((self.root / "escaped.txt").exists())
         self.assertFalse((self.root.parent / "escaped.txt").exists())
 
-    def test_reingest_reuses_existing_output(self):
+    def test_reingest_reuses_the_extraction_and_rebuilds_what_was_cooked(self):
+        """A reused extraction's cooked/ and analysis/ were appended to by the next run, doubling
+        every record (the Windows stacking eval, 7 November 2026)."""
         (self.acq / "lab-rocky").mkdir(parents=True)
         write_tarball(self.acq / "lab-rocky" / "lab-rocky.tar.gz", UNIX_LAYOUT)
         self.assess()
-        cooked = self.out / "lab-rocky" / "artefacts" / "cooked"
-        cooked.mkdir()
-        (cooked / "kept.csv").write_text("x")
+        host = self.out / "lab-rocky"
+        self.assertTrue((host / gandalf.EXTRACTED_MARKER).is_file())
+        (host / "artefacts" / "raw" / "kept").write_text("collected")
+        for derived in ("artefacts/cooked", "analysis"):
+            (host / derived).mkdir(parents=True, exist_ok=True)
+            (host / derived / "stale.jsonl").write_text("x")
         self.assess()
-        self.assertTrue((cooked / "kept.csv").exists())
-        self.assertFalse((self.out / "lab-rocky" / "artefacts" / "raw" / "passwd.1").exists())
+        self.assertTrue((host / "artefacts" / "raw" / "kept").exists())  # raw/ reused, not extracted again
+        self.assertFalse((host / "artefacts" / "cooked" / "stale.jsonl").exists())
+        self.assertFalse((host / "analysis" / "stale.jsonl").exists())
+        self.assertFalse((self.out / gandalf.PREVIOUS_DIR).exists())
+        self.assertIn("cleared to be rebuilt", (self.out / "rowanholt_audit.log").read_text())
+
+    def test_reingest_can_extract_again_and_keeps_the_earlier_one(self):
+        (self.acq / "lab-rocky").mkdir(parents=True)
+        write_tarball(self.acq / "lab-rocky" / "lab-rocky.tar.gz", UNIX_LAYOUT)
+        self.assess()
+        (self.out / "lab-rocky" / "artefacts" / "cooked").mkdir()
+        (self.out / "lab-rocky" / "artefacts" / "cooked" / "stale.jsonl").write_text("x")
+        with mock.patch.object(gandalf, "safe_input", return_value="n"):
+            self.assess()
+        host = self.out / "lab-rocky"
+        self.assertTrue((host / "artefacts" / "raw").is_dir())
+        self.assertFalse((host / "artefacts" / "cooked" / "stale.jsonl").exists())
+        [earlier] = (self.out / gandalf.PREVIOUS_DIR).glob("lab-rocky-*")
+        self.assertTrue((earlier / "artefacts" / "cooked" / "stale.jsonl").exists())  # moved aside, not deleted
+        self.assertIn("extracted again (asked to extract it again)", (self.out / "rowanholt_audit.log").read_text())
+
+    def test_reingest_extracts_again_when_the_earlier_one_did_not_finish(self):
+        (self.acq / "lab-rocky").mkdir(parents=True)
+        write_tarball(self.acq / "lab-rocky" / "lab-rocky.tar.gz", UNIX_LAYOUT)
+        self.assess()
+        host = self.out / "lab-rocky"
+        (host / gandalf.EXTRACTED_MARKER).unlink()  # as a run that stopped part-way leaves it
+        with mock.patch.object(gandalf, "safe_input") as asked:
+            self.assess()
+        asked.assert_not_called()
+        self.assertTrue((host / gandalf.EXTRACTED_MARKER).is_file())
+        [earlier] = (self.out / gandalf.PREVIOUS_DIR).glob("lab-rocky-*")
+        self.assertTrue((earlier / "artefacts" / "raw").is_dir())
+        self.assertIn("extraction is incomplete", (self.out / "rowanholt_audit.log").read_text())
+
+    def test_an_earlier_extraction_is_not_another_host(self):
+        sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "web" / "backend"))
+        import case_files
+        from rowanholt.analysis import stacking
+        from rowanholt.post.clean import cleanup_small_files_and_empty_dirs
+        (self.acq / "lab-rocky").mkdir(parents=True)
+        write_tarball(self.acq / "lab-rocky" / "lab-rocky.tar.gz", UNIX_LAYOUT)
+        self.assess()
+        (self.out / "lab-rocky" / "artefacts" / "cooked").mkdir()
+        (self.out / "lab-rocky" / "artefacts" / "host.tiny").write_text("x")
+        with mock.patch.object(gandalf, "safe_input", return_value="n"):
+            self.assess()
+        (self.out / "lab-rocky" / "artefacts" / "cooked").mkdir(exist_ok=True)
+        self.assertEqual([os.path.basename(h) for h in stacking.hosts(str(self.out))], ["lab-rocky"])
+        self.assertEqual([h.name for h in case_files.hosts(self.out)], ["lab-rocky"])
+        cleanup_small_files_and_empty_dirs(str(self.out))
+        [earlier] = (self.out / gandalf.PREVIOUS_DIR).glob("lab-rocky-*")
+        self.assertTrue((earlier / "artefacts" / "host.tiny").exists())  # kept as it was
 
     def test_not_an_acquisitions_folder_fails_the_run(self):
         """Exit 0 here read as success: a job over a host's own folder 'completed' with an empty

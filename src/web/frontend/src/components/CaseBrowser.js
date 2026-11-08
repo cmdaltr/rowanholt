@@ -4,6 +4,7 @@ import {
   getJob,
   getCase,
   getCaseRows,
+  getCaseRowsCsv,
   getFindings,
   flagFinding,
   updateFinding,
@@ -218,7 +219,15 @@ function CaseBrowser() {
         <div data-guide="case.table" className="card" style={{ minWidth: 0 }}>
           {!selected ? <p>Pick a table on the left.</p> : (
             <>
-              <h3 style={{ wordBreak: 'break-all' }}>{selected.host === CASE_HOST ? '' : `${selected.host}: `}{selected.path}</h3>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'baseline' }}>
+                <h3 style={{ wordBreak: 'break-all', flex: 1 }}>{selected.host === CASE_HOST ? '' : `${selected.host}: `}{selected.path}</h3>
+                <button type="button" title={query ? 'The rows matching the filter' : 'Every row'}
+                  onClick={() => act(async () => download(
+                    `${selected.host === CASE_HOST ? '' : `${selected.host}_`}${selected.path.split('/').pop().replace(/\.[^.]+$/, '')}.csv`,
+                    await getCaseRowsCsv(jobId, { host: selected.host, path: selected.path, q: query }), 'text/csv'))}>
+                  Download as CSV
+                </button>
+              </div>
               <input type="text" style={{ width: '100%', marginBottom: '0.5rem' }} placeholder="Filter rows (any field)" value={query}
                 onChange={(e) => { setQuery(e.target.value); setOffset(0); }} />
               {table && (

@@ -57,3 +57,27 @@ def test_no_bindings(tmp_path: Path) -> None:
     path = tmp_path / "OBJECTS.DATA"
     path.write_bytes(objects_data(consumer("CommandLineEventConsumer", "Orphan", "cmd /c x")))
     assert wmi_subscriptions(path) == []
+
+
+def test_carved_subscriptions_become_the_wbem_table(tmp_path: Path) -> None:
+    """process/windows.py's carve, end to end: wbem.jsonl with the envelope, T1546.003 on the
+    subscription Windows didn't make, and the table enriched (it once named a variable that didn't exist)."""
+    from rowanholt.core.records import check_file, read_records
+    from rowanholt.process import windows
+    out = str(tmp_path / "out") + "/"
+    wbem_dir = tmp_path / "out" / "HOST" / "artefacts" / "raw" / "wmi"
+    wbem_dir.mkdir(parents=True)
+    (tmp_path / "out" / "HOST" / "artefacts" / "cooked").mkdir()
+    (wbem_dir / "OBJECTS.DATA").write_bytes(objects_data(
+        consumer("CommandLineEventConsumer", "Updater", "powershell -enc AAAA"),
+        event_filter("UpdaterFilter", "SELECT * FROM __InstanceModificationEvent WITHIN 60"),
+        binding("CommandLineEventConsumer", "Updater", "UpdaterFilter"),
+        binding("NTEventLogEventConsumer", "SCM Event Log Consumer", "SCM Event Log Filter"),
+    ))
+    windows.carve_wmi_subscriptions("", "'HOST'", out, "HOST::Windows", "/", "processing", str(wbem_dir))
+    table = tmp_path / "out" / "HOST" / "artefacts" / "cooked" / "wbem.jsonl"
+    assert check_file(table) == []
+    records = {r["consumer_name"]: r for _, r in read_records(table)}
+    assert "T1546.003" in records["Updater"]["techniques"]
+    assert records["SCM Event Log Consumer"]["techniques"] == []
+    assert records["Updater"]["source_path"] == "artefacts/raw/wmi/OBJECTS.DATA"

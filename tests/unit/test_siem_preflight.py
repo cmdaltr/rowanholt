@@ -68,3 +68,40 @@ def test_memory_outputs_are_found_beside_artefacts(tmp_path):
     (tmp_path / "memory_pslist.json").write_text("[]")
     (tmp_path / "artefacts").mkdir()
     assert [Path(p).name for p in siem.memory_outputs(str(tmp_path))] == ["memory_pslist.json"]
+
+
+def test_memory_outputs_in_json_lines_too(tmp_path):
+    (tmp_path / "memory_pslist.jsonl").write_text('{"PID": 4}\n')
+    (tmp_path / "memory_netscan.json").write_text("[]")
+    assert [Path(p).name for p in siem.memory_outputs(str(tmp_path))] == [
+        "memory_netscan.json", "memory_pslist.jsonl"]
+
+
+def test_a_refused_splunk_login_fails_the_run(monkeypatch):
+    """Splunk refusing admin's remote login (its default password) only warned, and the run
+    reported success with nothing indexed (7 November 2026)."""
+    import io
+    import urllib.error
+    body = b'<response><messages><msg type="WARN">Remote login has been disabled for admin</msg></messages></response>'
+
+    def refuse(request, context, timeout):
+        raise urllib.error.HTTPError(request.full_url, 401, "Unauthorized", {}, io.BytesIO(body))
+    monkeypatch.setattr(siem.urllib.request, "urlopen", refuse)
+    with pytest.raises(siem.SIEMUnavailableError, match="refused the login for 'admin' .401: Remote login has been disabled"):
+        siem._check_splunk_login("splunk", "8089", "admin", "x", 1)
+
+
+def test_an_accepted_or_unreadable_splunk_answer_lets_the_run_go_on(monkeypatch):
+    import io
+    import urllib.error
+
+    class Answer:
+        def close(self):
+            pass
+    monkeypatch.setattr(siem.urllib.request, "urlopen", lambda request, context, timeout: Answer())
+    siem._check_splunk_login("splunk", "8089", "admin", "x", 1)
+
+    def broken(request, context, timeout):
+        raise urllib.error.HTTPError(request.full_url, 503, "Unavailable", {}, io.BytesIO(b""))
+    monkeypatch.setattr(siem.urllib.request, "urlopen", broken)
+    siem._check_splunk_login("splunk", "8089", "admin", "x", 1)

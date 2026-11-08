@@ -1,12 +1,12 @@
 """ClamAV in Elrond (post/clam.py): what's scanned, how clamscan's output is read, where it lands."""
 
-import csv
 import sys
 from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
+from rowanholt.core.records import check_file, read_records  # noqa: E402
 from rowanholt.post import clam  # noqa: E402
 
 
@@ -31,7 +31,7 @@ def test_user_writable_folders_or_the_whole_collection(tmp_path) -> None:
     assert clam.scan_targets(str(gandalf), str(tmp_path / "none")) == [str(gandalf)]
 
 
-def test_detections_land_in_analysis_csv(tmp_path, monkeypatch) -> None:
+def test_detections_land_in_the_analysis_table(tmp_path, monkeypatch) -> None:
     image = tmp_path / "mnt"
     (image / "Users" / "a").mkdir(parents=True)
     out_dir = str(tmp_path / "case") + "/"
@@ -42,9 +42,12 @@ def test_detections_land_in_analysis_csv(tmp_path, monkeypatch) -> None:
         assert clam.run_clamscan("", out_dir, str(image), "HOST::Windows") == 1
     [call] = run.call_args_list  # no freshclam: the signatures are the image's own
     assert call.args[0][0] == "clamscan" and "--follow-file-symlinks=0" in call.args[0]
-    with open(tmp_path / "case" / "HOST" / "analysis" / "analysis.csv", newline="") as f:
-        [row] = list(csv.DictReader(f))
-    assert (row["Filename"], row["analysis_type"], row["analysis_value"]) == ("/Users/a/x%2Cy.exe", "ClamAV",
+    table = tmp_path / "case" / "HOST" / "analysis" / "analysis.jsonl"
+    assert check_file(table) == []
+    [(_, row)] = list(read_records(table))
+    assert (row["host"], row["artefact"], row["techniques"]) == ("HOST", "analysis", [])
+    assert row["timestamp"].endswith("Z")
+    assert (row["Filename"], row["analysis_type"], row["analysis_value"]) == ("/Users/a/x,y.exe", "ClamAV",
                                                                              "Win.Tool.Mimikatz-1")
 
 

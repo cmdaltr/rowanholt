@@ -301,17 +301,18 @@ def build_server(api: RowanholtAPI, writes: bool = False, max_writes: int = MAX_
 
     @server.tool(annotations=READ_ONLY)
     def rare_across_hosts(job_id: str, limit: int = 20) -> Dict[str, Any]:
-        """The top of the case's stacking (stacking.csv): values on few of the case's hosts, highest score
+        """The top of the case's stacking (stacking.jsonl): values on few of the case's hosts, highest score
         first, each with its hosts and the named reasons for its score. Each row is a lead, not a verdict;
         its Host, Artefact and Row name the host row it was read from (read_rows on that host shows it)."""
         job(job_id)  # a job you can't see stays an error, not "no stacking"
-        try:
-            return read_rows(job_id, CASE_HOST, "stacking.csv", limit=limit)
-        except ApiError as exc:
-            if exc.status not in (400, 404):
-                raise
-            return {"rows": [], "note": "No stacking for this case: it needs two or more hosts and Elrond's "
-                                        "analysis (--Analysis); rare needs three or more hosts of an OS."}
+        for name in ("stacking.jsonl", "stacking.csv"):  # a case processed before JSON Lines has the CSV
+            try:
+                return read_rows(job_id, CASE_HOST, name, limit=limit)
+            except ApiError as exc:
+                if exc.status not in (400, 404):
+                    raise
+        return {"rows": [], "note": "No stacking for this case: it needs two or more hosts and Elrond's "
+                                    "analysis (--Analysis); rare needs three or more hosts of an OS."}
 
     @server.tool(annotations=READ_ONLY)
     def findings(job_id: str, status: str = "") -> List[Dict[str, Any]]:

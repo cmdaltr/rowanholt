@@ -9,6 +9,7 @@ REPO = Path(__file__).resolve().parents[2]
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(REPO / "src" / "analysis"))
 
+from rowanholt.core.records import read_records  # noqa: E402
 from rowanholt.analysis.stacking import (build_baseline, looks_generated, precision_at_k,  # noqa: E402
                                          stack_case)
 
@@ -53,8 +54,8 @@ def make_case(root: Path) -> Path:
 
 
 def read(path: Path):
-    with open(path, newline="") as fh:
-        return list(csv.DictReader(fh))
+    """The stacking table's rows; none when nothing was rare enough to write."""
+    return [r for _, r in read_records(path)] if path.exists() else []
 
 
 def test_generated_names():
@@ -67,7 +68,7 @@ def test_stacking_finds_the_seeded_values(tmp_path):
     case = make_case(tmp_path)
     totals = stack_case(str(case))
     assert totals["hosts"] == 8
-    rows = read(case / "stacking.csv")
+    rows = read(case / "stacking.jsonl")
     values = [r["Value"] for r in rows]
     # The generated name outranks a merely rare one; the rest are rare on their own
     assert values[0] == "a7f3k9qz2m.exe" and rows[0]["Reasons"] == "rare, generated name"
@@ -76,7 +77,7 @@ def test_stacking_finds_the_seeded_values(tmp_path):
     assert not any(v in values for v in ("svchost.exe", "ext4", "tracker"))
     diamorphine = next(r for r in rows if r["Value"] == "diamorphine")
     assert (diamorphine["Hosts With It"], diamorphine["Hosts In Case"], diamorphine["Hosts"]) == ("1", "3", "WEB02")
-    assert precision_at_k(str(case / "stacking.csv"), ["a7f3k9qz2m", "updater", "diamorphine"], k=3) == 1.0
+    assert precision_at_k(str(case / "stacking.jsonl"), ["a7f3k9qz2m", "updater", "diamorphine"], k=3) == 1.0
 
 
 def test_rows_point_at_the_host_row(tmp_path):
@@ -85,14 +86,15 @@ def test_rows_point_at_the_host_row(tmp_path):
     import case_files
     case = make_case(tmp_path)
     stack_case(str(case))
-    rows = {r["Value"]: r for r in read(case / "stacking.csv")}
+    rows = {r["Value"]: r for r in read(case / "stacking.jsonl")}
     for value, host, artefact, ref, field in (
             ("a7f3k9qz2m.exe", "WS03", "artefacts/cooked/prefetch/prefetch.json", "#5", "filename"),
             ("commandlineeventconsumer: updater", "WS03", "artefacts/cooked/wbem.json", "#0", "consumer_name"),
             ("diamorphine", "WEB02", "artefacts/cooked/kernel_modules.csv", "4", "Name")):
         row = rows[value]
         assert (row["Host"], row["Artefact"], row["Row"]) == (host, artefact, ref)
-        assert json.loads(row["Sources"]) == [[host, artefact, ref]]
+        assert row["host"] == host  # the envelope's, which the SIEMs and the case browser read
+        assert row["Sources"] == [[host, artefact, ref]]
         found = case_files.find_row(case_files.resolve(case, row["Host"], row["Artefact"]), row["Row"])
         assert value.endswith(found[field].lower())
 
@@ -104,13 +106,13 @@ def test_baseline_and_single_host(tmp_path):
     assert build_baseline([str(clean)], str(baseline)) == 6
     case = make_case(tmp_path)
     stack_case(str(case), str(baseline))
-    rows = {r["Value"]: r for r in read(case / "stacking.csv")}
+    rows = {r["Value"]: r for r in read(case / "stacking.jsonl")}
     assert "not in baseline" not in rows["a7f3k9qz2m.exe"]["Reasons"]
     assert "not in baseline" in rows["commandlineeventconsumer: updater"]["Reasons"]
 
     single = tmp_path / "ONE"
     windows_host(single, "WS01")
-    assert stack_case(str(single)) is None and not (single / "stacking.csv").exists()
+    assert stack_case(str(single)) is None and not (single / "stacking.jsonl").exists()
 
 
 def test_two_hosts_of_an_os_are_a_diff_not_a_tail(tmp_path):
@@ -118,12 +120,12 @@ def test_two_hosts_of_an_os_are_a_diff_not_a_tail(tmp_path):
     linux_host(case, "UBUNTU", modules=("ext4", "overlay"))
     linux_host(case, "ROCKY", modules=("ext4", "xfs"))
     stack_case(str(case))
-    assert read(case / "stacking.csv") == []
+    assert read(case / "stacking.jsonl") == []
     baseline = tmp_path / "baseline.csv"
     build_baseline([str(tmp_path / "PAIR")], str(baseline))
     linux_host(case, "NEW", modules=("ext4", "diamorphine"))
     stack_case(str(case), str(baseline))
-    rows = {r["Value"]: r["Reasons"] for r in read(case / "stacking.csv")}
+    rows = {r["Value"]: r["Reasons"] for r in read(case / "stacking.jsonl")}
     assert rows["diamorphine"] == "rare, not in baseline"
 
 
@@ -148,7 +150,7 @@ def test_linux_hosts_compared_within_their_distro(tmp_path):
     systemd_host(case, "ROCKY", ["crond.service", "sshd.service", "chronyd.service"],
                  os_release='NAME="Rocky Linux"\nID="rocky"\nID_LIKE="rhel centos fedora"\n')
     stack_case(str(case))
-    rows = read(case / "stacking.csv")
+    rows = read(case / "stacking.jsonl")
     assert [(r["Value"], r["Family"], r["Hosts In Case"]) for r in rows] == \
         [("lab-sync.service", "service (systemd), debian", "3")]
 
@@ -178,7 +180,7 @@ def test_windows_task_files_and_run_keys(tmp_path):
     for name in ("WIN2", "WIN3"):
         windows_host(case, name)
     stack_case(str(case))
-    rows = read(case / "stacking.csv")
+    rows = read(case / "stacking.jsonl")
     # Each install names its Edge update and SoftLanding tasks for itself: those stack together.
     # At the same score, persistence ranks above a program
     assert [(r["Family"], r["Value"]) for r in rows] == \
@@ -191,7 +193,7 @@ def test_windows_folders_vouch_for_consonant_names(tmp_path):
     windows_host(case, "ODD", extra=["ngrxbcpvt.exe"], folder="\\USERS\\ALICE\\APPDATA\\LOCAL")
     windows_host(case, "NEW")
     stack_case(str(case))
-    rows = {r["Value"]: (r["Reasons"], r["Example"]) for r in read(case / "stacking.csv")}
+    rows = {r["Value"]: (r["Reasons"], r["Example"]) for r in read(case / "stacking.jsonl")}
     assert rows["mscorsvw.exe"][0] == "rare"
     assert rows["ngrxbcpvt.exe"][0] == "rare, generated name"
     assert rows["ngrxbcpvt.exe"][1].endswith("\\USERS\\ALICE\\APPDATA\\LOCAL\\NGRXBCPVT.EXE")
@@ -242,7 +244,7 @@ def test_unsigned_no_team_id_and_outside_logon_hours(tmp_path):
             writer.writerow(["Name", "Identifier", "TeamIdentifier", "ExecutablePath"])
             writer.writerows(items)
     stack_case(str(case))
-    rows = {r["Value"]: r for r in read(case / "stacking.csv")}
+    rows = {r["Value"]: r for r in read(case / "stacking.jsonl")}
     assert rows["c:\\tools\\nightly.exe"]["Reasons"] == "rare, outside logon hours"
     assert rows["c:\\tools\\daytime.exe"]["Reasons"] == "rare"
     assert rows["c:\\windows\\temp\\rk.sys"]["Reasons"] == "rare, user path, unsigned, outside logon hours"
@@ -268,7 +270,7 @@ def test_persistence_scored_on_the_command_it_runs(tmp_path):
     for name, sid in (("WIN2", "S-1-5-21-4-5-6-1000"), ("WIN3", "S-1-5-21-7-8-9-1000")):
         persistence_host(case, name, sid, "bb77e3eb-ce2c-4d5e-8f90-0123456789ab")
     stack_case(str(case))
-    rows = {r["Value"]: r for r in read(case / "stacking.csv")}
+    rows = {r["Value"]: r for r in read(case / "stacking.jsonl")}
     assert rows["labupdater"]["Reasons"] == "rare, suspicious command" and rows["labupdater"]["Score"] == "3.5"
     assert rows["sync"]["Reasons"] == "rare, user path, suspicious command"
     assert rows["vendor"]["Reasons"] == "rare" and rows["tidy"]["Reasons"] == "rare"
@@ -282,4 +284,4 @@ def test_processes_are_not_scored_on_their_path_as_a_command(tmp_path):
     windows_host(case, "B")
     windows_host(case, "C")
     stack_case(str(case))
-    assert {r["Value"]: r["Reasons"] for r in read(case / "stacking.csv")}["archer.exe"] == "rare"
+    assert {r["Value"]: r["Reasons"] for r in read(case / "stacking.jsonl")}["archer.exe"] == "rare"

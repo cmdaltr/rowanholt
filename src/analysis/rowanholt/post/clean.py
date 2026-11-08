@@ -6,6 +6,7 @@ from datetime import datetime
 from zipfile import ZipFile
 
 from rowanholt.audit import write_audit_log_entry
+from rowanholt.core.records import SUFFIX, read_records
 
 
 def archive_artefacts(verbosity, output_directory):
@@ -141,9 +142,11 @@ def cleanup_small_files_and_empty_dirs(output_directory, min_file_size=10):
     # One bottom-up walk: a directory's files go before the directory is checked, so
     # nested empty directories fall in the same pass. Collected artefacts
     # (artefacts/raw/) are left alone: an empty .bash_history is evidence
-    # (T1070.003), not clutter.
+    # (T1070.003), not clutter. Nor is .previous/: earlier extractions, kept as they were.
     top = os.path.normpath(output_directory)
     for root, dirs, files in os.walk(top, topdown=False):
+        if os.path.relpath(root, top).split(os.sep)[0] == ".previous":
+            continue
         if "/artefacts/raw/" not in root.replace(os.sep, "/") + "/":
             for filename in files:
                 filepath = os.path.join(root, filename)
@@ -174,10 +177,23 @@ def output_folder_name(key, value):
     return str(entry).split("::")[0].rstrip("/").split("/")[-1]
 
 
+def has_no_records(path: str, max_empty_size: int = 100) -> bool:
+    """Whether a processed file holds nothing: a JSON Lines or CSV table with no records (a
+    one-record JSON Lines file can be under 100 bytes, so size alone won't do), or any other
+    file of ``max_empty_size`` bytes or less (an old case's [] or {})."""
+    if path.lower().endswith((SUFFIX, ".csv")):
+        try:
+            return next(iter(read_records(path)), None) is None
+        except (OSError, ValueError):
+            return False
+    return os.stat(path).st_size <= max_empty_size
+
+
 def tidy_processed_output(img_output_dir, max_empty_size=100):
-    """Tidy one host's processed output at the end of a run: drop near-empty files
-    (just [] or {}) from cooked/ and analysis/, and lift a lone file out of its
-    cooked/ subdirectory as cooked/<subdirectory><ext>. Collected artefacts under
+    """Tidy one host's processed output at the end of a run: drop tables with no records
+    (and other near-empty files) from cooked/ and analysis/, and lift a lone CSV or JSON file
+    out of its cooked/ subdirectory as cooked/<subdirectory><ext> (a JSON Lines table isn't
+    moved: its records' artefact is its path). Collected artefacts under
     raw/ are evidence, whatever their size, and aren't touched."""
     cooked_dir = os.path.join(img_output_dir, "artefacts", "cooked")
     for processed in (cooked_dir, os.path.join(img_output_dir, "analysis")):
@@ -185,7 +201,7 @@ def tidy_processed_output(img_output_dir, max_empty_size=100):
             for name in files:
                 path = os.path.join(root, name)
                 try:
-                    if os.stat(path).st_size <= max_empty_size:
+                    if has_no_records(path, max_empty_size):
                         os.remove(path)
                 except OSError:
                     pass
@@ -196,8 +212,10 @@ def tidy_processed_output(img_output_dir, max_empty_size=100):
         if not os.path.isdir(subdir_path):
             continue
         entries = os.listdir(subdir_path)
-        if len(entries) == 1 and os.path.isfile(os.path.join(subdir_path, entries[0])):
-            ext = os.path.splitext(entries[0])[1] or ".json"
+        # A JSON Lines table stays where it is: its records name it by its path under cooked/
+        if (len(entries) == 1 and os.path.isfile(os.path.join(subdir_path, entries[0]))
+                and not entries[0].endswith(SUFFIX)):
+            ext = os.path.splitext(entries[0])[1]
             dst = os.path.join(cooked_dir, subdir + ext)
             if not os.path.exists(dst):
                 try:

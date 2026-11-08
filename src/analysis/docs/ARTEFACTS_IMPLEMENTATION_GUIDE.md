@@ -186,17 +186,7 @@ def process_amcache(artefact_path, output_dir):
 | Plist Files | plistlib | JSON | ✅ Active |
 | LaunchAgents/Daemons | Custom | JSON | ✅ Active |
 
-#### Enhanced Parsers (`rowanholt/process/extractions/macos_enhanced.py`)
-
-| Artefact | Parser Class | Output | Status |
-|----------|--------------|--------|--------|
-| Unified Logs | `UnifiedLogParser` | JSON | ✅ Implemented |
-| KnowledgeC.db | `CoreDuetParser` | JSON | ✅ Implemented |
-| TCC.db | `TCCParser` | JSON | ✅ Implemented |
-| FSEvents | `FSEventsParser` | JSON | ✅ Implemented |
-| Quarantine Events | `QuarantineParser` | JSON | ✅ Implemented |
-
-> **Note:** Enhanced parsers are implemented but not integrated into the main collection/processing flow.
+The unified log, KnowledgeC, TCC, FSEvents and quarantine events are parsed natively now (`process/mac_artefacts.py`, `process/extra_artefacts.py`); the never-integrated `macos_enhanced.py` was removed on 6 November 2026.
 
 ---
 
@@ -234,18 +224,6 @@ def process_amcache(artefact_path, output_dir):
 | **Crash Reports** | `/Library/Logs/DiagnosticReports/` | Application crashes | Yes (plist/text) |
 | **USB History** | System logs, TimeMachine plist | Device connections | Partial |
 
-#### Integration Required
-
-These parsers exist in `macos_enhanced.py` but need integration:
-
-| Parser | Collection Location | Action Required |
-|--------|---------------------|-----------------|
-| FSEventsParser | `/.fseventsd/` | Add to collect/mac.py |
-| TCCParser | `/Library/Application Support/com.apple.TCC/TCC.db` | Add to collect/mac.py |
-| QuarantineParser | `~/Library/Preferences/com.apple.LaunchServices.QuarantineEventsV2` | Add to collect/mac.py |
-| CoreDuetParser | `/private/var/db/CoreDuet/Knowledge/knowledgeC.db` | Add to collect/mac.py |
-| UnifiedLogParser | `/private/var/db/diagnostics/` | Add to collect/mac.py |
-
 ---
 
 ## Linux Artefacts
@@ -280,15 +258,7 @@ These parsers exist in `macos_enhanced.py` but need integration:
 | **Printing** | CUPS | `/var/cache/cups/` | ✅ Collected |
 | **Temp** | tmp | `/tmp/` | ✅ Collected |
 
-#### Enhanced Processing (`rowanholt/process/extractions/linux_enhanced.py`)
-
-| Artefact | Parser | Output | Status |
-|----------|--------|--------|--------|
-| Systemd Journal | `SystemdJournalParser` | JSON | ✅ Implemented |
-| Audit Logs | `AuditLogParser` | JSON | ✅ Implemented |
-| Docker Configs | `DockerArtifactParser` | JSON | ✅ Implemented |
-| Command Histories | `CommandHistoryParser` | JSON | ✅ Implemented |
-| Package Logs | `PackageLogParser` | JSON | ✅ Implemented |
+The journal, command histories and Docker are parsed natively now (`process/linux.py`, `process/linux_artefacts.py`); the never-integrated `linux_enhanced.py` was removed on 6 November 2026.
 
 ---
 

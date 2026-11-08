@@ -1,63 +1,46 @@
+import json
 import os
-import re
 import shutil
 import subprocess
 import time
 from datetime import datetime
 
 from rowanholt.audit import write_audit_log_entry
+from rowanholt.core.records import SUFFIX, write_records
 
 
-def convert_plaso_timeline(verbosity, output_directory, stage, img):
-    lineno = 0
-    converted_count = 0
-    skipped_count = 0
-    with open(
-        output_directory + img.split("::")[0] + "/artefacts/plaso_timeline.csv",
-        "a",
-    ) as plasocsv:
-        plasocsv.write(
-            "LastWriteTime,timestamp_desc,logsource,source_long,message,parser,display_name,tag,Message,Artefact\n"
-        )
-        with open("./.plaso/plaso_timeline.csvtmp", "r") as plasotmp:
+PSTEAL_OUTPUT = "plaso_timeline.jsonl"
+
+
+def plaso_events(source):
+    """psteal's json_line events with a time, without Plaso's own container fields; and the count
+    of lines skipped (no time, or not JSON)."""
+    skipped = [0]
+
+    def events():
+        with open(source, encoding="utf-8", errors="replace") as plasotmp:
             for eachline in plasotmp:
-                if lineno != 0:
-                    matches = re.findall(
-                        r"^([^,]+),([^,]+,[^,]+,[^,]+),([^,]+),([^,]+),([^,]+),([^,]+)",
-                        eachline,
-                    )
-                    if not matches:
-                        # Line doesn't match expected format, skip it
-                        skipped_count += 1
-                        lineno += 1
-                        continue
-                    (
-                        LastWriteTime,
-                        timestamp_desc__logsource__source_long,
-                        Message,
-                        parser,
-                        Artefact,
-                        tag,
-                    ) = matches[0]
-                    if (
-                        LastWriteTime != "0000-00-00T00:00:00"
-                    ):  # removing all entries without timestamp to reduce size
-                        plasocsv.write(
-                            "{},{},{},{},{},{},{},{}\n".format(
-                                LastWriteTime,
-                                timestamp_desc__logsource__source_long,
-                                Message,
-                                parser,
-                                Artefact,
-                                tag,
-                                Message.lower().replace("\\\\", "/").replace("\\", "/"),
-                                Artefact.lower()
-                                .replace("\\\\", "/")
-                                .replace("\\", "/"),
-                            )
-                        )
-                        converted_count += 1
-                lineno += 1
+                try:
+                    event = json.loads(eachline)
+                except ValueError:
+                    skipped[0] += 1
+                    continue
+                if not isinstance(event, dict) or not event.get("timestamp"):
+                    # removing all entries without timestamp to reduce size
+                    skipped[0] += 1
+                    continue
+                yield {k: v for k, v in event.items() if not k.startswith("__") and k != "date_time"}
+
+    return events(), skipped
+
+
+def convert_plaso_timeline(verbosity, output_directory, stage, img, source="./.plaso/" + PSTEAL_OUTPUT):
+    """psteal's events into artefacts/plaso_timeline.jsonl: its timestamp is microseconds since the epoch."""
+    events, skipped = plaso_events(source)
+    converted_count = write_records(
+        output_directory + img.split("::")[0] + "/artefacts/plaso_timeline" + SUFFIX, events,
+        host=img.split("::")[0], artefact="plaso_timeline", source_path=img.split("::")[0])
+    skipped_count = skipped[0]
     print(f"     Converted {converted_count} timeline entries ({skipped_count} skipped)")
     entry, prnt = "{},{},{},{}\n".format(
         datetime.now().isoformat(),
@@ -179,9 +162,9 @@ def create_plaso_timeline(verbosity, output_directory, stage, img, d, timelineim
         "--source",
         timelineimagepath,
         "-o",
-        "dynamic",
+        "json_line",
         "-w",
-        "./plaso_timeline.csvtmp",
+        "./" + PSTEAL_OUTPUT,
     ])
 
     # Run psteal with completely clean PYTHONPATH to avoid conflicts with elrond modules
@@ -195,7 +178,7 @@ def create_plaso_timeline(verbosity, output_directory, stage, img, d, timelineim
     os.chdir("..")
 
     # Check if timeline was created
-    timeline_tmp = "./.plaso/plaso_timeline.csvtmp"
+    timeline_tmp = "./.plaso/" + PSTEAL_OUTPUT
     if psteal.returncode != 0 or not os.path.exists(timeline_tmp) or os.path.getsize(timeline_tmp) == 0:
         error_msg = "ERROR: Plaso failed to create timeline file (psteal exit {})".format(psteal.returncode)
         print(f"     {error_msg}")

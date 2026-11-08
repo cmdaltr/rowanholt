@@ -3,7 +3,24 @@ import json
 import re
 import subprocess
 
+from rowanholt.core.records import SUFFIX, write_records
 from rowanholt.process.extractions.mitre_tagger import tag_mitre_technique
+
+COOKED = "/artefacts/cooked"
+VSS = re.compile(r"^vss\d+/")
+
+
+def write_hive(path: str, records, artefact: str) -> int:
+    """A hive's RegRipper records as a JSON Lines table (path: where it goes, without the suffix):
+    the host and the artefact's name come from the path, its time from LastWriteTime, and a Run
+    key carries T1547.001."""
+    at = path.find(COOKED)
+    host = path[:at].rstrip("/").split("/")[-1] if at >= 0 else ""
+    name = VSS.sub("", path[at + len(COOKED):].lstrip("/")) if at >= 0 else path.split("/")[-1]
+    raw = artefact.find("/artefacts/")
+    return write_records(path + SUFFIX, records, host=host, artefact=name.replace("//", "/"),
+                         source_path=artefact[raw + 1:] if raw >= 0 else artefact, time_field="LastWriteTime",
+                         techniques=lambda r: ["T1547.001"] if r.get("Plugin") == "run" else [])
 
 
 def records_of(regjsonlist):
@@ -1535,44 +1552,42 @@ def extract_registry_system(
         # RegRipper not available - skip registry extraction
         return
 
-    with open(
+    regjson = (
         output_directory
         + img.split("::")[0]
         + "/artefacts/cooked"
         + vss_path_insert
         + "registry/"
         + artefact.split("/")[-1]
-        + ".json",
-        "a",
-    ) as regjson:
-        try:
-            rgrplistj, userinfo, sids = (
-                rip_text(
-                    subprocess.Popen(
-                        [
-                            rip_pl_path,
-                            "-r",
-                            artefact,
-                            "-f",
-                            artefact.split("/")[-1].lower(),
-                        ],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                    ).communicate()[0]
-                ),
-                [],
-                [],
-            )
-        except Exception:
-            # RegRipper execution failed - skip
-            return
-
-        jsonlist, regjsonlist = use_system_plugins(
-            artefact, jsondict, jsonlist, regjsonlist, rgrplistj, userinfo, sids
+    )
+    try:
+        rgrplistj, userinfo, sids = (
+            rip_text(
+                subprocess.Popen(
+                    [
+                        rip_pl_path,
+                        "-r",
+                        artefact,
+                        "-f",
+                        artefact.split("/")[-1].lower(),
+                    ],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                ).communicate()[0]
+            ),
+            [],
+            [],
         )
-        if any('"Plugin": "run"' in record for record in jsonlist):
-            tag_mitre_technique(output_directory, img, "registry", "T1547.001")
-        if len(regjsonlist) > 0:
-            json.dump([cleaned(record) for record in records_of(regjsonlist)], regjson)
-        regjsonlist.clear()
-        jsonlist.clear()
+    except Exception:
+        # RegRipper execution failed - skip
+        return
+
+    jsonlist, regjsonlist = use_system_plugins(
+        artefact, jsondict, jsonlist, regjsonlist, rgrplistj, userinfo, sids
+    )
+    if any('"Plugin": "run"' in record for record in jsonlist):
+        tag_mitre_technique(output_directory, img, "registry", "T1547.001")
+    if len(regjsonlist) > 0:
+        write_hive(regjson, [cleaned(record) for record in records_of(regjsonlist)], artefact)
+    regjsonlist.clear()
+    jsonlist.clear()

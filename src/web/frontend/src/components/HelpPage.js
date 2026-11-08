@@ -232,7 +232,7 @@ sudo python3 python/gandalf.py Password Remote -O /evidence/CASE-001`}
             journal, page and swap files, <code>$MFT</code>; temp directories on Linux and macOS), then logs that roll
             over, then everything else. Only when everything is copied is each file SHA-256 hashed into
             <code> log.meta</code>, which travels in the archive with <code>log.audit</code>. Elrond hashes every file
-            again on arrival and writes <code>gandalf_integrity.csv</code>: verified, MISMATCH, missing or unhashed.
+            again on arrival and writes <code>gandalf_integrity.jsonl</code>: verified, MISMATCH, missing or unhashed.
           </p>
         </>
       )
@@ -354,7 +354,7 @@ sudo python3 python/gandalf.py Password Remote -O /evidence/CASE-001`}
           <h4>Matching a case</h4>
           <p>
             Tick Threat Intelligence on Elrond's page, or run Elrond with <code>--threatIntel</code>. Each host
-            gets <code>analysis/threat_intel_matches.csv</code>, and the case gets <code>threat_groups.csv</code>:
+            gets <code>analysis/threat_intel_matches.jsonl</code>, and the case gets <code>threat_groups.jsonl</code>:
             groups ranked by what matched, each with the basis for its rank (atomic indicators, specific
             procedures, common tooling, or technique overlap only). Built-ins, ordinary words and elements many
             groups share don't count as attribution.
@@ -537,7 +537,8 @@ python3 -m rowanholt.mitre.dashboard -o /output`}
             findings (lead, confirmed or benign), keep notes, assign hosts and follow the activity feed. A row
             someone already flagged can't be flagged twice, and a finding changed by a colleague since you
             loaded it isn't silently overwritten. Report and Navigator layer are built from confirmed findings
-            only.
+            only. Every table is JSON Lines, each record starting with its host, artefact, source path, time (UTC)
+            and ATT&amp;CK techniques; Download as CSV gives a table, or the rows the filter shows, as a spreadsheet.
           </p>
 
           <h4>Container Forensics</h4>

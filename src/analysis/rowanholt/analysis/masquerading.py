@@ -13,10 +13,11 @@ Reference: https://attack.mitre.org/techniques/T1036/
 """
 
 import os
-import csv
 import re
 import hashlib
 from datetime import datetime
+
+from rowanholt.core.records import SUFFIX, write_records
 
 # Unicode Right-to-Left Override characters
 RLO_CHARACTERS = [
@@ -337,19 +338,11 @@ def detect_masquerading(mnt, output_directory, verbosity, img, vssimage):
                     if verbosity:
                         print(f"        Warning: Error checking {filename}: {str(e)}")
 
-    # Write findings to CSV
     if all_findings:
-        csv_path = os.path.join(output_directory, img.split("::")[0], "analysis", "masquerading.csv")
-        os.makedirs(os.path.dirname(csv_path), exist_ok=True)
-
-        fieldnames = ["timestamp", "hostname", "filename", "path", "technique_id", "technique_name", "detail"]
-
-        file_exists = os.path.exists(csv_path)
-        with open(csv_path, "a", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            if not file_exists:
-                writer.writeheader()
-            writer.writerows(all_findings)
+        host = img.split("::")[0]
+        write_records(os.path.join(output_directory, host, "analysis", f"masquerading{SUFFIX}"), all_findings,
+                      host=host, artefact="masquerading", time_field="timestamp",
+                      techniques=lambda row: [row["technique_id"]])
 
         # Group findings by technique for summary
         technique_counts = {}
@@ -360,7 +353,7 @@ def detect_masquerading(mnt, output_directory, verbosity, img, vssimage):
         print(f"\n       \033[1;32mFound {len(all_findings)} masquerading indicators:\033[1;m")
         for tid, count in sorted(technique_counts.items()):
             print(f"         - {tid}: {count} finding(s)")
-        print(f"       Results written to masquerading.csv")
+        print(f"       Results written to masquerading{SUFFIX}")
     else:
         print(f"\n       \033[1;32mNo masquerading techniques detected in {vssimage} ({file_count} files scanned)\033[1;m")
 

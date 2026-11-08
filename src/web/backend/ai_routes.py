@@ -315,13 +315,14 @@ async def get_case_info(case_id: str, http_request: Request, job_id: Optional[st
         info["status"] = job_info.status.value
         info["created_at"] = job_info.created_at.isoformat() if job_info.created_at else None
 
-    # Check for artifacts
-    cooked_path = os.path.join(case_path, "cooked")
-    if os.path.exists(cooked_path):
-        info["has_artifacts"] = True
-        # Count artifact files
-        artifact_count = sum(1 for _ in Path(cooked_path).rglob("*.json"))
-        info["artifact_count"] = artifact_count
+    # Processed artefacts: the tables in each host's artefacts/cooked
+    if os.path.isdir(case_path):
+        cooked = [h / "artefacts" / "cooked" for h in case_files.hosts(Path(case_path))]
+        artifact_count = sum(1 for folder in cooked if folder.is_dir()
+                             for p in folder.rglob("*") if p.suffix.lower() in case_files.ROW_FILES)
+        if artifact_count:
+            info["has_artifacts"] = True
+            info["artifact_count"] = artifact_count
 
     return info
 

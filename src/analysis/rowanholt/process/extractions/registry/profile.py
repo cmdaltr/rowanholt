@@ -5,7 +5,7 @@ import subprocess
 
 from rowanholt.process.extractions.mitre_tagger import tag_mitre_technique
 
-from rowanholt.process.extractions.registry.system import cleaned, records_of, rip_text, run_key_records
+from rowanholt.process.extractions.registry.system import cleaned, records_of, rip_text, run_key_records, write_hive
 
 
 LAST_WRITE_TIME = re.compile(r"^[\d-]{10} [\d:]{8}Z?$")
@@ -1367,7 +1367,7 @@ def extract_registry_profile(
         # RegRipper not available - skip registry profile extraction
         return
 
-    with open(
+    regjson = (
         output_directory
         + img.split("::")[0]
         + "/artefacts/cooked"
@@ -1376,47 +1376,45 @@ def extract_registry_profile(
         + regusr
         + "+"
         + regart
-        + ".json",
-        "a",
-    ) as regjson:
-        try:
-            # Use perl to invoke rip.pl since the shebang may be Windows-style
-            rgrplistj = rip_text(
-                subprocess.Popen(
-                    [
-                        "perl",
-                        rip_pl_path,
-                        "-r",
-                        output_directory
-                        + img.split("::")[0]
-                        + "/artefacts/raw"
-                        + vss_path_insert
-                        + "/registry/"
-                        + regusr
-                        + "+"
-                        + regart,
-                        "-f",
-                        regart.split(".")[0].lower(),
-                    ],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                ).communicate()[0]
-            )
-        except Exception:
-            # RegRipper execution failed - skip
-            return
-        jsonlist, regjsonlist = use_profile_plugins(
-            artefact,
-            jsondict,
-            jsonlist,
-            regjsonlist,
-            rgrplistj,
-            artefact.split("/")[-1].upper().split("+")[1],
-            regusr,
+    )
+    try:
+        # Use perl to invoke rip.pl since the shebang may be Windows-style
+        rgrplistj = rip_text(
+            subprocess.Popen(
+                [
+                    "perl",
+                    rip_pl_path,
+                    "-r",
+                    output_directory
+                    + img.split("::")[0]
+                    + "/artefacts/raw"
+                    + vss_path_insert
+                    + "/registry/"
+                    + regusr
+                    + "+"
+                    + regart,
+                    "-f",
+                    regart.split(".")[0].lower(),
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            ).communicate()[0]
         )
-        if any('"Plugin": "run"' in record for record in jsonlist):
-            tag_mitre_technique(output_directory, img, "registry", "T1547.001")
-        if len(regjsonlist) > 0:
-            json.dump([last_write_moved(cleaned(record)) for record in records_of(regjsonlist)], regjson)
-        regjsonlist.clear()
-        jsonlist.clear()
+    except Exception:
+        # RegRipper execution failed - skip
+        return
+    jsonlist, regjsonlist = use_profile_plugins(
+        artefact,
+        jsondict,
+        jsonlist,
+        regjsonlist,
+        rgrplistj,
+        artefact.split("/")[-1].upper().split("+")[1],
+        regusr,
+    )
+    if any('"Plugin": "run"' in record for record in jsonlist):
+        tag_mitre_technique(output_directory, img, "registry", "T1547.001")
+    if len(regjsonlist) > 0:
+        write_hive(regjson, [last_write_moved(cleaned(record)) for record in records_of(regjsonlist)], artefact)
+    regjsonlist.clear()
+    jsonlist.clear()

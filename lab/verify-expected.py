@@ -13,7 +13,7 @@ target by name, or paired when there's only one of each.
 
 Checks per seeded item (a dash where expected.json asks nothing of that kind):
   collected  the file's name is in the host's raw/ (path entries only)
-  cooked     the named cooked file exists
+  cooked     the named cooked table exists (.jsonl, or an older case's .csv or .json)
   attack     the technique ID is in mitre_techniques.txt ("not run" when only YARA gives it, attack_by)
   expect     every string appears somewhere in the host's output
   yara       every rule name appears in the output (skipped unless YARA ran)
@@ -21,22 +21,63 @@ Checks per seeded item (a dash where expected.json asks nothing of that kind):
 Exits 1 when any check fails.
 """
 import argparse
+import importlib.util
 import json
 import os
 import sys
 from pathlib import Path
 
-TEXT_SUFFIXES = (".csv", ".json", ".txt", ".log", ".tsv", ".audit")
+TEXT_SUFFIXES = (".jsonl", ".csv", ".json", ".txt", ".log", ".tsv", ".audit")
 MAX_TEXT_BYTES = 64 << 20
+RECORDS = Path(__file__).resolve().parents[1] / "src" / "analysis" / "rowanholt" / "core" / "records.py"
+
+
+def load_records():
+    """Rowanholt's records module, loaded by path: the analysis package isn't installed on the host."""
+    spec = importlib.util.spec_from_file_location("records", RECORDS)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+records = load_records()
+
+
+def values(value) -> list:
+    """A record's values as text, nested ones too: JSON escapes a backslash or a quote, so the
+    text is matched against what the record holds, not how it's written."""
+    if isinstance(value, dict):
+        return [v for item in value.values() for v in values(item)]
+    if isinstance(value, list):
+        return [v for item in value for v in values(item)]
+    return [] if value is None else [str(value)]
 
 
 def read_text(path: Path) -> str:
     try:
         if path.stat().st_size > MAX_TEXT_BYTES:
             return ""
+        if path.suffix == ".jsonl":
+            return "\n".join(v for _, record in records.read_records(path) for v in values(record))
         return path.read_text(errors="ignore")
-    except OSError:
+    except (OSError, records.RecordsError):
         return ""
+
+
+def table(folder: Path, name: str) -> bool:
+    """A table exists, whatever its suffix (expected.json may name an older case's CSV)."""
+    return records.table_path(folder, name).exists()
+
+
+def format_problems(host_dir: Path) -> list:
+    """Every JSON Lines table Elrond wrote for a host that breaks the format: a line that isn't a
+    record, or a record without the envelope."""
+    problems = []
+    for path in sorted(host_dir.rglob("*" + records.SUFFIX)):
+        if "raw" in path.relative_to(host_dir).parts:
+            continue
+        problems += [f"{path.relative_to(host_dir)}: {p}" for p in records.check_file(path)[:3]]
+    return problems
 
 
 def host_corpus(host_dir: Path) -> str:
@@ -84,14 +125,14 @@ def verify(host: Path, target: Path, techniques: set) -> list:
     expected = json.loads((target / "expected.json").read_text(encoding="utf-8-sig"))
     corpus, names = host_corpus(host), raw_names(host)
     cooked = host / "artefacts" / "cooked"
-    yara_ran = (host / "analysis" / "yara.csv").exists()
-    keywords_ran = (host / "analysis" / "keyword_matches.csv").exists()
+    yara_ran = table(host / "analysis", "yara")
+    keywords_ran = table(host / "analysis", "keyword_matches")
     rows = []
     for item in expected.get("seeded", []):
         label = item.get("path") or item.get("artefact", "?")
         row = {"item": label}
         row["collected"] = collected(item["path"], names) if "path" in item else None
-        row["cooked"] = (cooked / item["cooked"]).exists() if "cooked" in item else None
+        row["cooked"] = table(cooked, item["cooked"]) if "cooked" in item else None
         row["attack"] = (item["attack"] in techniques or item["attack"].split(".")[0] in techniques) if "attack" in item else None
         if "attack" in item and row["attack"] and item["attack"] not in techniques:
             row["attack"] = "parent"
@@ -105,8 +146,9 @@ def verify(host: Path, target: Path, techniques: set) -> list:
     # An IOC only in a seeded file's text (sync.ps1's download URL) is found by --extractIocs
     # alone; without it, a missing IOC wasn't looked for rather than missed
     missing = [i for i in expected.get("iocs", []) if i.lower() not in corpus]
-    iocs_ran = (host / "analysis" / "iocs.csv").exists()
+    iocs_ran = table(host / "analysis", "iocs")
     rows.append({"item": "IOCs", "expect": missing if iocs_ran or not missing else "not run"})
+    rows.append({"item": "JSON Lines format", "format": format_problems(host)})
     return rows
 
 
@@ -142,7 +184,7 @@ def main() -> int:
     if args.json:
         print(json.dumps(results, indent=2))
     else:
-        cols = ("collected", "cooked", "attack", "expect", "yara", "keywords")
+        cols = ("collected", "cooked", "attack", "expect", "yara", "keywords", "format")
         for name, rows in results.items():
             print(f"\n== {name}: {sum(not failed(r) for r in rows)}/{len(rows)} pass")
             for r in rows:

@@ -70,6 +70,23 @@ def test_only_shown_tags_are_cited(tmp_path):
     assert eru_context.cited(f"[{real}]", context) == []
 
 
+def test_json_lines_artefacts_are_searched(tmp_path):
+    """Windows evidence is Artemis's JSON: as JSON Lines it's in the context, nested fields and all,
+    without the envelope fields the line already gives."""
+    root = make_case(tmp_path / "CASE")
+    case_files.tables.write_records(
+        root / "WS01" / "artefacts" / "cooked" / "services.jsonl",
+        [{"name": "Spooler", "path": "spoolsv.exe"},
+         {"name": "LabSvc", "path": "C:\\Users\\Public\\labsvc.exe", "data": {"start": "auto"}}],
+        host="WS01", artefact="services", source_path="raw/registry/SYSTEM", techniques=["T1543.003"])
+    context = eru_context.build(str(root), "What is labsvc.exe?")
+    text = context.text()
+    tag = next(t for t, row in context.rows.items() if row["file"] == "artefacts/cooked/services.jsonl")
+    line = next(l for l in text.splitlines() if l.startswith(f"[{tag}]"))
+    assert "row 2:" in line and "labsvc.exe" in line and "T1543.003" in line and "auto" in line
+    assert '"host"' not in line and '"source_path"' not in line
+
+
 @unittest.skipIf(TestClient is None, "backend requirements (fastapi) not installed")
 class SuggestionParsingTest(unittest.TestCase):
     def test_numbered_points_under_a_suggestion_stay_in_it(self):

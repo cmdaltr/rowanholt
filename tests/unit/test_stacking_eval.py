@@ -52,3 +52,19 @@ def test_missing_plant_fails(tmp_path, monkeypatch, capsys):
     lab_run(tmp_path, '1,1.0,"service (systemd), debian",lab-sync.service,1,3,lab-ubuntu,rare,x,\n')
     assert run(tmp_path, monkeypatch) == 1
     assert "lab updater: NOT FOUND" in capsys.readouterr().out
+
+
+def test_reads_this_format(tmp_path, monkeypatch, capsys):
+    """stacking.jsonl, as Elrond writes it now; an older case's stacking.csv is read above."""
+    sys.path.append(str(SCRIPT.parents[2] / "src" / "analysis"))
+    from rowanholt.core.records import write_records
+    lab_run(tmp_path, "")
+    (tmp_path / OUT / "CASE" / "stacking.csv").unlink()
+    rows = [{"Rank": 1, "Score": 1.0, "Family": "service (systemd), debian", "Value": "lab-sync.service",
+             "Example": ""},
+            {"Rank": 2, "Score": 1.0, "Family": "autorun (Linux), debian", "Value": "lab updater", "Example": ""},
+            {"Rank": 3, "Score": 1.0, "Family": "autorun (Linux), debian", "Value": "x", "Example": "lab-agent.service"}]
+    write_records(tmp_path / OUT / "CASE" / "stacking.jsonl", rows, host="", artefact="stacking")
+    assert run(tmp_path, monkeypatch) == 0
+    out = capsys.readouterr().out
+    assert "3 rows" in out and "lab-agent.service: rank 3" in out

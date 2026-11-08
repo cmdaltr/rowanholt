@@ -1,22 +1,24 @@
 #!/usr/bin/env python3 -tt
-import csv
-import glob
+import base64
 import json
 import os
-import re
 import shlex
-import shutil
+import ssl
 import subprocess
 import time
-import urllib.request
 import urllib.error
-import ssl
-import base64
+import urllib.request
 from datetime import datetime
-from io import StringIO
+from functools import lru_cache
+from typing import Any, Callable, Dict, Iterator, List, Tuple
 
 from rowanholt.audit import write_audit_log_entry
+from rowanholt.core.records import ENVELOPE, SUFFIX, iso_timestamp, iter_json, read_records
 from rowanholt.post.siem import memory_outputs, siem_hosts
+
+# Records per bulk request: Elasticsearch refuses a body over http.max_content_length (100 MB)
+BATCH_SIZE = 1000
+OLD_SUFFIXES = (".csv", ".json")
 
 
 def normalize_timestamp(record):
@@ -58,324 +60,185 @@ def normalize_timestamp(record):
     return record
 
 
-def split_large_csv_files(root_dir):
-    for atftroot, _, atftfiles in os.walk(root_dir):
-        for (
-            atftfile
-        ) in (
-            atftfiles
-        ):  # spliting the large csv files into smaller chunks for easing ingestion
-            if os.path.exists(os.path.join(atftroot, atftfile)):
-                if os.path.getsize(
-                    os.path.join(atftroot, atftfile)
-                ) > 52427769 and atftfile.endswith(".csv"):
-                    subprocess.Popen(
-                        [
-                            "split",
-                            "-C",
-                            "20m",
-                            "--numeric-suffixes",
-                            os.path.join(atftroot, atftfile),
-                            "{}-split".format(os.path.join(atftroot, atftfile[0:-4])),
-                        ],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                    ).communicate()[0]
-    time.sleep(0.2)
+def _artefact_of(path: str, folder: str) -> str:
+    return os.path.splitext(os.path.relpath(path, folder))[0].replace(os.sep, "/")
 
 
-def prepare_csv_to_ndjson(root_dir):
-    for atftroot, _, atftfiles in os.walk(root_dir):
-        for atftfile in atftfiles:  # renaming the split files with the .csv extension
-            if "-split" in atftfile:
-                os.rename(
-                    os.path.join(atftroot, atftfile),
-                    os.path.join(atftroot, atftfile + ".csv"),
-                )
-    for atftroot, _, atftfiles in os.walk(root_dir):
-        for atftfile in atftfiles:  # adding header to split csv files
-            if (
-                "-split" in atftfile
-                and "journal_mft" in atftfile
-                and atftfile.endswith(".csv")
-                and "00" not in atftfile
-            ):
-                with open(
-                    os.path.join(atftroot, ".adding_header_" + atftfile),
-                    "a",
-                ) as adding_header:
-                    adding_header.write(
-                        "record,state,active,record_type,seq_number,parent_file_record,parent_file_record_seq,std_info_creation_date,std_info_modification_date,std_info_access_date,std_info_entry_date,object_id,birth_volume_id,birth_object_id,birth_domain_id,std_info,attribute_list,has_filename,has_object_id,volume_name,volume_info,data,index_root,index_allocation,bitmap,reparse_point,ea_information,ea,property_set,logged_utility_stream,log/notes,stf_fn_shift,usec_zero,ads,possible_copy,possible_volume_move,Filename,fn_info_creation_date,fn_info_modification_date,fn_info_access_date,fn_info_entry_date,LastWriteTime\n"
-                    )
-                    with open(os.path.join(atftroot, atftfile)) as read_split_file:
-                        for eachcsvrow in read_split_file:
-                            adding_header.write(eachcsvrow)
-                os.remove(os.path.join(atftroot, atftfile))
-    for atftroot, _, atftfiles in os.walk(root_dir):
-        for atftfile in atftfiles:  # renaming the split files, with headers
-            if (
-                "-split" in atftfile
-                and ".adding_header_" in atftfile
-                and "journal_mft" in atftfile
-                and atftfile.endswith(".csv")
-            ):
-                os.rename(
-                    os.path.join(atftroot, atftfile),
-                    os.path.join(atftroot, atftfile.split(".adding_header_")[-1]),
-                )
-    time.sleep(0.2)
+def host_tables(host_dir: str) -> List[Tuple[str, str]]:
+    """(path, artefact) for every table of a host's to index: artefacts/cooked/** and analysis/**,
+    artefacts/plaso_timeline, and Volatility's memory_* output beside artefacts/.
+
+    JSON Lines only, unless the host has none: then it's a case processed before the change, and
+    its CSV and JSON tables are indexed instead (never both, which would index a table twice).
+    """
+    new: List[Tuple[str, str]] = []
+    old: List[Tuple[str, str]] = []
+    for folder in (os.path.join(host_dir, "artefacts", "cooked"), os.path.join(host_dir, "analysis")):
+        for root, dirs, files in os.walk(folder):
+            dirs.sort()
+            for name in sorted(files):
+                if name.startswith("._"):
+                    continue
+                path = os.path.join(root, name)
+                suffix = os.path.splitext(name)[1].lower()
+                if suffix == SUFFIX:
+                    new.append((path, _artefact_of(path, folder)))
+                elif suffix in OLD_SUFFIXES:
+                    old.append((path, _artefact_of(path, folder)))
+    for suffix in (SUFFIX,) + OLD_SUFFIXES:
+        timeline = os.path.join(host_dir, "artefacts", f"plaso_timeline{suffix}")
+        if os.path.isfile(timeline):
+            (new if suffix == SUFFIX else old).append((timeline, "plaso_timeline"))
+    for path in memory_outputs(host_dir):
+        (new if path.endswith(SUFFIX) else old).append((path, os.path.splitext(os.path.basename(path))[0]))
+    return new or old
 
 
-def convert_csv_to_ndjson(output_directory, case, img, root_dir):
-    for atftroot, _, atftfiles in os.walk(root_dir):
-        for atftfile in atftfiles:  # converting csv files to ndjson
-            if (
-                os.path.getsize(os.path.join(atftroot, atftfile)) > 0
-                and atftfile.endswith(".csv")
-                and os.path.getsize(os.path.join(atftroot, atftfile)) < 52427770
-            ):
-                if atftfile.endswith(".csv"):
-                    with open(
-                        os.path.join(atftroot, atftfile), encoding="utf-8"
-                    ) as read_csv:
-                        # try/catch with file-reading error
-                        csv_results = csv.DictReader(read_csv)
-                        with open(
-                            os.path.join(atftroot, atftfile)[0:-4] + ".ndjson",
-                            "a",
-                            encoding="utf-8",
-                        ) as write_json:
-                            for result in csv_results:
-                                data = (
-                                    str(result)[2:]
-                                    .replace("': '", '": "')
-                                    .replace("', '", '", "')
-                                    .replace("'}", '"}')
-                                    .replace("': None", '": None')
-                                    .replace("\": None, '", '": None, "')
-                                    .replace("': \"", '": "')
-                                    .replace("\", '", '", "')
-                                    .replace('"-": "-", ', "")
-                                    .replace('"": "", ', "")
-                                )
-                                if "+index.dat" in atftfile:
-                                    malformed_indexdat_data = re.findall(
-                                        r"(.*\"Domain\": \")([\S\s]+)(\"url\".*)",
-                                        data,
-                                    )
-                                    reformed_data = (
-                                        malformed_indexdat_data[0][1]
-                                        .replace("(", "%28")
-                                        .replace(")", "%29")
-                                        .replace("{", "%7B")
-                                        .replace("}", "%7D")
-                                        .replace('"', "%22")
-                                    )
-                                    reformed_data = re.sub(
-                                        r'(Description": "[^"]+)(\}$)',
-                                        r'\1"\2',
-                                        reformed_data,
-                                    )
-                                    if reformed_data.endswith("%22, "):
-                                        reformed_data = reformed_data.replace(
-                                            "%22, ", '", '
-                                        )
-                                    reformed_data.replace("\" ', ", '"').replace(
-                                        "\\\\\\", "\\\\"
-                                    )
-                                    data = "{}{}{}".format(
-                                        malformed_indexdat_data[0][0],
-                                        reformed_data.replace("\\\\\\", "\\\\").replace(
-                                            "\\\\\\", "\\\\"
-                                        ),
-                                        malformed_indexdat_data[0][2],
-                                    )
-                                # inserting timestamp now() as no timestamp exists
-                                if (
-                                    "_index" not in data
-                                    and "LastWrite" not in data
-                                    and "@timestamp" not in data
-                                ):
-                                    time_insert = '", "@timestamp": "{}'.format(
-                                        datetime.now().isoformat().replace("T", " ")
-                                    )
-                                else:
-                                    time_insert = ""
-                                data = '{{"index": {{"_index": "{}"}}}}\n{{"hostname": "{}", "artefact": "{}{}", "{}\n\n'.format(
-                                    case.lower(),
-                                    img.split("::")[0],
-                                    atftfile,
-                                    time_insert,
-                                    data.replace("SystemTime", "@timestamp")
-                                    .replace("LastWriteTime", "@timestamp")
-                                    .replace("LastWrite Time", "@timestamp")
-                                    .replace('"LastWrite": "', '"@timestamp": "')
-                                    .replace(
-                                        '"@timestamp": "@timestamp ',
-                                        '"@timestamp": "',
-                                    ),
-                                )
-                                data = re.sub(r'(": )(None)([,:\}])', r'\1"\2"\3', data)
-                                data = data.replace("', None: ['", '", "None": ["')
-                                data = re.sub(r'(": \["[^\']+)\'(\])', r'\1"\2', data)
-                                converted_timestamp = convert_timestamps(data)
-                                write_json.write(
-                                    re.sub(
-                                        r'([^\{\[ ])"([^:,\}])',
-                                        r"\1%22\2",
-                                        re.sub(
-                                            r'([^:,] )"([^:,])',
-                                            r"\1%22\2",
-                                            converted_timestamp,
-                                        ),
-                                    )
-                                )
-                        prepare_elastic_ndjson(
-                            output_directory,
-                            img,
-                            case.lower(),
-                            os.path.join(atftroot, atftfile)[0:-4] + ".ndjson",
-                        )
-    time.sleep(0.2)
+def table_records(path: str) -> Iterator[Dict[str, Any]]:
+    """Each record of a table, streamed: JSON Lines, or an older case's CSV or JSON array."""
+    if path.lower().endswith(".json"):
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            for record in iter_json(fh):  # an old MFT array is several GB: not read whole
+                if isinstance(record, dict):
+                    yield record
+        return
+    for _, record in read_records(path):
+        if set(record) != {"unparsed"}:  # a line that isn't JSON isn't a document
+            yield record
 
 
-def convert_json_to_ndjson(output_directory, case, img, root_dir):
-    for atftroot, _, atftfiles in os.walk(root_dir):
-        for atftfile in atftfiles:  # converting json files to ndjson
-            if os.path.getsize(
-                os.path.join(atftroot, atftfile)
-            ) > 0 and atftfile.endswith(".json"):
-                try:
-                    with open(os.path.join(atftroot, atftfile)) as read_json:
-                        json_content = read_json.read()
-                    in_json = StringIO(json_content)
-                    results = [json.dumps(record) for record in json.load(in_json)]
-                    with open(
-                        os.path.join(atftroot, atftfile)[0:-5] + ".ndjson", "w"
-                    ) as write_json:
-                        for result in results:
-                            if result != "{}":
-                                data = '{{"index": {{"_index": "{}"}}}}\n{{"hostname": "{}", "artefact": "{}", {}\n\n'.format(
-                                    case.lower(),
-                                    img.split("::")[0],
-                                    atftfile,
-                                    result[1:]
-                                    .replace("SystemTime", "@timestamp")
-                                    .replace("LastWriteTime", "@timestamp")
-                                    .replace("LastWrite Time", "@timestamp")
-                                    .replace('"LastWrite": "', '"@timestamp": "')
-                                    .replace(
-                                        '"@timestamp": "@timestamp ',
-                                        '"@timestamp": "',
-                                    ),
-                                )
-                                data = re.sub(r'(": )(None)([,:\}])', r'\1"\2"\3', data)
-                                converted_timestamp = convert_timestamps(data)
-                                write_json.write(converted_timestamp)
-                    prepare_elastic_ndjson(
-                        output_directory,
-                        img,
-                        case.lower(),
-                        os.path.join(atftroot, atftfile)[0:-5] + ".ndjson",
-                    )
-                except:
-                    print(
-                        "       Could not ingest\t'{}'\t- perhaps the json did not format correctly?".format(
-                            atftfile
-                        )
-                    )
-    time.sleep(0.2)
-
-
-def convert_timestamps(data):
-    # yyyy/MM/dd HH:mm:ss.SSS
-    converted_timestamp_formats = re.sub(
-        r"(@timestamp\": \"\d{4})/(\d{2})/(\d{2}) (\d{2}:\d{2}:\d{2}\.\d{3}[^\d])",
-        r"\1-\2-\3 \4 000",
-        data,
-    )
-    # yyyy-MM-dd HH:mm:ssZ/yyyy-MM-dd HH:mm:ss
-    converted_timestamp_formats = re.sub(
-        r"(@timestamp\": \"\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})Z?",
-        r"\1 \2\.000000",
-        converted_timestamp_formats,
-    )
-    # MM/dd/yy HH:mm:ss
-    converted_timestamp_formats = re.sub(
-        r"(@timestamp\": \"\d{2})/(\d{2})/(\d{2}) (\d{2}:\d{2}:\d{2})",
-        r"\1-\2-\3 \4\.000000",
-        converted_timestamp_formats,
-    )
-    # evtx files and $I30
-    return (
-        converted_timestamp_formats.replace(" 000", "000")
-        .replace("000000.", ".")
-        .replace("\\.000000", ".000000")
-        .replace("\\..", ".")
-    )
-
-
-def ingest_elastic_ndjson(case, ndjsonfile):
-    ingest_data_command = shlex.split(
-        'curl -s -H "Content-Type: application/x-ndjson" -XPOST localhost:9200/{}/_doc/_bulk?pretty --data-binary @"{}"'.format(
-            case.lower(), ndjsonfile
-        )
-    )
-    ingested_data = subprocess.Popen(
-        ingest_data_command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    ).communicate()[0]
-    if "Unexpected character" in str(ingested_data) or 'failed" : 1' in str(
-        ingested_data
-    ):
-        print(
-            "       Could not ingest\t'{}'\t- perhaps the json did not format correctly?".format(
-                ndjsonfile.split("/")[-1]
-            )
-        )
-
-
-def prepare_elastic_ndjson(output_directory, img, case, source_location):
-    if not os.path.exists(
-        os.path.join(output_directory + img.split("::")[0] + "/elastic/")
-    ):
-        os.makedirs(os.path.join(output_directory + img.split("::")[0] + "/elastic/"))
-        os.makedirs(
-            os.path.join(output_directory + img.split("::")[0] + "/elastic/documents/")
-        )
-    if "/vss" in source_location:
-        vss_path_insert = "/vss{}".format(
-            source_location.split("/vss")[1].split("/")[0]
-        )
-        if not os.path.exists(
-            os.path.join(
-                output_directory
-                + img.split("::")[0]
-                + "/elastic/documents{}".format(vss_path_insert)
-            )
-        ):
-            os.makedirs(
-                os.path.join(
-                    output_directory
-                    + img.split("::")[0]
-                    + "/elastic/documents{}".format(vss_path_insert)
-                )
-            )
-    else:
-        vss_path_insert = ""
-    ndjsonfile = os.path.join(
-        output_directory + img.split("::")[0] + "/elastic/documents{}/{}"
-    ).format(vss_path_insert, source_location.split("/")[-1])
-    shutil.move(source_location, ndjsonfile)
+@lru_cache(maxsize=None)
+def _technique_info(technique_id: str) -> Dict[str, Any]:
     try:
-        ingest_elastic_ndjson(case, ndjsonfile)
-    except:
-        print(
-            "       Could not ingest\t'{}'\t- perhaps the json did not format correctly?".format(
-                ndjsonfile.split("/")[-1]
-            )
-        )
+        from rowanholt.post.mitre.attack_data import enrich_technique
+        return enrich_technique(technique_id) or {}
+    except Exception:  # without the ATT&CK data the IDs still go in
+        return {}
+
+
+def _union(values: List[Any]) -> List[Any]:
+    out: List[Any] = []
+    for value in values:
+        for item in value if isinstance(value, list) else [value]:
+            if item not in (None, "") and item not in out:
+                out.append(item)
+    return out
+
+
+def fill_technique_fields(doc: Dict[str, Any]) -> Dict[str, Any]:
+    """The technique fields Kibana's dashboards chart (mitre_technique_id, _name, _tactics, _groups,
+    _software), from the envelope's techniques, where ATT&CK enrichment hasn't already set them."""
+    ids = [t for t in doc.get("techniques") or [] if isinstance(t, str) and t]
+    if not ids or doc.get("mitre_technique_id"):
+        return doc
+    info = [_technique_info(t) for t in ids]
+    # Several IDs go in as an array, so a terms chart counts the record under each technique
+    doc["mitre_technique_id"] = ids[0] if len(ids) == 1 else ids
+    names = _union([i.get("mitre_technique_name") for i in info])
+    if names:
+        doc["mitre_technique_name"] = names[0] if len(names) == 1 else names
+    for field in ("mitre_tactics", "mitre_groups", "mitre_software"):
+        values = _union([i.get(field) for i in info])
+        if values:
+            doc[field] = values
+    return doc
+
+
+# Every dynamically mapped value is a keyword, as when Elrond's tables were CSV and every value a
+# string: with JSON Lines' own types, the first record's type fixed a field's mapping and later
+# records were refused (journal_mft's attribute_list.data, a number then base64; an LSN past a
+# long). Only @timestamp is a date: date detection would fix a field the same way.
+INDEX_MAPPING = {
+    "mappings": {
+        "date_detection": False,
+        "dynamic_templates": [
+            {"numbers_as_keywords": {"match_mapping_type": "long", "mapping": {"type": "keyword"}}},
+            {"decimals_as_keywords": {"match_mapping_type": "double", "mapping": {"type": "keyword"}}},
+            {"booleans_as_keywords": {"match_mapping_type": "boolean", "mapping": {"type": "keyword"}}},
+        ],
+        "properties": {
+            "@timestamp": {
+                "type": "date",
+                "format": "strict_date_optional_time||yyyy-MM-dd HH:mm:ss.SSSSSS||yyyy-MM-dd HH:mm:ss||yyyy-MM-dd'T'HH:mm:ss.SSS'Z'||yyyy-MM-dd'T'HH:mm:ss||epoch_millis",
+            },
+        },
+    },
+}
+
+
+def _text_nodes(value: Any) -> Any:
+    """``value`` with each XML text node (Artemis' ``{"#text": 4097, "#attributes": {...}}``,
+    an EventID with Qualifiers) as its text, the attributes beside it as ``<field>_attributes``:
+    the same field as an object in one event and a number in the next was refused."""
+    if isinstance(value, list):
+        return [_text_nodes(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    out: Dict[str, Any] = {}
+    for key, item in value.items():
+        if isinstance(item, dict) and "#text" in item:
+            out[key] = _text_nodes(item["#text"])
+            if item.get("#attributes"):
+                out[f"{key}_attributes"] = _text_nodes(item["#attributes"])
+        else:
+            out[key] = _text_nodes(item)
+    return out
+
+
+def to_document(record: Dict[str, Any], host: str, artefact: str) -> Dict[str, Any]:
+    """A record as an Elasticsearch document: hostname and artefact as the dashboards use them,
+    @timestamp from the envelope's timestamp, and the technique fields filled in.
+
+    A JSON Lines record whose timestamp is null gets no @timestamp: its writer chose the
+    artefact's time field, so any other field would be a guess, and a value Elasticsearch can't
+    parse as a date gets the whole document refused. An older case's record has no envelope, so
+    its time is looked for as before (normalize_timestamp), and kept only when it parses.
+    """
+    doc = _text_nodes(dict(record))
+    doc["hostname"] = record.get("host") or host
+    if not doc.get("artefact"):
+        doc["artefact"] = artefact
+    if all(field in record for field in ENVELOPE):
+        stamp = iso_timestamp(record.get("timestamp"))
+    else:
+        stamp = iso_timestamp(normalize_timestamp(dict(record)).get("@timestamp"))
+    if stamp:
+        doc["@timestamp"] = stamp
+    else:
+        doc.pop("@timestamp", None)
+    return fill_technique_fields(doc)
+
+
+def index_table(path: str, host: str, artefact: str, index: str,
+                send: Callable[[List[str]], bool]) -> Tuple[int, bool]:
+    """Bulk-post every record of one table to ``index`` through ``send``, BATCH_SIZE at a time;
+    (records sent, whether every batch was accepted)."""
+    action = json.dumps({"index": {"_index": index}})
+    batch: List[str] = []
+    sent, ok = 0, True
+    for record in table_records(path):
+        batch.append(action)
+        batch.append(json.dumps(to_document(record, host, artefact), default=str))
+        sent += 1
+        if len(batch) >= BATCH_SIZE * 2:
+            ok = send(batch) and ok
+            batch = []
+    if batch:
+        ok = send(batch) and ok
+    return sent, ok
+
+
+def ingest_host_tables(host_dir: str, host: str, index: str,
+                       send: Callable[[List[str]], bool]) -> List[Tuple[str, int, bool]]:
+    """Index every table of one host's; (artefact, records sent, all accepted) for each."""
+    results = []
+    for path, artefact in host_tables(host_dir):
+        try:
+            sent, ok = index_table(path, host, artefact, index, send)
+        except (OSError, ValueError):
+            sent, ok = 0, False
+        results.append((artefact, sent, ok))
+    return results
 
 
 def ingest_elastic_data(
@@ -385,25 +248,9 @@ def ingest_elastic_data(
     stage,
     allimgs,
 ):
-    imgs_to_ingest = []
-    for _, img in allimgs.items():
-        if img not in imgs_to_ingest:
-            imgs_to_ingest.append(img)
-        if not os.path.exists(output_directory + img.split("::")[0] + "/elastic/"):
-            os.makedirs(
-                os.path.join(output_directory + img.split("::")[0] + "/elastic")
-            )
-            os.makedirs(
-                os.path.join(
-                    output_directory + img.split("::")[0] + "/elastic/documents/"
-                )
-            )
     # creating index based on case name in elasticsearch
-    make_index = shlex.split(
-        'curl -X PUT "localhost:9200/{}?pretty" -H "Content-Type: application/json" -d\'{{"mappings": {{"properties": {{"@timestamp": {{"type": "date", "format": "strict_date_optional_time||yyyy-MM-dd HH:mm:ss.SSSSSS||yyyy-MM-dd HH:mm:ss||yyyy-MM-dd\'T\'HH:mm:ss.SSS\'Z\'||yyyy-MM-dd\'T\'HH:mm:ss||epoch_millis"}}}}}}}}\''.format(
-            case.lower()
-        )
-    )
+    make_index = ["curl", "-X", "PUT", "localhost:9200/{}?pretty".format(case.lower()),
+                  "-H", "Content-Type: application/json", "-d", json.dumps(INDEX_MAPPING)]
     subprocess.Popen(
         make_index,
         stdout=subprocess.PIPE,
@@ -428,11 +275,9 @@ def ingest_elastic_data(
         make_index_pattern, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     ).communicate()[0]
     time.sleep(0.2)
-    for img in imgs_to_ingest:
-        # Handle image name format: "imagename::mountpoint" or just "imagename"
-        img_parts = img.split("::")
-        img_name = img_parts[0]
-        img_mount = img_parts[1] if len(img_parts) > 1 else ""
+    seen = set()
+    for img_name, img in siem_hosts(allimgs):
+        img_mount = img.split("::")[1] if "::" in img else ""
 
         if "vss" in img_mount:
             vss_part = img_mount.split("_")[1] if "_" in img_mount else img_mount
@@ -440,6 +285,10 @@ def ingest_elastic_data(
             vsstext = " from " + vss_part.replace("vss", "volume shadow copy #")
         else:
             vssimage, vsstext = "'" + img_name + "'", ""
+        # A host's shadow copies are in its own cooked/ (cooked/vssN/) and go in with it
+        if img_name in seen:
+            continue
+        seen.add(img_name)
         print()
         print("     Ingesting artefacts into elasticsearch for {}...".format(vssimage))
         entry, prnt = "{},{}{},{},ingesting\n".format(
@@ -451,37 +300,17 @@ def ingest_elastic_data(
             vsstext,
         )
         write_audit_log_entry(verbosity, output_directory, entry, prnt)
-        directories_with_data = [
-            os.path.realpath(os.path.join(output_directory, img_name)),
-            os.path.realpath(
-                os.path.join(output_directory, img_name, "/artefacts/cooked/")
-            ),
-        ]
-        if os.path.exists(
-            os.path.join(output_directory, img_name, "/artefacts/cooked/")
-        ):
-            for sub_dir in os.listdir(
-                os.path.realpath(
-                    output_directory + img_name + "/artefacts/cooked/"
-                )
-            ):
-                if "vss" in sub_dir:
-                    directories_with_data.append(
-                        os.path.realpath(
-                            os.path.join(
-                                output_directory
-                                + img_name
-                                + "/artefacts/cooked",
-                                sub_dir,
-                            )
-                        )
+        results = ingest_host_tables(
+            os.path.join(output_directory, img_name), img_name, case.lower(),
+            lambda batch: send_bulk_to_elastic(batch, "http://localhost:9200", None, None, case),
+        )
+        for artefact, _, ok in results:
+            if not ok:
+                print(
+                    "       Could not ingest\t'{}'\t- perhaps the json did not format correctly?".format(
+                        artefact
                     )
-        for each_dir in directories_with_data:
-            if os.path.exists(each_dir):
-                split_large_csv_files(each_dir)
-                prepare_csv_to_ndjson(each_dir)
-                convert_csv_to_ndjson(output_directory, case, img, each_dir)
-                convert_json_to_ndjson(output_directory, case, img, each_dir)
+                )
 
         print("     elasticsearch ingestion completed for {}".format(vssimage))
         entry, prnt = "{},{},{},completed\n".format(
@@ -509,7 +338,7 @@ def ingest_elastic_data(
 
 
 def send_bulk_to_elastic(bulk_data, elastic_url, auth_header, ssl_context, case):
-    """Send bulk data to Elasticsearch"""
+    """Send bulk data to Elasticsearch: False when the request, or any document in it, is refused"""
     if not bulk_data:
         return True
 
@@ -522,12 +351,15 @@ def send_bulk_to_elastic(bulk_data, elastic_url, auth_header, ssl_context, case)
         req.add_header('Authorization', auth_header)
 
     try:
-        urllib.request.urlopen(req, context=ssl_context, timeout=120)
+        with urllib.request.urlopen(req, context=ssl_context, timeout=120) as response:
+            reply = response.read()
+    except Exception:
+        return False
+    # A bulk request is accepted as a whole even when documents in it are refused
+    try:
+        return not json.loads(reply).get("errors")
+    except (ValueError, AttributeError):
         return True
-    except urllib.error.HTTPError as e:
-        return False
-    except Exception as e:
-        return False
 
 
 def ingest_elastic_data_remote(
@@ -560,27 +392,13 @@ def ingest_elastic_data_remote(
     elastic_url = "http://{}:{}".format(elastic_host, elastic_port)
     kibana_url = "http://{}:{}".format(kibana_host, kibana_port)
 
-    # Batch size for bulk ingestion (number of records per batch)
-    BATCH_SIZE = 1000
-    # Large file threshold (50MB) - files larger than this use streaming
-    LARGE_FILE_THRESHOLD = 50 * 1024 * 1024
-
     imgs_to_ingest = siem_hosts(allimgs)
 
     # Create index in Elasticsearch
     print("     Creating Elasticsearch index '{}'...".format(case.lower()))
     try:
         index_url = "{}/{}".format(elastic_url, case.lower())
-        index_mapping = json.dumps({
-            "mappings": {
-                "properties": {
-                    "@timestamp": {
-                        "type": "date",
-                        "format": "strict_date_optional_time||yyyy-MM-dd HH:mm:ss.SSSSSS||yyyy-MM-dd HH:mm:ss||yyyy-MM-dd'T'HH:mm:ss.SSS'Z'||yyyy-MM-dd'T'HH:mm:ss||epoch_millis"
-                    }
-                }
-            }
-        }).encode('utf-8')
+        index_mapping = json.dumps(INDEX_MAPPING).encode('utf-8')
 
         req = urllib.request.Request(index_url, data=index_mapping, method='PUT')
         req.add_header('Content-Type', 'application/json')
@@ -639,6 +457,7 @@ def ingest_elastic_data_remote(
         print("     Warning: Could not create index pattern: {}".format(e))
 
     # Ingest data for each image
+    seen = set()
     for img_name, img in imgs_to_ingest:
         # img is "<name>::<platform>[_vssN]"; img_name is the host's output folder
         img_parts = img.split("::")
@@ -648,6 +467,10 @@ def ingest_elastic_data_remote(
             vssimage = "'" + img_name + "' (volume shadow copy)"
         else:
             vssimage = "'" + img_name + "'"
+        # A host's shadow copies are in its own cooked/ (cooked/vssN/) and go in with it
+        if img_name in seen:
+            continue
+        seen.add(img_name)
 
         entry, prnt = "{},{},indexing artefacts for {}\n".format(
             datetime.now().isoformat(), stage, vssimage
@@ -656,191 +479,25 @@ def ingest_elastic_data_remote(
         )
         write_audit_log_entry(verbosity, output_directory, entry, prnt)
 
-        # Find all JSON and CSV files in cooked directory
-        cooked_path = os.path.join(output_directory, img_name, "artefacts", "cooked")
-
-        memory_files = memory_outputs(os.path.join(output_directory, img_name))
-        if not os.path.exists(cooked_path) and not memory_files:
+        host_dir = os.path.join(output_directory, img_name)
+        if not host_tables(host_dir):
             print("     No cooked artefacts found for {}".format(vssimage))
             continue
 
-        # Collect all files to ingest: cooked artefacts, and Volatility's output beside them
-        files_to_ingest = list(memory_files)
-        files_to_ingest.extend(glob.glob(os.path.join(cooked_path, "*.json")))
-        files_to_ingest.extend(glob.glob(os.path.join(cooked_path, "*.csv")))
-        files_to_ingest.extend(glob.glob(os.path.join(cooked_path, "**", "*.json"), recursive=True))
-        files_to_ingest.extend(glob.glob(os.path.join(cooked_path, "**", "*.csv"), recursive=True))
-
-        # Remove duplicates
-        files_to_ingest = list(set(files_to_ingest))
-
-        for filepath in files_to_ingest:
-            filename = os.path.basename(filepath)
-            file_size = os.path.getsize(filepath)
-
-            try:
-                bulk_data = []
-                records_processed = 0
-
-                if filepath.endswith('.json'):
-                    # Check if file is large - use streaming for large files
-                    if file_size > LARGE_FILE_THRESHOLD:
-                        # Stream large JSON files line by line
-                        with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
-                            # Try to detect if it's a JSON array by peeking
-                            first_char = f.read(1)
-                            f.seek(0)
-
-                            if first_char == '[':
-                                # JSON array - use ijson-style streaming (manual parsing)
-                                # Read in chunks and extract objects
-                                buffer = ""
-                                depth = 0
-                                in_string = False
-                                escape_next = False
-                                obj_start = -1
-
-                                for chunk in iter(lambda: f.read(8192), ''):
-                                    for i, char in enumerate(chunk):
-                                        if escape_next:
-                                            escape_next = False
-                                            continue
-                                        if char == '\\' and in_string:
-                                            escape_next = True
-                                            continue
-                                        if char == '"' and not escape_next:
-                                            in_string = not in_string
-                                            continue
-                                        if in_string:
-                                            continue
-
-                                        if char == '{':
-                                            if depth == 0:
-                                                obj_start = len(buffer) + i
-                                            depth += 1
-                                        elif char == '}':
-                                            depth -= 1
-                                            if depth == 0 and obj_start >= 0:
-                                                # Extract object
-                                                obj_str = buffer[obj_start:] + chunk[:i+1]
-                                                try:
-                                                    record = json.loads(obj_str)
-                                                    record['hostname'] = img_name
-                                                    record['artefact'] = filename
-                                                    normalize_timestamp(record)
-                                                    bulk_data.append(json.dumps({"index": {"_index": case.lower()}}))
-                                                    bulk_data.append(json.dumps(record))
-                                                    records_processed += 1
-
-                                                    # Send batch when full
-                                                    if len(bulk_data) >= BATCH_SIZE * 2:
-                                                        send_bulk_to_elastic(bulk_data, elastic_url, auth_header, ssl_context, case)
-                                                        bulk_data = []
-                                                except:
-                                                    pass
-                                                obj_start = -1
-                                                buffer = ""
-                                                continue
-
-                                    buffer += chunk
-                                    # Trim buffer if no object in progress
-                                    if obj_start == -1:
-                                        buffer = ""
-                            else:
-                                # JSON lines format - read line by line
-                                for line in f:
-                                    if line.strip():
-                                        try:
-                                            record = json.loads(line)
-                                            record['hostname'] = img_name
-                                            record['artefact'] = filename
-                                            normalize_timestamp(record)
-                                            bulk_data.append(json.dumps({"index": {"_index": case.lower()}}))
-                                            bulk_data.append(json.dumps(record))
-                                            records_processed += 1
-
-                                            # Send batch when full
-                                            if len(bulk_data) >= BATCH_SIZE * 2:
-                                                send_bulk_to_elastic(bulk_data, elastic_url, auth_header, ssl_context, case)
-                                                bulk_data = []
-                                        except:
-                                            pass
-                    else:
-                        # Small files - load entirely
-                        with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
-                            try:
-                                content = f.read()
-                                # Handle JSON lines format
-                                if '\n' in content and not content.strip().startswith('['):
-                                    for line in content.strip().split('\n'):
-                                        if line.strip():
-                                            try:
-                                                record = json.loads(line)
-                                                record['hostname'] = img_name
-                                                record['artefact'] = filename
-                                                normalize_timestamp(record)
-                                                bulk_data.append(json.dumps({"index": {"_index": case.lower()}}))
-                                                bulk_data.append(json.dumps(record))
-                                                records_processed += 1
-                                            except:
-                                                pass
-                                else:
-                                    # Regular JSON array
-                                    records = json.loads(content)
-                                    if isinstance(records, list):
-                                        for record in records:
-                                            if isinstance(record, dict):
-                                                record['hostname'] = img_name
-                                                record['artefact'] = filename
-                                                normalize_timestamp(record)
-                                                bulk_data.append(json.dumps({"index": {"_index": case.lower()}}))
-                                                bulk_data.append(json.dumps(record))
-                                                records_processed += 1
-                                    elif isinstance(records, dict):
-                                        records['hostname'] = img_name
-                                        records['artefact'] = filename
-                                        normalize_timestamp(records)
-                                        bulk_data.append(json.dumps({"index": {"_index": case.lower()}}))
-                                        bulk_data.append(json.dumps(records))
-                                        records_processed += 1
-                            except json.JSONDecodeError:
-                                pass
-
-                elif filepath.endswith('.csv'):
-                    with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
-                        try:
-                            reader = csv.DictReader(f)
-                            for row in reader:
-                                row['hostname'] = img_name
-                                row['artefact'] = filename
-                                # Add timestamp if not present
-                                if '@timestamp' not in row and 'LastWriteTime' not in row:
-                                    row['@timestamp'] = datetime.now().isoformat()
-                                bulk_data.append(json.dumps({"index": {"_index": case.lower()}}))
-                                bulk_data.append(json.dumps(row))
-                                records_processed += 1
-
-                                # Send batch when full
-                                if len(bulk_data) >= BATCH_SIZE * 2:
-                                    send_bulk_to_elastic(bulk_data, elastic_url, auth_header, ssl_context, case)
-                                    bulk_data = []
-                        except:
-                            pass
-
-                # Send remaining bulk data
-                if bulk_data:
-                    send_bulk_to_elastic(bulk_data, elastic_url, auth_header, ssl_context, case)
-
-                # Log successful indexing
+        results = ingest_host_tables(
+            host_dir, img_name, case.lower(),
+            lambda batch: send_bulk_to_elastic(batch, elastic_url, auth_header, ssl_context, case),
+        )
+        for artefact, records, ok in results:
+            if ok:
                 entry, prnt = "{},{},indexed '{}' for {}\n".format(
-                    datetime.now().isoformat(), stage, filename, img_name
+                    datetime.now().isoformat(), stage, artefact, img_name
                 ), " -> {} -> indexed '{}' for '{}'".format(
-                    datetime.now().isoformat().replace("T", " "), filename, img_name
+                    datetime.now().isoformat().replace("T", " "), artefact, img_name
                 )
                 write_audit_log_entry(verbosity, output_directory, entry, prnt)
-
-            except Exception as e:
-                print("       Warning: Could not process {}: {}".format(filename, str(e)[:50]))
+            else:
+                print("       Warning: Could not index all of {} ({} records sent)".format(artefact, records))
 
         entry, prnt = "{},{},completed indexing for {}\n".format(
             datetime.now().isoformat(), stage, vssimage

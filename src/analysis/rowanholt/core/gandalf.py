@@ -1,6 +1,7 @@
 import csv
 import getpass
 import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -11,8 +12,10 @@ from zipfile import ZipFile
 
 from rowanholt.audit import write_audit_log_entry
 from rowanholt.core import event_dataset
+from rowanholt.core.records import SUFFIX, write_records
 from rowanholt.core.identify import identify_gandalf_host
 from rowanholt.core.identify import identify_memory_image
+from rowanholt.utils import safe_input
 
 
 ARCHIVE_SUFFIXES = (".zip", ".7z", ".tar.gz", ".tgz")
@@ -20,6 +23,13 @@ STAGING_DIR = ".gandalf_staging"
 # Files Gandalf writes about the live system (not collected from disk); they sit
 # beside raw/ as they do for disk images.
 VOLATILE_SUFFIXES = (".info", ".csv")
+# Written in the host's folder once its extraction has finished; without it, raw/ may be half there
+EXTRACTED_MARKER = "gandalf_extracted.json"
+# Earlier extractions moved aside, as <case>/.previous/<host>-<time>: outside the case's host
+# folders, so nothing reads one as another host
+PREVIOUS_DIR = ".previous"
+# What processing and analysis write in a host's folder, rebuilt when an extraction is reused
+DERIVED = (os.path.join("artefacts", "cooked"), "analysis")
 
 
 def _inside(root, path):
@@ -282,17 +292,23 @@ def ingest_gandalf_archive(archive, output_directory, verbosity, allimgs):
     gandalf_host, osplatform = identify_gandalf_host(output_directory, verbosity, host_info)
     host_dir = os.path.join(output_directory, gandalf_host)
     artefacts_dir = os.path.join(host_dir, "artefacts")
+    reuse = False
     if os.path.isdir(os.path.join(artefacts_dir, "raw")):
+        if not os.path.isfile(os.path.join(host_dir, EXTRACTED_MARKER)):
+            print("   '{}' was extracted to {} before, but nothing says it finished".format(gandalf_host, artefacts_dir))
+            set_aside(verbosity, output_directory, gandalf_host, host_dir, "the earlier extraction is incomplete")
+        else:
+            reuse = reuse_extraction(verbosity, output_directory, gandalf_host, host_dir, artefacts_dir)
+    if reuse:
+        clear_derived(verbosity, output_directory, gandalf_host, host_dir)
         print("   '{}' was already extracted to {}; reusing it".format(gandalf_host, artefacts_dir))
     else:
         integrity = verify_manifest(staging)
         if integrity is not None:
             rows, counts = integrity
             os.makedirs(host_dir, exist_ok=True)
-            with open(os.path.join(host_dir, "gandalf_integrity.csv"), "w", newline="") as out:
-                writer = csv.DictWriter(out, fieldnames=["file_path", "expected_sha256", "actual_sha256", "status"])
-                writer.writeheader()
-                writer.writerows(rows)
+            write_records(os.path.join(host_dir, "gandalf_integrity" + SUFFIX), rows, host=gandalf_host,
+                          artefact="gandalf_integrity", source_path="log.meta")
             summary = ", ".join("{} {}".format(n, s) for s, n in counts.items() if n)
             print("   Checked '{}' against Gandalf's hashes: {}".format(gandalf_host, summary))
             entry, prnt = (
@@ -308,11 +324,61 @@ def ingest_gandalf_archive(archive, output_directory, verbosity, allimgs):
                 if os.path.basename(f) == audit:
                     _place(f, os.path.join(host_dir, "gandalf_" + audit))
         normalise_gandalf_artefacts(os.path.dirname(host_info), artefacts_dir)
+        with open(os.path.join(host_dir, EXTRACTED_MARKER), "w", encoding="utf-8") as marker:
+            json.dump({"archive": name, "extracted": datetime.now().isoformat(),
+                       "integrity": summary if integrity is not None else "not checked"}, marker)
         print("   Successfully extracted artefacts for '{}'".format(gandalf_host))
     _remove_tree(staging)
     print()
     allimgs[os.path.join(artefacts_dir, "raw")] = "{}::{}".format(gandalf_host, osplatform)
     return gandalf_host
+
+
+def reuse_extraction(verbosity, output_directory, gandalf_host, host_dir, artefacts_dir) -> bool:
+    """Whether to reuse a host this case already extracted, or extract its archive again (a newer
+    collection, or an extraction that went wrong). Asked when run interactively; a web job or
+    automation reuses it, as before. The earlier extraction is moved aside, never deleted: its
+    raw/ is evidence. Only asked of an extraction that finished (EXTRACTED_MARKER)."""
+    answer = safe_input(
+        "   '{}' was already extracted to {}.\n   Reuse it, or extract the archive again? Y(reuse)/n(extract again) [Y] ".format(
+            gandalf_host, artefacts_dir), default="y")
+    if answer.strip().lower() not in ("n", "no"):
+        return True
+    set_aside(verbosity, output_directory, gandalf_host, host_dir, "asked to extract it again")
+    return False
+
+
+def set_aside(verbosity, output_directory, gandalf_host, host_dir, why) -> str:
+    """Move a host's earlier extraction to <case>/.previous/<host>-<time>, before extracting its
+    archive again; where it went."""
+    previous = os.path.join(output_directory, PREVIOUS_DIR)
+    os.makedirs(previous, exist_ok=True)
+    aside = os.path.join(previous, "{}-{}".format(gandalf_host, datetime.now().strftime("%Y%m%d-%H%M%S")))
+    os.rename(host_dir, aside)
+    entry, prnt = (
+        "{},{},gandalf extraction,extracted again ({}); the earlier extraction moved to {}\n".format(
+            datetime.now().isoformat(), gandalf_host, why, os.path.relpath(aside, output_directory)),
+        " -> {} -> extracting '{}' again ({}); the earlier extraction is in {}".format(
+            datetime.now().isoformat().replace("T", " "), gandalf_host, why, aside),
+    )
+    write_audit_log_entry(verbosity, output_directory, entry, prnt)
+    return aside
+
+
+def clear_derived(verbosity, output_directory, gandalf_host, host_dir) -> None:
+    """Remove what an earlier run cooked and analysed for a reused extraction: its writers append,
+    so a second run over them doubles every record. Rebuilt from raw/, which is kept."""
+    cleared = [d for d in DERIVED if os.path.isdir(os.path.join(host_dir, d))]
+    for derived in cleared:
+        _remove_tree(os.path.join(host_dir, derived))
+    if cleared:
+        entry, prnt = (
+            "{},{},gandalf extraction,reused; {} cleared to be rebuilt\n".format(
+                datetime.now().isoformat(), gandalf_host, " and ".join(cleared)),
+            " -> {} -> reusing '{}'; cleared {} to be rebuilt".format(
+                datetime.now().isoformat().replace("T", " "), gandalf_host, " and ".join(cleared)),
+        )
+        write_audit_log_entry(verbosity, output_directory, entry, prnt)
 
 
 def ingest_event_dataset(staging, stem, output_directory, verbosity, allimgs):

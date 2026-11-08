@@ -135,7 +135,7 @@ sudo ./src/acquisition/bash/gandalf.sh ENCRYPTION MODE [OPTIONS]
 | `-h HOST`, `-u USER` | Remote host and user |
 | `-f FILE` | Hosts file for batch remote acquisition |
 
-**Live containers (`-l`, `gandalf.py -L`, `Invoke-Gandalf.ps1 -LiveContainers`).** Off by default, because it asks the runtime rather than reading its files: Docker's and Podman's daemons log the calls, and an export reads the container's whole filesystem. Neither pauses nor stops a container. For each running container it saves `docker|podman inspect`, `top` (PID, PPID, user, elapsed time, command) and `export`, cut at `GANDALF_CONTAINER_EXPORT_MAX` bytes (2 GB by default; `0` leaves exports out), into `live_containers/<runtime>/<id>/`. Every command goes in `log.audit` with the status `ran` instead of `collected`, an export that was cut saying so. Rootless Podman keeps each user's containers to that user (root's `podman` doesn't list them), so every user with `~/.local/share/containers/storage` is asked as themselves too (`runuser -l`, or `su -l`), with their `/run/user/<uid>` when it exists, and the audit names them: `podman (rootless, alice) top <id>`. Elrond reads the processes into `container_processes.csv` (`suspicious command` flagged as for start-up scripts) and keeps `inspect.json` and `export.tar` in `raw/` for the analyst. On Windows, `-LiveContainers` asks Docker (Docker Desktop's, or Windows Server's) the same, into `raw\live_containers\docker\<id>\`; a Windows container's `top` can't take ps's columns, so it's kept as `top-windows.txt` and not parsed. The web app's New Acquisition page offers it for all three. CRIU checkpoints (process memory) stay out: they need Docker's experimental mode and can stop the container.
+**Live containers (`-l`, `gandalf.py -L`, `Invoke-Gandalf.ps1 -LiveContainers`).** Off by default, because it asks the runtime rather than reading its files: Docker's and Podman's daemons log the calls, and an export reads the container's whole filesystem. Neither pauses nor stops a container. For each running container it saves `docker|podman inspect`, `top` (PID, PPID, user, elapsed time, command) and `export`, cut at `GANDALF_CONTAINER_EXPORT_MAX` bytes (2 GB by default; `0` leaves exports out), into `live_containers/<runtime>/<id>/`. Every command goes in `log.audit` with the status `ran` instead of `collected`, an export that was cut saying so. Rootless Podman keeps each user's containers to that user (root's `podman` doesn't list them), so every user with `~/.local/share/containers/storage` is asked as themselves too (`runuser -l`, or `su -l`), with their `/run/user/<uid>` when it exists, and the audit names them: `podman (rootless, alice) top <id>`. Elrond reads the processes into `container_processes.jsonl` (`suspicious command` flagged as for start-up scripts) and keeps `inspect.json` and `export.tar` in `raw/` for the analyst. On Windows, `-LiveContainers` asks Docker (Docker Desktop's, or Windows Server's) the same, into `raw\live_containers\docker\<id>\`; a Windows container's `top` can't take ps's columns, so it's kept as `top-windows.txt` and not parsed. The web app's New Acquisition page offers it for all three. CRIU checkpoints (process memory) stay out: they need Docker's experimental mode and can stop the container.
 
 ```bash
 sudo ./src/acquisition/bash/gandalf.sh None Local
@@ -169,7 +169,7 @@ All three collectors copy everything into their local working directory first, i
 
 Connections and processes take seconds to list and the memory dump takes minutes, so they go first. `$LogFile` is a circular log that wraps in minutes on a busy host. Prefetch is rewritten whenever a program runs, Gandalf's own PowerShell included.
 
-Hashing waits until everything is copied, so it doesn't widen the window in which the system changes under the collection. Each collector then writes `log.meta` (`hostname,file_path,sha256_hash`, the path being where the file sits in the archive) and archives it with `log.audit`, which records when each artefact was taken. When Elrond extracts the archive it hashes every file again and writes `<host>/gandalf_integrity.csv` with a status per file: `verified`, `MISMATCH`, `missing` or `unhashed`. The summary also goes to Elrond's audit log. Archives from collectors older than this recorded source paths instead, which can't be checked; Elrond says so and carries on.
+Hashing waits until everything is copied, so it doesn't widen the window in which the system changes under the collection. Each collector then writes `log.meta` (`hostname,file_path,sha256_hash`, the path being where the file sits in the archive) and archives it with `log.audit`, which records when each artefact was taken. When Elrond extracts the archive it hashes every file again and writes `<host>/gandalf_integrity.jsonl` with a status per file: `verified`, `MISMATCH`, `missing` or `unhashed`. The summary also goes to Elrond's audit log. Archives from collectors older than this recorded source paths instead, which can't be checked; Elrond says so and carries on.
 
 The collection still writes to the disk it's collecting from (`C:\TEMP\gandalf` on Windows, `/tmp/gandalf` on Linux and macOS), which itself changes `$MFT`, `$LogFile` and the journals. Writing to other media with `-O` avoids that.
 
@@ -203,11 +203,11 @@ On Windows, beyond the event logs, registry, prefetch, `$MFT` and browsers, Gand
 | `wer` | `Report.wer` (system and per user) | Elrond |
 | `notepad` | Windows 11 Notepad TabState | Elrond |
 | `registry\original` | hive files, transaction logs, RegBack | collected for the analyst |
-| `thumbcache` | Explorer thumbnail and icon caches | Elrond: `thumbcache.csv`, each image saved to `cooked/thumbcache/<database>/` |
-| `powershell` | PSReadLine `ConsoleHost_history.txt` per user | Elrond: `powershell_history.csv`, download, encoded-command, Defender-tampering and other lines tagged (**T1059.001**, **T1105**, **T1027**, **T1562.001** and so on) |
+| `thumbcache` | Explorer thumbnail and icon caches | Elrond: `thumbcache.jsonl`, each image saved to `cooked/thumbcache/<database>/` |
+| `powershell` | PSReadLine `ConsoleHost_history.txt` per user | Elrond: `powershell_history.jsonl`, download, encoded-command, Defender-tampering and other lines tagged (**T1059.001**, **T1105**, **T1027**, **T1562.001** and so on) |
 | `rdpcache` | RDP bitmap cache | collected for the analyst |
 
-The USN journal is parsed with the `$MFT` beside it, so journal entries carry full paths. `$LogFile` is decoded into `ntfs_logfile.csv`: names added to and removed from directories, MFT records initialised and freed, and renames (a removal and an add of the same file in one transaction), each with its `$FILE_NAME` times. It covers the last minutes to hours before collection, even where `$MFT` entries have been reused. `pagefile.sys`, `swapfile.sys` and `hiberfil.sys` are searched for URLs, command lines, Run-key paths, executable paths, e-mail and IPv4 addresses (`paged_strings.csv`, one row per distinct string with its first offset and count) whether or not `--Memory` is set; with it, the paging files also go to Volatility. `Amcache.hve` goes to Artemis.
+The USN journal is parsed with the `$MFT` beside it, so journal entries carry full paths. `$LogFile` is decoded into `ntfs_logfile.jsonl`: names added to and removed from directories, MFT records initialised and freed, and renames (a removal and an add of the same file in one transaction), each with its `$FILE_NAME` times. It covers the last minutes to hours before collection, even where `$MFT` entries have been reused. `pagefile.sys`, `swapfile.sys` and `hiberfil.sys` are searched for URLs, command lines, Run-key paths, executable paths, e-mail and IPv4 addresses (`paged_strings.jsonl`, one row per distinct string with its first offset and count) whether or not `--Memory` is set; with it, the paging files also go to Volatility. `Amcache.hve` goes to Artemis.
 
 ---
 
@@ -246,20 +246,20 @@ On macOS, both the Bash and Python collectors gather:
 | Unified-log store | The raw store: `uuidtext/` first, then the `tracev3` files under `diagnostics/`, newest first, up to 2 GB (`GANDALF_UNIFIED_LOG_STORE_MAX`, in bytes; `0` turns it off), into `unified_log_store/` with its layout kept for log-archive readers |
 | Spotlight | Each volume's index stores (`store.db`, `.store.db`, the `dbStr-*.map.*` files `store.db` can't be read without, `VolumeConfiguration.plist`), each file up to 1 GB (`GANDALF_SPOTLIGHT_MAX`; `0` turns it off), into `spotlight/` |
 
-TCC.db, KnowledgeC, Safari, Mail, ExecPolicy and XPdb are protected by macOS: they're only readable when the process collecting them has Full Disk Access (for Remote mode, enable "Allow full disk access for remote users" under System Settings → General → Sharing → Remote Login). Anything unreadable is skipped and left out of `log.meta`. SQLite databases come with their `-wal`, so rows not yet checkpointed aren't lost. Elrond parses the export above into `unified_log.csv`, and the raw store (in `raw/unified_log_store/`, also taken from a macOS disk image, by the same rules) into `unified_log_store.csv`, keeping the same processes and subsystems as the export, over however far back the store goes. The store reader (`process/extractions/tracev3.py`, stdlib) reads LZ4 chunksets (macOS up to 26) and LZBITMAP ones (macOS 27), resolves format strings from `uuidtext/` and the shared cache's `dsc/`, and times each message from `timesync/`; it reads log messages only (not activities, signposts or state dumps), arguments logged as private read `<private>`, and Apple's own value decoders (`%{network:…}`, masked hashes, enum names) print the raw value. On a macOS 27 store (LZBITMAP) it matched `log show` on 97 to 99.9% of messages; on the lab's macOS 15 store (LZ4), 1,744 of the 1,745 messages found in both matched exactly, time included. A copy of the store lacks what `logd` still held in memory when it was taken (136 of the export's 1,881 messages on the lab VM). Spotlight's index is parsed into `spotlight.csv` (below).
+TCC.db, KnowledgeC, Safari, Mail, ExecPolicy and XPdb are protected by macOS: they're only readable when the process collecting them has Full Disk Access (for Remote mode, enable "Allow full disk access for remote users" under System Settings → General → Sharing → Remote Login). Anything unreadable is skipped and left out of `log.meta`. SQLite databases come with their `-wal`, so rows not yet checkpointed aren't lost. Elrond parses the export above into `unified_log.jsonl`, and the raw store (in `raw/unified_log_store/`, also taken from a macOS disk image, by the same rules) into `unified_log_store.jsonl`, keeping the same processes and subsystems as the export, over however far back the store goes. The store reader (`process/extractions/tracev3.py`, stdlib) reads LZ4 chunksets (macOS up to 26) and LZBITMAP ones (macOS 27), resolves format strings from `uuidtext/` and the shared cache's `dsc/`, and times each message from `timesync/`; it reads log messages only (not activities, signposts or state dumps), arguments logged as private read `<private>`, and Apple's own value decoders (`%{network:…}`, masked hashes, enum names) print the raw value. On a macOS 27 store (LZBITMAP) it matched `log show` on 97 to 99.9% of messages; on the lab's macOS 15 store (LZ4), 1,744 of the 1,745 messages found in both matched exactly, time included. A copy of the store lacks what `logd` still held in memory when it was taken (136 of the export's 1,881 messages on the lab VM). Spotlight's index is parsed into `spotlight.jsonl` (below).
 
-Elrond parses the macOS additions into `btm_items.csv` (third-party items flagged; enabled ones tag **T1543.001** or **T1547.015**), `shared_file_lists.csv` (paths decoded from the bookmarks), `notifications.csv`, `execpolicy_*.csv`, `kextpolicy_*.csv` (third-party kexts tag **T1547.006**), `xprotect_*.csv`, `emond_rules.csv` (**T1546.014**), `periodic.csv`, `unified_log.csv` and `unified_log_store.csv`, and also:
+Elrond parses the macOS additions into `btm_items.jsonl` (third-party items flagged; enabled ones tag **T1543.001** or **T1547.015**), `shared_file_lists.jsonl` (paths decoded from the bookmarks), `notifications.jsonl`, `execpolicy_*.jsonl`, `kextpolicy_*.jsonl` (third-party kexts tag **T1547.006**), `xprotect_*.jsonl`, `emond_rules.jsonl` (**T1546.014**), `periodic.jsonl`, `unified_log.jsonl` and `unified_log_store.jsonl`, and also:
 
 | Artefact | Elrond output |
 |---|---|
-| TCC databases | `tcc.csv`: every grant and denial, sensitive ones (Full Disk Access, Accessibility, Screen Recording, Apple Events, camera, microphone) flagged; a technique is tagged only for a client that runs from a temp, shared or hidden path |
-| KnowledgeC | `knowledgec.csv`: each event's stream, value, start, end and app |
-| Quarantine events | `quarantine_events.csv`: what was downloaded, by which app, from where; downloads by curl, scripts or Terminal and bare-IP URLs flagged (**T1105**) |
-| Biome streams | `biome.csv`: each SEGB record (v1 and v2) with its stream, state, times and the strings in its protobuf payload |
-| ASL stores | `asl.csv`: `/var/log/asl`, DiagnosticMessages and powermanagement records with sender, level, IDs and key/value pairs |
-| FSEvents | `fsevents.csv`: path, event ID, flags (created, removed, renamed, modified…) and inode, with each page file's time |
-| Spotlight index | `spotlight.csv`: one row per indexed item, its path rebuilt from the index itself, with content type, kind, created, modified, last used, use count, date added, downloaded, where-froms (download URLs), size and owner, the rest in `Other`; `Complete` is "no" for a record that couldn't be read to its end. Elrond's image collection takes the stores too. Checked against `mdls` on a test volume (every value matched); Apple's per-user CoreSpotlight stores, which Gandalf doesn't take, read less fully |
-| Staging folders | `staged_files.csv`: every file collected from `/Users/Shared` and `/private/tmp` with its hash; hidden names tag **T1564.001**, download tooling **T1105** |
+| TCC databases | `tcc.jsonl`: every grant and denial, sensitive ones (Full Disk Access, Accessibility, Screen Recording, Apple Events, camera, microphone) flagged; a technique is tagged only for a client that runs from a temp, shared or hidden path |
+| KnowledgeC | `knowledgec.jsonl`: each event's stream, value, start, end and app |
+| Quarantine events | `quarantine_events.jsonl`: what was downloaded, by which app, from where; downloads by curl, scripts or Terminal and bare-IP URLs flagged (**T1105**) |
+| Biome streams | `biome.jsonl`: each SEGB record (v1 and v2) with its stream, state, times and the strings in its protobuf payload |
+| ASL stores | `asl.jsonl`: `/var/log/asl`, DiagnosticMessages and powermanagement records with sender, level, IDs and key/value pairs |
+| FSEvents | `fsevents.jsonl`: path, event ID, flags (created, removed, renamed, modified…) and inode, with each page file's time |
+| Spotlight index | `spotlight.jsonl`: one row per indexed item, its path rebuilt from the index itself, with content type, kind, created, modified, last used, use count, date added, downloaded, where-froms (download URLs), size and owner, the rest in `Other`; `Complete` is "no" for a record that couldn't be read to its end. Elrond's image collection takes the stores too. Checked against `mdls` on a test volume (every value matched); Apple's per-user CoreSpotlight stores, which Gandalf doesn't take, read less fully |
+| Staging folders | `staged_files.jsonl`: every file collected from `/Users/Shared` and `/private/tmp` with its hash; hidden names tag **T1564.001**, download tooling **T1105** |
 
 PowerLog is collected for the analyst only.
 
@@ -267,20 +267,20 @@ On Linux, both collectors also take, into `linux/` (Elrond's image collection ta
 
 | Area | Artefacts | Elrond output |
 |---|---|---|
-| Logins | `utmp`, `wtmp`, `btmp`, `lastlog`, `faillog`, and `wtmpdb`/`lastlog2` (Ubuntu 24.04+) | `login_records.csv`, `lastlog.csv`, `faillog.csv`; repeated btmp failures tag **T1110.001** |
-| Loader and shell start-up | `ld.so.preload`, `ld.so.conf(.d)`, `/etc/environment`, `/etc/profile(.d)`, `bash.bashrc`/`bashrc`, `rc.local`, `update-motd.d` | `preload.csv` (**T1574.006**), `shell_init.csv` (**T1546.004**, **T1037.004**) |
-| Authentication | PAM stacks, `sudoers` and `sudoers.d` | `pam.csv` (**T1556.003**), `sudoers.csv` (**T1548.003**) |
-| Persistence | XDG autostart (system and per user), per-user systemd units, systemd generators, udev rules | `autostart.csv` (**T1547.013**, **T1543.002**), `generators.csv`, `udev_rules.csv` (**T1546.017**) |
-| Kernel | loaded modules with their file and SHA-256 (live only) | `kernel_modules.csv`; modules with no file, or one outside `/lib/modules`, tag **T1547.006** |
-| Staging | executables (ELF, scripts, exec bit) in `/tmp`, `/var/tmp`, `/dev/shm`, listed with hashes; the files themselves (up to 10 MB) into `tmp/`, `var_tmp/`, `dev_shm/` | `tmp_executables.csv`, `staged_files.csv` (hidden names **T1564.001**, download tooling **T1105**) |
-| Scheduled | `/etc/crontab`, `cron.d`, `cron.daily` and the like, per-user crontabs (`/var/spool/cron`), at jobs | `cron.csv` (jobs from temp or hidden paths, or with download or shell tradecraft, tag **T1053.003**), `at_jobs.csv` (**T1053.002**) |
-| SSH and accounts | `authorized_keys`, `known_hosts`, `sshd_config`, `passwd` with `shadow` | `ssh_keys.csv` (forced commands, root keys, keys whose comment names another host: **T1098.004**), `sshd_config.csv`, `accounts.csv` (password state and hash type only, never the hash; a second UID 0 tags **T1136.001**) |
-| Web | web-root scripts (`/var/www`, `/srv/www`, `/srv/http`, nginx html; up to 5,000 of 1 MB) and nginx/Apache configs | `webshells.csv` (**T1505.003**) |
-| Histories | zsh, vim (`.viminfo`), less, python, mysql, psql, wget HSTS, `recently-used.xbel` | `shell_histories.csv`, `viminfo.csv`, `wget_hsts.csv`, `recently_used.csv` |
-| Docker | each container's `config.v2.json` and `hostconfig.json`, its `json-file` log (up to 64 MB); each container's writable layer (everything changed since its image, deleted files included) listed with hashes, and the executables and scripts among those changes copied (up to 500 per container, 64 MB each, into `container_layer/<id>/`); containerd's `meta.db`; Podman's state (`db.sql` with its `-wal`, or `libpod/bolt_state.db` before 4.8), rootful and each user's rootless store (`~/.local/share/containers/storage`), and Podman/CRI-O's `containers.json` | `docker_containers.csv` (privileged, a runtime socket or a sensitive host path mounted, the host's namespaces, escape capabilities: **T1611**, and **T1610** when it was also told to run a shell or fetch something), `container_logs.csv`, `container_changes.csv` (executables dropped in temp or hidden paths **T1105**; cron, SSH keys, accounts, `ld.so.preload` or shell start-up changed inside a container tag their technique); the copied executables in `staged_files.csv` as `container <id>:/path` (hash, executable, hidden name, download commands); containerd's containers from `meta.db` in `docker_containers.csv` as well (`Runtime` `containerd`; every namespace but Docker's `moby`), flagged by the same rules; Podman's containers likewise (`Runtime` `podman`, or `podman (rootless, <user>)`, from either store; its API socket counts as a runtime socket); `containers.json` is kept unparsed (it holds names and images, not settings) |
-| Kubernetes node | static pod manifests (`/etc/kubernetes/manifests`), pod logs (`/var/log/pods`), the API server's audit log (`/var/log/kubernetes`) | `static_pods.csv` (a static pod that isn't the control plane's: **T1543.005**, **T1611** if it can reach the host), `container_logs.csv`, `k8s_audit.csv` (secrets read **T1552.007**, exec into pods **T1609**, cluster-admin bindings **T1098.006**, service-account tokens **T1528**, jobs **T1053.007**, privileged pods **T1611**, cluster-wide discovery **T1613**) |
+| Logins | `utmp`, `wtmp`, `btmp`, `lastlog`, `faillog`, and `wtmpdb`/`lastlog2` (Ubuntu 24.04+) | `login_records.jsonl`, `lastlog.jsonl`, `faillog.jsonl`; repeated btmp failures tag **T1110.001** |
+| Loader and shell start-up | `ld.so.preload`, `ld.so.conf(.d)`, `/etc/environment`, `/etc/profile(.d)`, `bash.bashrc`/`bashrc`, `rc.local`, `update-motd.d` | `preload.jsonl` (**T1574.006**), `shell_init.jsonl` (**T1546.004**, **T1037.004**) |
+| Authentication | PAM stacks, `sudoers` and `sudoers.d` | `pam.jsonl` (**T1556.003**), `sudoers.jsonl` (**T1548.003**) |
+| Persistence | XDG autostart (system and per user), per-user systemd units, systemd generators, udev rules | `autostart.jsonl` (**T1547.013**, **T1543.002**), `generators.jsonl`, `udev_rules.jsonl` (**T1546.017**) |
+| Kernel | loaded modules with their file and SHA-256 (live only) | `kernel_modules.jsonl`; modules with no file, or one outside `/lib/modules`, tag **T1547.006** |
+| Staging | executables (ELF, scripts, exec bit) in `/tmp`, `/var/tmp`, `/dev/shm`, listed with hashes; the files themselves (up to 10 MB) into `tmp/`, `var_tmp/`, `dev_shm/` | `tmp_executables.jsonl`, `staged_files.jsonl` (hidden names **T1564.001**, download tooling **T1105**) |
+| Scheduled | `/etc/crontab`, `cron.d`, `cron.daily` and the like, per-user crontabs (`/var/spool/cron`), at jobs | `cron.jsonl` (jobs from temp or hidden paths, or with download or shell tradecraft, tag **T1053.003**), `at_jobs.jsonl` (**T1053.002**) |
+| SSH and accounts | `authorized_keys`, `known_hosts`, `sshd_config`, `passwd` with `shadow` | `ssh_keys.jsonl` (forced commands, root keys, keys whose comment names another host: **T1098.004**), `sshd_config.jsonl`, `accounts.jsonl` (password state and hash type only, never the hash; a second UID 0 tags **T1136.001**) |
+| Web | web-root scripts (`/var/www`, `/srv/www`, `/srv/http`, nginx html; up to 5,000 of 1 MB) and nginx/Apache configs | `webshells.jsonl` (**T1505.003**) |
+| Histories | zsh, vim (`.viminfo`), less, python, mysql, psql, wget HSTS, `recently-used.xbel` | `shell_histories.jsonl`, `viminfo.jsonl`, `wget_hsts.jsonl`, `recently_used.jsonl` |
+| Docker | each container's `config.v2.json` and `hostconfig.json`, its `json-file` log (up to 64 MB); each container's writable layer (everything changed since its image, deleted files included) listed with hashes, and the executables and scripts among those changes copied (up to 500 per container, 64 MB each, into `container_layer/<id>/`); containerd's `meta.db`; Podman's state (`db.sql` with its `-wal`, or `libpod/bolt_state.db` before 4.8), rootful and each user's rootless store (`~/.local/share/containers/storage`), and Podman/CRI-O's `containers.json` | `docker_containers.jsonl` (privileged, a runtime socket or a sensitive host path mounted, the host's namespaces, escape capabilities: **T1611**, and **T1610** when it was also told to run a shell or fetch something), `container_logs.jsonl`, `container_changes.jsonl` (executables dropped in temp or hidden paths **T1105**; cron, SSH keys, accounts, `ld.so.preload` or shell start-up changed inside a container tag their technique); the copied executables in `staged_files.jsonl` as `container <id>:/path` (hash, executable, hidden name, download commands); containerd's containers from `meta.db` in `docker_containers.jsonl` as well (`Runtime` `containerd`; every namespace but Docker's `moby`), flagged by the same rules; Podman's containers likewise (`Runtime` `podman`, or `podman (rootless, <user>)`, from either store; its API socket counts as a runtime socket); `containers.json` is kept unparsed (it holds names and images, not settings) |
+| Kubernetes node | static pod manifests (`/etc/kubernetes/manifests`), pod logs (`/var/log/pods`), the API server's audit log (`/var/log/kubernetes`) | `static_pods.jsonl` (a static pod that isn't the control plane's: **T1543.005**, **T1611** if it can reach the host), `container_logs.jsonl`, `k8s_audit.jsonl` (secrets read **T1552.007**, exec into pods **T1609**, cluster-admin bindings **T1098.006**, service-account tokens **T1528**, jobs **T1053.007**, privileged pods **T1611**, cluster-wide discovery **T1613**) |
 
-Endpoint antivirus on the analysis machine may quarantine or block collected web shells (and archives holding them), so they can be missing from `webshells.csv`; Elrond logs the file as unreadable ("Operation not permitted") and carries on. Exclude the case directory from scanning if that matters.
+Endpoint antivirus on the analysis machine may quarantine or block collected web shells (and archives holding them), so they can be missing from `webshells.jsonl`; Elrond logs the file as unreadable ("Operation not permitted") and carries on. Exclude the case directory from scanning if that matters.
 
 Pass the directory holding the archives to Elrond with `--Gandalf`. It must end in `acquisitions/` (subfolders per host are fine). Elrond extracts each archive, maps Gandalf's layout onto its own (`etc+passwd` → `raw/passwd`, `user/<name>/.zsh_history` → `raw/user_profiles/<name>+zsh_history`, `browsers/<browser>/<name>+History` → `raw/browsers/<name>/<browser>/History`, and so on), then runs processing, keyword search and analysis exactly as for a disk image. An archive with a member that points outside it is refused as possible tampering.
 
@@ -337,7 +337,7 @@ Memory analysis reads memory images from `SOURCE_DIR` alongside the disk images;
 | Option | Does |
 |---|---|
 | `--Process` | Parse collected artefacts (always runs) |
-| `--Analysis` | MFT analysis: extended attributes other than Windows' own, and timestomping ($SI created before $FN created) of executables and scripts in user-writable paths; hits under `Users\Default` and `ProgramData\Microsoft` are marked likely benign (Windows setup copies them with their original times). Alternate data streams from the raw `$MFT`; Mark of the Web, WOF compression and other Windows streams are marked likely benign. On a case of two or more hosts, also stacking: processes, parent and child pairs, services, scheduled tasks, autoruns, WMI consumers, drivers (Sysmon 6) and kernel modules found on few of the hosts of the same OS, Linux hosts within their distribution family (three or more of that OS or family before anything counts as rare; with fewer, only `--stackBaseline` finds anything), ranked in the case's `stacking.csv` with the reasons for each score (rare, user path, generated name, not in baseline, and the host's own: unsigned modules and drivers, BTM items with no Team ID, first seen outside the host's logon hours), and the host row each value was read from (`Host`, `Artefact`, `Row`, the case browser's reference; `Sources` lists it for every host with the value) so it can be flagged there. Nothing is tagged with a technique on a score |
+| `--Analysis` | MFT analysis: extended attributes other than Windows' own, and timestomping ($SI created before $FN created) of executables and scripts in user-writable paths; hits under `Users\Default` and `ProgramData\Microsoft` are marked likely benign (Windows setup copies them with their original times). Alternate data streams from the raw `$MFT`; Mark of the Web, WOF compression and other Windows streams are marked likely benign. On a case of two or more hosts, also stacking: processes, parent and child pairs, services, scheduled tasks, autoruns, WMI consumers, drivers (Sysmon 6) and kernel modules found on few of the hosts of the same OS, Linux hosts within their distribution family (three or more of that OS or family before anything counts as rare; with fewer, only `--stackBaseline` finds anything), ranked in the case's `stacking.jsonl` with the reasons for each score (rare, user path, generated name, not in baseline, and the host's own: unsigned modules and drivers, BTM items with no Team ID, first seen outside the host's logon hours), and the host row each value was read from (`Host`, `Artefact`, `Row`, the case browser's reference; `Sources` lists it for every host with the value) so it can be flagged there. Nothing is tagged with a technique on a score |
 | `--stackBaseline FILE` | A baseline of clean hosts for stacking; values absent from it score higher. Build one with `python3 -m rowanholt.analysis.stacking --baseline OUT CASE_DIR ...` (from `src/analysis`) |
 | `--Memory` | Volatility 3 analysis of memory images |
 | `--Timeline` | Plaso timeline of the disk image. Very slow (105 min on a 12 GB E01) |
@@ -353,12 +353,12 @@ Memory analysis reads memory images from `SOURCE_DIR` alongside the disk images;
 | `--symlinks` | Follow symbolic links when copying folders. Slow |
 | `--extractIocs` | Extract IOCs from processed files. Slow |
 | `--iocsFile FILE` | Match extracted IOCs against a watchlist |
-| `--threatIntel FILE [FILE ...]` | Match the case against threat intelligence: the Iran APT workbook, STIX 2.1 bundles, MITRESaw procedures, Rowanholt's CSV or a text watchlist. Writes `<host>/analysis/threat_intel_matches.csv`, fills `watchlist_match` in `iocs.csv`, and ranks groups in the case's `threat_groups.csv` with the basis for each rank. Runs after the analysis phase |
+| `--threatIntel FILE [FILE ...]` | Match the case against threat intelligence: the Iran APT workbook, STIX 2.1 bundles, MITRESaw procedures, Rowanholt's CSV or a text watchlist. Writes `<host>/analysis/threat_intel_matches.jsonl`, fills `watchlist_match` in `iocs.jsonl`, and ranks groups in the case's `threat_groups.jsonl` with the basis for each rank. Runs after the analysis phase |
 | `--Keywords FILE` | Search for keywords. Remove blank and `#` lines first: they match every line |
 | `--Yara DIR` | Scan with YARA rules, against the whole mounted image or only collected files. Symbolic links are not followed (`yara -N`). A rule whose `meta` has `attack = "T1059.001, T1105"` (or `mitre`, `technique`) tags those techniques when it matches; any match on a web-root script tags **T1505.003** |
 | `--misplacedBinaries` | Find Windows system binaries in unexpected locations (**T1036.005**) |
 | `--masquerading` | RLO characters, double extensions, trailing spaces, renamed utilities (**T1036**) |
-| `--ClamAV` | ClamAV over the collected files and the image's user-writable folders (all of a Gandalf collection); detections are `ClamAV` rows in `analysis.csv`. Signatures are the worker image's, refreshed first only if `ROWANHOLT_ONLINE_LOOKUPS` lists `freshclam` |
+| `--ClamAV` | ClamAV over the collected files and the image's user-writable folders (all of a Gandalf collection); detections are `ClamAV` rows in `analysis.jsonl`. Signatures are the worker image's, refreshed first only if `ROWANHOLT_ONLINE_LOOKUPS` lists `freshclam` |
 | `--magicBytes` | Verify file signatures |
 
 **Hashing**
@@ -377,10 +377,13 @@ Memory analysis reads memory images from `SOURCE_DIR` alongside the disk images;
 | `--Splunk` | Index output into the local Splunk instance |
 | `--Elastic` | Index output into the local Elasticsearch instance |
 | `--Navigator` | Build an ATT&CK Navigator layer from the case's `mitre_techniques.txt` |
+| `--Index` | Index a case already processed into Splunk, Elastic and/or the Navigator (with the options above), without mounting, extracting or processing again; the one directory is the case's folder |
 | `--Ziparchive` | Zip raw data after processing |
 | `--Delete` | Delete raw data after processing |
 
 SIEM options fail fast if the service is unreachable. Start them with `docker compose --profile siem up -d`.
+
+`--Index` finds the case's hosts (folders holding `artefacts/cooked/`) and their platforms from the audit log, or a Gandalf host's `host.info`, and skips any host whose platform neither records. Memory-only hosts aren't indexed this way. It replaces the case's index in each SIEM rather than adding to it (indexing again into the same index put every record in twice, and Elastic kept the old field mappings): Elastic's is deleted and made afresh, Splunk's is deleted and its files read again. Anything saved against the old index (searches, dashboards, alerts) may need re-pointing; it says so when it replaces one. A local, non-container SIEM install is added to, not replaced. It exits 1 if a target fails, after trying the others, and records what it indexed in the audit log.
 
 ---
 
@@ -399,6 +402,9 @@ python3 src/analysis/elrond.py CASE-001 /evidence /output/CASE-001 --Collect --P
 # Brisk mode
 python3 src/analysis/elrond.py CASE-001 /evidence /output/CASE-001 --Collect --Brisk
 
+# Index a case processed earlier, without processing it again
+python3 src/analysis/elrond.py CASE-001 /output/CASE-001 --Index --Splunk --Elastic --Navigator
+
 # IOC extraction and YARA
 python3 src/analysis/elrond.py CASE-001 /evidence /output/CASE-001 \
   --Collect --Process --Analysis --extractIocs --Yara /opt/yara-rules
@@ -415,7 +421,13 @@ python3 src/analysis/elrond.py CASE-001 /evidence /output/CASE-001 \
 
 ### Output Structure
 
-Elrond writes one directory per case, with one subdirectory per image. Taken from the October 2026 test runs:
+Elrond writes one directory per case, with one subdirectory per image. Every table is JSON Lines (`.jsonl`): one record per line, each starting with the same five fields, `host`, `artefact` (the table's path under `cooked/` without the suffix), `source_path` (what it was parsed from), `timestamp` (ISO 8601 UTC, or null when the artefact has no time) and `techniques` (the ATT&CK IDs that record shows), then the artefact's own fields. A row reference is the line number. The case browser's **Download as CSV** gives any table as a spreadsheet. Cases processed before November 2026 have CSV and JSON tables, which everything still reads. See `docs/OUTPUT_FORMAT.md`.
+
+```bash
+jq -c 'select(.techniques | length > 0)' <case>/<host>/artefacts/cooked/startup_items.jsonl
+```
+
+Taken from the October 2026 test runs:
 
 ```
 <output>/<case>/
@@ -428,16 +440,17 @@ Elrond writes one directory per case, with one subdirectory per image. Taken fro
 │   │   ├── raw/                   # collected files, as found on the image
 │   │   ├── cooked/                # parsed artefacts
 │   │   │   ├── registry/  evt/  browsers/  jumplists/
-│   │   │   ├── journal_mft.json  shimcache.json  usb.log.json  wbem.json
-│   │   └── plaso_timeline.csv     # if -T
+│   │   │   ├── journal_mft.jsonl  shimcache.jsonl  usb.log.jsonl  wbem.jsonl
+│   │   └── plaso_timeline.jsonl   # if -T
 │   ├── analysis/                  # written only when there are results
-│   │   ├── analysis.csv           # if -A
-│   │   ├── iocs.csv               # if -I
-│   │   ├── keyword_matches.csv    # if -K
-│   │   └── yara.csv               # if -Y
+│   │   ├── analysis.jsonl         # if -A
+│   │   ├── iocs.jsonl             # if -I
+│   │   ├── keyword_matches.jsonl  # if -K
+│   │   └── yara.jsonl             # if -Y
 │   └── carved/                    # if carving; one folder per file type plus foremost's audit.txt
+├── stacking.jsonl                 # -A on two or more hosts
 └── <memory image>/
-    └── windows.<plugin>.<Plugin>.json   # one file per Volatility 3 plugin
+    └── memory_windows.<plugin>.<Plugin>.jsonl   # one table per Volatility 3 plugin
 ```
 
 Shadow copies (`--vss`) get their own `<image> (volume shadow copy #N)` entries in the audit log.
@@ -507,7 +520,7 @@ python3 -m src.analysis.rowanholt.cloud.cli {aws|azure|gcp|k8s} COMMAND [OPTIONS
 
 `--region` applies to AWS (and Azure location), `--resource-group` to Azure, `--zone` to GCP.
 
-`k8s` takes only `analyze-logs`, with no credentials: an API server audit log exported from EKS, AKS, GKE or a self-managed cluster (JSON lines, a JSON array or an `EventList`), written as `k8s_audit.csv` and `k8s_audit_analysis.json` with the same flags and techniques as a node's collected audit log.
+`k8s` takes only `analyze-logs`, with no credentials: an API server audit log exported from EKS, AKS, GKE or a self-managed cluster (JSON lines, a JSON array or an `EventList`), written as `k8s_audit.jsonl` and `k8s_audit_analysis.json` with the same flags and techniques as a node's collected audit log.
 
 ```bash
 python3 -m src.analysis.rowanholt.cloud.cli aws list -c aws_creds.json --region eu-west-2

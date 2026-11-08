@@ -5,9 +5,17 @@ import time
 from datetime import datetime
 
 from rowanholt.audit import write_audit_log_entry
+from rowanholt.core.records import SUFFIX, write_records
 from rowanholt.utils import safe_input
 
 _WRITE_FAILED = set()
+LINE_ENTRY_LIMIT = 200
+
+
+def _line_entry(line: str) -> str:
+    """The matched line with its whitespace collapsed, cut at LINE_ENTRY_LIMIT characters."""
+    entry = " ".join(line.split())
+    return entry[:LINE_ENTRY_LIMIT] + "<>TRUNCATED<>" if len(entry) > LINE_ENTRY_LIMIT else entry
 
 
 def write_keywords(
@@ -42,48 +50,22 @@ def write_keywords(
                 vsstext,
             )
             write_audit_log_entry(verbosity, output_directory, entry, prnt)
-            keyword_match_entry = "{},{},{},{},{},{},{}\n".format(
-                str(
-                    datetime.fromtimestamp(
-                        os.path.getctime(keywords_target_file.split(": ")[0])
-                    )
-                ),
-                str(
-                    datetime.fromtimestamp(
-                        os.path.getatime(keywords_target_file.split(": ")[0])
-                    )
-                ),
-                str(
-                    datetime.fromtimestamp(
-                        os.path.getmtime(keywords_target_file.split(": ")[0])
-                    )
-                ),
-                eachkeyword.strip(),
-                keywords_target_file.replace(",", "%2C"),
-                str(keyword_line_number),
-                eachline.strip().replace(",", "%2C").replace("\n", "\\n"),
-            )
-            kw_match_entry = (
-                str(keyword_match_entry.split())[2:-2]
-                .replace("', '", " ")
-                .replace("\\x", "\\\\x")
-                .replace("\\\\\\", "\\\\")
-            )
-            if len(keyword_match_entry.split(",")[-1]) > 200:
-                kw_match_entry = (
-                    ",".join(keyword_match_entry.split(",")[0:-1])
-                    + ","
-                    + keyword_match_entry.split(",")[-1][0:200]
-                    + "<>TRUNCATED<>\n"
-                )
-            else:
-                kw_match_entry = kw_match_entry + "\n"
-            matches = output_directory + img.split("::")[0] + "/analysis/keyword_matches.csv"
+            target = keywords_target_file.split(": ")[0]
+            row = {
+                "CreationTime": str(datetime.fromtimestamp(os.path.getctime(target))),
+                "LastAccessTime": str(datetime.fromtimestamp(os.path.getatime(target))),
+                "LastWriteTime": str(datetime.fromtimestamp(os.path.getmtime(target))),
+                "keyword": eachkeyword.strip(),
+                "Filename": keywords_target_file,
+                "line_number": keyword_line_number,
+                "line_entry": _line_entry(eachline),
+            }
+            host = img.split("::")[0]
+            matches = output_directory + host + f"/analysis/keyword_matches{SUFFIX}"
             try:
-                with open(matches, "a", encoding=encoding_choice) as keyword_matches_results_file:
-                    keyword_matches_results_file.write(kw_match_entry)
+                write_records(matches, [row], host=host, artefact="keyword_matches", time_field="LastWriteTime")
             except OSError as e:
-                # endpoint AV on the analysis machine can delete or lock the CSV (it
+                # endpoint AV on the analysis machine can delete or lock the table (it
                 # quotes the matched lines); one lost write mustn't end the host's analysis
                 if matches not in _WRITE_FAILED:
                     _WRITE_FAILED.add(matches)
@@ -104,15 +86,6 @@ def search_keywords(
 ):
     analysis_dir = output_directory + img.split("::")[0] + "/analysis/"
     os.makedirs(analysis_dir, exist_ok=True)
-    # Header whenever the CSV is new, not only when analysis/ didn't exist yet.
-    if not os.path.exists(analysis_dir + "keyword_matches.csv"):
-        with open(
-            output_directory + img.split("::")[0] + "/analysis/keyword_matches.csv",
-            "a",
-        ) as keyword_matches_results_file:
-            keyword_matches_results_file.write(
-                "CreationTime,LastAccessTime,LastWriteTime,keyword,Filename,line_number,line_entry\n"
-            )
     with open(keywords[0], "r") as keywords_source_file:
         # A blank line is "" after strip(), which is "in" every line, so one empty
         # line in the list matched everything (45 min -> 14.6 h). Skip blanks and

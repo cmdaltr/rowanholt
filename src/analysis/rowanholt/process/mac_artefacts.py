@@ -6,7 +6,7 @@ gandalf.py) and Elrond's image collection both write them; SQLite write-ahead
 logs sit beside their database as <name>-wal. Gandalf's live unified-log export
 is gandalf+unifiedlog.ndjson; the unified-log store itself (tracev3, with uuidtext/
 and timesync/) is under raw/unified_log_store/, its layout kept. Each parser writes a
-cooked/*.csv. Plists with no parser here go on to Elrond's generic plist processing.
+cooked/*.jsonl. Plists with no parser here go on to Elrond's generic plist processing.
 """
 
 import csv
@@ -43,15 +43,15 @@ APPLE_TEAMS = {"", "apple", "Apple", "APPLECOMPUTER"}
 SQLITE_SIDECARS = ("-wal", "-shm", "-journal")
 
 HEADERS = {
-    "btm_items.csv": ["Source", "Name", "Identifier", "Type", "Disposition", "Enabled", "URL", "ExecutablePath",
+    "btm_items": ["Source", "Name", "Identifier", "Type", "Disposition", "Enabled", "URL", "ExecutablePath",
                       "TeamIdentifier", "DeveloperName", "Flag"],
-    "shared_file_lists.csv": ["Source", "List", "Name", "Path"],
-    "notifications.csv": ["Source", "App", "Title", "Subtitle", "Body", "LastWriteTime"],
-    "emond_rules.csv": ["Source", "Name", "Enabled", "EventTypes", "Actions", "Flag"],
-    "periodic.csv": ["Source", "LineNumber", "Line", "Flag"],
-    "unified_log.csv": ["LastWriteTime", "Process", "PID", "Subsystem", "Category", "Type", "Message"],
-    "unified_log_store.csv": ["LastWriteTime", "Process", "PID", "Subsystem", "Category", "Type", "Message"],
-    "spotlight.csv": spotlight.COLUMNS,
+    "shared_file_lists": ["Source", "List", "Name", "Path"],
+    "notifications": ["Source", "App", "Title", "Subtitle", "Body", "LastWriteTime"],
+    "emond_rules": ["Source", "Name", "Enabled", "EventTypes", "Actions", "Flag"],
+    "periodic": ["Source", "LineNumber", "Line", "Flag"],
+    "unified_log": ["LastWriteTime", "Process", "PID", "Subsystem", "Category", "Type", "Message"],
+    "unified_log_store": ["LastWriteTime", "Process", "PID", "Subsystem", "Category", "Type", "Message"],
+    "spotlight": spotlight.COLUMNS,
 }
 
 
@@ -351,15 +351,11 @@ def spotlight_rows(path: str) -> List[Dict[str, str]]:
         return []
 
 
-def _append_table(path: str, rows: List[Dict]) -> int:
-    """Append rows whose columns come from the database, keeping an existing file's header."""
+def _append_table(path: str, rows: List[Dict], img: str, artefact: str) -> int:
+    """Append rows whose fields come from the database table itself."""
     if not rows:
         return 0
-    header = list(rows[0])
-    if os.path.exists(path):
-        with open(path, newline="", encoding="utf-8") as fh:
-            header = next(csv.reader(fh), header)
-    return _append_rows(path, header, rows)
+    return _append_rows(path, list(rows[0]), rows, img, artefact)
 
 
 # ---- routing -------------------------------------------------------------------
@@ -369,11 +365,11 @@ def _route(artefact: str):
     name = os.path.basename(artefact)
     if LOG_STORE.match(artefact):
         if name.endswith(".tracev3"):
-            return "unified_log_store.csv", unified_log_store_rows(artefact), "unified log store", []
+            return "unified_log_store", unified_log_store_rows(artefact), "unified log store", []
         return "", [], "", []  # uuidtext and timesync: read with the tracev3 files
     if SPOTLIGHT.match(artefact):
         if name.endswith("+store.db"):
-            return "spotlight.csv", spotlight_rows(artefact), "Spotlight index", []
+            return "spotlight", spotlight_rows(artefact), "Spotlight index", []
         return "", [], "", []  # .store.db, the dbStr maps, VolumeConfiguration.plist: read with store.db
     path = host_path(name)
     lower = path.lower()
@@ -385,29 +381,29 @@ def _route(artefact: str):
         for row in rows:
             if row["Flag"] and row["Enabled"] == "yes":
                 techniques.append("T1543.001" if "/Launch" in row["URL"] + row["ExecutablePath"] else "T1547.015")
-        return "btm_items.csv", rows, "background task items", sorted(set(techniques))
+        return "btm_items", rows, "background task items", sorted(set(techniques))
     if lower.endswith((".sfl2", ".sfl3")):
-        return "shared_file_lists.csv", sfl_rows(artefact), "shared file list", []
+        return "shared_file_lists", sfl_rows(artefact), "shared file list", []
     if path.endswith("/db2/db") and ("usernoted" in path or "notificationcenter" in path):
-        return "notifications.csv", notification_rows(artefact), "notification database", []
+        return "notifications", notification_rows(artefact), "notification database", []
     if path == "/var/db/SystemPolicyConfiguration/ExecPolicy":
         tables = sqlite_tables(artefact, ("executable_measurements_v2", "policy_scan_cache", "provenance_tracking"))
-        return {f"execpolicy_{t}.csv": r for t, r in tables.items()}, None, "ExecPolicy database", []
+        return {f"execpolicy_{t}": r for t, r in tables.items()}, None, "ExecPolicy database", []
     if path == "/var/db/SystemPolicyConfiguration/KextPolicy":
         tables = sqlite_tables(artefact)
         third_party = [r for r in tables.get("kext_load_history_v3", []) if not str(r.get("path", "")).startswith("/System/")]
-        return {f"kextpolicy_{t}.csv": r for t, r in tables.items()}, None, "KextPolicy database", \
+        return {f"kextpolicy_{t}": r for t, r in tables.items()}, None, "KextPolicy database", \
             ["T1547.006"] if third_party else []
     if path == "/var/protected/xprotect/XPdb":
-        return {f"xprotect_{t}.csv": r for t, r in sqlite_tables(artefact).items()}, None, "XProtect database", []
+        return {f"xprotect_{t}": r for t, r in sqlite_tables(artefact).items()}, None, "XProtect database", []
     if path.startswith("/etc/emond.d/rules/") and lower.endswith(".plist"):
         rows = emond_row(artefact)
-        return "emond_rules.csv", rows, "emond rule", ["T1546.014"] if any(r["Flag"] for r in rows) else []
+        return "emond_rules", rows, "emond rule", ["T1546.014"] if any(r["Flag"] for r in rows) else []
     if path.startswith("/etc/periodic/") or path in ("/etc/periodic.conf", "/etc/daily.local", "/etc/weekly.local",
                                                        "/etc/monthly.local", "/etc/launchd.conf", "/etc/rc.common"):
-        return "periodic.csv", periodic_rows(artefact), "periodic script", []
+        return "periodic", periodic_rows(artefact), "periodic script", []
     if name == "gandalf+unifiedlog.ndjson":
-        return "unified_log.csv", unified_log_rows(artefact), "unified log export", []
+        return "unified_log", unified_log_rows(artefact), "unified log export", []
     if lower.endswith(".plist"):
         return None, [], "", []  # Elrond's generic plist processing reads it
     return "", [], "", []  # collected for the analyst (Biome, PowerLog, emondClients) with nothing to parse
@@ -429,9 +425,9 @@ def process_mac_artefact(verbosity, vssimage, output_directory, img, vss_path_in
             return True
         cooked = _cooked(output_directory, img, vss_path_insert)
         if isinstance(out, dict):
-            written = sum(_append_table(os.path.join(cooked, name), table) for name, table in out.items())
+            written = sum(_append_table(os.path.join(cooked, name), table, img, artefact) for name, table in out.items())
         else:
-            written = _append_rows(os.path.join(cooked, out), HEADERS[out], rows)
+            written = _append_rows(os.path.join(cooked, out), HEADERS[out], rows, img, artefact, techniques)
         if written:
             _audit(verbosity, output_directory, img, stage, vssimage, what, artefact)
             _techniques(output_directory, techniques)

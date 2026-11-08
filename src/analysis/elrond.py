@@ -83,6 +83,13 @@ parser.add_argument(
     default=False,
 )
 parser.add_argument(
+    "--Index",
+    help="Index a case Elrond has already processed into Splunk, Elastic and/or the Navigator (with --Splunk, --Elastic, --Navigator), without processing it again; the directory is the case's folder; Example syntax: elrond.py CASE /path/to/case --Index --Splunk --Elastic",
+    action="store_const",
+    const=True,
+    default=False,
+)
+parser.add_argument(
     "--Gandalf",
     help="Read artefacts acquired using gandalf",
     action="store_const",
@@ -114,13 +121,13 @@ parser.add_argument(
     metavar="FILE",
     help="Match the case against threat intelligence: the Iran APT workbook (XLSX), STIX 2.1 bundles "
     "(JSON), MITRESaw's mitre_procedures.csv, Rowanholt's indicator CSV or a text watchlist; writes "
-    "<host>/analysis/threat_intel_matches.csv and threat_groups.csv. Example: --threatIntel iran_apt.xlsx feed.json",
+    "<host>/analysis/threat_intel_matches.jsonl and threat_groups.jsonl. Example: --threatIntel iran_apt.xlsx feed.json",
 )
 parser.add_argument(
     "--stackBaseline",
     nargs=1,
     metavar="FILE",
-    help="A baseline of clean hosts for stacking (Analysis on a case of two or more hosts writes stacking.csv; rarity needs three of an OS); "
+    help="A baseline of clean hosts for stacking (Analysis on a case of two or more hosts writes stacking.jsonl; rarity needs three of an OS); "
     "values absent from it score higher. Build one with python3 -m rowanholt.analysis.stacking --baseline OUT CASE...",
 )
 parser.add_argument(
@@ -132,7 +139,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--ClamAV",
-    help="Scan the collected files and the image's user-writable folders with ClamAV (commodity malware and known tools); detections go to analysis.csv",
+    help="Scan the collected files and the image's user-writable folders with ClamAV (commodity malware and known tools); detections go to analysis.jsonl",
     action="store_const",
     const=True,
     default=False,
@@ -293,6 +300,7 @@ exhaustive = args.eXhaustive
 threathunt = args.ThreatHunt
 mordor = args.Mordor  # Input type flag for Mordor datasets
 archive = args.Ziparchive
+index_only = args.Index
 
 d = directory[0]
 case = case[0]
@@ -522,6 +530,22 @@ if __name__ == "__main__":
     except SIEMUnavailableError as e:
         print(f"\n  Error: {e}\n")
         sys.exit(1)
+
+    if index_only:
+        from rowanholt.post.index_only import IndexOnlyError, index_case
+        if not (splunk or elastic or navigator):
+            print("\n  Error: --Index needs --Splunk, --Elastic or --Navigator\n")
+            sys.exit(1)
+        if len(directory) != 1 or not os.path.isdir(directory[0]):
+            print("\n  Error: --Index takes one directory, the case's folder (the one holding its host folders)\n")
+            sys.exit(1)
+        print("\n  -> \033[1;36mIndexing a processed case (nothing is mounted, extracted or processed)...\033[1;m")
+        try:
+            failed = index_case(directory[0], case, "veryverbose", splunk, elastic, navigator)
+        except IndexOnlyError as e:
+            print(f"\n  Error: {e}\n")
+            sys.exit(1)
+        sys.exit(1 if failed else 0)
 
     # Process mode is always enabled - it's the core analysis functionality
     process = True
@@ -942,7 +966,7 @@ if __name__ == "__main__":
             else:
                 entry, prnt = "{},{},stacking,{} hosts; {} values; {} rare\n".format(
                     datetime.now().isoformat(), case, stacked["hosts"], stacked["values"], stacked["rows"]
-                ), " -> {} -> stacked {} values across {} hosts: {} rare, in stacking.csv".format(
+                ), " -> {} -> stacked {} values across {} hosts: {} rare, in stacking.jsonl".format(
                     datetime.now().isoformat().replace("T", " "), stacked["values"], stacked["hosts"], stacked["rows"]
                 )
                 write_audit_log_entry(verbosity, output_directory, entry, prnt)

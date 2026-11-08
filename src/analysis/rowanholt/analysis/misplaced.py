@@ -9,8 +9,9 @@ Reference: https://attack.mitre.org/techniques/T1036/005/
 """
 
 import os
-import csv
 from datetime import datetime
+
+from rowanholt.core.records import SUFFIX, write_records
 
 # Windows system binaries and their expected locations
 # Format: binary_name -> list of expected paths (case-insensitive)
@@ -180,21 +181,13 @@ def detect_misplaced_binaries(mnt, output_directory, verbosity, img, vssimage):
                         print(f"        [!] Misplaced binary: {filename} found in {relative_path}")
                         print(f"            Expected in: {', '.join(expected_locations)}")
 
-    # Write findings to CSV
     if findings:
-        csv_path = os.path.join(output_directory, img.split("::")[0], "analysis", "misplaced_binaries.csv")
-        os.makedirs(os.path.dirname(csv_path), exist_ok=True)
+        host = img.split("::")[0]
+        write_records(os.path.join(output_directory, host, "analysis", f"misplaced_binaries{SUFFIX}"), findings,
+                      host=host, artefact="misplaced_binaries", time_field="timestamp",
+                      techniques=lambda row: [row["mitre_technique"]])
 
-        fieldnames = ["timestamp", "hostname", "binary_name", "found_path", "expected_locations", "mitre_technique", "description"]
-
-        file_exists = os.path.exists(csv_path)
-        with open(csv_path, "a", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            if not file_exists:
-                writer.writeheader()
-            writer.writerows(findings)
-
-        print(f"\n       \033[1;32mFound {len(findings)} misplaced binaries - results written to misplaced_binaries.csv\033[1;m")
+        print(f"\n       \033[1;32mFound {len(findings)} misplaced binaries - results written to misplaced_binaries{SUFFIX}\033[1;m")
     else:
         print(f"\n       \033[1;32mNo misplaced binaries detected in {vssimage}\033[1;m")
 

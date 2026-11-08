@@ -21,8 +21,64 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set, TextIO
 from datetime import datetime
 
+try:
+    from rowanholt.core.records import ENVELOPE, read_records
+except ImportError:
+    ENVELOPE = ("host", "artefact", "source_path", "timestamp", "techniques")
+    read_records = None
+
 # Techniques file name - written incrementally during enrichment
 TECHNIQUES_FILE = "mitre_techniques.txt"
+# Tables under this size are rewritten with each record's ATT&CK fields; larger ones only have
+# their techniques recorded
+LARGE_FILE_BYTES = 10 * 1024 * 1024
+TABLE_SUFFIXES = (".jsonl", ".json")
+_TECHNIQUES_MARK = '"techniques": ['
+
+
+def scannable(record: Dict) -> Dict:
+    """The part of a record its techniques are read from: not the envelope, whose source path and
+    artefact name are the same on every record, nor ATT&CK fields an earlier run added."""
+    enveloped = all(key in record for key in ENVELOPE)
+    return {k: v for k, v in record.items()
+            if not (enveloped and k in ENVELOPE) and not str(k).startswith("mitre_")}
+
+
+def _technique_ids(values) -> List[str]:
+    """Technique IDs from a list of IDs, or of the dicts enrichment writes."""
+    out = []
+    for value in values if isinstance(values, list) else []:
+        if isinstance(value, dict):
+            value = value.get("mitre_technique_id") or value.get("technique_id")
+        if isinstance(value, str) and value.strip():
+            out.append(value.strip())
+    return out
+
+
+def record_technique_ids(record: Dict) -> Set[str]:
+    """Every technique a record names: the envelope's techniques, mitre_technique_id and
+    mitre_techniques."""
+    found = set(_technique_ids(record.get("techniques")))
+    found.update(_technique_ids(record.get("mitre_techniques")))
+    primary = record.get("mitre_technique_id")
+    found.update(_technique_ids(primary if isinstance(primary, list) else [primary]))
+    return found
+
+
+def _split_envelope(line: str):
+    """(the envelope's techniques, the rest of the line) for a JSON Lines record as write_records
+    writes it, without decoding it; None when the line isn't one."""
+    start = line.find(_TECHNIQUES_MARK)
+    if start < 0 or not line.startswith('{"host": '):
+        return None
+    end = line.find("]", start)
+    if end < 0:
+        return None
+    try:
+        techniques = json.loads(line[start + len(_TECHNIQUES_MARK) - 1:end + 1])
+    except ValueError:
+        return None
+    return _technique_ids(techniques), line[end + 1:]
 
 # Import the content-based pattern matcher
 try:
@@ -369,18 +425,23 @@ class MitreEnrichment:
         Returns:
             Enriched record with full MITRE metadata
         """
-        all_technique_ids = set()
         # Not the artefact type's techniques: every memory image has a DLL list and a module
         # list, which isn't DLL hijacking or a rootkit. A record's techniques are what it shows
-        base_techniques = []
-
-        # Content-based pattern matching
+        all_technique_ids = set()
         if PATTERNS_AVAILABLE and scan_json_record:
-            content_techniques = scan_json_record(record)
-            all_technique_ids.update(content_techniques)
+            all_technique_ids.update(scan_json_record(scannable(record)))
+        return self.apply_techniques(record, all_technique_ids)
 
+    def apply_techniques(self, record: Dict, all_technique_ids: Set[str]) -> Dict:
+        """``record`` with the ATT&CK fields for the techniques its content matched, which also
+        join the envelope's ``techniques`` list when the record has one."""
+        base_techniques = []
         if not all_technique_ids:
             return record
+
+        if isinstance(record.get("techniques"), list):
+            record["techniques"] = record["techniques"] + sorted(
+                t for t in all_technique_ids if t not in record["techniques"])
 
         # 3. Build full enrichment data for all techniques
         if ATTACK_DATA_AVAILABLE and enrich_technique:
@@ -445,12 +506,15 @@ class MitreEnrichment:
             if not artefact_type:
                 artefact_type = self._detect_artefact_type(filepath)
 
+            if filepath.lower().endswith(".jsonl"):
+                return self._enrich_jsonl(filepath, techniques_file, artefact_type, file_size)
+
             # The artefact type's own techniques aren't recorded: its being there shows nothing
             # (see enrich_json_record); only what the content matches is
             base_techniques = set()
 
             # For large files (>10MB), use streaming content scanning
-            if file_size > 10 * 1024 * 1024:  # > 10MB
+            if file_size > LARGE_FILE_BYTES:
                 # Write base techniques
                 for tech_id in base_techniques:
                     techniques_file.write(f"{tech_id}\n")
@@ -553,6 +617,87 @@ class MitreEnrichment:
             self.logger.error(f"Error enriching {filepath}: {e}")
             return False
 
+    def _enrich_jsonl(self, filepath: str, techniques_file: TextIO, artefact_type: Optional[str],
+                      file_size: int) -> bool:
+        """Record a JSON Lines table's techniques (the envelope's and what each record's content
+        matches) and, for a table under LARGE_FILE_BYTES with an artefact type, rewrite it line
+        by line with each matching record's ATT&CK fields, through a temporary file so a failure
+        leaves the table as it was. A large table's lines are matched as text, not decoded."""
+        if file_size > LARGE_FILE_BYTES:
+            found = self._scan_large_jsonl(filepath)
+            for tech_id in sorted(found):
+                techniques_file.write(f"{tech_id}\n")
+            techniques_file.flush()
+            return True
+
+        found: Set[str] = set()
+        building = f"{filepath}.enriching"
+        out = open(building, "w", encoding="utf-8") if artefact_type else None
+        changed = False
+        try:
+            with open(filepath, encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    try:
+                        record = json.loads(line) if line.strip() else None
+                    except ValueError:
+                        record = None
+                    if not isinstance(record, dict):
+                        if out is not None:
+                            out.write(line)  # blank or broken lines are kept as they are
+                        continue
+                    found.update(record_technique_ids(record))
+                    matched = set()
+                    if PATTERNS_AVAILABLE and scan_json_record:
+                        matched = scan_json_record(scannable(record))
+                    found.update(matched)
+                    if out is None:
+                        continue
+                    if matched:
+                        record = self.apply_techniques(record, matched)
+                        out.write(json.dumps(record, ensure_ascii=False, default=str) + "\n")
+                        changed = True
+                    else:
+                        out.write(line if line.endswith("\n") else line + "\n")
+        except BaseException:
+            if out is not None:
+                out.close()
+                os.remove(building)
+            raise
+        if out is not None:
+            out.close()
+            if changed:
+                os.replace(building, filepath)
+            else:
+                os.remove(building)
+
+        for tech_id in sorted(found):
+            techniques_file.write(f"{tech_id}\n")
+        techniques_file.flush()
+        return True
+
+    def _scan_large_jsonl(self, filepath: str, chunk: int = 1 << 20) -> Set[str]:
+        """A large JSON Lines table's techniques: the envelope's, and what the records' own fields
+        match as text, a megabyte at a time (decoding an MFT's millions of lines would take
+        longer than the run)."""
+        found: Set[str] = set()
+        matcher = get_pattern_matcher() if PATTERNS_AVAILABLE else None
+        buffer: List[str] = []
+        size = 0
+        with open(filepath, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                split = _split_envelope(line)
+                if split is not None:
+                    techniques, line = split
+                    found.update(techniques)
+                buffer.append(line)
+                size += len(line)
+                if matcher is not None and size >= chunk:
+                    found.update(matcher.match_content("".join(buffer)))
+                    buffer, size = [], 0
+        if matcher is not None and buffer:
+            found.update(matcher.match_content("".join(buffer)))
+        return found
+
     def _enrich_large_file(self, filepath: str, artefact_type: str) -> bool:
         """
         Enrich a large JSON file - for large files, skip JSON modification
@@ -632,34 +777,23 @@ class MitreEnrichment:
 
         for root, dirs, files in os.walk(directory):
             for filename in files:
-                if filename.endswith('.json'):
+                if filename.endswith('.jsonl') and read_records is not None:
+                    try:
+                        for _, record in read_records(os.path.join(root, filename)):
+                            techniques.update(record_technique_ids(record))
+                    except (OSError, ValueError):
+                        pass
+                elif filename.endswith('.json'):
                     filepath = os.path.join(root, filename)
                     try:
                         with open(filepath, 'r') as f:
                             data = json.load(f)
 
-                        # Handle arrays
-                        if isinstance(data, list):
-                            for record in data:
-                                if isinstance(record, dict):
-                                    tech_id = record.get("mitre_technique_id")
-                                    if tech_id:
-                                        techniques.add(tech_id)
-
-                                    # Also check for multiple techniques
-                                    multi_techs = record.get("mitre_techniques", [])
-                                    for tech in multi_techs:
-                                        if isinstance(tech, dict):
-                                            techniques.add(tech.get("technique_id"))
-                        elif isinstance(data, dict):
-                            tech_id = data.get("mitre_technique_id")
-                            if tech_id:
-                                techniques.add(tech_id)
+                        for record in data if isinstance(data, list) else [data]:
+                            if isinstance(record, dict):
+                                techniques.update(record_technique_ids(record))
                     except:
                         pass
-
-        # Remove None if present
-        techniques.discard(None)
 
         return techniques
 
@@ -696,12 +830,12 @@ def enrich_artefacts_directory(directory: str) -> Dict:
     json_files = []
     for root, dirs, files in os.walk(directory):
         for filename in files:
-            if filename.endswith('.json'):
+            if filename.endswith(TABLE_SUFFIXES) and not filename.startswith("._"):
                 json_files.append(os.path.join(root, filename))
 
     total_json_files = len(json_files)
     if total_json_files > 0:
-        print(f" -> {datetime.now().isoformat().replace('T', ' ')} -> MITRE tagging: found {total_json_files} JSON files to process (this may take several minutes)...")
+        print(f" -> {datetime.now().isoformat().replace('T', ' ')} -> MITRE tagging: found {total_json_files} JSON and JSON Lines files to process (this may take several minutes)...")
 
     # Determine where to write the techniques file
     # Go up from 'cooked' to the image directory

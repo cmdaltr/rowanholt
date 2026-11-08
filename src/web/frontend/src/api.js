@@ -404,6 +404,10 @@ export const getCase = async (jobId) => (await api.get(caseBase(jobId))).data;
 
 export const getCaseRows = async (jobId, params) => (await api.get(`${caseBase(jobId)}/rows`, { params })).data;
 
+// A table as CSV (the filter applied), for a spreadsheet: through the API client, so sign-in carries
+export const getCaseRowsCsv = async (jobId, params) =>
+  (await api.get(`${caseBase(jobId)}/rows.csv`, { params, responseType: 'blob' })).data;
+
 export const getFindings = async (jobId, verify = false) =>
   (await api.get(`${caseBase(jobId)}/findings`, { params: { verify } })).data;
 

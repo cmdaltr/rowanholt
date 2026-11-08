@@ -4,7 +4,7 @@ Each host contributes the set of values it has in a few families: processes (Pre
 4688 and Sysmon 1), parent and child pairs, services (7045, systemd units), scheduled tasks
 (4698, task files), autoruns (Run keys, startup items, Linux autostart, BTM), WMI consumers, drivers
 (Sysmon 6) and kernel modules. A value
-on few of the case's hosts is the long tail; <case>/stacking.csv lists it, ranked by a score
+on few of the case's hosts is the long tail; <case>/stacking.jsonl lists it, ranked by a score
 that is the sum of named features, so every row says why it's there:
 
     rare             on one host, or on at most a fifth of the hosts that have that family at all
@@ -55,8 +55,15 @@ import json
 import math
 import os
 import re
+import sys
 from collections import Counter, defaultdict
 from typing import Callable, Dict, Iterable, Iterator, List, Optional, Set, Tuple
+
+try:
+    from rowanholt.core.records import TABLE_SUFFIXES, RecordsError, read_records, write_records
+except ImportError:  # loaded by path, as the lab's stacking eval does on the host
+    sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+    from rowanholt.core.records import TABLE_SUFFIXES, RecordsError, read_records, write_records
 
 # Host and Row: the row on that host's Artefact the value was read from, as the case browser refers to it
 # (CSV line number with the header as 1, or #index in a JSON list), so a stacking row can be flagged there.
@@ -117,30 +124,16 @@ OS_RELEASE_FAMILY = {"debian": "debian", "ubuntu": "debian", "rhel": "rhel", "fe
                      "opensuse": "suse", "sles": "suse", "arch": "arch", "alpine": "alpine"}
 
 
-def _json_records(path: str) -> Iterator[Tuple[str, dict]]:
-    """(row reference, record): #index in the file's list. An object is one record, #0, unless it holds
-    items or records, which the case browser lists instead; those get no reference rather than a wrong one."""
-    if os.path.getsize(path) > MAX_JSON_BYTES:
+def _rows(path: str) -> Iterator[Tuple[str, dict]]:
+    """(row reference, record) for each record of a cooked table, as the case browser numbers them;
+    nothing from an old case's JSON array over MAX_JSON_BYTES. Top-level values that aren't lists or
+    objects come as text (an old case's CSV gave text; JSON Lines keeps numbers)."""
+    try:
+        for ref, record in read_records(path, max_json_bytes=MAX_JSON_BYTES):
+            yield ref, {k: v if isinstance(v, (str, dict, list)) else ("" if v is None else str(v))
+                        for k, v in record.items()}
+    except RecordsError:
         return
-    with open(path, encoding="utf-8", errors="replace") as fh:
-        try:
-            data = json.load(fh)
-        except ValueError:
-            return
-    if not isinstance(data, list):
-        if isinstance(data, dict):
-            yield ("" if data.get("items") or data.get("records") else "#0"), data
-        return
-    for number, record in enumerate(data):
-        if isinstance(record, dict):
-            yield f"#{number}", record
-
-
-def _csv_rows(path: str) -> Iterator[Tuple[str, Dict[str, str]]]:
-    """(row reference, row): the line number with the header as 1."""
-    with open(path, newline="", encoding="utf-8", errors="replace") as fh:
-        for number, row in enumerate(csv.DictReader(fh), start=2):
-            yield str(number), row
 
 
 def _event(record: dict) -> Tuple[Optional[int], Dict[str, str]]:
@@ -178,7 +171,7 @@ def _norm_path(path: str) -> str:
 
 
 def _prefetch(path: str) -> Iterable[Value]:
-    for ref, r in _json_records(path):
+    for ref, r in _rows(path):
         name = (r.get("filename") or "").lower()
         if name:
             # The program's own path is among the files it loaded; the example carries it. The list arrives
@@ -189,14 +182,14 @@ def _prefetch(path: str) -> Iterable[Value]:
 
 
 def _amcache(path: str) -> Iterable[Value]:
-    for ref, r in _json_records(path):
+    for ref, r in _rows(path):
         full = r.get("path") or ""
         if full:
             yield "process", _norm_path(full), full, ref
 
 
 def _security(path: str) -> Iterable[Value]:
-    for ref, r in _json_records(path):
+    for ref, r in _rows(path):
         event_id, data = _event(r)
         if event_id == 4688 and data.get("NewProcessName"):
             child = _norm_path(data["NewProcessName"])
@@ -213,7 +206,7 @@ def _security(path: str) -> Iterable[Value]:
 
 
 def _sysmon(path: str) -> Iterable[Value]:
-    for ref, r in _json_records(path):
+    for ref, r in _rows(path):
         event_id, data = _event(r)
         if event_id == 1 and data.get("Image"):
             yield "process", _norm_path(data["Image"]), data["Image"], ref, (), _when(r)
@@ -228,19 +221,19 @@ def _sysmon(path: str) -> Iterable[Value]:
 
 
 def _system(path: str) -> Iterable[Value]:
-    for ref, r in _json_records(path):
+    for ref, r in _rows(path):
         event_id, data = _event(r)
         if event_id == 7045 and data.get("ServiceName"):
             yield "service (Windows)", data["ServiceName"].lower(), data.get("ImagePath", ""), ref, (), _when(r)
 
 
 def _systemd(path: str) -> Iterable[Value]:
-    name = os.path.basename(path)[:-len(".json")]
+    name = os.path.splitext(os.path.basename(path))[0]
     yield "service (systemd)", name.lower(), name, "#0"
 
 
 def _startup_items(path: str) -> Iterable[Value]:
-    for ref, r in _csv_rows(path):
+    for ref, r in _rows(path):
         target = r.get("Target") or r.get("Item") or ""
         if target:
             yield "autorun (Windows)", _norm_path(target), f"{r.get('Item', '')}: {target}", ref
@@ -255,7 +248,7 @@ def _norm_name(name: str) -> str:
 
 def _task_file(path: str) -> Iterable[Value]:
     # A collection carries every task, where 4698 only shows the ones created while Security was auditing
-    for ref, r in _json_records(path):
+    for ref, r in _rows(path):
         for task in r.get("tasks") or []:
             name = ((task.get("registration_info") or {}).get("uri") or "").strip("\\")
             if name:
@@ -265,20 +258,20 @@ def _task_file(path: str) -> Iterable[Value]:
 
 
 def _run_keys(path: str) -> Iterable[Value]:
-    for ref, r in _json_records(path):
+    for ref, r in _rows(path):
         if r.get("Plugin") == "run" and r.get("AppName"):
             yield ("autorun (Windows)", r["AppName"].lower(), f"{r.get('RegistryKey', '')}: {r.get('AppLocation', '')}",
                    ref)
 
 
 def _autostart(path: str) -> Iterable[Value]:
-    for ref, r in _csv_rows(path):
+    for ref, r in _rows(path):
         if r.get("Name") or r.get("Command"):
             yield "autorun (Linux)", (r.get("Name") or r.get("Command") or "").lower(), r.get("Command", ""), ref
 
 
 def _btm(path: str) -> Iterable[Value]:
-    for ref, r in _csv_rows(path):
+    for ref, r in _rows(path):
         value = r.get("ExecutablePath") or r.get("Identifier") or r.get("Name") or ""
         if value:
             third_party = not (r.get("Identifier") or "").startswith("com.apple.")
@@ -288,34 +281,34 @@ def _btm(path: str) -> Iterable[Value]:
 
 
 def _wmi(path: str) -> Iterable[Value]:
-    for ref, r in _json_records(path):
+    for ref, r in _rows(path):
         if r.get("consumer_name") and not r.get("note"):
             values = " ".join(str(v) for v in r.get("consumer_values") or [])
             yield "wmi consumer", f"{r.get('consumer_class', '')}: {r['consumer_name']}".lower(), values, ref
 
 
 def _kernel_modules(path: str) -> Iterable[Value]:
-    for ref, r in _csv_rows(path):
+    for ref, r in _rows(path):
         if r.get("Name"):
             yield ("kernel module", r["Name"].lower(), r.get("Path", ""), ref,
                    ("unsigned",) if "E" in (r.get("Taint") or "") else ())
 
 
-# (test on the cooked path relative to the host's cooked folder, extractor)
+# (test on the table's name: its path under the host's cooked folder without the suffix, extractor)
 SOURCES: List[Tuple[Callable[[str], bool], Callable[[str], Iterable[Value]]]] = [
-    (lambda p: p.startswith("prefetch/") and p.endswith(".json"), _prefetch),
-    (lambda p: p.startswith("amcache/") and p.endswith(".json"), _amcache),
-    (lambda p: p == "evt/Security.json", _security),
-    (lambda p: p.startswith("evt/") and "Sysmon" in p and p.endswith(".json"), _sysmon),
-    (lambda p: p == "evt/System.json", _system),
-    (lambda p: p.startswith("services/") and p.endswith(".json"), _systemd),
-    (lambda p: p.startswith("tasks/") and p.endswith(".json"), _task_file),
-    (lambda p: p.startswith("registry/") and p.endswith(".json"), _run_keys),
-    (lambda p: p.endswith("startup_items.csv"), _startup_items),
-    (lambda p: p.endswith("autostart.csv"), _autostart),
-    (lambda p: p.endswith("btm_items.csv"), _btm),
-    (lambda p: p.endswith("wbem.json"), _wmi),
-    (lambda p: p.endswith("kernel_modules.csv"), _kernel_modules),
+    (lambda t: t.startswith("prefetch/"), _prefetch),
+    (lambda t: t.startswith("amcache/"), _amcache),
+    (lambda t: t == "evt/Security", _security),
+    (lambda t: t.startswith("evt/") and "Sysmon" in t, _sysmon),
+    (lambda t: t == "evt/System", _system),
+    (lambda t: t.startswith("services/"), _systemd),
+    (lambda t: t.startswith("tasks/"), _task_file),
+    (lambda t: t.startswith("registry/"), _run_keys),
+    (lambda t: t.endswith("startup_items"), _startup_items),
+    (lambda t: t.endswith("autostart"), _autostart),
+    (lambda t: t.endswith("btm_items"), _btm),
+    (lambda t: t.endswith("wbem"), _wmi),
+    (lambda t: t.endswith("kernel_modules"), _kernel_modules),
 ]
 
 
@@ -343,8 +336,11 @@ def host_values(host_dir: str) -> Dict[Tuple[str, str], Tuple[str, str, str, Tup
         for name in sorted(files):
             full = os.path.join(root, name)
             relative = os.path.relpath(full, cooked).replace(os.sep, "/")
+            table, suffix = os.path.splitext(relative)
+            if suffix.lower() not in TABLE_SUFFIXES:
+                continue
             for test, extract in SOURCES:
-                if not test(relative):
+                if not test(table):
                     continue
                 try:
                     for family, value, example, ref, *more in extract(full):
@@ -355,7 +351,7 @@ def host_values(host_dir: str) -> Dict[Tuple[str, str], Tuple[str, str, str, Tup
                             found[(family, value)] = (f"artefacts/cooked/{relative}", example[:300], ref, traits)
                             if when:
                                 seen_at[(family, value)] = when
-                except (OSError, csv.Error):
+                except (OSError, ValueError, csv.Error):
                     continue  # an unreadable artefact leaves its values out; the rest still stack
     hours = logon_hours(logons)
     if hours is not None:
@@ -481,8 +477,8 @@ def stack(per_host: Dict[str, Dict[Tuple[str, str], Tuple[str, str, str, Tuple[s
         rows.append({"Score": f"{score:.1f}", "Family": shown, "Value": value, "Hosts With It": str(len(with_it)),
                      "Hosts In Case": str(total), "Hosts": "; ".join(sorted(with_it)[:10]), "Reasons": ", ".join(why),
                      "Artefact": artefact, "Example": example, "Host": with_it[0], "Row": ref,
-                     "Sources": json.dumps([[h, *[per_host[h][(family, value)][i] for i in (0, 2)]]
-                                            for h in sorted(with_it)[:MAX_SOURCES]])})
+                     "Sources": [[h, *[per_host[h][(family, value)][i] for i in (0, 2)]]
+                                 for h in sorted(with_it)[:MAX_SOURCES]]})
     rows.sort(key=lambda r: (-float(r["Score"]), int(r["Hosts With It"]), r["Family"].split(",")[0] not in PERSISTENCE,
                              r["Family"], r["Value"]))
     for number, row in enumerate(rows, start=1):
@@ -509,7 +505,7 @@ def build_baseline(output_directories: Iterable[str], path: str) -> int:
 
 
 def stack_case(output_directory: str, baseline_path: str = "") -> Optional[Dict[str, int]]:
-    """Write <case>/stacking.csv; None when the case has fewer than two hosts."""
+    """Write <case>/stacking.jsonl; None when the case has fewer than two hosts."""
     host_dirs = hosts(output_directory)
     if len(host_dirs) < 2:
         return None
@@ -518,19 +514,20 @@ def stack_case(output_directory: str, baseline_path: str = "") -> Optional[Dict[
                if any(FAMILY_OS[family] == "linux" for family, _ in per_host[os.path.basename(h)])}
     baseline = read_baseline(baseline_path) if baseline_path else None
     rows = stack(per_host, baseline, distros)
-    with open(os.path.join(output_directory, "stacking.csv"), "w", newline="", encoding="utf-8") as out:
-        writer = csv.DictWriter(out, fieldnames=HEADER)
-        writer.writeheader()
-        writer.writerows(rows)
+    path = os.path.join(output_directory, "stacking.jsonl")
+    if os.path.exists(path):
+        os.remove(path)  # a re-run replaces the case's stacking
+    # The envelope's host is the one the row's example was read from, as its Host column
+    write_records(path, ({k: row[k] for k in HEADER} for row in rows), host=lambda row: row["Host"],
+                  artefact="stacking")
     return {"hosts": len(host_dirs), "values": sum(len(v) for v in per_host.values()), "rows": len(rows)}
 
 
-def precision_at_k(stacking_csv: str, expected: Iterable[str], k: int = 20) -> float:
+def precision_at_k(stacking_table: str, expected: Iterable[str], k: int = 20) -> float:
     """The share of the top k rows whose value contains one of the expected (seeded) values:
     how the lab measures stacking before Eru is given it."""
     needles = [e.lower() for e in expected]
-    with open(stacking_csv, newline="", encoding="utf-8") as fh:
-        top = [r for _, r in zip(range(k), csv.DictReader(fh))]
+    top = [r for _, (_, r) in zip(range(k), read_records(stacking_table))]
     if not top:
         return 0.0
     return sum(any(n in r["Value"] or n in r["Example"].lower() for n in needles) for r in top) / len(top)

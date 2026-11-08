@@ -2,21 +2,48 @@
 and rows from them, paged and filtered.
 
 Read-only by construction: nothing here opens a file for writing, and only artefacts/cooked/,
-analysis/ and the case's own top-level CSVs are reachable; raw/ never is. A path from a request
+analysis/ and the case's own top-level tables are reachable; raw/ never is. A path from a request
 is resolved and must stay under one of those folders.
+
+Tables are JSON Lines (rowanholt/core/records.py, loaded from Elrond's source tree); cases
+processed before that are CSV and JSON arrays, read the same way.
 """
 
 import csv
 import hashlib
+import importlib.util
+import io
 import json
+import os
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Tuple
 
-ROW_FILES = (".csv", ".json")
-MAX_JSON_BYTES = 64 << 20
+
+def _load_tables():
+    """rowanholt/core/records.py, loaded by path: putting Elrond's source tree on sys.path would let
+    its own config and main shadow the backend's."""
+    here = Path(__file__).resolve()
+    # in the backend image this file is /app/case_files.py: no repository above it to fall back on
+    sources = [os.environ.get("ROWANHOLT_ELROND_SRC", "/opt/elrond-src")]
+    if len(here.parents) > 2:
+        sources.append(here.parents[2] / "analysis")
+    for src in sources:
+        path = Path(src, "rowanholt", "core", "records.py")
+        if path.is_file():
+            spec = importlib.util.spec_from_file_location("rowanholt_records", path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return module
+    raise ImportError("rowanholt/core/records.py not found: is Elrond's source mounted at ROWANHOLT_ELROND_SRC?")
+
+
+tables = _load_tables()
+
+ROW_FILES = tables.TABLE_SUFFIXES
+MAX_JSON_BYTES = 64 << 20  # an old case's JSON array is read whole
 MAX_SCAN = 500_000  # rows scanned for a filter before the count stops being exact
 MAX_CELL = 2000
-CASE_HOST = "(case)"  # the case's top-level files, such as threat_groups.csv
+CASE_HOST = "(case)"  # the case's top-level tables, such as threat_groups
 
 csv.field_size_limit(16 << 20)
 
@@ -62,7 +89,8 @@ def listing(root: Path) -> Dict:
                 if path.is_file() and path.suffix.lower() in ROW_FILES:
                     files.append({"path": str(path.relative_to(host_dir)), "size": path.stat().st_size})
         out.append({"host": host_dir.name, "files": files})
-    case_files = [{"path": p.name, "size": p.stat().st_size} for p in sorted(root.glob("*.csv")) if p.is_file()]
+    case_files = [{"path": p.name, "size": p.stat().st_size} for p in sorted(root.iterdir())
+                  if p.is_file() and p.suffix.lower() in ROW_FILES]
     return {"hosts": out, "case_files": case_files}
 
 
@@ -78,7 +106,7 @@ def resolve(root: Path, host: str, relative: str) -> Path:
         allowed = _readable(base)
     path = (base / relative).resolve()
     if path.suffix.lower() not in ROW_FILES or not path.is_file():
-        raise CaseFileError(f"{relative}: not a CSV or JSON table in this case")
+        raise CaseFileError(f"{relative}: not a table in this case")
     for folder in allowed:
         folder = folder.resolve()
         if host == CASE_HOST and path.parent == folder:
@@ -100,29 +128,21 @@ def json_row(record) -> Dict[str, str]:
     return {str(k): v if isinstance(v, str) else json.dumps(v, default=str) for k, v in record.items()}
 
 
+def records_with_values(path: Path) -> Iterator[Tuple[str, Dict, Dict[str, str]]]:
+    """(row reference, record as written, row as records() gives it) for each row."""
+    convert = csv_row if path.suffix.lower() == ".csv" else json_row
+    try:
+        for ref, record in tables.read_records(path, max_json_bytes=MAX_JSON_BYTES):
+            yield ref, record, convert(record)
+    except tables.RecordsError as exc:
+        raise CaseFileError(f"{exc}: open it from the case folder, or re-run its processing") from None
+
+
 def records(path: Path) -> Iterator[Tuple[str, Dict[str, str]]]:
-    """(row reference, row) for each row: the CSV line number (header is 1), or #index in JSON."""
-    if path.suffix.lower() == ".csv":
-        with open(path, newline="", encoding="utf-8", errors="replace") as fh:
-            for number, row in enumerate(csv.DictReader(fh), start=2):
-                yield str(number), csv_row(row)
-        return
-    if path.stat().st_size > MAX_JSON_BYTES:
-        raise CaseFileError(f"{path.name} is over {MAX_JSON_BYTES >> 20} MB: open it from the case folder")
-    with open(path, encoding="utf-8", errors="replace") as fh:
-        try:
-            data = json.load(fh)
-        except ValueError as whole:
-            # JSON lines
-            fh.seek(0)
-            try:
-                data = [json.loads(line) for line in fh if line.strip()]
-            except ValueError:
-                raise CaseFileError(f"{path.name} isn't valid JSON ({whole}): re-run its processing") from None
-    if isinstance(data, dict):
-        data = data.get("items") or data.get("records") or [data]
-    for number, record in enumerate(data):
-        yield f"#{number}", json_row(record)
+    """(row reference, row) for each row: the line number in JSON Lines and CSV (a CSV's header
+    is line 1), #index in an old case's JSON array. Values are text, nested ones as JSON."""
+    for ref, _, row in records_with_values(path):
+        yield ref, row
 
 
 def row_hash(row: Dict[str, str]) -> str:
@@ -162,3 +182,38 @@ def find_row(path: Path, ref: str) -> Optional[Dict[str, str]]:
         if current == ref:
             return row
     return None
+
+
+SPREADSHEET_FORMULA = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _cell(value: str) -> str:
+    """A spreadsheet runs a cell that starts with = + - or @ as a formula: an evidential value such
+    as =HYPERLINK(...) or a command line is prefixed with ' so it opens as text."""
+    return "'" + value if value.startswith(SPREADSHEET_FORMULA) and value != "-" else value
+
+
+def csv_export(path: Path, query: str = "") -> Iterator[str]:
+    """The table as CSV, rows matching `query` as page() matches them: a header of every field any
+    record has (a JSON Lines table's records needn't share them), nested values as JSON text, the
+    row reference first. Read twice, for the header and then the rows."""
+    needle = query.lower()
+
+    def matching() -> Iterator[Tuple[str, Dict[str, str]]]:
+        for ref, row in records(path):
+            if not needle or any(needle in (v or "").lower() for v in row.values()):
+                yield ref, row
+
+    columns: Dict[str, None] = {}
+    for _, row in matching():
+        columns.update(dict.fromkeys(row))
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["row", *columns])
+    for count, (ref, row) in enumerate(matching(), 1):
+        writer.writerow([ref, *(_cell(row.get(c) or "") for c in columns)])
+        if count % 1000 == 0:
+            yield buffer.getvalue()
+            buffer.seek(0)
+            buffer.truncate()
+    yield buffer.getvalue()

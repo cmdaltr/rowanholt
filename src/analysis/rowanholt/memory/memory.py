@@ -365,7 +365,8 @@ def process_memory(
     no_pslist = not any(
         os.path.exists(p) and os.path.getsize(p) > 0
         for p in (os.path.join(output_directory + mempath, name)
-                  for name in ("memory_linux.pslist.PsList.json", "linux.pslist.PsList.json")))
+                  for name in ("memory_linux.pslist.PsList.jsonl", "memory_linux.pslist.PsList.json",
+                               "linux.pslist.PsList.json")))
     if profileplatform == "Linux" and no_pslist and five_level_paging(artefact + memext):
         entry, prnt = "{},processing,{},5-level page tables\n".format(
             datetime.now().isoformat(), artefact.split("/")[-1]

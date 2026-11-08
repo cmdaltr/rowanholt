@@ -1,6 +1,6 @@
 # Roadmap: the v2.3 features
 
-Plans for four of the README's v2.3 items: what already exists, what each one needs, and the order to build them in. Everything else requested is in `docs/FEATURE_REQUESTS.md`.
+Plans for four of the README's v2.3 items: what already exists, what each one needs, and the order to build them in. Everything else requested is in `docs/FEATURE_REQUESTS.md`. One output format for every artefact (JSON Lines) is planned in `docs/OUTPUT_FORMAT.md`.
 
 | Feature | Already there | Size | Order |
 |---|---|---|---|

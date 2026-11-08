@@ -2,8 +2,8 @@
 Eru without an LLM: questions answered straight from Elrond's case output.
 
 Free-text questions need Ollama. When it isn't there, Ask Eru offers these
-instead: each reads the case directory (<case>/<host>/artefacts/cooked/*.csv,
-<case>/<host>/analysis/*.csv, <case>/mitre_techniques.txt, <case>/threat_groups.csv) and summarises what
+instead: each reads the case directory (<case>/<host>/artefacts/cooked/, <case>/<host>/analysis/,
+<case>/mitre_techniques.txt, <case>/threat_groups) and summarises what
 Elrond found, so the answers are exact rather than generated. Each line built from a row
 carries that row (host, file, row reference, SHA-256: what a finding stores), so the answer can
 be flagged from (answer_with_rows).
@@ -34,10 +34,10 @@ SUSPICIOUS_COMMAND = re.compile(
     r"powershell|iex|invoke-|certutil|bitsadmin|mshta|rundll32|regsvr32|history\s+-c|unset\s+histfile)\b",
     re.I,
 )
-# Cooked CSVs whose Flag column marks a finding (Elrond's Windows, Linux and macOS processors)
-FLAGGED_CSVS = ("pam.csv", "sudoers.csv", "autostart.csv", "udev_rules.csv", "preload.csv", "shell_init.csv",
-                "kernel_modules.csv", "btm_items.csv", "emond_rules.csv", "periodic.csv")
-PERSISTENCE_LISTS = ("startup_items.csv", "generators.csv")
+# Cooked tables whose Flag field marks a finding (Elrond's Windows, Linux and macOS processors)
+FLAGGED_TABLES = ("pam", "sudoers", "autostart", "udev_rules", "preload", "shell_init",
+                  "kernel_modules", "btm_items", "emond_rules", "periodic")
+PERSISTENCE_LISTS = ("startup_items", "generators")
 # stacking.py's PERSISTENCE (the backend doesn't import the analysis package; a test keeps them equal)
 STACKING_PERSISTENCE = {"scheduled task", "wmi consumer", "service (Windows)", "autorun (Windows)", "service (systemd)",
                         "autorun (Linux)", "kernel module", "autorun (macOS)", "driver (Windows)"}
@@ -67,19 +67,24 @@ def _hosts(case_path: str) -> List[Path]:
     return sorted(p for p in root.iterdir() if p.is_dir() and (p / "artefacts").is_dir())
 
 
-def _rows(path: Path) -> List[Dict[str, str]]:
+def _numbered(path: Path) -> Iterator[Tuple[str, Dict, Dict[str, str]]]:
+    """(row reference, row as written, row as hashed) for each row of a table, as case_files reads it;
+    nothing for a table that isn't there."""
+    if not path.is_file():
+        return
     try:
-        with open(path, newline="", encoding="utf-8", errors="replace") as fh:
-            return list(csv.DictReader(fh))
-    except (OSError, csv.Error) as e:
+        yield from case_files.records_with_values(path)
+    except (OSError, ValueError, csv.Error, case_files.CaseFileError) as e:
         logger.debug(f"Couldn't read {path}: {e}")
-        return []
 
 
-def _numbered(path: Path) -> Iterator[Tuple[str, Dict[str, str], Dict[str, str]]]:
-    """(row reference, row, row as hashed) for each CSV row: references and hashes as case_files gives them."""
-    for number, row in enumerate(_rows(path), start=2):
-        yield str(number), row, case_files.csv_row(row)
+def _rows(path: Path) -> List[Dict]:
+    return [row for _, row, _ in _numbered(path)]
+
+
+def _table(folder: Path, name: str) -> Path:
+    """The table ``name`` in ``folder``, in this case's format."""
+    return case_files.tables.table_path(folder, name)
 
 
 def _where(host: Path, path: Path) -> Tuple[str, str]:
@@ -90,20 +95,19 @@ def _where(host: Path, path: Path) -> Tuple[str, str]:
         return case_files.CASE_HOST, path.name
 
 
-def _json_records(path: Path, keep_index: bool = False) -> List:
-    """A JSON file's records; with keep_index, everything in the list, so positions are the file's own."""
-    try:
-        records = json.loads(path.read_text(encoding="utf-8", errors="replace"))
-    except (OSError, ValueError) as e:
-        logger.debug(f"Couldn't read {path}: {e}")
-        return []
-    if not isinstance(records, list):
-        return []
-    return records if keep_index else [r for r in records if isinstance(r, dict)]
-
-
-def _cooked(host: Path, pattern: str) -> Iterable[Path]:
-    return sorted((host / "artefacts" / "cooked").rglob(pattern))
+def _cooked(host: Path, pattern: str) -> List[Path]:
+    """The cooked tables matching ``pattern`` (a name without its suffix, globbing allowed): one
+    file per table, in this case's format."""
+    found: Dict[Path, Path] = {}
+    for path in (host / "artefacts" / "cooked").rglob(pattern + ".*"):
+        suffix = path.suffix.lower()
+        if suffix not in case_files.ROW_FILES or not path.is_file():
+            continue
+        stem = path.with_suffix("")
+        held = found.get(stem)
+        if held is None or case_files.ROW_FILES.index(suffix) < case_files.ROW_FILES.index(held.suffix.lower()):
+            found[stem] = path
+    return sorted(found.values())
 
 
 def _bullets(lines: Iterable[str], limit: int = MAX_ROWS) -> str:
@@ -137,7 +141,7 @@ def hosts(case_path: str) -> str:
         return "No processed hosts in this case yet: Elrond writes one folder per host with an artefacts/ folder inside."
     lines = []
     for host in found:
-        cooked = list(_cooked(host, "*.csv")) + list(_cooked(host, "*.json"))
+        cooked = _cooked(host, "*")
         lines.append(f"**{host.name}**: {_host_info(host)}, {len(cooked)} processed artefact files")
     return "**Hosts in this case:**\n" + _bullets(lines, 50)
 
@@ -158,12 +162,12 @@ def persistence(case_path: str) -> str:
     sections = []
     for host in _hosts(case_path):
         lines = []
-        for name in FLAGGED_CSVS:
+        for name in FLAGGED_TABLES:
             for path in _cooked(host, name):
                 for ref, row, normal in _numbered(path):
                     flag = row.get("Flag") or ""
                     # out-of-tree and unsigned alone are DKMS and VM drivers; only an odd file location is a lead
-                    if name == "kernel_modules.csv" and not ("no module file" in flag or "outside" in flag):
+                    if name == "kernel_modules" and not ("no module file" in flag or "outside" in flag):
                         continue
                     if flag:
                         what = row.get("Command") or row.get("Line") or row.get("Module") or row.get("Library") or \
@@ -176,22 +180,23 @@ def persistence(case_path: str) -> str:
                     text = f"{path.stem}: {row.get('Path') or row.get('Source') or row.get('Name') or ''}"
                     lines.append(_cited(text, *_where(host, path), ref, normal))
         # WMI event subscriptions carved from the repository; Elrond notes the ones Windows makes itself
-        for path in _cooked(host, "wbem.json"):
-            for index, sub in enumerate(_json_records(path, keep_index=True)):
-                if isinstance(sub, dict) and not sub.get("note"):
-                    action = "; ".join(str(v) for v in sub.get("consumer_values") or [])
+        for path in _cooked(host, "wbem"):
+            for ref, sub, normal in _numbered(path):
+                if not sub.get("note"):
+                    values = sub.get("consumer_values") or []
+                    action = "; ".join(str(v) for v in values) if isinstance(values, list) else str(values)
                     text = (f"WMI subscription: {sub.get('filter_name')} -> {sub.get('consumer_class')} "
                             f"'{sub.get('consumer_name')}'" + (f": {action}" if action else ""))
-                    lines.append(_cited(text, *_where(host, path), f"#{index}", case_files.json_row(sub)))
+                    lines.append(_cited(text, *_where(host, path), ref, normal))
         # Run keys: RegRipper's run plugin over SOFTWARE and each NTUSER.DAT (Elrond tags them T1547.001)
-        for path in _cooked(host, "registry/*.json"):
-            for index, record in enumerate(_json_records(path, keep_index=True)):
-                if isinstance(record, dict) and record.get("Plugin") == "run" and record.get("AppName"):
+        for path in _cooked(host, "registry/*"):
+            for ref, record, normal in _numbered(path):
+                if record.get("Plugin") == "run" and record.get("AppName"):
                     hive = record.get("RegistryHive") or path.stem
                     if record.get("AccountProfile"):
                         hive += f" ({record['AccountProfile']})"
                     text = f"Run key: {hive} {record.get('RegistryKey', '')}: {record['AppName']} -> {record.get('AppLocation', '')}"
-                    lines.append(_cited(text, *_where(host, path), f"#{index}", case_files.json_row(record)))
+                    lines.append(_cited(text, *_where(host, path), ref, normal))
         if lines:
             sections.append(f"**{host.name}**\n" + _bullets(lines))
     if not sections:
@@ -205,14 +210,14 @@ def logins(case_path: str) -> str:
     sections = []
     for host in _hosts(case_path):
         lines = []
-        records = [r for p in _cooked(host, "login_records.csv") for r in _rows(p)]
+        records = [r for p in _cooked(host, "login_records") for r in _rows(p)]
         users = Counter(r.get("User", "") for r in records if r.get("Type") == "USER_PROCESS" and r.get("User"))
         failed = Counter((r.get("Address") or r.get("Host") or "?") for r in records if r.get("Source", "").endswith("btmp"))
         if users:
             lines.append("logins: " + ", ".join(f"{u} ({n})" for u, n in users.most_common(10)))
         if failed:
             lines.append("failed logins by source: " + ", ".join(f"{s} ({n})" for s, n in failed.most_common(10)))
-        for path in _cooked(host, "lastlog.csv"):
+        for path in _cooked(host, "lastlog"):
             for ref, row, normal in list(_numbered(path))[:10]:
                 text = f"last login {row.get('User') or row.get('UID')}: {row.get('LastWriteTime')} from {row.get('Host') or 'local'}"
                 lines.append(_cited(text, *_where(host, path), ref, normal))
@@ -226,7 +231,7 @@ def logins(case_path: str) -> str:
 def iocs(case_path: str) -> str:
     sections = []
     for host in _hosts(case_path):
-        rows = _rows(host / "analysis" / "iocs.csv")
+        rows = _rows(_table(host / "analysis", "iocs"))
         if not rows:
             continue
         kinds = Counter(r.get("indicator_type", "?") for r in rows)
@@ -266,7 +271,7 @@ def threat_intel(case_path: str) -> str:
     groups whose evidence turned up, with what each rank rests on."""
     sections = []
     for host in _hosts(case_path):
-        path = host / "analysis" / "threat_intel_matches.csv"
+        path = _table(host / "analysis", "threat_intel_matches")
         seen: Dict[str, Tuple[str, Dict[str, str], Dict[str, str]]] = {}
         for ref, row, normal in _numbered(path):
             seen.setdefault(row.get("Element", ""), (ref, row, normal))
@@ -277,7 +282,7 @@ def threat_intel(case_path: str) -> str:
             _cited(f"{r['Element']} in {Path(r.get('Artefact', '')).name}: {r.get('Groups') or r.get('Sources')}"
                    + (" (common: many groups use it)" if r.get("Common") == "yes" else ""), *_where(host, path), ref, normal)
             for ref, r, normal in ordered))
-    groups_csv = Path(case_path) / "threat_groups.csv"
+    groups_csv = _table(Path(case_path), "threat_groups")
     groups = list(_numbered(groups_csv))
     if groups:
         sections.append("**Whose tradecraft it resembles** (a lead, not attribution)\n" + _bullets(
@@ -294,10 +299,10 @@ def commands(case_path: str) -> str:
     sections = []
     for host in _hosts(case_path):
         hits = []
-        for pattern in ("*bash_history.csv", "*zsh_history.csv", "shell_histories.csv", "*ConsoleHost_history*.csv"):
+        for pattern in ("*bash_history", "*zsh_history", "shell_histories", "*ConsoleHost_history*"):
             for path in _cooked(host, pattern):
                 for ref, row, normal in _numbered(path):
-                    command = row.get("Command") or next(iter(row.values()), "") or ""
+                    command = str(row.get("Command") or next(iter(case_files.tables.own_fields(row).values()), "") or "")
                     if SUSPICIOUS_COMMAND.search(command):
                         hits.append(_cited(f"{path.stem}: {command.strip()[:200]}", *_where(host, path), ref, normal))
         if hits:
@@ -312,7 +317,7 @@ def staging(case_path: str) -> str:
     for host in _hosts(case_path):
         lines = [_cited(f"{r.get('Path')} ({r.get('Kind')}, {r.get('Size')} bytes, sha256 {(r.get('SHA256') or '')[:16]}…)",
                         *_where(host, p), ref, normal)
-                 for p in _cooked(host, "tmp_executables.csv") for ref, r, normal in _numbered(p)]
+                 for p in _cooked(host, "tmp_executables") for ref, r, normal in _numbered(p)]
         if lines:
             sections.append(f"**{host.name}**\n" + _bullets(lines))
     if not sections:
@@ -324,20 +329,21 @@ def detections(case_path: str) -> str:
     sections = []
     for host in _hosts(case_path):
         lines = []
-        for p in _cooked(host, "defender_detections.csv"):
+        for p in _cooked(host, "defender_detections"):
             lines += [_cited(f"Defender: {r.get('ThreatName') or r.get('Threat') or ''} {r.get('Path') or ''}".strip(),
                              *_where(host, p), ref, normal) for ref, r, normal in _numbered(p)]
-        for p in _cooked(host, "webshells.csv"):
+        for p in _cooked(host, "webshells"):
             lines += [_cited(f"web shell: {r.get('Source')} ({r.get('Indicators')})", *_where(host, p), ref, normal)
                       for ref, r, normal in _numbered(p)]
-        for p in _cooked(host, "xprotect_*.csv"):
-            lines += [_cited(f"XProtect ({p.stem}): {', '.join(f'{k}={v}' for k, v in list(r.items())[:4])}",
+        for p in _cooked(host, "xprotect_*"):
+            shown = case_files.tables.own_fields
+            lines += [_cited(f"XProtect ({p.stem}): {', '.join(f'{k}={v}' for k, v in list(shown(r).items())[:4])}",
                              *_where(host, p), ref, normal) for ref, r, normal in list(_numbered(p))[:10]]
-        # Elrond's own scanners: ClamAV's rows in analysis.csv, and one line per YARA rule and file
-        clamav = host / "analysis" / "analysis.csv"
+        # Elrond's own scanners: ClamAV's rows in analysis, and one line per YARA rule and file
+        clamav = _table(host / "analysis", "analysis")
         lines += [_cited(f"ClamAV: {r.get('analysis_value')} {r.get('Filename')}", *_where(host, clamav), ref, normal)
                   for ref, r, normal in _numbered(clamav) if r.get("analysis_type") == "ClamAV"]
-        yara = host / "analysis" / "yara.csv"
+        yara = _table(host / "analysis", "yara")
         seen = set()
         for ref, r, normal in _numbered(yara):
             key = (r.get("yara_rule"), r.get("path"), r.get("file"))
@@ -353,8 +359,8 @@ def detections(case_path: str) -> str:
 
 
 def rare(case_path: str) -> str:
-    """The top of Elrond's stacking across hosts (<case>/stacking.csv): persistence, then programs."""
-    stacking_csv = Path(case_path) / "stacking.csv"
+    """The top of Elrond's stacking across hosts (<case>/stacking): persistence, then programs."""
+    stacking_csv = _table(Path(case_path), "stacking")
     rows = list(_numbered(stacking_csv))
     if not rows:
         return ("Nothing was stacked for this case. Stacking compares hosts, so it needs two or more, and runs with "
@@ -387,7 +393,7 @@ def rare(case_path: str) -> str:
         parts.append(f"**Ways back in** ({len(persistence)})\n" + _bullets(lines(persistence), RARE_ROWS))
     if programs:
         parts.append(f"**Programs and process pairs** ({len(programs)})\n" + _bullets(lines(programs), RARE_ROWS))
-    return ("**What's rare across the hosts** (stacking.csv, highest score first):\n\n" + "\n\n".join(parts) +
+    return ("**What's rare across the hosts** (stacking, highest score first):\n\n" + "\n\n".join(parts) +
             "\n\nEach row is a lead, not a verdict: rare can be an older build or a busier host. "
             "Flag one with ⚑: the flag goes on the host's own row the value was read from.")
 
@@ -397,9 +403,11 @@ RARE_SOURCES = 5  # host rows cited per stacking line
 
 def _stacking_sources(row: Dict[str, str]) -> List[Tuple[str, str, str]]:
     """(host, artefact, row) for each host a stacking row's value was read on: Sources, or from a
-    stacking.csv before it, Host and Row."""
+    stacking table before it, Host and Row."""
+    listed = row.get("Sources") or []
     try:
-        sources = [tuple(map(str, s)) for s in json.loads(row.get("Sources") or "[]") if len(s) == 3]
+        listed = json.loads(listed) if isinstance(listed, str) else listed
+        sources = [tuple(map(str, s)) for s in listed if len(s) == 3]
     except (TypeError, ValueError):
         sources = []
     if not sources and row.get("Host") and row.get("Row"):
@@ -410,7 +418,7 @@ def _stacking_sources(row: Dict[str, str]) -> List[Tuple[str, str, str]]:
 def _host_rows(root: Path, stacked: List[Dict[str, str]]) -> Dict[Tuple[str, str, str], Dict[str, str]]:
     """{(host, artefact, row reference): the row as case_files reads it} for the host rows these stacking rows
     name (_stacking_sources); each file read once, and only through case_files, so only what the case
-    browser can open. A stacking.csv from before Host and Row names none: those stay unresolved."""
+    browser can open. A stacking table from before Host and Row names none: those stay unresolved."""
     wanted: Dict[Tuple[str, str], set] = {}
     for r in stacked:
         for host, artefact, ref in _stacking_sources(r):
@@ -432,7 +440,7 @@ def _host_rows(root: Path, stacked: List[Dict[str, str]]) -> Dict[Tuple[str, str
 def analysis(case_path: str) -> str:
     sections = []
     for host in _hosts(case_path):
-        path = host / "analysis" / "analysis.csv"
+        path = _table(host / "analysis", "analysis")
         rows = list(_numbered(path))
         if rows:
             kinds = Counter(r.get("analysis_type", "?") for _, r, _ in rows)
@@ -461,7 +469,7 @@ GENERAL_ANSWERS = {
         "**Where Windows persistence lives, and where Rowanholt shows it**\n\n"
         "• Run/RunOnce keys and services: registry (SOFTWARE, SYSTEM, NTUSER.DAT), tagged T1547.001 / T1543.003\n"
         "• Scheduled tasks: System32\\Tasks (Artemis) and the TaskScheduler event log, T1053.005\n"
-        "• Startup folders: startup_items.csv, T1547.001\n"
+        "• Startup folders: startup_items, T1547.001\n"
         "• WMI subscriptions: the WMI repository (carved when Artemis can't parse it), T1546.003\n"
         "• BITS jobs: bits/qmgr, T1197\n"
         "Check the Navigator layer for what was actually tagged in a case."
@@ -469,19 +477,19 @@ GENERAL_ANSWERS = {
     "linux_persistence": (
         "**Linux persistence checklist, as Rowanholt collects it**\n\n"
         "• cron and at: cron/, crontab, T1053.003\n"
-        "• systemd units, user units and generators: services/, autostart.csv, generators.csv, T1543.002\n"
-        "• shell start-up: /etc/profile(.d), bashrc, rc.local: shell_init.csv, T1546.004 / T1037.004\n"
-        "• loader: ld.so.preload: preload.csv, T1574.006\n"
-        "• PAM and sudoers: pam.csv, sudoers.csv, T1556.003 / T1548.003\n"
-        "• udev, XDG autostart, SSH authorized_keys, kernel modules: udev_rules.csv, autostart.csv, kernel_modules.csv"
+        "• systemd units, user units and generators: services/, autostart, generators, T1543.002\n"
+        "• shell start-up: /etc/profile(.d), bashrc, rc.local: shell_init, T1546.004 / T1037.004\n"
+        "• loader: ld.so.preload: preload, T1574.006\n"
+        "• PAM and sudoers: pam, sudoers, T1556.003 / T1548.003\n"
+        "• udev, XDG autostart, SSH authorized_keys, kernel modules: udev_rules, autostart, kernel_modules"
     ),
     "macos_persistence": (
         "**macOS persistence checklist, as Rowanholt collects it**\n\n"
         "• LaunchAgents and LaunchDaemons (system, Apple's and per user): plists, T1543.001 / T1543.004\n"
-        "• Login and background items as macOS 13+ tracks them: btm_items.csv, T1547.015\n"
-        "• emond rules: emond_rules.csv, T1546.014\n"
-        "• periodic scripts and *.local: periodic.csv\n"
-        "• kernel extensions: kextpolicy_*.csv, T1547.006\n"
+        "• Login and background items as macOS 13+ tracks them: btm_items, T1547.015\n"
+        "• emond rules: emond_rules, T1546.014\n"
+        "• periodic scripts and *.local: periodic\n"
+        "• kernel extensions: kextpolicy_*, T1547.006\n"
         "• TCC grants, quarantine events and the unified-log export show what ran and what it was allowed to touch."
     ),
     "gandalf": (

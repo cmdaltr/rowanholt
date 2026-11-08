@@ -7,9 +7,11 @@ import stat
 import struct
 from datetime import datetime
 from pathlib import Path
+from typing import Dict, Iterable, List
 
 from rowanholt.audit import write_audit_log_entry
 from rowanholt.analysis.iocs import compare_iocs
+from rowanholt.core.records import SUFFIX, iter_json as iter_json_records, write_records
 from rowanholt.analysis.ntfs_ads import known_stream_note, mft_alternate_data_streams
 from rowanholt.process.extractions.artemis import _record_techniques
 
@@ -66,11 +68,31 @@ TIMESTOMP_PAIRS = (("created", "filename_created"),)
 # implant is one file. This many in one folder with the same $SI created time is an installation
 BULK_TIMESTOMP = 3
 BULK_TIMESTOMP_NOTE = "likely benign: {} files in this folder carry the same times (installed or extracted together)"
-MFT_JSON_NAMES = ("mft.json", "mft.jsonl", "rawfiles.json", "rawfiles.jsonl", "journal_mft.json")
+MFT_JSON_NAMES = ("mft.json", "mft.jsonl", "rawfiles.json", "rawfiles.jsonl", "journal_mft.json", "journal_mft.jsonl")
 # Keys only Artemis's MFT records have, to know an unnamed .jsonl for one (prefetch and others
 # also have filename, created and modified)
 MFT_ONLY_KEYS = ("filename_created", "attribute_list", "ads_info")
-ANALYSIS_HEADER = "LastWriteTime,hostname,Filename,analysis_type,analysis_value\n"
+ANALYSIS_FIELDS = ("LastWriteTime", "hostname", "Filename", "analysis_type", "analysis_value")
+# The finding types whose technique is known; a finding marked likely benign gets none
+FINDING_TECHNIQUES = {"Timestomp": "T1070.006", "AlternateDataStream": "T1564.004"}
+IOC_FIELDS = ("CreationTime", "LastAccessTime", "LastWriteTime", "Filename", "ioc", "indicator_type",
+              "line_number", "resolvable", "watchlist_match")
+
+
+def analysis_row(hostname: str, filename: str, analysis_type: str, analysis_value: str) -> Dict[str, str]:
+    """One row of a host's analysis table, found now."""
+    return dict(zip(ANALYSIS_FIELDS, (datetime.now().isoformat(), hostname, filename, analysis_type, analysis_value)))
+
+
+def _finding_techniques(row: Dict[str, str]) -> List[str]:
+    technique = FINDING_TECHNIQUES.get(row.get("analysis_type", ""))
+    return [technique] if technique and "likely benign" not in str(row.get("analysis_value", "")) else []
+
+
+def write_analysis(analysis_dir: str, host: str, rows: Iterable[Dict[str, str]]) -> int:
+    """Append rows to ``<host>/analysis/analysis.jsonl``; the number written."""
+    return write_records(os.path.join(analysis_dir, f"analysis{SUFFIX}"), rows, host=host, artefact="analysis",
+                         time_field="LastWriteTime", techniques=_finding_techniques)
 
 # What each extension's file starts with. Windows' delta-compressed copies (WinSxS, updates) keep
 # the extension of what they expand to; an image saved under another image's extension (a web
@@ -108,53 +130,6 @@ def signature_mismatch(name, header):
         return b"%PDF-" not in header[:HEADER_BYTES]
     expected = SIGNATURES.get(extension)
     return bool(expected) and not header.startswith(expected)
-
-
-def iter_json_records(f, chunk=1 << 20):
-    """Records from a JSON array or JSON Lines file, without loading it whole
-    (an Artemis MFT export is several GB)."""
-    first = f.read(chunk)
-    if not first.lstrip().startswith("["):
-        rest = first
-        while True:
-            lines = rest.split("\n")
-            rest = lines.pop()
-            for line in lines:
-                if line.strip():
-                    try:
-                        yield json.loads(line)
-                    except ValueError:
-                        pass
-            more = f.read(chunk)
-            if not more:
-                if rest.strip():
-                    try:
-                        yield json.loads(rest)
-                    except ValueError:
-                        pass
-                return
-            rest += more
-    decoder = json.JSONDecoder()
-    buf, eof = first.lstrip()[1:], False
-    while True:
-        buf = buf.lstrip().lstrip(",").lstrip()
-        if buf.startswith("]") or (not buf and eof):
-            return
-        try:
-            record, end = decoder.raw_decode(buf)
-        except ValueError:
-            if eof:
-                return
-            more = f.read(chunk)
-            eof = not more
-            buf += more
-            continue
-        yield record
-        buf = buf[end:]
-        if len(buf) < chunk and not eof:
-            more = f.read(chunk)
-            eof = not more
-            buf += more
 
 
 def mft_findings(record):
@@ -227,21 +202,20 @@ def analyse_artefacts(
             "Timestomp": "evidence of timestomping",
         }
 
-        def write_findings(filename, findings):
+        def write_findings(filename, findings, show=True):
+            """Each finding to the analysis table and the audit log; on screen too unless show is
+            False (a likely-benign timestomp, which the summary counts instead)."""
             short = filename.replace("\\", "/").split("/")[-1]
-            with open(anysd + "/analysis.csv", "a") as analysisfile:
-                for kind, value in findings:
-                    counts[kind] += 1
-                    analysisfile.write("{},{},{},{},{}\n".format(
-                        datetime.now().isoformat(), vssimage.replace("'", ""),
-                        filename.replace(",", "%2C"), kind, value.replace(",", "%2C"),
-                    ))
-                    entry, prnt = "{},{},{},{} found in '{}'\n".format(
-                        datetime.now().isoformat(), vssimage, stage, audit_text[kind], short
-                    ), " -> {} -> {} found in '{}' for {}".format(
-                        datetime.now().isoformat().replace("T", " "), audit_text[kind], short, vssimage
-                    )
-                    write_audit_log_entry(verbosity, output_directory, entry, prnt)
+            write_analysis(anysd, img_name, (analysis_row(vssimage.replace("'", ""), filename, kind, value)
+                                             for kind, value in findings))
+            for kind, value in findings:
+                counts[kind] += 1
+                entry, prnt = "{},{},{},{} found in '{}'\n".format(
+                    datetime.now().isoformat(), vssimage, stage, audit_text[kind], short
+                ), " -> {} -> {} found in '{}' for {}".format(
+                    datetime.now().isoformat().replace("T", " "), audit_text[kind], short, vssimage
+                )
+                write_audit_log_entry(verbosity, output_directory, entry, prnt if show else "")
 
         # Timestomp findings wait for the whole MFT, to know which files came in a batch
         timestomps = []
@@ -259,12 +233,15 @@ def analyse_artefacts(
                         write_findings(filename, others)
             batches = bulk_timestomps([(path, created) for path, _, created in timestomps])
             for index, (filename, value, _) in enumerate(timestomps):
+                likely_benign = True
                 if value.endswith(SETUP_COPIED_NOTE):
                     benign[SETUP_COPIED_NOTE] += 1
                 elif index in batches:
                     value += "|" + BULK_TIMESTOMP_NOTE.format(batches[index])
                     benign[BULK_TIMESTOMP_NOTE] += 1
-                write_findings(filename, [("Timestomp", value)])
+                else:
+                    likely_benign = False
+                write_findings(filename, [("Timestomp", value)], show=not likely_benign)
         except (OSError, ValueError) as e:
             print(" -> {} -> warning: could not analyse MFT JSON: {}".format(
                 datetime.now().isoformat().replace("T", " "), str(e)[:100]
@@ -297,26 +274,24 @@ def analyse_artefacts(
                 datetime.now().isoformat().replace("T", " "), str(e)[:100]
             ))
             return
-        with open(anysd + "/analysis.csv", "a") as analysisfile:
-            for path, stream, size in streams:
-                total += 1
-                note = known_stream_note(stream)
-                value = "{} ({} bytes)".format(stream, size)
-                if note:
-                    benign += 1
-                    value += "|" + note
-                analysisfile.write("{},{},{},AlternateDataStream,{}\n".format(
-                    datetime.now().isoformat(), vssimage.replace("'", ""),
-                    path.replace(",", "%2C"), value.replace(",", "%2C"),
-                ))
-                if not note:
-                    short = path.split("\\")[-1]
-                    entry, prnt = "{},{},{},alternate data stream '{}' found in '{}'\n".format(
-                        datetime.now().isoformat(), vssimage, stage, stream, short
-                    ), " -> {} -> alternate data stream '{}' found in '{}' for {}".format(
-                        datetime.now().isoformat().replace("T", " "), stream, short, vssimage
-                    )
-                    write_audit_log_entry(verbosity, output_directory, entry, prnt)
+        rows = []
+        for path, stream, size in streams:
+            total += 1
+            note = known_stream_note(stream)
+            value = "{} ({} bytes)".format(stream, size)
+            if note:
+                benign += 1
+                value += "|" + note
+            rows.append(analysis_row(vssimage.replace("'", ""), path, "AlternateDataStream", value))
+            if not note:
+                short = path.split("\\")[-1]
+                entry, prnt = "{},{},{},alternate data stream '{}' found in '{}'\n".format(
+                    datetime.now().isoformat(), vssimage, stage, stream, short
+                ), " -> {} -> alternate data stream '{}' found in '{}' for {}".format(
+                    datetime.now().isoformat().replace("T", " "), stream, short, vssimage
+                )
+                write_audit_log_entry(verbosity, output_directory, entry, prnt)
+        write_analysis(anysd, img_name, rows)
         if total > benign:
             _record_techniques(os.path.join(output_directory, "mitre_techniques.txt"), ["T1564.004"])
         now = datetime.now().isoformat().replace("T", " ")
@@ -350,7 +325,7 @@ def analyse_artefacts(
                 output_directory + img_name + "/artefacts/cooked/",
                 "'" + img_name + "'",
             )
-        print("    Analsying artefacts for {}...".format(vssimage))
+        print("    Analysing artefacts for {}...".format(vssimage))
         entry, prnt = "{},{},{},commenced\n".format(
             datetime.now().isoformat(), vssimage.replace("'", ""), stage
         ), " -> {} -> {} artefacts for {}".format(
@@ -359,9 +334,6 @@ def analyse_artefacts(
         write_audit_log_entry(verbosity, output_directory, entry, prnt)
         if not os.path.exists(anysd):
             os.mkdir(anysd)
-        if not os.path.exists(anysd + "/analysis.csv"):
-            with open(anysd + "/analysis.csv", "w") as analysisfile:
-                analysisfile.write(ANALYSIS_HEADER)
         if magicbytes:
             print(
                 "     Analysing files for file-signature (magic-byte) discrepencies for {}...".format(
@@ -392,15 +364,9 @@ def analyse_artefacts(
                     path = "/" + os.path.relpath(full, mnt)
                     if not signature_mismatch(f, file_hdr) or SIGNATURE_EXEMPT.match(path):
                         continue
-                    with open(anysd + "/analysis.csv", "a") as analysisfile:
-                        analysisfile.write(
-                            "{},{},{},File-signature (magic-byte) Discrepency,{}\n".format(
-                                datetime.now().isoformat(),
-                                vssimage.replace("'", ""),
-                                path.replace(",", "%2C"),
-                                file_hdr[:8].hex(" "),
-                            )
-                        )
+                    write_analysis(anysd, img_name, [analysis_row(
+                        vssimage.replace("'", ""), path, "File-signature (magic-byte) Discrepency", file_hdr[:8].hex(" "),
+                    )])
                     entry, prnt = "{},{},{},file-signature (magic-byte) discrepency of '{}' for '{}'\n".format(
                         datetime.now().isoformat(), vssimage, stage, file_hdr[:8].hex(" "), f,
                     ), " -> {} -> identified file-signature (magic-byte) discrepency of '{}' from '{}' for {}".format(
@@ -508,16 +474,6 @@ def analyse_artefacts(
         iocfiles = list(set(iocfilelist))
         if not os.path.exists(anysd):
             os.mkdir(anysd)
-        if not os.path.exists(
-            output_directory + img_name + "/analysis/iocs.csv"
-        ):
-            with open(
-                output_directory + img_name + "/analysis/iocs.csv",
-                "w",
-            ) as ioccsv:
-                ioccsv.write(
-                    "CreationTime,LastAccessTime,LastWriteTime,Filename,ioc,indicator_type,line_number,resolvable,watchlist_match\n"
-                )
         # Get watchlist file path if provided (iocsfile is a list from argparse)
         watchlist_file = iocsfile[0] if iocsfile else None
         compare_iocs(

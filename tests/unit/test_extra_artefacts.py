@@ -11,6 +11,7 @@ from pathlib import Path
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
+from rowanholt.core.records import check_file, own_fields, read_records  # noqa: E402
 from rowanholt.analysis import keywords as kw  # noqa: E402
 from rowanholt.post import yara as yara_post  # noqa: E402
 from rowanholt.process import extra_artefacts as ex  # noqa: E402
@@ -31,8 +32,11 @@ def run(out, artefact):
 
 
 def rows(out, name):
-    with open(Path(out) / "HOST" / "artefacts" / "cooked" / name, newline="") as fh:
-        return list(csv.DictReader(fh))
+    """A cooked table's rows as Elrond wrote them (JSON Lines), without the envelope; every record
+    checked for it first."""
+    path = Path(out) / "HOST" / "artefacts" / "cooked" / f"{name}.jsonl"
+    assert check_file(path) == []
+    return [own_fields(r) for _, r in read_records(path)]
 
 
 def techniques(out):
@@ -300,11 +304,11 @@ def test_router_writes_cooked_csvs_and_techniques(tmp_path):
              raw / "tmp" / ".x" / "update.sh", raw / "tcc" / "system+TCC.db"]
     assert all(ex.is_extra_artefact(str(f)) for f in files)
     assert all(run(out, f) for f in files)
-    assert rows(out, "cron.csv")[0]["Source"] == "/etc/cron.d/lab-update"
-    assert rows(out, "ssh_keys.csv")[0]["User"] == "gandalf"
-    [staged] = rows(out, "staged_files.csv")
+    assert rows(out, "cron")[0]["Source"] == "/etc/cron.d/lab-update"
+    assert rows(out, "ssh_keys")[0]["User"] == "gandalf"
+    [staged] = rows(out, "staged_files")
     assert (staged["Source"], staged["Hidden"]) == ("/tmp/.x/update.sh", "yes")
-    assert rows(out, "tcc.csv")[0]["Techniques"] == "T1113"
+    assert rows(out, "tcc")[0]["Techniques"] == "T1113"
     assert set(techniques(out)) == {"T1053.003", "T1098.004", "T1564.001", "T1105", "T1113"}
 
 
@@ -312,7 +316,7 @@ def test_router_leaves_paging_files_for_volatility_and_skips_appledouble(tmp_pat
     out, raw = host(tmp_path)
     (raw / "pagefile.sys").write_bytes(b"\0" * 64 + b"cmd.exe /c whoami /all" + b"\0" * 64)
     assert run(out, raw / "pagefile.sys") is False  # strings taken, and still offered to Volatility
-    assert rows(out, "paged_strings.csv")[0]["Kind"] == "command"
+    assert rows(out, "paged_strings")[0]["Kind"] == "command"
     (raw / "shared").mkdir()
     (raw / "shared" / "._update.sh").write_bytes(b"\0\5\26\7")
     assert not ex.is_extra_artefact(str(raw / "shared" / "._update.sh"))
@@ -338,5 +342,9 @@ def test_keywords_search_the_host_output_after_processing(tmp_path):
     keywords = tmp_path / "keywords.txt"
     keywords.write_text("# comment\n\napi_key\n")
     kw.prepare_keywords("", out, True, {"/mnt/HOST": "HOST::Linux"}, [], [str(keywords)], "keyword searching")
-    matches = (tmp_path / "HOST" / "analysis" / "keyword_matches.csv").read_text()
-    assert "api_key" in matches and "notes.txt" in matches
+    table = tmp_path / "HOST" / "analysis" / "keyword_matches.jsonl"
+    assert check_file(table) == []
+    row = next(record for _, record in read_records(table))
+    assert (row["host"], row["artefact"], row["keyword"], row["line_number"]) == ("HOST", "keyword_matches", "api_key", 2)
+    assert row["Filename"].endswith("notes.txt") and row["line_entry"] == "the api_key is in here"
+    assert row["timestamp"] and not (tmp_path / "HOST" / "analysis" / "keyword_matches.csv").exists()

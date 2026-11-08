@@ -186,8 +186,7 @@ def run_siem_export(job, output_dir: Path, logger):
                 artifact_count = 0
                 artifacts_dir = output_dir / source_name / "artefacts" / "cooked"
                 if artifacts_dir.exists():
-                    artifact_count = sum(1 for _ in artifacts_dir.rglob("*.csv"))
-                    artifact_count += sum(1 for _ in artifacts_dir.rglob("*.json"))
+                    artifact_count = sum(1 for p in artifacts_dir.rglob("*") if p.suffix in (".jsonl", ".json", ".csv"))
 
                 if artifact_count > 0:
                     job.log.append(f"[{datetime.now().isoformat()}] -> configuring Splunk to monitor {artifact_count:,} artefacts for '{source_name}'")
@@ -260,8 +259,7 @@ def run_siem_export(job, output_dir: Path, logger):
                 artifact_count = 0
                 artifacts_dir = output_dir / source_name / "artefacts" / "cooked"
                 if artifacts_dir.exists():
-                    artifact_count = sum(1 for _ in artifacts_dir.rglob("*.csv"))
-                    artifact_count += sum(1 for _ in artifacts_dir.rglob("*.json"))
+                    artifact_count = sum(1 for p in artifacts_dir.rglob("*") if p.suffix in (".jsonl", ".json", ".csv"))
 
                 if artifact_count > 0:
                     job.log.append(f"[{datetime.now().isoformat()}] -> ingesting artefacts into Elasticsearch for '{source_name}'")

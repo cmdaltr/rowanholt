@@ -6,6 +6,7 @@ from pathlib import Path
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
+from rowanholt.core.records import check_file, own_fields, read_records  # noqa: E402
 from rowanholt.process import windows_artefacts as wa  # noqa: E402
 from rowanholt.process.select import WINDOWS_RAW_FOLDERS  # noqa: E402
 
@@ -21,8 +22,11 @@ def run(out, artefact):
 
 
 def rows(out, name):
-    with open(Path(out) / "HOST" / "artefacts" / "cooked" / name, newline="") as fh:
-        return list(csv.DictReader(fh))
+    """A cooked table's rows as Elrond wrote them (JSON Lines), without the envelope; every record
+    checked for it first."""
+    path = Path(out) / "HOST" / "artefacts" / "cooked" / f"{name}.jsonl"
+    assert check_file(path) == []
+    return [own_fields(r) for _, r in read_records(path)]
 
 
 def test_folders_are_selected_and_routed():
@@ -42,7 +46,7 @@ def test_pca_both_files(tmp_path):
         "2|2026-10-02 08:00:00.000|2|%programfiles%\\tool\\t.exe|Tool|Acme|1.0|0006abc|Abnormal process exit\r\n".encode("utf-16-le"))
     run(out, raw / "pca" / "PcaAppLaunchDic.txt")
     run(out, raw / "pca" / "PcaGeneralDb0.txt")
-    found = rows(out, "pca.csv")
+    found = rows(out, "pca")
     assert found[0]["Path"].endswith("x.exe") and found[0]["LastWriteTime"] == "2026-10-01T10:11:12.123"
     assert found[1]["CompanyName"] == "Acme" and found[1]["ExitMessage"] == "Abnormal process exit"
 
@@ -56,7 +60,7 @@ def test_wer_report(tmp_path):
     path = raw / "wer" / "System+ReportArchive+AppCrash_evil+Report.wer"
     path.write_bytes(b"\xff\xfe" + report.encode("utf-16-le"))
     run(out, path)
-    (row,) = rows(out, "wer.csv")
+    (row,) = rows(out, "wer")
     assert row["EventType"] == "APPCRASH" and row["FaultModule"] == "ntdll.dll"
     assert row["LastWriteTime"].startswith("2024-10-")
 
@@ -65,7 +69,7 @@ def test_hosts_flags_extra_entries(tmp_path):
     out, raw = host(tmp_path)
     (raw / "hosts").write_text("# comment\n127.0.0.1 localhost\n10.9.9.9 login.microsoftonline.com  # hijack\n")
     run(out, raw / "hosts")
-    found = rows(out, "hosts.csv")
+    found = rows(out, "hosts")
     assert [r["NonDefault"] for r in found] == ["", "yes"]
 
 
@@ -76,7 +80,7 @@ def test_startup_items_tag_t1547_001(tmp_path):
     (raw / "startup" / "bob+desktop.ini").write_text("[.ShellClassInfo]")
     run(out, raw / "startup" / "bob+updater.bat")
     run(out, raw / "startup" / "bob+desktop.ini")
-    (row,) = rows(out, "startup_items.csv")
+    (row,) = rows(out, "startup_items")
     assert row["User"] == "bob" and row["Item"] == "updater.bat" and row["Technique"] == "T1547.001"
     assert "T1547.001" in (Path(out) / "mitre_techniques.txt").read_text()
 
@@ -94,9 +98,9 @@ def test_defender_mplog_and_detection(tmp_path):
                        + "file:_C:\\Temp\\evil.exe".encode("utf-16-le") + b"\x00\x00")
     run(out, mplog)
     run(out, record)
-    (line,) = rows(out, "defender_mplog.csv")
+    (line,) = rows(out, "defender_mplog")
     assert line["Category"] == "detection" and line["LastWriteTime"] == "2026-10-01T10:11:00.000Z"
-    (det,) = rows(out, "defender_detections.csv")
+    (det,) = rows(out, "defender_detections")
     assert det["ThreatName"] == "Trojan:Win32/Fake!MTB" and "evil.exe" in det["Resources"]
 
 
@@ -106,7 +110,7 @@ def test_notepad_tab_text(tmp_path):
     tab = raw / "notepad" / "bob+{1234}.bin"
     tab.write_bytes(b"NP\x00\x01\x05" + "net user backdoor P@ss /add".encode("utf-16-le") + b"\x00\x00\x9a")
     run(out, tab)
-    (row,) = rows(out, "notepad_tabs.csv")
+    (row,) = rows(out, "notepad_tabs")
     assert row["User"] == "bob" and "net user backdoor" in row["Text"]
 
 

@@ -35,6 +35,8 @@ MAX_TERMS = 5
 MAX_FILE_BYTES = 32 << 20  # tables searched for the question's words; bigger ones are left to the case browser
 MAX_MATCHES = 25
 MAX_MATCHES_PER_FILE = 3
+SAID = {"host", "artefact", "source_path"}  # envelope fields the line already gives
+EMPTY = {"[]", "null", "{}"}
 # A cited tag, [R3], or several in one bracket, as models write them: [R2, R3], [R2–R5], [R2-R5, R8]
 TAG_ITEM = r"R\d+(?:\s*[-–—]\s*R?\d+)?"
 TAG = re.compile(rf"\[\s*({TAG_ITEM}(?:\s*[,;]\s*{TAG_ITEM})*)\s*\]")
@@ -83,7 +85,8 @@ def _searched(root: Path, words: List[str], context: Context) -> List[str]:
     lines: List[str] = []
     for host in case_files.hosts(root):
         for folder in (host / "artefacts" / "cooked", host / "analysis"):
-            for path in sorted(folder.rglob("*.csv")) if folder.is_dir() else []:
+            for path in sorted(p for p in folder.rglob("*") if p.suffix.lower() in case_files.ROW_FILES and p.is_file()) \
+                    if folder.is_dir() else []:
                 if len(lines) >= MAX_MATCHES:
                     return lines
                 try:
@@ -94,7 +97,8 @@ def _searched(root: Path, words: List[str], context: Context) -> List[str]:
                         cells = " ".join(v or "" for v in row.values()).lower()
                         if not any(w in cells for w in words):
                             continue
-                        compact = json.dumps({k: v for k, v in row.items() if v}, ensure_ascii=False)[:MAX_ROW_CHARS]
+                        compact = json.dumps({k: v for k, v in row.items() if v and v not in EMPTY and k not in SAID},
+                                             ensure_ascii=False)[:MAX_ROW_CHARS]
                         file = str(path.relative_to(host))
                         tag = context.tag({"host": host.name, "file": file, "row_ref": ref,
                                            "hash": case_files.row_hash(row), "line": f"{path.stem}: {compact}"})

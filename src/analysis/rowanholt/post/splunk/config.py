@@ -11,8 +11,10 @@ from tarfile import TarFile
 from rowanholt.audit import write_audit_log_entry
 from rowanholt.utils import safe_input
 from rowanholt.post.splunk.app.app import build_app_elrond
-from rowanholt.post.splunk.ingest import ingest_splunk_data
-from rowanholt.post.siem import memory_outputs, siem_hosts
+from rowanholt.post.splunk.ingest import (INPUTS_HEADER, LOGTYPE_EVAL, LOGTYPE_TRANSFORM, TIME_TRANSFORM,
+                                          drop_case_inputs, host_monitors, indexed_tables, ingest_splunk_data)
+from rowanholt.post.splunk.ingest import PROPS as SPLUNK_PROPS
+from rowanholt.post.siem import siem_hosts
 
 # Try to import Splunk apps - they may not be installed
 try:
@@ -207,7 +209,9 @@ def install_splunk_stack(
     return requser, request_password
 
 
-def configure_splunk_stack(verbosity, output_directory, case, stage, allimgs):
+def configure_splunk_stack(verbosity, output_directory, case, stage, allimgs, salt=""):
+    """Index the case into Splunk. ``salt`` (--Index, replacing the case's index) has Splunk read
+    the case's files again and drops the inputs an earlier run wrote for it; remote mode only."""
     # Check if we're using remote Splunk (containerized environment)
     splunk_host = os.environ.get('SPLUNK_HOST', '')
     splunk_port = os.environ.get('SPLUNK_PORT', '8089')
@@ -334,8 +338,9 @@ def configure_splunk_stack(verbosity, output_directory, case, stage, allimgs):
             transforms_conf_path = app_default_path + "transforms.conf"
             with open(transforms_conf_path, "w") as transformsconf:
                 # Basic transforms for field extractions
+                transformsconf.write(LOGTYPE_TRANSFORM + TIME_TRANSFORM)
                 transformsconf.write(
-                    "[logtype_make]\nREGEX = (?<logtype>(?:registry|evt|shimcache|jumplists|usb|log|plist|service|journal|browser|analysis|timeline|memory|audit))\nSOURCE_KEY = source\n\n[IPAddress_get]\nREGEX = (?P<ip>(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))\nSOURCE_KEY = _raw\nMV_ADD = true\n\n"
+                    "[IPAddress_get]\nREGEX = (?P<ip>(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))\nSOURCE_KEY = _raw\nMV_ADD = true\n\n"
                 )
                 transformsconf.write(
                     "[Filenames_get]\nREGEX = (?<Filepath>.*)\\/(?<Filename>[^\\/]+)\\.(?<Fileext>[^\\:]+)$\nSOURCE_KEY = Filename\n\n"
@@ -361,7 +366,7 @@ def configure_splunk_stack(verbosity, output_directory, case, stage, allimgs):
 
             # Create props.conf with sourcetype definitions
             props_conf_path = app_default_path + "props.conf"
-            propsreports = "TRANSFORMS = mitre_assign\nREPORT-logtype_make = logtype_make\nREPORT-IPAddress_get = IPAddress_get\nREPORT-MFTFiles1_get = MFTFiles1_get\nREPORT-MFTFiles2_get = MFTFiles2_get\nREPORT-MFTFiles3_get = MFTFiles3_get\nREPORT-MFTFiles4_get = MFTFiles4_get\nREPORT-Commands_get = Commands_get\nREPORT-Processes_get = Processes_get\nREPORT-usb_win_hw = usb_win_hw\nREPORT-usb_win_dvc = usb_win_dvc\nREPORT-usb_mac_ven = usb_mac_ven\nREPORT-usb_mac_prod = usb_mac_prod\nREPORT-usb_lin_ven = usb_lin_ven\nREPORT-usb_lin_prod = usb_lin_prod\nREPORT-usb_lin_rev = usb_lin_rev\nREPORT-usb_lin_sn = usb_lin_sn"
+            propsreports = "TRANSFORMS = mitre_assign\nREPORT-logtype_make = logtype_make\nREPORT-IPAddress_get = IPAddress_get\nREPORT-MFTFiles1_get = MFTFiles1_get\nREPORT-MFTFiles2_get = MFTFiles2_get\nREPORT-MFTFiles3_get = MFTFiles3_get\nREPORT-MFTFiles4_get = MFTFiles4_get\nREPORT-Commands_get = Commands_get\nREPORT-Processes_get = Processes_get\nREPORT-usb_win_hw = usb_win_hw\nREPORT-usb_win_dvc = usb_win_dvc\nREPORT-usb_mac_ven = usb_mac_ven\nREPORT-usb_mac_prod = usb_mac_prod\nREPORT-usb_lin_ven = usb_lin_ven\nREPORT-usb_lin_prod = usb_lin_prod\nREPORT-usb_lin_rev = usb_lin_rev\nREPORT-usb_lin_sn = usb_lin_sn" + "\n" + LOGTYPE_EVAL
 
             with open(props_conf_path, "w") as propsconf:
                 propsconf.write(
@@ -384,6 +389,7 @@ def configure_splunk_stack(verbosity, output_directory, case, stage, allimgs):
                         propsreports
                     )
                 )
+                propsconf.write(SPLUNK_PROPS.format(reports=propsreports))
 
             print("     MITRE ATT&CK transforms configured successfully")
         except Exception as e:
@@ -399,9 +405,9 @@ def configure_splunk_stack(verbosity, output_directory, case, stage, allimgs):
             # output where the worker does, so it monitors the worker's own path (E10:
             # it was always /tmp/elrond/output/<case>/, so custom destinations indexed 0)
             inputs_entries = []
+            monitored = set()
             for img_name, img in siem_hosts(allimgs):
                 base_path = os.path.join(os.path.normpath(output_directory), img_name)
-                cooked_path = "{}/artefacts/cooked".format(base_path)
                 if not splunk_can_see(base_path):
                     entry, prnt = "{},{},not indexed: '{}' is outside the Splunk container's mounts ({})\n".format(
                         datetime.now().isoformat(), "splunk", base_path, ", ".join(monitor_roots()),
@@ -421,151 +427,40 @@ def configure_splunk_stack(verbosity, output_directory, case, stage, allimgs):
                 )
                 write_audit_log_entry(verbosity, output_directory, entry, prnt)
 
-                # Find and log actual artefact files being indexed
-                import glob
-                host_cooked_path = output_directory + img_name + "/artefacts/cooked"
+                # A host's shadow copies are in its own cooked/ (cooked/vssN/): monitored once
+                if img_name in monitored:
+                    continue
+                monitored.add(img_name)
 
-                # Log CSV files
-                csv_files = glob.glob(host_cooked_path + "/*.csv")
-                for csv_file in csv_files:
-                    artefact_name = os.path.basename(csv_file)
+                # Every table under cooked/ and analysis/, through one recursive monitor each
+                # (naming files one by one left most cooked tables unindexed), and Volatility's
+                # output beside artefacts/
+                for table in indexed_tables(base_path):
                     entry, prnt = "{},{},indexing '{}' for '{}'\n".format(
-                        datetime.now().isoformat(), "splunk", artefact_name, img_name
+                        datetime.now().isoformat(), "splunk", table, img_name
                     ), " -> {} -> indexing '{}' for '{}'".format(
-                        datetime.now().isoformat().replace("T", " "), artefact_name, img_name
+                        datetime.now().isoformat().replace("T", " "), table, img_name
                     )
                     write_audit_log_entry(verbosity, output_directory, entry, prnt)
-
-                # Log JSON files
-                json_files = glob.glob(host_cooked_path + "/*.json")
-                for json_file in json_files:
-                    artefact_name = os.path.basename(json_file)
-                    entry, prnt = "{},{},indexing '{}' for '{}'\n".format(
-                        datetime.now().isoformat(), "splunk", artefact_name, img_name
-                    ), " -> {} -> indexing '{}' for '{}'".format(
-                        datetime.now().isoformat().replace("T", " "), artefact_name, img_name
-                    )
-                    write_audit_log_entry(verbosity, output_directory, entry, prnt)
-
-                # Log JSONL files (Artemis output format)
-                jsonl_files = glob.glob(host_cooked_path + "/*.jsonl")
-                for jsonl_file in jsonl_files:
-                    artefact_name = os.path.basename(jsonl_file)
-                    entry, prnt = "{},{},indexing '{}' for '{}'\n".format(
-                        datetime.now().isoformat(), "splunk", artefact_name, img_name
-                    ), " -> {} -> indexing '{}' for '{}'".format(
-                        datetime.now().isoformat().replace("T", " "), artefact_name, img_name
-                    )
-                    write_audit_log_entry(verbosity, output_directory, entry, prnt)
-
-                # Log registry files
-                registry_files = glob.glob(host_cooked_path + "/registry/*.json")
-                for reg_file in registry_files:
-                    artefact_name = os.path.basename(reg_file)
-                    entry, prnt = "{},{},indexing '{}' for '{}'\n".format(
-                        datetime.now().isoformat(), "splunk", artefact_name, img_name
-                    ), " -> {} -> indexing '{}' for '{}'".format(
-                        datetime.now().isoformat().replace("T", " "), artefact_name, img_name
-                    )
-                    write_audit_log_entry(verbosity, output_directory, entry, prnt)
-
-                # Log event log files (both json and jsonl)
-                evt_files = glob.glob(host_cooked_path + "/evt/*.json") + glob.glob(host_cooked_path + "/evt/*.jsonl")
-                for evt_file in evt_files:
-                    artefact_name = os.path.basename(evt_file)
-                    entry, prnt = "{},{},indexing '{}' for '{}'\n".format(
-                        datetime.now().isoformat(), "splunk", artefact_name, img_name
-                    ), " -> {} -> indexing '{}' for '{}'".format(
-                        datetime.now().isoformat().replace("T", " "), artefact_name, img_name
-                    )
-                    write_audit_log_entry(verbosity, output_directory, entry, prnt)
-
-                # Add CSV files
-                inputs_entries.append(
-                    "[monitor://{}/*.csv]\n"
-                    "disabled = false\n"
-                    "crcSalt = <SOURCE>\n"
-                    "host = {}\n"
-                    "sourcetype = elrondCSV\n"
-                    "index = {}\n\n".format(cooked_path, img_name, case)
-                )
-
-                # Add JSON files
-                inputs_entries.append(
-                    "[monitor://{}/*.json]\n"
-                    "disabled = false\n"
-                    "crcSalt = <SOURCE>\n"
-                    "host = {}\n"
-                    "sourcetype = json\n"
-                    "index = {}\n\n".format(cooked_path, img_name, case)
-                )
-
-                # Add JSONL files (Artemis output format)
-                inputs_entries.append(
-                    "[monitor://{}/*.jsonl]\n"
-                    "disabled = false\n"
-                    "crcSalt = <SOURCE>\n"
-                    "host = {}\n"
-                    "sourcetype = json\n"
-                    "index = {}\n\n".format(cooked_path, img_name, case)
-                )
-
-                # Add registry subdirectory
-                inputs_entries.append(
-                    "[monitor://{}/registry/*.json]\n"
-                    "disabled = false\n"
-                    "crcSalt = <SOURCE>\n"
-                    "host = {}\n"
-                    "sourcetype = json\n"
-                    "index = {}\n\n".format(cooked_path, img_name, case)
-                )
-
-                # Add evt subdirectory (both json and jsonl)
-                inputs_entries.append(
-                    "[monitor://{}/evt/*.json]\n"
-                    "disabled = false\n"
-                    "crcSalt = <SOURCE>\n"
-                    "host = {}\n"
-                    "sourcetype = json\n"
-                    "index = {}\n\n".format(cooked_path, img_name, case)
-                )
-                inputs_entries.append(
-                    "[monitor://{}/evt/*.jsonl]\n"
-                    "disabled = false\n"
-                    "crcSalt = <SOURCE>\n"
-                    "host = {}\n"
-                    "sourcetype = json\n"
-                    "index = {}\n\n".format(cooked_path, img_name, case)
-                )
-
-                # Volatility's output sits beside artefacts/, not in cooked/
-                for memory_file in memory_outputs(base_path):
-                    entry, prnt = "{},{},indexing '{}' for '{}'\n".format(
-                        datetime.now().isoformat(), "splunk", os.path.basename(memory_file), img_name
-                    ), " -> {} -> indexing '{}' for '{}'".format(
-                        datetime.now().isoformat().replace("T", " "), os.path.basename(memory_file), img_name
-                    )
-                    write_audit_log_entry(verbosity, output_directory, entry, prnt)
-                inputs_entries.append(
-                    "[monitor://{}/memory_*.json]\n"
-                    "disabled = false\n"
-                    "crcSalt = <SOURCE>\n"
-                    "host = {}\n"
-                    "sourcetype = json\n"
-                    "index = {}\n\n".format(base_path, img_name, case)
-                )
-
+                inputs_entries.extend(host_monitors(base_path, img_name, case, salt))
                 # Add audit log file
                 inputs_entries.append(
                     "[monitor://{}/rowanholt_audit.log]\n"
                     "disabled = false\n"
+                    "{}"
                     "host = {}\n"
                     "sourcetype = elrondCSV\n"
-                    "index = {}\n\n".format(base_path, img_name, case)
+                    "index = {}\n\n".format(base_path, "crcSalt = <SOURCE>{}\n".format(salt) if salt else "",
+                                             img_name, case)
                 )
 
+            if salt and os.path.isfile(inputs_conf_path):
+                with open(inputs_conf_path) as inputs_conf:
+                    kept = drop_case_inputs(inputs_conf.read(), case)
+                with open(inputs_conf_path, "w") as inputs_conf:
+                    inputs_conf.write(kept)
             with open(inputs_conf_path, "a") as inputs_conf:
-                inputs_conf.write("\n# Auto-generated inputs for case: {}\n".format(case))
+                inputs_conf.write(INPUTS_HEADER.format(case))
                 for entry in inputs_entries:
                     inputs_conf.write(entry)
 

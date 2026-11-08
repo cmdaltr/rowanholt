@@ -421,9 +421,9 @@ python3 -m src.analysis.rowanholt.ai.web_interface
 Docker hosts and Kubernetes nodes, from a disk image or a Gandalf collection.
 
 **Features:**
-- Every Docker, containerd and Podman container's configuration, mounts, capabilities and log (`docker_containers.csv`, `container_logs.csv`)
-- The writable layer listed and hashed (`container_changes.csv`), with its executables and scripts copied and hashed: dropped executables, cron, SSH keys and `ld.so.preload` in a container
-- Static pod manifests, pod logs, and the API server's audit log (`static_pods.csv`, `k8s_audit.csv`)
+- Every Docker, containerd and Podman container's configuration, mounts, capabilities and log (`docker_containers.jsonl`, `container_logs.jsonl`)
+- The writable layer listed and hashed (`container_changes.jsonl`), with its executables and scripts copied and hashed: dropped executables, cron, SSH keys and `ld.so.preload` in a container
+- Static pod manifests, pod logs, and the API server's audit log (`static_pods.jsonl`, `k8s_audit.jsonl`)
 - Exported EKS, AKS or GKE audit logs: `python3 -m src.analysis.rowanholt.cloud.cli k8s analyze-logs --log-file audit.json --output ./analysis`
 
 **Detected Techniques:** **T1611** (escape to host), **T1610** (deploy container), **T1609** (container administration command), **T1552.007** (container API), **T1613** (container and resource discovery), **T1543.005** (container service) and more.
@@ -437,8 +437,8 @@ Docker hosts and Kubernetes nodes, from a disk image or a Gandalf collection.
 Match a case against the Iran APT workbook, STIX 2.1 bundles, TAXII 2.1 collections, MITRESaw procedures or a watchlist, in **Pippin** (the web app's threat intelligence page) or from a shell.
 
 **Features:**
-- Every cooked artefact and IOC matched, with the groups, techniques and reference behind each element (`threat_intel_matches.csv`)
-- Groups ranked by what matched (`threat_groups.csv`), each with the basis for its rank: atomic indicators, specific procedures, common tooling or technique overlap only
+- Every cooked artefact and IOC matched, with the groups, techniques and reference behind each element (`threat_intel_matches.jsonl`)
+- Groups ranked by what matched (`threat_groups.jsonl`), each with the basis for its rank: atomic indicators, specific procedures, common tooling or technique overlap only
 - Elements dozens of groups share are marked common, and built-ins and ordinary words never match, so a shared PowerShell switch never reads like attribution
 - Single values checked in Pippin, and an offline Eru question
 

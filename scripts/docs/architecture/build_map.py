@@ -222,7 +222,7 @@ steps = [
      "laid out); Mordor datasets; cloud logs"),
     ("02", "Collect", "Per OS: hives, event logs, $MFT and journals; launchd, BTM, unified logs; cron, systemd, "
      "PAM, logins, containers. Shadow copies too."),
-    ("03", "Process", "Parsers and tools turn raw artefacts into cooked CSV and JSON with a LastWriteTime column"),
+    ("03", "Process", "Parsers and tools turn raw artefacts into cooked JSON Lines, each record with its host, source, UTC time and techniques"),
     ("04", "Analyse", "Keywords, YARA, IOCs, threat intelligence, stacking across hosts, timestomping, ADS, masquerading"),
     ("05", "ATT&amp;CK", "Techniques tagged from artefacts and event-log rules; Navigator layer"),
     ("06", "Timeline", "Plaso super-timeline across every source"),
@@ -267,7 +267,7 @@ for i, (t, body, icons, col) in enumerate(inputs):
 parts.append(f'<div class="column-title" style="left:2160px;top:172px;width:360px">What Returns'
              f'<div class="column-sub">what the analyst gets</div></div>')
 outputs = [
-    ("Case directory", "raw/ as collected, cooked/ CSV and JSON per artefact, analysis/ (IOCs, threat intelligence matches), "
+    ("Case directory", "raw/ as collected, cooked/ JSON Lines per artefact, analysis/ (IOCs, threat intelligence matches), "
      "audit log of every step", GOLD),
     ("ATT&amp;CK Navigator", "A layer of every technique tagged in the case, served by the bundled Navigator", GOLD),
     ("Timeline", "One Plaso super-timeline of every source, also indexed into Splunk or Kibana", GOLD),
@@ -410,7 +410,7 @@ lanes = [
     ("Linux", "The North-way", 545,
      ("/etc (passwd, group, shadow, sudoers, PAM, preload, profile), /var/log and the journal, cron, systemd units and "
       "generators, utmp/wtmp/btmp, wtmpdb and lastlog2, udev, autostart, web roots, histories, Docker and Kubernetes."),
-     ("Logs, services and groups to CSV; logins and failed logins; PAM, sudoers and preload flagged; udev, desktop "
+     ("Logs, services and groups to JSON Lines; logins and failed logins; PAM, sudoers and preload flagged; udev, desktop "
       "and user units; kernel modules without a file; executables in /tmp and /dev/shm; web shells; bash, zsh and "
       "vim histories; containers flagged for what they can reach."),
      "linux.pslist, pstree, bash, lsof, malfind, lsmod, check_modules, check_syscall, check_idt, check_creds, "
@@ -432,7 +432,7 @@ for name, kicker, y, collect, process, memory in lanes:
     parts.append(f'<div class="lane-title" style="left:{px + 20}px;top:{y - 14}px;color:{INK}">'
                  f'{kicker.upper()} · <span style="color:#1b3a4b">{name.upper()}</span></div>')
     box(cx, y + 30, CW, 270, "Collect", collect, col, kicker="disk images only")
-    box(prx, y + 30, PW_, 270, "Process", process, col, kicker="raw/ to cooked/ CSV and JSON")
+    box(prx, y + 30, PW_, 270, "Process", process, col, kicker="raw/ to cooked/ JSON Lines")
     box(mx, y + 30, MW_, 270, "Memory", memory, MEM, kicker="Volatility 3")
     route(f"M {cx + CW} {y + 165} L {prx - 4} {y + 165}", col, 3.5)
 

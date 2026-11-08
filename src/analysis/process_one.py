@@ -10,7 +10,7 @@ container with the checkout's source, so a parser edit is tested without rebuild
 """
 
 import argparse
-import csv
+import json
 import os
 import re
 import shutil
@@ -22,6 +22,7 @@ from typing import List
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
+from rowanholt.core.records import RecordsError, is_table, read_records  # noqa: E402
 from rowanholt.process.process import process_artefacts  # noqa: E402
 
 RAW = re.compile(r"^(?P<root>.*?)/(?P<host>[^/]+)/artefacts/raw/(?P<rel>.+)$")
@@ -40,19 +41,23 @@ def guess_os(rel: str) -> str:
 def show(path: Path, limit: int) -> None:
     """A cooked file's row count and its first rows, one field per line."""
     print(f"\n== {path.name}")
-    if path.suffix.lower() != ".csv":
+    if not is_table(path):
         text = path.read_text(encoding="utf-8", errors="replace")
         print(f"   {len(text)} characters" + ("; the start" if len(text) > 1200 else ""))
         print("   " + text[:1200].replace("\n", "\n   "))
         return
-    with open(path, newline="", encoding="utf-8", errors="replace") as fh:
-        rows: List[dict] = list(csv.DictReader(fh))
+    try:
+        rows: List[dict] = [record for _, record in read_records(path)]
+    except RecordsError as exc:
+        print(f"   unreadable: {exc}")
+        return
     print(f"   {len(rows)} rows" + (f"; the first {limit}" if len(rows) > limit else ""))
     for n, row in enumerate(rows[:limit], 1):
         print(f"   [{n}]")
         for key, value in row.items():
-            if value:
-                print(f"       {key}: {value[:200]}")
+            if value not in (None, "", [], {}):
+                shown = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, default=str)
+                print(f"       {key}: {shown[:200]}")
 
 
 def main() -> int:

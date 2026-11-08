@@ -3,7 +3,7 @@
 user-writable folders of the image (or the whole of a Gandalf collection, which is small).
 Commodity malware and known tools; YARA, Defender's own detections and stacking cover the rest.
 
-Detections go to analysis/analysis.csv as "ClamAV" rows, where the case browser and Eru's
+Detections go to the host's analysis table as "ClamAV" rows, where the case browser and Eru's
 analysis answer read them. The signature database is the one built into the worker image:
 freshclam runs first only when ROWANHOLT_ONLINE_LOOKUPS lists "freshclam"."""
 import os
@@ -11,6 +11,7 @@ import subprocess
 from datetime import datetime
 from typing import List, Tuple
 
+from rowanholt.analysis.analysis import analysis_row, write_analysis
 from rowanholt.audit import write_audit_log_entry
 
 # Under a mounted image's root: where users, installers and intruders write (Windows, Linux, macOS)
@@ -20,7 +21,6 @@ USER_WRITABLE = ("Users", "ProgramData", "Windows/Temp", "$Recycle.Bin", "PerfLo
 # What clamscan is asked to skip or cap: the image's symlinks point at the analysis host
 CLAMSCAN_OPTIONS = ["-r", "-i", "--no-summary", "--follow-dir-symlinks=0", "--follow-file-symlinks=0",
                     "--max-filesize=100M", "--max-scansize=400M"]
-ANALYSIS_HEADER = "LastWriteTime,hostname,Filename,analysis_type,analysis_value\n"
 
 
 def freshclam_enabled() -> bool:
@@ -69,19 +69,14 @@ def run_clamscan(verbosity: str, output_directory: str, loc: str, img: str) -> i
     if result.returncode == 2 and not found:
         error = result.stderr.decode("utf-8", "replace").strip().splitlines()
         print(f"      WARNING: ClamAV reported errors for '{host}': {error[-1] if error else 'unknown'}")
-    analysis_csv = os.path.join(analysis_dir, "analysis.csv")
-    if found:
-        new = not os.path.exists(analysis_csv)
-        with open(analysis_csv, "a") as out:
-            if new:
-                out.write(ANALYSIS_HEADER)
-            for path, signature in found:
-                shown = "/" + os.path.relpath(path, loc) if path.startswith(loc.rstrip("/") + "/") else path
-                out.write("{},{},{},ClamAV,{}\n".format(datetime.now().isoformat(), host,
-                                                        shown.replace(",", "%2C"), signature.replace(",", "%2C")))
-                entry = "{},{},clamAV,'{}' found in '{}'\n".format(datetime.now().isoformat(), host, signature, shown)
-                prnt = " -> {} -> ClamAV found '{}' in '{}' for '{}'".format(
-                    datetime.now().isoformat().replace("T", " "), signature, shown, host)
-                write_audit_log_entry(verbosity, output_directory, entry, prnt)
+    rows = []
+    for path, signature in found:
+        shown = "/" + os.path.relpath(path, loc) if path.startswith(loc.rstrip("/") + "/") else path
+        rows.append(analysis_row(host, shown, "ClamAV", signature))
+        entry = "{},{},clamAV,'{}' found in '{}'\n".format(datetime.now().isoformat(), host, signature, shown)
+        prnt = " -> {} -> ClamAV found '{}' in '{}' for '{}'".format(
+            datetime.now().isoformat().replace("T", " "), signature, shown, host)
+        write_audit_log_entry(verbosity, output_directory, entry, prnt)
+    write_analysis(analysis_dir, host, rows)
     print(f"       ClamAV: {len(found)} detection(s) on '{host}'.")
     return len(found)

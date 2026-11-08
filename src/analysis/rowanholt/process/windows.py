@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from rowanholt.audit import write_audit_log_entry
+from rowanholt.core.records import SUFFIX, RecordsError, read_records, table_path, write_records
 from rowanholt.memory.memory import process_memory
 from rowanholt.process.extractions.clipboard import extract_clipboard
 from rowanholt.process.extractions.registry.profile import extract_registry_profile
@@ -122,6 +123,7 @@ def process_usb(
         jsondict,
         jsonlist,
         setupdata,
+        artefact,
     )
 
 
@@ -177,7 +179,7 @@ def process_registry_system(
         + vss_path_insert
         + "registry/"
         + artefact.split("/")[-1]
-        + ".json"
+        + ".jsonl"
     ):
         try:
             os.makedirs(
@@ -234,7 +236,7 @@ def process_registry_profile(
         + regusr
         + "+"
         + regart
-        + ".json"
+        + ".jsonl"
     ):
         try:
             os.makedirs(
@@ -346,7 +348,7 @@ def process_clipboard(
         + vss_path_insert
         + "clipboard/"
         + artefact.split("/")[-1]
-        + ".json"
+        + ".jsonl"
     ):
         try:
             os.makedirs(
@@ -500,12 +502,12 @@ def process_wbem(
 def carve_wmi_subscriptions(verbosity, vssimage, output_directory, img, vss_path_insert, stage, wbem_dir):
     """Carve event subscriptions from OBJECTS.DATA when Artemis found none
     (it can't parse Windows 11 repositories, E35)."""
-    wbem_json = output_directory + img.split("::")[0] + "/artefacts/cooked" + vss_path_insert + "wbem.json"
+    cooked = output_directory + img.split("::")[0] + "/artefacts/cooked" + vss_path_insert
+    found = table_path(cooked, "wbem")
     try:
-        with open(wbem_json) as f:
-            if json.load(f):
-                return
-    except (OSError, ValueError):
+        if found.is_file() and next(read_records(found), None):
+            return
+    except (OSError, RecordsError):
         pass
     objects_data = os.path.join(wbem_dir, "OBJECTS.DATA")
     if not os.path.isfile(objects_data):
@@ -519,9 +521,11 @@ def carve_wmi_subscriptions(verbosity, vssimage, output_directory, img, vss_path
         return
     if not subscriptions:
         return
-    os.makedirs(os.path.dirname(wbem_json), exist_ok=True)
-    with open(wbem_json, "w") as f:
-        json.dump(subscriptions, f, indent=1)
+    raw = wbem_dir.find("/artefacts/")
+    wbem_table = cooked + "wbem" + SUFFIX
+    write_records(wbem_table, subscriptions, host=img.split("::")[0], artefact="wbem",
+                  source_path=os.path.join(wbem_dir[raw + 1:] if raw >= 0 else wbem_dir, "OBJECTS.DATA"),
+                  techniques=lambda record: [] if "note" in record else ["T1546.003"])
     for record in subscriptions:
         if "note" in record:
             continue
@@ -535,7 +539,7 @@ def carve_wmi_subscriptions(verbosity, vssimage, output_directory, img, vss_path
         write_audit_log_entry(verbosity, output_directory, entry, prnt)
     # Only a subscription Windows doesn't create itself is evidence of T1546.003
     if any("note" not in record for record in subscriptions):
-        artemis.enrich_with_mitre(wbem_json, "wmipersist")
+        artemis.enrich_with_mitre(wbem_table, "wmipersist")
 
 
 def process_sru(
@@ -583,7 +587,7 @@ def process_ual(
         + vss_path_insert
         + "ual/"
         + artefact.split("/")[-1]
-        + ".csv"
+        + ".jsonl"
     ):
         try:
             os.makedirs(
@@ -619,29 +623,20 @@ def process_ual(
                     stderr=subprocess.PIPE,
                 ).communicate()[0]
             )[2:-4].split("\\r\\n")
-            if len(kstrike_list) > 0:
-                with open(
-                    output_directory
-                    + img.split("::")[0]
-                    + "/artefacts/cooked"
-                    + vss_path_insert
-                    + "ual/"
-                    + artefact.split("/")[-1]
-                    + ".csv",
-                    "a",
-                ) as ual_csv:
-                    ual_csv.write(
-                        "{},LastWriteTime\n".format(
-                            kstrike_list[0][0:-4].replace(",", "").replace("||", ","),
-                        )
-                    )
-                    for ual_entry in kstrike_list[1:]:
-                        ual_csv.write(
-                            "{},{}\n".format(
-                                ual_entry[0:-4].replace(",", "").replace("||", ","),
-                                ual_entry.split("||")[4],
-                            )
-                        )
+            if len(kstrike_list) > 1:
+                header = kstrike_list[0][0:-4].split("||")
+                rows = []
+                for ual_entry in kstrike_list[1:]:
+                    values = ual_entry[0:-4].split("||")
+                    row = dict(zip(header, values))
+                    row["LastWriteTime"] = ual_entry.split("||")[4] if len(values) > 4 else ""
+                    rows.append(row)
+                raw = artefact.find("/artefacts/")
+                write_records(
+                    output_directory + img.split("::")[0] + "/artefacts/cooked" + vss_path_insert + "ual/"
+                    + artefact.split("/")[-1] + SUFFIX, rows, host=img.split("::")[0],
+                    artefact="ual/" + artefact.split("/")[-1], source_path=artefact[raw + 1:] if raw >= 0 else artefact,
+                    time_field="LastWriteTime")
         except KeyError as error:
             entry, prnt = "{},{},{},'{}' user access log [{}]\n".format(
                 error,
@@ -782,20 +777,11 @@ def process_hiberfil(
 def process_pagefile(
     verbosity, vssimage, output_directory, img, vss_path_insert, artefact
 ):
-    if not os.path.exists(
-        output_directory
-        + img.split("::")[0]
-        + "/artefacts/cooked"
-        + vss_path_insert
-        + "memory"
-    ):
-        os.makedirs(
-            output_directory
-            + img.split("::")[0]
-            + "/artefacts/cooked"
-            + vss_path_insert
-            + "memory"
-        )
+    strings_file = (output_directory + img.split("::")[0] + "/artefacts/cooked" + vss_path_insert + "memory/"
+                    + artefact.split("/")[-1] + ".strings")
+    # Each paging file its own: the memory/ folder existing only meant the first one was done
+    if not os.path.exists(strings_file):
+        os.makedirs(os.path.dirname(strings_file), exist_ok=True)
         entry, prnt = "{},{},extracting strings,'{}'\n".format(
             datetime.now().isoformat(),
             vssimage,
@@ -806,22 +792,9 @@ def process_pagefile(
             vssimage,
         )
         write_audit_log_entry(verbosity, output_directory, entry, prnt)
-        subprocess.Popen(
-            [
-                "strings",
-                artefact,
-                ">>",
-                output_directory
-                + img.split("::")[0]
-                + "/artefacts/cooked"
-                + vss_path_insert
-                + "memory/"
-                + artefact.split("/")[-1]
-                + ".strings",
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        ).communicate()[0]
+        # No shell, so ">>" never redirected anything: strings' output goes to the file itself
+        with open(strings_file, "ab") as out:
+            subprocess.Popen(["strings", artefact], stdout=out, stderr=subprocess.PIPE).communicate()
         (
             entry,
             prnt,

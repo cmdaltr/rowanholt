@@ -35,6 +35,12 @@ from rowanholt.process.extra_artefacts import process_extra_artefact
 from rowanholt.process.linux_artefacts import process_linux_artefact
 from rowanholt.process.mac_artefacts import process_mac_artefact
 from rowanholt.process.windows_artefacts import process_windows_artefact
+from rowanholt.core.records import SUFFIX, write_records
+
+# A listing's first character, as `ls -l` on Windows (MKS) writes it
+ITEM_TYPES = {"-": "file", "d": "directory", "l": "link", "b": "block-special", "c": "character-special",
+              "n": "network", "p": "FIFO", "s": "socket", "D": "demand-recall", "E": "encrypted", "O": "offline",
+              "S": "sparse"}
 
 
 def process_artefacts(
@@ -112,13 +118,15 @@ def process_artefacts(
                 vss_path_insert,
                 stage,
             )
-        elif artefact.endswith(".SYSTEM") and not os.path.exists(
+        # Artemis writes shimcache.jsonl (shimcache.json before JSON Lines); ShimCache.csv was
+        # the old parser's, so the check never matched and shimcache re-ran for every .SYSTEM
+        elif artefact.endswith(".SYSTEM") and not any(os.path.exists(
             output_directory
             + img.split("::")[0]
             + "/artefacts/cooked"
             + vss_path_insert
-            + "ShimCache.csv"
-        ):
+            + name
+        ) for name in ("shimcache.jsonl", "shimcache.json")):
             process_shimcache(
                 verbosity, vssimage, output_directory, img, vss_path_insert, stage
             )
@@ -412,78 +420,31 @@ def process_artefacts(
         elif artefact.endswith("LastAccessTimes.txt"):
             with open(artefact, encoding="utf-8", errors="ignore") as last_access_times:
                 access_times = last_access_times.read()
-            with open(
-                output_directory
-                + img.split("::")[0]
-                + "/artefacts/LastAccessTimes.csv",
-                "a",
-            ) as access_time_handle:
-                for segment in access_times.split("\n\n"):
-                    directory = segment.split("\n")[0]
-                    blocks = segment.split("\n")[1]
-                    for line in segment.split("\n")[2:]:
-                        metadata = re.findall(
-                            r"^\s*(\d+)\s+([\-dlbcnpsDEOS])([rwxacsht\-\+]+)\s+(\d+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+(\d+)(?:,\s+\d+)?\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d+)\s+([^\s]+)\s(.*)$",
-                            line,
-                        )
-                        try:  # https://www.mkssoftware.com/docs/man1/ls.1.asp
-                            if metadata[0][-1] != '"."' and metadata[0][-1] != '".."':
-                                inode = metadata[0][0]
-                                item = metadata[0][1]
-                                if item == "-":
-                                    item = "file"
-                                elif item == "d":
-                                    item = "directory"
-                                elif item == "l":
-                                    item = "link"
-                                elif item == "b":
-                                    item = "block-special"
-                                elif item == "c":
-                                    item = "character-special"
-                                elif item == "n":
-                                    item = "network"
-                                elif item == "p":
-                                    item = "FIFO"
-                                elif item == "s":
-                                    item = "socket"
-                                elif item == "D":
-                                    item = "demand-recall"
-                                elif item == "E":
-                                    item = "encrypted"
-                                elif item == "O":
-                                    item = "offline"
-                                elif item == "S":
-                                    item = "sparse"
-                                permissions = metadata[0][
-                                    2
-                                ]  # read (r), write (w), execute (x), archive (a), compressed (c), system (s), hidden (h), temporary (t)
-                                links = metadata[0][3]
-                                user = metadata[0][4]
-                                group = metadata[0][5]
-                                author = metadata[0][6]
-                                size = metadata[0][7]
-                                timestamp = metadata[0][8]
-                                timezone = metadata[0][9]
-                                name = metadata[0][10]
-                                access_time_handle.write(
-                                    "{},{},{},{},{},{},{},{},{},{},{},{},{}\n".format(
-                                        directory,
-                                        blocks,
-                                        inode,
-                                        item,
-                                        permissions,
-                                        links,
-                                        user,
-                                        group,
-                                        author,
-                                        size,
-                                        timestamp,
-                                        timezone,
-                                        name,
-                                    )
-                                )
-                        except:
-                            pass
+            rows = []
+            for segment in access_times.split("\n\n"):
+                lines = segment.split("\n")
+                if len(lines) < 2:
+                    continue
+                directory, blocks = lines[0], lines[1]
+                for line in lines[2:]:
+                    metadata = re.findall(
+                        r"^\s*(\d+)\s+([\-dlbcnpsDEOS])([rwxacsht\-\+]+)\s+(\d+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+(\d+)(?:,\s+\d+)?\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d+)\s+([^\s]+)\s(.*)$",
+                        line,
+                    )
+                    # https://www.mkssoftware.com/docs/man1/ls.1.asp
+                    if not metadata or metadata[0][-1] in ('"."', '".."'):
+                        continue
+                    inode, kind, permissions, links, user, group, author, size, when, zone, name = metadata[0]
+                    rows.append({
+                        "Directory": directory, "Blocks": blocks, "Inode": inode, "Type": ITEM_TYPES.get(kind, kind),
+                        # read (r), write (w), execute (x), archive (a), compressed (c), system (s), hidden (h), temporary (t)
+                        "Permissions": permissions, "Links": links, "User": user, "Group": group, "Author": author,
+                        "Size": size, "LastAccessTime": f"{when}{zone}", "Name": name,
+                    })
+            raw = artefact.find("/artefacts/")
+            write_records(output_directory + img.split("::")[0] + "/artefacts/LastAccessTimes" + SUFFIX, rows,
+                          host=img.split("::")[0], artefact="LastAccessTimes",
+                          source_path=artefact[raw + 1:] if raw >= 0 else artefact, time_field="LastAccessTime")
     return vssmem
 
 

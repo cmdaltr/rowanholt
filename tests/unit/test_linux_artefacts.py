@@ -10,6 +10,7 @@ import pytest
 # Appended, not prepended: src/analysis/platform would shadow the stdlib module.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
+from rowanholt.core.records import check_file, own_fields, read_records  # noqa: E402
 from rowanholt.process import linux_artefacts as la  # noqa: E402
 
 
@@ -25,8 +26,11 @@ def run(out, artefact):
 
 
 def rows(out, name):
-    with open(Path(out) / "HOST" / "artefacts" / "cooked" / name, newline="") as fh:
-        return list(csv.DictReader(fh))
+    """A cooked table's rows as Elrond wrote them (JSON Lines), without the envelope; every record
+    checked for it first."""
+    path = Path(out) / "HOST" / "artefacts" / "cooked" / f"{name}.jsonl"
+    assert check_file(path) == []
+    return [own_fields(r) for _, r in read_records(path)]
 
 
 def techniques(out):
@@ -56,9 +60,11 @@ def test_wtmp_and_btmp(tmp_path):
         utmp_record(6, "root", "ssh:notty", "203.0.113.9", 1793000000 + i, b"\xcb\x00\x71\x09") for i in range(12)))
     run(out, raw / "linux" / "var+log+wtmp")
     run(out, raw / "linux" / "var+log+btmp")
-    found = rows(out, "login_records.csv")
+    found = rows(out, "login_records")
     assert found[0]["Type"] == "USER_PROCESS" and found[0]["User"] == "bob" and found[0]["Address"] == "10.0.0.5"
     assert found[0]["LastWriteTime"].startswith("2026-")
+    first = next(r for _, r in read_records(Path(out) / "HOST" / "artefacts" / "cooked" / "login_records.jsonl"))
+    assert first["timestamp"].startswith("2026-") and first["timestamp"].endswith("Z")
     assert len([r for r in found if r["Source"] == "/var/log/btmp"]) == 12
     assert "T1110.001" in techniques(out)
 
@@ -70,7 +76,7 @@ def test_lastlog_names_users_from_passwd(tmp_path):
     (raw / "linux" / "var+log+lastlog").write_bytes(
         record.pack(0, b"", b"") * 2 + record.pack(1793000000, b"pts/1", b"198.51.100.4"))
     run(out, raw / "linux" / "var+log+lastlog")
-    found = rows(out, "lastlog.csv")
+    found = rows(out, "lastlog")
     assert len(found) == 1 and found[0]["User"] == "bob" and found[0]["Host"] == "198.51.100.4"
 
 
@@ -81,8 +87,8 @@ def test_preload_and_shell_init(tmp_path):
     (raw / "linux" / "etc+rc.local").write_text("#!/bin/sh -e\n/opt/agent/start\nexit 0\n")
     for name in ("etc+ld.so.preload", "etc+profile.d+update.sh", "etc+rc.local"):
         run(out, raw / "linux" / name)
-    assert rows(out, "preload.csv")[0]["Library"] == "/usr/lib/libprocesshider.so"
-    init = rows(out, "shell_init.csv")
+    assert rows(out, "preload")[0]["Library"] == "/usr/lib/libprocesshider.so"
+    init = rows(out, "shell_init")
     assert [r["Flag"] for r in init] == ["suspicious command", "runs at boot"]
     assert {"T1574.006", "T1546.004", "T1037.004"} <= set(techniques(out))
 
@@ -98,10 +104,16 @@ def test_pam_flags_only_the_odd_lines(tmp_path):
         "auth sufficient /tmp/.x/pam_backdoor.so\n"
         "session optional pam_exec.so /usr/local/bin/notify\n")
     run(out, raw / "linux" / "etc+pam.d+common-auth")
-    found = rows(out, "pam.csv")
+    found = rows(out, "pam")
     assert found[0]["Control"] == "[success=1 default=ignore]" and found[0]["Flag"] == ""
     assert [r["Flag"] for r in found if r["Flag"]] == ["module outside the PAM security directory", "runs a command"]
     assert "T1556.003" in techniques(out)
+    # The envelope: the route's technique on the flagged rows only, and where each row came from
+    records = [r for _, r in read_records(Path(out) / "HOST" / "artefacts" / "cooked" / "pam.jsonl")]
+    assert {r["host"] for r in records} == {"HOST"} and {r["artefact"] for r in records} == {"pam"}
+    assert {r["source_path"] for r in records} == {"artefacts/raw/linux/etc+pam.d+common-auth"}
+    assert [bool(r["techniques"]) for r in records] == [bool(r["Flag"]) for r in records]
+    assert all(r["timestamp"] is None for r in records)
 
 
 def test_sudoers(tmp_path):
@@ -109,7 +121,7 @@ def test_sudoers(tmp_path):
     (raw / "linux" / "etc+sudoers.d+backup").write_text(
         "Defaults env_reset\nroot ALL=(ALL:ALL) ALL\n%sudo ALL=(ALL:ALL) ALL\nsvc ALL=(ALL) NOPASSWD: ALL\n")
     run(out, raw / "linux" / "etc+sudoers.d+backup")
-    found = rows(out, "sudoers.csv")
+    found = rows(out, "sudoers")
     assert [r["Flag"] for r in found] == ["", "", "NOPASSWD; full root for a non-admin principal"]
     assert "T1548.003" in techniques(out)
 
@@ -118,7 +130,7 @@ def test_cloud_init_sudoers_is_listed_not_tagged(tmp_path):
     out, raw = host(tmp_path)
     (raw / "linux" / "etc+sudoers.d+90-cloud-init-users").write_text("ubuntu ALL=(ALL) NOPASSWD:ALL\n")
     run(out, raw / "linux" / "etc+sudoers.d+90-cloud-init-users")
-    assert rows(out, "sudoers.csv")[0]["Flag"].startswith("NOPASSWD")
+    assert rows(out, "sudoers")[0]["Flag"].startswith("NOPASSWD")
     assert techniques(out) == []
 
 
@@ -133,7 +145,7 @@ def test_autostart_and_user_units(tmp_path):
     for name in ("etc+xdg+autostart+gnome-keyring.desktop", "home+bob+.config+autostart+upd.desktop",
                  "home+bob+.config+systemd+user+sync.service"):
         run(out, raw / "linux" / name)
-    found = rows(out, "autostart.csv")
+    found = rows(out, "autostart")
     assert [(r["Kind"], r["Flag"]) for r in found] == [
         ("system autostart", ""), ("user autostart", "suspicious command"), ("systemd user unit", "")]
     assert {"T1547.013", "T1543.002"} <= set(techniques(out))
@@ -158,11 +170,11 @@ def test_user_histories(tmp_path):
         '</bookmark></xbel>')
     for name in ("bob+mysql_history", "bob+lesshst", "bob+viminfo", "bob+wget-hsts", "bob+recently-used.xbel"):
         run(out, profiles / name)
-    assert [r["Command"] for r in rows(out, "shell_histories.csv")] == ["select * from users;", "password"]
-    assert [(r["Kind"], r["Value"]) for r in rows(out, "viminfo.csv")] == [
+    assert [r["Command"] for r in rows(out, "shell_histories")] == ["select * from users;", "password"]
+    assert [(r["Kind"], r["Value"]) for r in rows(out, "viminfo")] == [
         ("command", "wq"), ("search", "/secret"), ("file mark", "/etc/shadow"), ("file", "/etc/passwd")]
-    assert rows(out, "wget_hsts.csv")[0]["Host"] == "example.org"
-    used = rows(out, "recently_used.csv")[0]
+    assert rows(out, "wget_hsts")[0]["Host"] == "example.org"
+    used = rows(out, "recently_used")[0]
     assert used["URI"] == "file:///home/bob/loot.zip" and used["Applications"] == "File Roller"
 
 
@@ -180,7 +192,7 @@ def test_udev(tmp_path):
         'ACTION=="add", SUBSYSTEM=="usb", RUN+="/bin/sh -c \'/tmp/x &\'"\n'
         'KERNEL=="sda", PROGRAM="/usr/lib/udev/scsi_id -g"\n')
     run(out, raw / "linux" / "etc+udev+rules.d+99-x.rules")
-    found = rows(out, "udev_rules.csv")
+    found = rows(out, "udev_rules")
     assert found[0]["Flag"] == "suspicious command; administrator rule" and found[1]["Flag"] == "administrator rule"
     assert "T1546.017" in techniques(out)
 
@@ -194,7 +206,7 @@ def test_kernel_modules(tmp_path):
         "diamorphine,16384,0,Live,OE,,\n"
         "nf_tables,300,0,Live,,?,\n")
     run(out, raw / "linux" / "gandalf+kernel_modules.csv")
-    found = {r["Name"]: r["Flag"] for r in rows(out, "kernel_modules.csv")}
+    found = {r["Name"]: r["Flag"] for r in rows(out, "kernel_modules")}
     assert found == {"ext4": "", "vboxdrv": "out-of-tree; unsigned",
                      "diamorphine": "no module file; out-of-tree; unsigned", "nf_tables": ""}
     assert "T1547.006" in techniques(out)
@@ -213,7 +225,7 @@ def test_webshell(tmp_path):
         pytest.skip("endpoint antivirus blocks reading the sample web shell")
     run(out, raw / "linux" / "var+www+html+index.php")
     run(out, raw / "linux" / "var+www+html+up+img.php")
-    found = rows(out, "webshells.csv")
+    found = rows(out, "webshells")
     assert len(found) == 1 and found[0]["Source"] == "/var/www/html/up/img.php"
     assert "T1505.003" in techniques(out)
 
@@ -231,11 +243,11 @@ def test_wtmpdb_and_lastlog2(tmp_path):
     db.commit(); db.close()
     run(out, raw / "linux" / "var+lib+wtmpdb+wtmp.db")
     run(out, raw / "linux" / "var+lib+lastlog+lastlog2.db")
-    sessions = rows(out, "login_records.csv")
+    sessions = rows(out, "login_records")
     assert [(r["Type"], r["User"], r["Host"]) for r in sessions] == [
         ("USER_PROCESS", "bob", "198.51.100.4"), ("DEAD_PROCESS", "bob", "198.51.100.4")]
     assert sessions[1]["LastWriteTime"] > sessions[0]["LastWriteTime"]
-    assert rows(out, "lastlog.csv")[0]["User"] == "bob"
+    assert rows(out, "lastlog")[0]["User"] == "bob"
 
 
 def test_selection_matches_whole_paths(tmp_path):

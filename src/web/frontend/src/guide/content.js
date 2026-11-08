@@ -199,7 +199,7 @@ export const GUIDE_PAGES = [
       {
         id: 'case.hosts',
         title: 'Hosts',
-        what: 'Each host\'s cooked artefacts and analysis files, who it\'s assigned to and how far they\'ve got, and the case\'s own files such as threat_groups.csv.',
+        what: 'Each host\'s cooked artefacts and analysis files, who it\'s assigned to and how far they\'ve got, and the case\'s own files such as threat_groups.jsonl.',
         who: 'Case leads splitting the work; analysts picking up a host.',
         when: 'At the start of a multi-host case, and at hand-over.',
       },
@@ -430,7 +430,7 @@ export const GUIDE_PAGES = [
 // Tips: the best use of features and enrichments that are easy to miss. `to` opens the
 // page it's about.
 export const TIPS = [
-  { id: 'gandalf-integrity', text: 'Analyse Gandalf archives with the Gandalf source: Elrond checks every collected file against Gandalf\'s SHA-256 log and writes the result to gandalf_integrity.csv, so you can show nothing changed between collection and analysis.', to: '/elrond' },
+  { id: 'gandalf-integrity', text: 'Analyse Gandalf archives with the Gandalf source: Elrond checks every collected file against Gandalf\'s SHA-256 log and writes the result to gandalf_integrity.jsonl, so you can show nothing changed between collection and analysis.', to: '/elrond' },
   { id: 'gandalf-command', text: 'The Generated Command on the Gandalf page is the exact command for your choices. Copy it into your case notes, or run it by hand where the web UI can\'t reach.', to: '/gandalf' },
   { id: 'gandalf-volatility', text: 'Gandalf collects in order of volatility and hashes afterwards, so ticking Live Memory Capture doesn\'t cost you the volatile state of everything else.', to: '/gandalf' },
   { id: 'eru-offline', text: 'Eru answers its quick-action questions straight from the case files when there\'s no language model: hosts, ATT&CK techniques, persistence, logins, IOCs and suspicious commands, with no GPU and no Ollama.', to: '/ai' },
@@ -456,7 +456,7 @@ export const TIPS = [
   { id: 'pause', text: 'A job can be paused, not just cancelled. Pause a long analysis to free the machine for something urgent, then resume it where it stopped.', to: '/jobs' },
   { id: 'bulk-restart', text: 'Several jobs failed for the same reason? Filter Jobs by Failed, select them and restart them together.', to: '/jobs' },
   { id: 'case-confirmed', text: 'Flag rows as leads in the case browser and confirm them as they hold up: the report and Navigator layer from there carry confirmed findings only, not everything Elrond tagged.', to: '/jobs' },
-  { id: 'intel-match', text: 'Tick Threat Intelligence on Elrond\'s page to match a case against Pippin\'s indicators: threat_groups.csv ranks the groups and says what each rank rests on, so one shared PowerShell switch never reads like attribution.', to: '/pippin' },
+  { id: 'intel-match', text: 'Tick Threat Intelligence on Elrond\'s page to match a case against Pippin\'s indicators: threat_groups.jsonl ranks the groups and says what each rank rests on, so one shared PowerShell switch never reads like attribution.', to: '/pippin' },
   { id: 'intel-check', text: 'Check a single command line or hash in Pippin before reading anything into it: an element dozens of groups use is marked common.', to: '/pippin' },
   { id: 'archive', text: 'Archive finished cases instead of deleting them: the Jobs page stays tidy and the output stays on disk.', to: '/archive' },
   { id: 'verbose', text: 'Verbose Logging writes everything Elrond did to verbose.log in the case, which is what you want to hand over when something misbehaves.', to: '/elrond' },
