@@ -15,19 +15,24 @@ import importlib.util
 import io
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Tuple
+
+
+def _elrond_sources() -> List[Path]:
+    here = Path(__file__).resolve()
+    # in the backend image this file is /app/case_files.py: no repository above it to fall back on
+    sources = [Path(os.environ.get("ROWANHOLT_ELROND_SRC", "/opt/elrond-src"))]
+    if len(here.parents) > 2:
+        sources.append(here.parents[2] / "analysis")
+    return sources
 
 
 def _load_tables():
     """rowanholt/core/records.py, loaded by path: putting Elrond's source tree on sys.path would let
     its own config and main shadow the backend's."""
-    here = Path(__file__).resolve()
-    # in the backend image this file is /app/case_files.py: no repository above it to fall back on
-    sources = [os.environ.get("ROWANHOLT_ELROND_SRC", "/opt/elrond-src")]
-    if len(here.parents) > 2:
-        sources.append(here.parents[2] / "analysis")
-    for src in sources:
+    for src in _elrond_sources():
         path = Path(src, "rowanholt", "core", "records.py")
         if path.is_file():
             spec = importlib.util.spec_from_file_location("rowanholt_records", path)
@@ -35,6 +40,29 @@ def _load_tables():
             spec.loader.exec_module(module)
             return module
     raise ImportError("rowanholt/core/records.py not found: is Elrond's source mounted at ROWANHOLT_ELROND_SRC?")
+
+
+_report = None
+
+
+def report_package():
+    """Elrond's rowanholt/report package (the case report), loaded by path as records.py is, on
+    first use: the backend starts without it, and only the report download needs it."""
+    global _report
+    if _report is None:
+        for src in _elrond_sources():
+            path = Path(src, "rowanholt", "report", "__init__.py")
+            if path.is_file():
+                spec = importlib.util.spec_from_file_location("rowanholt_report", path,
+                                                              submodule_search_locations=[str(path.parent)])
+                module = importlib.util.module_from_spec(spec)
+                sys.modules["rowanholt_report"] = module  # its modules import each other relatively
+                spec.loader.exec_module(module)
+                _report = module
+                break
+        else:
+            raise ImportError("rowanholt/report not found: is Elrond's source mounted at ROWANHOLT_ELROND_SRC?")
+    return _report
 
 
 tables = _load_tables()

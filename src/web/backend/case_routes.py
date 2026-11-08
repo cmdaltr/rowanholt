@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi.responses import PlainTextResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -357,15 +357,19 @@ async def list_findings(job_id: str, status: str = "", verify: bool = False):
     """Findings; with verify, whether each row still reads the same (a re-run may have changed it)."""
     found = store().findings(job_id, status)
     if verify and found:
-        root = _root(job_id)
-        for finding in found:
-            try:
-                row = case_files.find_row(case_files.resolve(root, finding["host"], finding["artefact"]),
-                                          finding["row_ref"])
-            except case_files.CaseFileError:
-                row = None
-            finding["intact"] = bool(row) and case_files.row_hash(row) == finding["row_hash"]
+        _verify(_root(job_id), found)
     return found
+
+
+def _verify(root: Path, found: List[Dict]) -> None:
+    """Set each finding's intact: whether its row still reads as it did when it was flagged."""
+    for finding in found:
+        try:
+            row = case_files.find_row(case_files.resolve(root, finding["host"], finding["artefact"]),
+                                      finding["row_ref"])
+        except case_files.CaseFileError:
+            row = None
+        finding["intact"] = bool(row) and case_files.row_hash(row) == finding["row_hash"]
 
 
 @router.post("/findings")
@@ -576,6 +580,72 @@ async def report(job_id: str, request: Request):
         raise HTTPException(status_code=404, detail="Job not found")
     store().record(job_id, _actor(request), "exported", "the report")
     return report_markdown(job.case_number, store().findings(job_id), store().notes(job_id))
+
+
+REPORT_TYPES = {
+    "markdown": "text/markdown; charset=utf-8",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+REPORT_CACHE = 4  # cases whose reading is kept, so the second format downloads at once
+_gathered: Dict[str, tuple] = {}
+
+
+def _fingerprint(root: Path) -> tuple:
+    """What changes when a re-run rewrites the case: every table's size and time, and the method file."""
+    paths = [p for p in root.iterdir() if p.is_file()]
+    for host_dir in case_files.hosts(root):
+        paths += [p for p in host_dir.iterdir() if p.is_file()]
+        for folder in (host_dir / "artefacts" / "cooked", host_dir / "analysis"):  # never raw/
+            if folder.is_dir():
+                paths += [p for p in folder.rglob("*") if p.is_file()]
+    stats = []
+    for path in sorted(set(paths)):
+        stat = path.stat()
+        stats.append((str(path), stat.st_size, stat.st_mtime_ns))
+    return tuple(stats)
+
+
+def gathered_case(root: Path, case_number: str):
+    """Elrond's reading of the case for its report (rowanholt/report), kept until the case changes:
+    on a large case it reads gigabytes of tables."""
+    key = str(root.resolve())
+    fingerprint = _fingerprint(root)
+    cached = _gathered.get(key)
+    if cached and cached[0] == fingerprint:
+        return cached[1]
+    report = case_files.report_package().gather(root, case_number)
+    _gathered[key] = (fingerprint, report)
+    while len(_gathered) > REPORT_CACHE:
+        _gathered.pop(next(iter(_gathered)))
+    return report
+
+
+@router.get("/full-report")
+async def full_report(job_id: str, request: Request,
+                      fmt: str = Query("docx", alias="format", pattern="^(docx|markdown)$")):
+    """The case report (FR-07): confirmed findings first, then open leads and dismissed rows, then
+    Elrond's report from the case alone (techniques with their rows, indicators, integrity, method).
+    The first download of a large case takes as long as reading its tables; it's kept until the case changes."""
+    job = _jobs.get_job(job_id) if _jobs else None
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    root = _root(job_id)
+    findings, notes = store().findings(job_id), store().notes(job_id)
+    try:
+        package = case_files.report_package()
+        report = await asyncio.to_thread(gathered_case, root, job.case_number)
+        await asyncio.to_thread(_verify, root, findings)
+        body = await asyncio.to_thread(package.curated_report, report, findings, notes, fmt)
+    except ImportError as exc:
+        logger.error(f"Case report unavailable: {exc}")
+        raise HTTPException(status_code=503, detail=str(exc))
+    except (OSError, ValueError) as exc:
+        logger.warning(f"Case report for job {job_id} failed: {exc}")
+        raise HTTPException(status_code=500, detail=f"The report couldn't be built: {exc}")
+    store().record(job_id, _actor(request), "exported", f"the case report ({fmt})")
+    name = re.sub(r"[^\w.+-]", "_", f"{job.case_number}_report") + (".docx" if fmt == "docx" else ".md")
+    return Response(content=body, media_type=REPORT_TYPES[fmt],
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
 @router.get("/layer")

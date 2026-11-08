@@ -75,6 +75,8 @@ services:
       - ./src/mordor:/opt/rowanholt/src/mordor # Mordor: recorded attack telemetry (/api/mordor/telemetry)
       - ./src/analysis/rowanholt/threat_intel:/opt/elrond-src/rowanholt/threat_intel:ro # threat intelligence parsing (/api/threat-intel)
       - ./src/analysis/rowanholt/core:/opt/elrond-src/rowanholt/core:ro # reading case tables (rowanholt/core/records.py)
+      - ./src/analysis/rowanholt/report:/opt/elrond-src/rowanholt/report:ro # the case report (/api/jobs/{id}/case/full-report)
+      - ./src/analysis/rowanholt/post/mitre/enterprise_attack.csv:/opt/elrond-src/rowanholt/post/mitre/enterprise_attack.csv:ro # technique names in the report
       - anduril_token:/run/anduril:ro # Written by anduril
       # Platform-specific mounts - uncomment for your OS:
       # - /mnt:/mnt:ro              # Linux: Mount points (read-only)
