@@ -12,6 +12,11 @@ which the backend already mounts read-only) and required in X-Lab-Token. The
 agent binds to the address lab.sh passes (loopback on macOS), so only this
 machine and its containers can reach it.
 
+Consoles (FR-04): GET /consoles lists the running VMs' VNC servers (src/mordor/lab/consoles.py),
+and GET /consoles/<engine>/<name>/connect, with Upgrade: rowanholt-vnc, turns the connection into
+a raw byte tunnel to that VM's own port on 127.0.0.1. The request names a VM, never a host or a
+port: the agent looks the port up itself, so the tunnel can't be pointed anywhere else.
+
 Standard library only; started by `./lab.sh agent start`.
 """
 from __future__ import annotations
@@ -24,6 +29,7 @@ import os
 import re
 import secrets
 import signal
+import socket
 import subprocess
 import threading
 import time
@@ -34,13 +40,16 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import mordor_api  # the Mordor page's lab (src/mordor/lab, ported from Archer)
+from src.mordor.lab import consoles  # noqa: E402 (mordor_api puts the repository on sys.path)
 
 LAB_ROOT = Path(__file__).resolve().parent.parent
 LAB_SH = LAB_ROOT / "lab.sh"
 DEFAULT_TOKEN_FILE = Path("/tmp/rowanholt/.lab-agent/token")
 RUN_DIR = Path.home() / ".config" / "rowanholt-lab" / "run" / "agent-runs"
 KEEP_RUNS = 30
-VERSION = "1"
+VERSION = "2"  # 2: consoles
+CONSOLE_UPGRADE = "rowanholt-vnc"
+CONSOLE_CONNECT_TIMEOUT = 5
 
 log = logging.getLogger("lab_agent")
 
@@ -273,6 +282,24 @@ class Runner:
             (RUN_DIR / f"{run['id']}.log").unlink(missing_ok=True)
 
 
+def pump(read, dest: socket.socket) -> None:
+    """Copy bytes from read() to dest until either side closes, then shut both directions of
+    dest down so the copy running the other way stops too."""
+    try:
+        while True:
+            data = read(65536)
+            if not data:
+                break
+            dest.sendall(data)
+    except OSError:
+        pass
+    finally:
+        try:
+            dest.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+
+
 def parse_state(text: str) -> dict[str, str]:
     return dict(line.split("=", 1) for line in text.splitlines() if "=" in line and not line.startswith("["))
 
@@ -341,6 +368,11 @@ class Handler(BaseHTTPRequestHandler):
             })
         if parts == ["runs"]:
             return self._send(200, self.runner.list())
+        if parts == ["consoles"]:
+            mordor_api.configure(self._lab_config)
+            return self._send(200, consoles.discover_live())
+        if len(parts) == 4 and parts[0] == "consoles" and parts[3] == "connect":
+            return self._console(parts[1], parts[2])
         if parts and parts[0] == "mordor":
             mordor_api.configure(self._lab_config)
             return self._send(*mordor_api.handle_get(parts[1:], parse_qs(url.query), self.runner.busy()))
@@ -351,6 +383,35 @@ class Handler(BaseHTTPRequestHandler):
             except (KeyError, FileNotFoundError):
                 return self._send(404, {"error": "no such run"})
         self._send(404, {"error": "not found"})
+
+    def _console(self, engine: str, name: str) -> None:
+        """Tunnel this connection to a VM's VNC server: its port from consoles.find, on loopback."""
+        if engine not in consoles.ENGINES or not NAME.match(name):
+            return self._send(400, {"error": "engine: tart or utm; name: a VM's name"})
+        if self.headers.get("Upgrade", "").lower() != CONSOLE_UPGRADE:
+            return self._send(400, {"error": f"expected Upgrade: {CONSOLE_UPGRADE}"})
+        mordor_api.configure(self._lab_config)
+        console = consoles.find(engine, name)
+        if not console:
+            return self._send(404, {"error": f"{name} has no console: it isn't running, or serves no VNC on loopback"})
+        try:
+            upstream = socket.create_connection((consoles.LOOPBACK, console["port"]), timeout=CONSOLE_CONNECT_TIMEOUT)
+        except OSError as exc:
+            return self._send(502, {"error": f"{name}'s VNC server on {consoles.LOOPBACK}:{console['port']} didn't answer: {exc}"})
+        upstream.settimeout(None)
+        self.send_response(HTTPStatus.SWITCHING_PROTOCOLS)
+        self.send_header("Upgrade", CONSOLE_UPGRADE)
+        self.send_header("Connection", "Upgrade")
+        self.end_headers()
+        self.wfile.flush()
+        self.close_connection = True
+        log.info("console %s/%s opened (%s:%s)", engine, name, consoles.LOOPBACK, console["port"])
+        other_way = threading.Thread(target=pump, args=(self.rfile.read1, upstream), daemon=True)
+        other_way.start()
+        pump(upstream.recv, self.connection)
+        other_way.join(timeout=5)
+        upstream.close()
+        log.info("console %s/%s closed", engine, name)
 
     def do_POST(self) -> None:
         if not self._authorised():

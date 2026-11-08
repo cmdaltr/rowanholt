@@ -1,7 +1,7 @@
 // The lab's machines (src/mordor/lab, ported from Archer's Emulate page): this host's engines,
 // the machines it can create, and every machine with its lifecycle, set-up and recording. Shown
 // on Aragorn → Lab; driven on the host by the lab agent (lab/agent/mordor_api.py).
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useCallback, useRef } from 'react';
 import {
   getMordorLab,
   getMordorLabLogs,
@@ -10,7 +10,12 @@ import {
   getLabStatus,
   getLabRun,
   runLabCommand,
+  listLabConsoles,
 } from '../api';
+
+// noVNC is loaded only when a console is opened
+const LabConsole = lazy(() => import('./LabConsole'));
+const CONSOLE_ENGINES = new Set(['tart', 'utm']);
 
 const IMG = `${process.env.PUBLIC_URL}/images/mordor`;
 const errorText = (err) => {
@@ -148,6 +153,8 @@ function LabMachines({ onRecorded = () => {} }) {
   const [error, setError] = useState(null);
   const [run, setRun] = useState(null);
   const [dialog, setDialog] = useState(null);
+  const [consoles, setConsoles] = useState({});
+  const [consoleVm, setConsoleVm] = useState(null);
   const offsetRef = useRef(0);
   const pollRef = useRef(null);
 
@@ -159,6 +166,9 @@ function LabMachines({ onRecorded = () => {} }) {
       const d = await getMordorLab();
       setData(d);
       setError(null);
+      listLabConsoles()
+        .then((r) => setConsoles(Object.fromEntries((r.consoles || []).map((c) => [`${c.engine}/${c.name}`, c]))))
+        .catch(() => setConsoles({}));
       if (d.busy && d.busy.status === 'running') setRun((r) => (r && r.id === d.busy.id ? r : { ...d.busy, output: '' }));
     } catch (err) { setError(errorText(err)); }
   }, []);
@@ -303,6 +313,13 @@ function LabMachines({ onRecorded = () => {} }) {
                   {m.engine === 'utm' && !m.os && <button className="mt-pill" onClick={() => act(m, 'adopt')}>Set OS</button>}
                   {m.os && <button className="mt-pill" disabled={busy} onClick={() => act(m, 'provision')}>Set up</button>}
                   {m.os && <button className="mt-pill" disabled={busy} onClick={() => act(m, 'record')}>Record</button>}
+                  {CONSOLE_ENGINES.has(m.engine) && (
+                    <button className="mt-pill" disabled={m.state !== 'running'}
+                            title={m.state !== 'running' ? 'Start the VM to see its screen'
+                              : consoles[`${m.engine}/${m.name}`] ? `Its screen, over VNC on the host's 127.0.0.1:${consoles[`${m.engine}/${m.name}`].port}`
+                                : 'No console found yet: a VM started before consoles needs a stop and a start (lab/README.md)'}
+                            onClick={() => setConsoleVm(m)}>Console</button>
+                  )}
                   <button className="mt-pill" onClick={() => act(m, 'logs')}>Logs</button>
                   {m.deletable && <button className="mt-pill mt-danger" disabled={busy} onClick={() => act(m, 'delete')}>Delete</button>}
                 </div>
@@ -399,6 +416,11 @@ function LabMachines({ onRecorded = () => {} }) {
       {dialog?.kind === 'record' && (
         <RecordDialog machine={dialog.m} labWindows={dialog.m.name === data.lab_windows_vm}
                       onCancel={() => setDialog(null)} onRun={(body) => post('record', body)} />
+      )}
+      {consoleVm && (
+        <Suspense fallback={<p className="lab-note">Loading the console…</p>}>
+          <LabConsole machine={consoleVm} onClose={() => { setConsoleVm(null); refresh(); }} />
+        </Suspense>
       )}
       {dialog?.kind === 'logs' && (
         <Modal title={`Logs — ${dialog.m.name}`} onClose={() => setDialog(null)}>

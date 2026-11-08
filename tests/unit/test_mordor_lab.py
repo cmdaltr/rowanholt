@@ -10,7 +10,7 @@ import json
 
 import pytest
 
-from src.mordor.lab import engines, hosts, machines, provision, templates
+from src.mordor.lab import consoles, engines, hosts, machines, provision, templates
 from src.mordor.lab.runner import LabError, safe_name
 
 
@@ -112,11 +112,13 @@ def test_docker_snapshot_and_revert_use_the_committed_image(monkeypatch):
 
 def test_tart_start_spawns_and_snapshot_clones(monkeypatch):
     spawned, ran = [], []
-    monkeypatch.setattr("src.mordor.lab.engines.spawn", lambda argv: spawned.append(list(argv)))
+    monkeypatch.setattr("src.mordor.lab.engines.spawn", lambda argv, **k: spawned.append((list(argv), k)))
     monkeypatch.setattr("src.mordor.lab.engines.run", lambda argv, **k: ran.append(list(argv)) or "")
     t = engines.Tart()
     t.start("mac1")
-    assert spawned == [["tart", "run", "mac1", "--no-graphics"]]
+    # Its screen on VNC, the address and password in the log the console reads
+    assert spawned == [(["tart", "run", "mac1", "--no-graphics", "--vnc-experimental"],
+                        {"log_path": str(consoles.tart_log("mac1"))})]
     t.snapshot("mac1", "clean")
     assert ["tart", "clone", "mac1", "mac1.snap.clean"] in ran
 

@@ -118,7 +118,7 @@ It downloads the virtio-win drivers and Win32-OpenSSH, builds a config ISO (`aut
 
 Two UTM details shape how this works. The system disk is VirtIO, not NVMe, because QEMU crashes in its NVMe TRIM handler when Windows trims (the VM just stops; L5 in [BUGS.md](../tests/docs/BUGS.md)). And because UTM's `export` drops removable media, the ISOs are hard-linked into the VM bundle as fixed CD images rather than attached as removable drives (L6).
 
-To watch an install, set `WINDOWS_VM_VNC=1` before `create`: QEMU then also serves the VM's screen over VNC on `127.0.0.1:5959` (loopback only, no password), which any VNC client can open (`open vnc://127.0.0.1:5959`). Automatic updates are turned off in the answer file; a first-boot update run on a slow disk otherwise adds hours. `WINDOWS_INSTALL_WAIT` sets how many minutes `create` waits (default 90), and running `create` again on an existing VM just resumes waiting. `WINDOWS_BOOT_WAIT` (default 30) is the wait for SSH after `start` or a reboot; on a USB HDD, Windows took about 15 minutes to answer.
+To watch an install, open the VM's **Console** on **Aragorn → Lab**, or any VNC client on the Mac (`open vnc://127.0.0.1:5959`): QEMU serves the screen on `127.0.0.1:5959` (`5959+n` for a clean sibling), loopback only and without a password (see [VM Consoles](#vm-consoles)). Automatic updates are turned off in the answer file; a first-boot update run on a slow disk otherwise adds hours. `WINDOWS_INSTALL_WAIT` sets how many minutes `create` waits (default 90), and running `create` again on an existing VM just resumes waiting. `WINDOWS_BOOT_WAIT` (default 30) is the wait for SSH after `start` or a reboot; on a USB HDD, Windows took about 15 minutes to answer.
 
 **Clean siblings, for stacking.** `WINDOWS_CLEAN=<n>` before any `windows-vm` action, or before `windows/utm-vm.sh collect`, works on `rowan-lab-win11-clean<n>` instead: computer name `LAB-WINCLEAN<n>`, SSH on `127.0.0.1:2232+n`, provisioned with the `gandalf` user and remoting but nothing seeded (`Provision-GandalfTarget.ps1 -Clean`). It doesn't change which VM the lab drives by default. Two of them with `rowan-lab-win11` make three Windows hosts, one seeded; run them one at a time on a 16 GB Mac:
 
@@ -183,9 +183,22 @@ python3 -m src.mordor.telemetry --guide <Kaggle zip>     # re-summarise Microsof
 Recording is a Mordor run on **Aragorn → Deploy**; the machines themselves are on **Aragorn → Lab** (`/aragorn#lab`), with the rest of what Rowanholt runs on this host. Both need the lab agent and an admin login. The **Lab machines** panel shows this host and the engines it can drive (Docker, Tart, UTM), what you can create on it, and every machine:
 
 - **Create a machine**: an Ubuntu container (Docker), an Ubuntu or macOS VM (Tart, Apple silicon). Windows comes from UTM: **Clone existing** copies a built VM; **From ISO** checks a Windows 11 ARM64 ISO and can run `./lab.sh windows-vm create` to build the lab's VM unattended.
-- **Your machines**: Start/Stop, Snapshot, Revert, Clone (UTM), Set OS (a UTM VM the lab didn't build), Set up (audit logging, PowerShell, Atomic Red Team), Record (Atomic Red Team, with a preview and a snapshot confirmation), Logs, and Delete.
+- **Your machines**: Start/Stop, Snapshot, Revert, Clone (UTM), Set OS (a UTM VM the lab didn't build), Set up (audit logging, PowerShell, Atomic Red Team), Record (Atomic Red Team, with a preview and a snapshot confirmation), Console (a running Tart or UTM VM's screen; see [VM Consoles](#vm-consoles)), Logs, and Delete.
 
 The lab's own machines (the `lab-*` Gandalf containers, `rowan-lab-macos`, `rowan-lab-win11`) are listed and can be driven, but only `./lab.sh` deletes them. Delete appears only on machines this page created. Other VMs in UTM (Archer's `archer-win11`, say) can be started, snapshotted and recorded on, never deleted. **Set up** and **Record** on the lab's Windows VM run `mordor-sensor` and `mordor-record` over SSH; on any other machine they run inside it through `docker exec`, `tart exec` or `utmctl exec`, which on a UTM VM needs the UTM guest tools. Machines go to the Docker engine Rowanholt runs on and to `LAB_TART_HOME`. What the page knows about them (template, OS, set-up steps) is in `~/.config/rowanholt-lab/mordor-machines.json`. Slow actions run one at a time with the other lab commands and show their log on the page.
+
+### VM Consoles
+
+**Console** on a running Tart or UTM VM opens its screen in the browser, drawn by [noVNC](https://github.com/novnc/noVNC) 1.5.0 (MPL-2.0; its source and licence are in `node_modules/@novnc/novnc`), with keyboard, mouse, **Ctrl+Alt+Del** and fit-to-window. Every key, Escape included, goes to the VM, so the window closes from its × only. It's for an admin who isn't at the host, which on a team server is every admin.
+
+Each VM serves its screen over VNC on the host's loopback, and nothing else changes in the VM:
+
+- **Tart**: VMs start with `tart run --no-graphics --vnc-experimental`, from this page and from `./lab.sh linux-vm|macos-vm start`. Virtualization.framework's VNC server picks a port and a password each run, and Tart prints them into `~/.config/rowanholt-lab/run/<vm>.log`, which only you can read.
+- **UTM**: QEMU's `-vnc 127.0.0.1:<display>` among the VM's QEMU arguments in its `config.plist`, port `5900 + display`, no password. `./lab.sh windows-vm create`, `adopt` and `start` give the lab's Windows VM display 59 (`127.0.0.1:5959`) and a clean sibling `59+n`; a clone made with **Clone** gets the first free display from 70. For a UTM VM of your own, add `-vnc 127.0.0.1:<display>` under its QEMU arguments in UTM (one the lab doesn't use) and restart it.
+
+A VM that was running before consoles existed has none until it's stopped and started again. `LAB_VM_CONSOLE=0` leaves VNC off for what `./lab.sh` starts (the Machines list always starts Tart VMs with it). Vagrant/VirtualBox VMs (Intel Macs and Linux hosts) have no console yet.
+
+The lab agent finds each running VM's port itself (`src/mordor/lab/consoles.py`: Tart's log for Tart; UTM's registry, then the bundle's `config.plist`, for UTM) and accepts only a loopback address; a port two VMs claim (a UTM clone copied by hand, say) gives neither a console. The backend's `/api/lab/consoles/<engine>/<vm>/ws` takes a signed-in admin only, locally as on a server, checked before the agent hears of the request and every 30 seconds while it's open; it asks the agent for a tunnel to the VM by name, and the agent connects to that VM's own port on `127.0.0.1`. Neither takes a host or a port from the browser. Two things to know: a UTM VM's VNC has no password, so anything that can reach the host's loopback can open it as any VNC client could before; and Apple's VNC server behind `--vnc-experimental` is undocumented, so check once that it listens on loopback only (`lsof -nP -iTCP -sTCP:LISTEN | grep -i tart`). The agent must be restarted (`./lab.sh agent stop && ./lab.sh agent start`) after an update for consoles to appear.
 
 ## Running Rowanholt's Tests Against the Lab
 
@@ -209,6 +222,7 @@ Settings live in `~/.config/rowanholt-lab/lab.conf`. Edit them with `./lab.sh co
 | `WINDOWS_UTM_VM` | `rowan-lab-win11` | Apple silicon: the UTM VM the lab drives (set by `windows-vm adopt`) |
 | `LAB_TART_HOME` | — | Apple silicon: keep the Tart VMs here instead of `$LAB_VM_DIR/tart`, for example on the internal SSD while testing macOS (a first boot from a USB HDD took about an hour). `./lab.sh macos-vm move <dir>` moves the VM there, keeping its disk sparse (`rsync -S` and `cp` don't between APFS volumes), checks the copy, sets this, and offers to remove the old copy |
 | `WINDOWS_VM_MEMORY_MB` / `WINDOWS_VM_CPUS` | 6144 / 2 | |
+| `LAB_VM_CONSOLE` | 1 | Apple silicon: `0` has `./lab.sh` start its Tart VMs without VNC and leave `-vnc` out of the Windows VM's QEMU arguments (environment only; `WINDOWS_VM_VNC=0` still works) |
 | `LINUX_VM_MEMORY_MB` | 2048 | |
 
 Unattended runs: `LAB_YES=1` accepts every default, `LAB_FORCE=1` answers yes to everything, and `LAB_PASSWORD` overrides both the keyring and the default.

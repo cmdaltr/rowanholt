@@ -234,4 +234,4 @@ The backend migrates its database on start with Alembic (`src/web/backend/alembi
 
 These are feature requests in `docs/FEATURE_REQUESTS.md`:
 
-- **FR-04:** lab VM consoles in the browser.
+- **FR-04:** lab VM consoles in the browser. Built (**Console** on Aragorn › Lab; `lab/README.md`, VM Consoles), not yet tried on a server. The console is a websocket under `/api/lab/consoles/`, which Caddy's `/api/*` proxy carries as it does any websocket (uvicorn's 20-second pings keep an idle console inside the 30-minute timeouts there), and it needs the lab agent on the server host itself, with Tart or UTM VMs: the backend reaches the agent at `LAB_AGENT_URL`, and the agent the VMs on the host's loopback.

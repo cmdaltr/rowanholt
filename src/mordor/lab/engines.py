@@ -5,20 +5,26 @@ The engines Rowanholt drives on the machine it runs on, behind one interface
   docker   Linux containers. A snapshot is a committed image; revert recreates the
            container from it. Works wherever the docker command does.
   tart     macOS and Linux VMs on Apple Silicon. A snapshot is a clone; revert deletes the
-           VM and clones the snapshot back. `tart run` holds the VM open, so start spawns it.
+           VM and clones the snapshot back. `tart run` holds the VM open, so start spawns it,
+           with its screen on VNC (consoles.py).
+  utm      UTM/QEMU VMs on macOS through utmctl; a clone gets a console port of its own.
 
 The command parsing (parse_docker_ps, parse_tart_list) is pure, so it's tested without either
 installed. Names are validated by the caller (machines) before they reach here. Ported from Archer.
 """
 
 import json
+import logging
 import re
 import subprocess
 import sys
 import time
 from typing import Dict, List
 
+from . import consoles
 from .runner import LabError, run, run_ok, spawn
+
+logger = logging.getLogger(__name__)
 
 LABEL = "rowanholt.mordor=1"  # marks the containers Rowanholt made
 LAB_PROJECT = "com.docker.compose.project=rowanholt-lab"  # the lab's own Gandalf targets (lab-ubuntu…)
@@ -144,7 +150,9 @@ class Tart:
         run(["tart", "clone", image, name], timeout=1800)  # pulls the image if it's remote
 
     def start(self, name: str):
-        spawn(["tart", "run", name, "--no-graphics"])  # holds the VM open; returns at once
+        # Holds the VM open; returns at once. Its screen is served over VNC on loopback, and
+        # the address and password Tart prints go to the log consoles.discover reads
+        spawn(["tart", "run", name, "--no-graphics", "--vnc-experimental"], log_path=str(consoles.tart_log(name)))
 
     def stop(self, name: str):
         run(["tart", "stop", name], timeout=90, check=False)
@@ -299,6 +307,13 @@ class UTM:
         # Copies the disk, so it's slow for a Windows VM — run it as a job. UTM registers the
         # clone itself; it inherits the source's drives, snapshots and guest tools.
         utmctl("clone", name, "--name", new_name, timeout=1800)
+        # The clone has its source's -vnc display too, and QEMU won't start on a taken port
+        clone = [m for m in self.list() if m["name"] == new_name]
+        if clone:
+            try:
+                consoles.renumber_utm_clone(new_name, clone[0]["uuid"])
+            except LabError as e:
+                logger.warning(f"{new_name}: {e.message} ({e.detail}); it shares {name}'s console port")
 
     def delete(self, name: str):
         utmctl("delete", name, timeout=60, check=False)

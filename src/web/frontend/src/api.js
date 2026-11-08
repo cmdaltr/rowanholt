@@ -337,6 +337,15 @@ export const listLabRuns = async () => (await api.get('/api/lab/runs')).data;
 export const getLabRun = async (runId, offset = 0) =>
   (await api.get(`/api/lab/runs/${runId}`, { params: { offset } })).data;
 export const cancelLabRun = async (runId) => (await api.post(`/api/lab/runs/${runId}/cancel`)).data;
+// Lab VM consoles (lab_routes.lab_console_socket): the running VMs with a VNC server, one VM's
+// (with the password noVNC answers with), and its websocket, which goes by the session cookie
+export const listLabConsoles = async () => (await api.get('/api/lab/consoles')).data;
+export const getLabConsole = async (engine, name) =>
+  (await api.get(`/api/lab/consoles/${engine}/${encodeURIComponent(name)}`)).data;
+export const labConsoleUrl = (engine, name) => {
+  const base = new URL(API_BASE_URL || window.location.origin, window.location.href);
+  return `${base.origin.replace(/^http/, 'ws')}/api/lab/consoles/${engine}/${encodeURIComponent(name)}/ws`;
+};
 
 // Mordor: recorded attack telemetry (src/mordor/telemetry) and the lab that records it
 // (src/mordor/lab, through the host's lab agent; admin-only)
