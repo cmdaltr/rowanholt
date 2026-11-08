@@ -12,7 +12,7 @@ from unittest import mock
 import zipfile
 from pathlib import Path
 
-# Appended, not prepended: src/analysis/platform would shadow the stdlib module.
+# Appended, not prepended, as it always was (src/analysis/platform shadowed the stdlib module until it became platform_adapters).
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src" / "analysis"))
 
 from rowanholt.core import gandalf  # noqa: E402

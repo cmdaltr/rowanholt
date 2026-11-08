@@ -10,7 +10,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-# Appended, not prepended: src/analysis/platform would shadow the stdlib module.
+# Appended, not prepended, as it always was (src/analysis/platform shadowed the stdlib module until it became platform_adapters).
 sys.path.append(str(ROOT / "src" / "analysis"))
 
 from src.mordor.lab import dataset  # noqa: E402

@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from elrond.platform import get_platform_adapter
+from elrond.platform_adapters import get_platform_adapter
 from elrond.tools import get_tool_manager
 from elrond.utils.constants import DEFAULT_COMMAND_TIMEOUT
 from elrond.utils.exceptions import ToolNotFoundError

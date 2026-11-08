@@ -275,3 +275,16 @@ def test_export_targets_runs_each_and_reports_failures(tmp_path):
     assert os_export.call_args.args[2] == {f"{case}/LAB-WIN11/artefacts/raw": "LAB-WIN11::Windows10"}
     audit = (case / "rowanholt_audit.log").read_text()
     assert "exported 1 host(s) to OpenSearch" in audit and "Timesketch export failed: down" in audit
+
+
+def test_modules_import_as_elrond_runs_them():
+    """Elrond runs with src/analysis first on sys.path, where a package called platform shadowed the
+    stdlib's: uuid imports platform, so --OpenSearch, --Timesketch and the method record crashed in the
+    worker (8 November 2026). A subprocess, so this test's own sys.path doesn't hide it."""
+    import subprocess
+    analysis = Path(__file__).resolve().parents[2] / "src" / "analysis"
+    code = ("import sys; sys.path.insert(0, %r); import platform; assert hasattr(platform, 'system'); "
+            "import rowanholt.post.timesketch, rowanholt.post.opensearch, rowanholt.report.method, "
+            "rowanholt.post.elastic.dashboards.generator") % str(analysis)
+    result = subprocess.run([sys.executable, "-c", code], cwd=analysis, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr[-2000:]

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from elrond.config import get_settings
-from elrond.platform import get_platform_adapter
+from elrond.platform_adapters import get_platform_adapter
 from elrond.tools import get_tool_manager
 from elrond.core.executor import get_executor
 from elrond.utils.logging import get_logger
