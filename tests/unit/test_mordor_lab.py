@@ -115,6 +115,11 @@ def test_tart_start_spawns_and_snapshot_clones(monkeypatch):
     monkeypatch.setattr("src.mordor.lab.engines.spawn", lambda argv, **k: spawned.append((list(argv), k)))
     monkeypatch.setattr("src.mordor.lab.engines.run", lambda argv, **k: ran.append(list(argv)) or "")
     t = engines.Tart()
+    monkeypatch.delenv("LAB_VM_CONSOLE", raising=False)
+    t.start("mac1")  # no console unless asked for: a UTM VM's VNC has no password
+    assert spawned == [(["tart", "run", "mac1", "--no-graphics"], {"log_path": str(consoles.tart_log("mac1"))})]
+    spawned.clear()
+    monkeypatch.setenv("LAB_VM_CONSOLE", "1")
     t.start("mac1")
     # Its screen on VNC, the address and password in the log the console reads
     assert spawned == [(["tart", "run", "mac1", "--no-graphics", "--vnc-experimental"],

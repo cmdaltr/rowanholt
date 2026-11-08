@@ -35,7 +35,7 @@ from typing import Callable, Dict, Iterable, Iterator, List, Optional, Tuple
 
 from rowanholt.audit import write_audit_log_entry
 from rowanholt.core.mobile import (ANDROID, IOS, MobileEvidence, backup_password, is_mobile_image, load_evidence,
-                                   manifest_files)
+                                   manifest_files, verify_evidence)
 from rowanholt.core.records import SUFFIX, iso_timestamp, own_fields, read_records, write_records
 from rowanholt.process.extractions import android_backup, mobile_config
 from rowanholt.process.extractions.artemis import _record_techniques
@@ -501,5 +501,9 @@ def process_mobile(verbosity: str, output_directory: str, imgs: Dict[str, str], 
         except Exception as e:  # one phone's failure mustn't stop the others
             logger.exception("processing %s failed", img)
             print(f"     ERROR processing '{img.split('::')[0]}': {e}", flush=True)
+        try:  # whatever happened, the evidence is checked against its hashes from registration
+            verify_evidence(verbosity, output_directory, img.split("::")[0])
+        except OSError as e:
+            print(f"     ERROR checking '{img.split('::')[0]}' against its hashes: {e}", flush=True)
     print("  ----------------------------------------\n  -> Completed Processing Phase (phones).\n")
     return done

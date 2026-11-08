@@ -179,14 +179,14 @@ PY
 
 # The VM's screen over VNC on 127.0.0.1:$VNC_PORT (QEMU display $VNC_DISPLAY; no password,
 # loopback only), for the Console button on Aragorn > Lab and any VNC client on this host
-# (open vnc://127.0.0.1:5959). LAB_VM_CONSOLE=0 (or the older WINDOWS_VM_VNC=0) leaves it off.
+# (open vnc://127.0.0.1:5959). Only with LAB_VM_CONSOLE=1 (or the older WINDOWS_VM_VNC=1).
 # Exits 0 when config.plist changed (UTM then needs to reload it), 1 when it was already so.
 VNC_DISPLAY=$((59 + ${CLEAN:-0}))
 VNC_PORT=$((5900 + VNC_DISPLAY))
 write_console() {
-  python3 - "$BUNDLE/config.plist" "$VNC_DISPLAY" "${LAB_VM_CONSOLE:-${WINDOWS_VM_VNC:-1}}" <<'PY'
+  python3 - "$BUNDLE/config.plist" "$VNC_DISPLAY" "${LAB_VM_CONSOLE:-${WINDOWS_VM_VNC:-0}}" <<'PY'
 import plistlib, sys
-path, display, on = sys.argv[1], sys.argv[2], sys.argv[3] != "0"
+path, display, on = sys.argv[1], sys.argv[2], sys.argv[3] == "1"
 with open(path, "rb") as f:
     cfg = plistlib.load(f)
 old = cfg.setdefault("QEMU", {}).get("AdditionalArguments", [])

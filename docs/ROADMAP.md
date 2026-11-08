@@ -237,6 +237,24 @@ The day v2.3 was merged (PR #2, merge commit `a9c118b`). Bug numbers are in `tes
 | `server init --tls tailscale` serves Tailscale's certificate for a MagicDNS name (refusing `internal` there), and `rowanholt server cert` renews it | `scripts/server/`, [SERVER.md](SERVER.md#certificates) |
 | A server's accounts live in the checkout's `users.json`, not the images: rebuilds keep them, `git clean -x` doesn't, so back it up with `.env` and Postgres | [SERVER.md](SERVER.md#limits-worth-knowing) |
 
+## Done 8 November 2026
+
+Every feature request built, each still open in `docs/FEATURE_REQUESTS.md` until its "Done when" has been run where it needs to be.
+
+| What | Where |
+|---|---|
+| Team servers on Rocky, RHEL and Alma: SELinux without relabelling evidence (`label=disable` on the services that mount host folders), firewalld, Docker's RHEL packages (FR-01) | `deploy/docker-compose.selinux.yml`, `server-init.sh`, [SERVER.md](SERVER.md#rocky-rhel-and-alma) |
+| Team servers on Windows Server 2022 and 2025, in a WSL 2 distribution of their own, started at boot with nobody signed in (FR-02) | `scripts/server/windows/`, [SERVER.md](SERVER.md#windows-server) |
+| The desktop app as an RPM for Rocky, RHEL and Alma 9 (FR-03) | `app/linux/package-rpm.sh`, `desktop-release.yml` |
+| Lab VM consoles on Aragorn › Lab, through the lab agent, for admins only; opt-in with `LAB_VM_CONSOLE=1` (FR-04) | `src/mordor/lab/consoles.py`, `lab_routes.py`, `lab/README.md` |
+| Phones: iTunes/Finder and ADB backups, bug reports and extractions through iLEAPP and ALEAPP, ATT&CK Mobile techniques, the evidence hashed before and after (FR-05) | `core/mobile.py`, `process/mobile.py`, [CLI.md](CLI.md) |
+| Network evidence: PCAPs through Zeek, Zeek logs and NetFlow exports, joined to the hosts' IOCs (FR-06) | `process/network.py`, [CLI.md](CLI.md) |
+| The case report, Markdown and DOCX, every claim cited to its row; curated from the findings in the case browser (FR-07) | `rowanholt/report/`, [CLI.md](CLI.md#case-report) |
+| OpenSearch (and Wazuh's indexer) and Timesketch (FR-08) | `post/opensearch.py`, `post/timesketch.py`, [CLI.md](CLI.md#siem-integration) |
+| Artemis's event times were null on the 3.10 worker, so every event log lost its time; the SIEM exports fall back to the event's own time for cases processed before the fix | `core/records.py`, `post/elastic/ingest.py` |
+
+Parked: Azure in a lab (above). The Volatility 3 plugins are their own repository's work.
+
 ## Decisions (Ben, 29 October 2026)
 
 1. **The `mcp` package: yes,** in its own `requirements/mcp.txt`, installed only where the MCP server runs, not in the worker or backend images.

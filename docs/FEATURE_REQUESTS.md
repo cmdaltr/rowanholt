@@ -6,13 +6,13 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 
 | ID | Request | Area |
 |---|---|---|
-| FR-01 | Team servers on Linux beyond Ubuntu (RHEL, Rocky, Alma) | Server |
-| FR-02 | Team servers on Windows Server | Server |
-| FR-03 | Desktop app RPM for Rocky Linux 9 / RHEL 9 | Desktop app |
-| FR-04 | Lab VM consoles in the browser | Aragorn, server |
-| FR-05 | Mobile device forensics (iOS, Android) | Gandalf, Elrond |
-| FR-06 | Network forensics (PCAP, Zeek, NetFlow) | Elrond |
-| FR-07 | Automated reporting | Elrond, web |
+| FR-01 | Team servers on Linux beyond Ubuntu (RHEL, Rocky, Alma): built, not yet run on Rocky | Server |
+| FR-02 | Team servers on Windows Server: built, not yet run on Windows Server | Server |
+| FR-03 | Desktop app RPM for Rocky Linux 9 / RHEL 9: built, first run on a desktop untried | Desktop app |
+| FR-04 | Lab VM consoles in the browser: built, not yet run on a server | Aragorn, server |
+| FR-05 | Mobile device forensics (iOS, Android): built, needs test images | Gandalf, Elrond |
+| FR-06 | Network forensics (PCAP, Zeek, NetFlow): built, lab capture to do | Elrond |
+| FR-07 | Automated reporting: built, some techniques have no row to cite | Elrond, web |
 | FR-08 | More SIEM integrations: OpenSearch/Wazuh and Timesketch (built; Wazuh untried) | Elrond output |
 
 ## FR-01: Team servers on Linux beyond Ubuntu
@@ -39,7 +39,7 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 
 ## FR-04: Lab VM consoles in the browser
 
-Built 8 November 2026 on `feat/lab-consoles`: **Console** per Tart and UTM VM on Aragorn › Lab, drawn by noVNC; Tart VMs start with `--vnc-experimental`, the lab's UTM VMs get `-vnc 127.0.0.1:N` (a clone a free display of its own); the lab agent finds each running VM's port (`src/mordor/lab/consoles.py`) and tunnels to it on loopback by VM name; the backend's websocket relay takes signed-in admins only, locally and on a server. Described in `lab/README.md` (VM Consoles). Still to do: `@novnc/novnc` 1.5.0 into `package.json` and the lock file, exact-pinned (the registry couldn't be reached when it was built, so the frontend doesn't build until it's installed); Vagrant/VirtualBox VMs have no console.
+Built 8 November 2026 on `feat/lab-consoles`: **Console** per Tart and UTM VM on Aragorn › Lab, drawn by noVNC, opt-in with `LAB_VM_CONSOLE=1`; Tart VMs start with `--vnc-experimental`, the lab's UTM VMs get `-vnc 127.0.0.1:N` (a clone a free display of its own); the lab agent finds each running VM's port (`src/mordor/lab/consoles.py`) and tunnels to it on loopback by VM name; the backend's websocket relay takes signed-in admins only, locally and on a server. Described in `lab/README.md` (VM Consoles). Still to do: `@novnc/novnc` 1.5.0 into `package.json` and the lock file, exact-pinned (the registry couldn't be reached when it was built, so the frontend doesn't build until it's installed); Vagrant/VirtualBox VMs have no console.
 
 **Done when** an admin opens a lab VM's console from the browser on a team server, and a non-admin can't reach the relay at all.
 
@@ -47,7 +47,7 @@ Built 8 November 2026 on `feat/lab-consoles`: **Console** per Tart and UTM VM on
 
 ## FR-05: Mobile device forensics (iOS, Android)
 
-Built 8 November 2026 (`feat/mobile-forensics`): `elrond.py --Mobile` (and the job form's Mobile source) takes iTunes/Finder backups, encrypted ones with the password on standard input (`--backupPasswordStdin`; the web app hands it to the worker through Redis, never the job), ADB backups (opened and laid out as a file system by Elrond), bug reports and full file system extractions (folders or archives). iLEAPP v2026.4.6 and ALEAPP v2026.4.5 run as subprocesses from their own virtualenvs in the worker image; their TSV exports are cooked into `cooked/ileapp/` and `cooked/aleapp/`, with `artefacts/mobile_timeline.jsonl` and IOC extraction as for any host; device management (configuration profiles, MDM, Android device administrators and owners) is read by Elrond and tagged **T1632.001** and **T1626.001** from ATT&CK Mobile. Documented in `docs/CLI.md` (Phones). Tested only against synthetic fixtures shaped like the tools' output: neither tool has been run by Rowanholt yet, and the worker image with them hasn't been built.
+Built 8 November 2026 (`feat/mobile-forensics`): `elrond.py --Mobile` (and the job form's Mobile source) takes iTunes/Finder backups, encrypted ones with the password on standard input (`--backupPasswordStdin`; the web app hands it to the worker through Redis, never the job), ADB backups (opened and laid out as a file system by Elrond), bug reports and full file system extractions (folders or archives). iLEAPP v2026.4.6 and ALEAPP v2026.4.5 run as subprocesses from their own virtualenvs in the worker image; their TSV exports are cooked into `cooked/ileapp/` and `cooked/aleapp/`, with `artefacts/mobile_timeline.jsonl` and IOC extraction as for any host; device management (configuration profiles, MDM, Android device administrators and owners) is read by Elrond and tagged **T1632.001** and **T1626.001** from ATT&CK Mobile. Each item's files are hashed (SHA-256) when it's registered and checked again after processing (`mobile_integrity`). Documented in `docs/CLI.md` (Phones). Tested only against synthetic fixtures shaped like the tools' output: neither tool has been run by Rowanholt yet, and the worker image with them hasn't been built.
 
 **Done when** (not yet) an iOS backup and an Android extraction each produce a case with a timeline, cooked artefacts and mobile techniques, with known answers from test images.
 

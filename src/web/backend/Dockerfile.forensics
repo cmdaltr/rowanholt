@@ -230,9 +230,8 @@ RUN freshclam --quiet --stdout || echo "WARNING: freshclam failed; rebuild the w
 # (the security:zeek project on openSUSE's build service, as zeek.org's install guide gives).
 # zeek-7.0 is the 7.0 LTS series, so the pin is the series: the build service keeps only each
 # package's latest build, and an exact =7.0.x pin would stop building at the next patch release.
-# It installs to /opt/zeek. If the repository has no build for this architecture (it is built for
-# x86_64 first), the image still builds: --Network then cooks Zeek logs and NetFlow exports and
-# says each PCAP was skipped
+# It installs to /opt/zeek. A worker without Zeek would skip every PCAP, so a missing build for this
+# architecture fails the image rather than warning
 ARG ZEEK_SERIES=7.0
 RUN apt-get update && apt-get install -y --no-install-recommends gnupg \
     && echo "deb http://download.opensuse.org/repositories/security:/zeek/xUbuntu_22.04/ /" \
@@ -240,10 +239,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends gnupg \
     && curl -fsSL "https://download.opensuse.org/repositories/security:zeek/xUbuntu_22.04/Release.key" \
         | gpg --dearmor > /etc/apt/trusted.gpg.d/security_zeek.gpg \
     && apt-get update \
-    && (apt-get install -y --no-install-recommends "zeek-${ZEEK_SERIES}" \
-        && ln -sf /opt/zeek/bin/zeek /usr/local/bin/zeek \
-        && zeek --version \
-        || echo "WARNING: Zeek ${ZEEK_SERIES} isn't available for $(dpkg --print-architecture); --Network will skip PCAPs") \
+    && apt-get install -y --no-install-recommends "zeek-${ZEEK_SERIES}" \
+    && ln -sf /opt/zeek/bin/zeek /usr/local/bin/zeek \
+    && zeek --version \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

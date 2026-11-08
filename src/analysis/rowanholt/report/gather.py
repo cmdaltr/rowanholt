@@ -121,6 +121,7 @@ class Integrity:
     archive: str = ""
     extracted: str = ""
     summary: str = ""  # what the extraction marker recorded
+    phone: bool = False  # checked against the hashes taken when the phone's evidence was registered
 
 
 @dataclass
@@ -452,9 +453,10 @@ def _integrity(host: HostReport, host_dir: Path) -> None:
             integrity.summary = str(data.get("integrity", ""))
         except (OSError, ValueError, AttributeError):
             pass
-    path = _table(host_dir, "gandalf_integrity")
+    path = _table(host_dir, "gandalf_integrity") or _table(host_dir, "mobile_integrity")
     if not path:
         return
+    integrity.phone = path.stem == "mobile_integrity"
     integrity.checked = True
     integrity.file = path.relative_to(host_dir).as_posix()
     try:

@@ -257,6 +257,29 @@ class ClassifyTest(Tmp):
             if path.is_file():
                 self.assertNotIn(PASSWORD.encode(), path.read_bytes(), path)
 
+    def test_evidence_is_hashed_when_registered_and_checked_after(self):
+        source = self.tmp / "phones"
+        ios_filesystem(source / "Ben_s_iPhone")
+        case = self.tmp / "case"
+        case.mkdir()
+        host, = core_mobile.ingest_mobile(str(case) + "/", "", str(source), {})
+        recorded = (case / host / core_mobile.HASH_FILE).read_text().splitlines()
+        files = [p for p in (source / "Ben_s_iPhone").rglob("*") if p.is_file()]
+        self.assertEqual(recorded[0], "file_path,size,sha256")
+        self.assertEqual(len(recorded) - 1, len(files))
+        self.assertEqual(core_mobile.verify_evidence("", str(case) + "/", host),
+                         {"verified": len(files), "MISMATCH": 0, "missing": 0})
+        changed, gone = files[0], files[1]
+        changed.write_bytes(changed.read_bytes() + b"altered")
+        gone.unlink()
+        counts = core_mobile.verify_evidence("", str(case) + "/", host)
+        self.assertEqual((counts["MISMATCH"], counts["missing"]), (1, 1))
+        rows = [json.loads(line) for line in (case / host / "mobile_integrity.jsonl").read_text().splitlines()]
+        statuses = {r["file_path"]: r["status"] for r in rows}
+        self.assertEqual([s for p, s in statuses.items() if p.endswith(changed.name)], ["MISMATCH"])
+        self.assertEqual([s for p, s in statuses.items() if p.endswith(gone.name)], ["missing"])
+        self.assertIn(",mobile integrity,", (case / "rowanholt_audit.log").read_text())
+
     def test_password_from_standard_input(self):
         self.assertEqual(core_mobile.read_backup_password(io.StringIO(PASSWORD + "\nmore\n")), PASSWORD)
         self.assertIsNone(core_mobile.read_backup_password(io.StringIO("\n")))

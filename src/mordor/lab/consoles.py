@@ -17,6 +17,7 @@ Standard library only, Python 3.8-compatible: the lab agent runs it on the host.
 """
 from __future__ import annotations
 
+import os
 import logging
 import plistlib
 import shlex
@@ -42,6 +43,12 @@ RUN_DIR = Path.home() / ".config" / "rowanholt-lab" / "run"
 # QEMU -vnc options that need something the relay can't give (a password set over the monitor,
 # TLS, SASL) or that point the server elsewhere
 _REFUSED_VNC_OPTIONS = ("password", "password-secret", "tls-creds", "tls-authz", "sasl", "reverse")
+
+
+def enabled() -> bool:
+    """Whether the lab's VMs get a VNC console: opt-in with LAB_VM_CONSOLE=1, since a UTM VM's VNC
+    has no password and anything on the host's loopback could open it."""
+    return os.environ.get("LAB_VM_CONSOLE", "0").strip() == "1"
 
 
 def tart_log(name: str) -> Path:

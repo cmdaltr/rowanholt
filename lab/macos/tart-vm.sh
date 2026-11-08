@@ -70,12 +70,12 @@ start_vm() {
     info "Starting $VM (headless)"
     # The screen goes to Virtualization.framework's VNC server, on a port and password Tart
     # picks and prints into the log, for the Console button on Aragorn > Lab (src/mordor/lab/
-    # consoles.py); hence a log only its owner can read. LAB_VM_CONSOLE=0 leaves VNC off.
+    # consoles.py); hence a log only its owner can read. Only with LAB_VM_CONSOLE=1.
     rm -f "$RUN_DIR/$VM.log"
-    if [ "${LAB_VM_CONSOLE:-1}" = 0 ]; then
-      ( umask 077; nohup "$TART" run --no-graphics "$VM" >"$RUN_DIR/$VM.log" 2>&1 & )
-    else
+    if [ "${LAB_VM_CONSOLE:-0}" = 1 ]; then
       ( umask 077; nohup "$TART" run --no-graphics --vnc-experimental "$VM" >"$RUN_DIR/$VM.log" 2>&1 & )
+    else
+      ( umask 077; nohup "$TART" run --no-graphics "$VM" >"$RUN_DIR/$VM.log" 2>&1 & )
     fi
   fi
   local ip; ip="$(wait_ip)"

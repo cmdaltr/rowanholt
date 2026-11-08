@@ -221,7 +221,8 @@ def _integrity_result(host: HostReport) -> str:
         bad = sum(n for s, n in counts.items() if s != "verified")
         total = sum(counts.values())
         if not bad:
-            return f"all {total:,} files match Gandalf's SHA-256"
+            whose = "the SHA-256 taken when the evidence was registered" if integrity.phone else "Gandalf's SHA-256"
+            return f"all {total:,} files match {whose}"
         return f"{bad:,} of {total:,} files don't verify: see below"
     if integrity.gandalf:
         return ("not checked: Gandalf's log.meta has no archive-path hashes (an older collector)"
@@ -234,11 +235,14 @@ def _integrity(report: CaseReport) -> List[Block]:
                            Para([("Gandalf records the SHA-256 of every file it collects in ", ""), ("log.meta", "code"),
                                  ("; before extracting an archive, Elrond hashes each file in it again and records the "
                                   "result per file in the host's ", ""), ("gandalf_integrity", "code"),
-                                 (" table (verified, MISMATCH, missing, unhashed).", "")])]
+                                 (" table (verified, MISMATCH, missing, unhashed). A phone's evidence, which stays where "
+                                  "it is, is hashed when it's registered and again after iLEAPP or ALEAPP has run, into ", ""),
+                                 ("mobile_integrity", "code"), (".", "")])]
     rows = []
     for host in report.hosts:
         counts = host.integrity.counts
-        source = host.integrity.archive or ("Gandalf" if host.integrity.gandalf else "disk or memory image")
+        source = host.integrity.archive or ("Gandalf" if host.integrity.gandalf else
+                                            "phone evidence" if host.integrity.phone else "disk or memory image")
         rows.append([host.name, source, *(f"{counts.get(s, 0):,}" if host.integrity.checked else ""
                                           for s in ("verified", "MISMATCH", "missing", "unhashed")),
                      _integrity_result(host), [(host.integrity.file, "code")] if host.integrity.file else ""])

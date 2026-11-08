@@ -342,6 +342,8 @@ Techniques are tagged only where the logs show the behaviour, and each tagged ro
 
 Rowanholt doesn't extract from devices: that's a different job with its own tools and legal footing. It reads what the extraction tool or `adb` produced. Each item becomes a host, `DEST_DIR/<host>/`, named from the backup's `Info.plist` (device name) or the file or folder's name, with `host.info` (`<host>::iOS` or `<host>::Android`) and `mobile_evidence.json` (what it is and where). The evidence stays where it is: `raw/` is empty.
 
+For chain of custody, every file of each item is hashed (SHA-256) when it's registered, into `<host>/mobile_evidence_sha256.csv`, and hashed again after iLEAPP or ALEAPP has run: `<host>/mobile_integrity.jsonl` records each file as verified, MISMATCH or missing, the audit log the counts, and the case report shows it with Gandalf's checks. Hashing reads the whole extraction twice, which on a large one takes a while.
+
 | Evidence | What happens |
 |---|---|
 | iTunes/Finder backup | iLEAPP `-t itunes`. Encrypted: iLEAPP decrypts it with the password, which reaches it on its standard input (its own prompt, which reads standard input when it has no terminal; it runs in a session of its own) |
@@ -484,7 +486,7 @@ python3 src/analysis/elrond.py CASE-001 /evidence/zeek/sensor-1 /evidence/flows.
 | Hosts and timespan | Each host's OS (`host.info` or the audit log), tables and records, when Gandalf collected it (`gandalf_log.audit`) and Elrond processed it (the audit log); the earliest and latest record times and the first and last rows tagged with a technique, each cited |
 | ATT&CK techniques | Every technique in `mitre_techniques.txt` or a row's `techniques`, with its name and tactics, and up to five rows per table cited for each (the count of the rest, to filter for in the case browser). Techniques recorded with no row naming them are listed apart, as leads |
 | Indicators | `analysis/iocs`: counts by type, watchlist matches, the most frequent 25 of each type; `threat_intel_matches` and the case's `threat_groups` |
-| Evidence integrity | `gandalf_integrity` per host (verified, MISMATCH, missing, unhashed), with every file that didn't verify cited |
+| Evidence integrity | `gandalf_integrity` per host (verified, MISMATCH, missing, unhashed), or a phone's `mobile_integrity`, with every file that didn't verify cited |
 | Method | `rowanholt_method.json`: the command, options, evidence, the tools found with their versions, Python and platform; the audit log's stages and failures |
 
 Every claim is cited by host, file (relative to the host's folder, as the case browser lists it), row (the line number) and the first 12 hex digits of the row's SHA-256, computed as the case browser and findings compute it. A row's "parsed from" is the collected file in `artefacts/raw/` it came from.

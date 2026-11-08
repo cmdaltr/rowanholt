@@ -193,10 +193,12 @@ The lab's own machines (the `lab-*` Gandalf containers, `rowan-lab-macos`, `rowa
 
 Each VM serves its screen over VNC on the host's loopback, and nothing else changes in the VM:
 
+Consoles are opt-in: set `LAB_VM_CONSOLE=1` in the environment of the lab agent and of `./lab.sh`, because a UTM VM's VNC has no password. Then:
+
 - **Tart**: VMs start with `tart run --no-graphics --vnc-experimental`, from this page and from `./lab.sh linux-vm|macos-vm start`. Virtualization.framework's VNC server picks a port and a password each run, and Tart prints them into `~/.config/rowanholt-lab/run/<vm>.log`, which only you can read.
 - **UTM**: QEMU's `-vnc 127.0.0.1:<display>` among the VM's QEMU arguments in its `config.plist`, port `5900 + display`, no password. `./lab.sh windows-vm create`, `adopt` and `start` give the lab's Windows VM display 59 (`127.0.0.1:5959`) and a clean sibling `59+n`; a clone made with **Clone** gets the first free display from 70. For a UTM VM of your own, add `-vnc 127.0.0.1:<display>` under its QEMU arguments in UTM (one the lab doesn't use) and restart it.
 
-A VM that was running before consoles existed has none until it's stopped and started again. `LAB_VM_CONSOLE=0` leaves VNC off for what `./lab.sh` starts (the Machines list always starts Tart VMs with it). Vagrant/VirtualBox VMs (Intel Macs and Linux hosts) have no console yet.
+A VM that was running before consoles were turned on has none until it's stopped and started again. Without `LAB_VM_CONSOLE=1` nothing gets VNC: Tart VMs start without it, and `./lab.sh windows-vm start` takes `-vnc` back out of the Windows VM's QEMU arguments. Vagrant/VirtualBox VMs (Intel Macs and Linux hosts) have no console yet.
 
 The lab agent finds each running VM's port itself (`src/mordor/lab/consoles.py`: Tart's log for Tart; UTM's registry, then the bundle's `config.plist`, for UTM) and accepts only a loopback address; a port two VMs claim (a UTM clone copied by hand, say) gives neither a console. The backend's `/api/lab/consoles/<engine>/<vm>/ws` takes a signed-in admin only, locally as on a server, checked before the agent hears of the request and every 30 seconds while it's open; it asks the agent for a tunnel to the VM by name, and the agent connects to that VM's own port on `127.0.0.1`. Neither takes a host or a port from the browser. Two things to know: a UTM VM's VNC has no password, so anything that can reach the host's loopback can open it as any VNC client could before; and Apple's VNC server behind `--vnc-experimental` is undocumented, so check once that it listens on loopback only (`lsof -nP -iTCP -sTCP:LISTEN | grep -i tart`). The agent must be restarted (`./lab.sh agent stop && ./lab.sh agent start`) after an update for consoles to appear.
 
@@ -222,7 +224,7 @@ Settings live in `~/.config/rowanholt-lab/lab.conf`. Edit them with `./lab.sh co
 | `WINDOWS_UTM_VM` | `rowan-lab-win11` | Apple silicon: the UTM VM the lab drives (set by `windows-vm adopt`) |
 | `LAB_TART_HOME` | — | Apple silicon: keep the Tart VMs here instead of `$LAB_VM_DIR/tart`, for example on the internal SSD while testing macOS (a first boot from a USB HDD took about an hour). `./lab.sh macos-vm move <dir>` moves the VM there, keeping its disk sparse (`rsync -S` and `cp` don't between APFS volumes), checks the copy, sets this, and offers to remove the old copy |
 | `WINDOWS_VM_MEMORY_MB` / `WINDOWS_VM_CPUS` | 6144 / 2 | |
-| `LAB_VM_CONSOLE` | 1 | Apple silicon: `0` has `./lab.sh` start its Tart VMs without VNC and leave `-vnc` out of the Windows VM's QEMU arguments (environment only; `WINDOWS_VM_VNC=0` still works) |
+| `LAB_VM_CONSOLE` | 0 | Apple silicon: `1` gives the lab's VMs a VNC console for Aragorn › Lab (Tart's `--vnc-experimental`, `-vnc 127.0.0.1:N` for UTM); set it for the lab agent and `./lab.sh` alike (environment only; `WINDOWS_VM_VNC=1` still works) |
 | `LINUX_VM_MEMORY_MB` | 2048 | |
 
 Unattended runs: `LAB_YES=1` accepts every default, `LAB_FORCE=1` answers yes to everything, and `LAB_PASSWORD` overrides both the keyring and the default.

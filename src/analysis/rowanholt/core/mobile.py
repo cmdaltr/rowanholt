@@ -13,12 +13,19 @@ Each item becomes an Elrond host, <case>/<host>/, registered in allimgs as "<hos
 is tens of gigabytes, and it isn't Elrond's to copy), and <host>/mobile_evidence.json records
 where it is and what it is. process/mobile.py runs iLEAPP or ALEAPP over it.
 
+For chain of custody every file of the evidence is hashed (SHA-256) when it's registered, into
+<host>/mobile_evidence_sha256.csv, and hashed again once the tools have run: verify_evidence()
+writes the comparison per file to <host>/mobile_integrity.jsonl (verified, MISMATCH, missing),
+the shape of Gandalf's gandalf_integrity, and the case report shows it as it shows that.
+
 The password of an encrypted backup comes from the analyst at run time (elrond.py's
 --backupPasswordStdin), is held in memory here only, and never reaches a command line, the
 audit log or the case.
 """
 
+import csv
 import getpass
+import hashlib
 import json
 import logging
 import os
@@ -31,7 +38,7 @@ import zipfile
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, TextIO
+from typing import Dict, Iterable, List, Optional, TextIO, Tuple
 
 from rowanholt.audit import write_audit_log_entry
 from rowanholt.core.identify import print_identification
@@ -42,6 +49,8 @@ logger = logging.getLogger(__name__)
 IOS, ANDROID = "iOS", "Android"
 PLATFORMS = (IOS, ANDROID)
 EVIDENCE_FILE = "mobile_evidence.json"
+HASH_FILE = "mobile_evidence_sha256.csv"
+INTEGRITY_TABLE = "mobile_integrity"
 ARCHIVES = (".zip", ".tar", ".tar.gz", ".tgz", ".tar.xz")
 # Paths only a phone's file system has, as an extraction tool lays it out (any prefix before them)
 IOS_MARKERS = ("private/var/mobile/", "private/var/containers/", "var/mobile/Library/",
@@ -331,6 +340,13 @@ def ingest_mobile(output_directory: str, verbosity: str, source: str, allimgs: D
         record["registered"] = datetime.now().isoformat()
         (host_dir / EVIDENCE_FILE).write_text(json.dumps(record, indent=2), encoding="utf-8")
         print_identification(verbosity, output_directory, item.name, item.platform)
+        print("   Hashing '{}' (SHA-256 of every file, for the check after processing)...".format(item.name), flush=True)
+        files, size = hash_evidence(host_dir, item)
+        write_audit_log_entry(
+            verbosity, output_directory,
+            "{},{},mobile evidence hashed,{} files; {} bytes ({})\n".format(
+                datetime.now().isoformat(), item.name, files, size, HASH_FILE),
+            "   '{}': {:,} files hashed ({:,} bytes) into {}".format(item.name, files, size, HASH_FILE))
         write_audit_log_entry(
             verbosity, output_directory,
             "{},{},mobile evidence,{} at {}{}\n".format(
@@ -345,6 +361,75 @@ def ingest_mobile(output_directory: str, verbosity: str, source: str, allimgs: D
         hosts.append(item.name)
     print()
     return hosts
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for block in iter(lambda: fh.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def evidence_files(path: Path) -> List[Tuple[str, Path]]:
+    """(path relative to the evidence, file) for every file of an item: the file itself, or every
+    file under the folder, in a stable order. Symbolic links aren't followed."""
+    if path.is_file():
+        return [(path.name, path)]
+    found = []
+    for root, dirs, files in os.walk(path):
+        dirs.sort()
+        for name in sorted(files):
+            file = Path(root) / name
+            if file.is_file() and not file.is_symlink():
+                found.append((file.relative_to(path).as_posix(), file))
+    return found
+
+
+def hash_evidence(host_dir: Path, item: "MobileEvidence") -> Tuple[int, int]:
+    """Hash every file of the item into <host>/mobile_evidence_sha256.csv; (files, bytes)."""
+    files = size = 0
+    with open(host_dir / HASH_FILE, "w", newline="", encoding="utf-8") as out:
+        writer = csv.writer(out)
+        writer.writerow(["file_path", "size", "sha256"])
+        for relative, file in evidence_files(Path(item.path)):
+            length = file.stat().st_size
+            writer.writerow([relative, length, _sha256(file)])
+            files += 1
+            size += length
+    return files, size
+
+
+def verify_evidence(verbosity: str, output_directory: str, host: str) -> Optional[Dict[str, int]]:
+    """Hash the host's evidence again, after processing, against what was recorded when it was
+    registered; the rows go to <host>/mobile_integrity.jsonl. Counts by status, or None when
+    nothing was recorded (a case registered before hashing)."""
+    from rowanholt.core.records import SUFFIX, write_records
+
+    host_dir = Path(output_directory) / host
+    item = load_evidence(output_directory, host)
+    if item is None or not (host_dir / HASH_FILE).is_file():
+        return None
+    with open(host_dir / HASH_FILE, newline="", encoding="utf-8") as fh:
+        recorded = {row["file_path"]: row["sha256"] for row in csv.DictReader(fh)}
+    now = dict(evidence_files(Path(item.path)))
+    rows, counts = [], {"verified": 0, "MISMATCH": 0, "missing": 0}
+    for relative, expected in recorded.items():
+        file = now.get(relative)
+        actual = _sha256(file) if file is not None and file.is_file() else ""
+        status = "missing" if not actual else ("verified" if actual == expected else "MISMATCH")
+        counts[status] += 1
+        rows.append({"file_path": relative, "expected_sha256": expected, "actual_sha256": actual, "status": status})
+    write_records(str(host_dir / (INTEGRITY_TABLE + SUFFIX)), rows, host=host, artefact=INTEGRITY_TABLE,
+                  source_path=HASH_FILE)
+    summary = ", ".join(f"{n} {s}" for s, n in counts.items() if n) or "no files"
+    print(f"     Checked '{host}' against its hashes from registration: {summary}")
+    write_audit_log_entry(
+        verbosity, output_directory,
+        "{},{},mobile integrity,{}\n".format(datetime.now().isoformat(), host, summary.replace(",", ";")),
+        " -> {} -> checked '{}' against its hashes from registration: {}".format(
+            datetime.now().isoformat().replace("T", " "), host, summary))
+    return counts
 
 
 def load_evidence(output_directory: str, host: str) -> Optional[MobileEvidence]:

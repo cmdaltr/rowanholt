@@ -150,9 +150,10 @@ class Tart:
         run(["tart", "clone", image, name], timeout=1800)  # pulls the image if it's remote
 
     def start(self, name: str):
-        # Holds the VM open; returns at once. Its screen is served over VNC on loopback, and
-        # the address and password Tart prints go to the log consoles.discover reads
-        spawn(["tart", "run", name, "--no-graphics", "--vnc-experimental"], log_path=str(consoles.tart_log(name)))
+        # Holds the VM open; returns at once. With LAB_VM_CONSOLE=1 its screen is served over VNC on
+        # loopback, and the address and password Tart prints go to the log consoles.discover reads
+        console = ["--vnc-experimental"] if consoles.enabled() else []
+        spawn(["tart", "run", name, "--no-graphics", *console], log_path=str(consoles.tart_log(name)))
 
     def stop(self, name: str):
         run(["tart", "stop", name], timeout=90, check=False)
