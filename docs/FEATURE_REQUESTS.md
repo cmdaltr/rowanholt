@@ -39,7 +39,7 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 
 ## FR-04: Lab VM consoles in the browser
 
-Built 8 November 2026 on `feat/lab-consoles`: **Console** per Tart and UTM VM on Aragorn › Lab, drawn by noVNC, opt-in with `LAB_VM_CONSOLE=1`; Tart VMs start with `--vnc-experimental`, the lab's UTM VMs get `-vnc 127.0.0.1:N` (a clone a free display of its own); the lab agent finds each running VM's port (`src/mordor/lab/consoles.py`) and tunnels to it on loopback by VM name; the backend's websocket relay takes signed-in admins only, locally and on a server. Described in `lab/README.md` (VM Consoles). Still to do: `@novnc/novnc` 1.5.0 into `package.json` and the lock file, exact-pinned (the registry couldn't be reached when it was built, so the frontend doesn't build until it's installed); Vagrant/VirtualBox VMs have no console.
+Built 8 November 2026 on `feat/lab-consoles`: **Console** per Tart and UTM VM on Aragorn › Lab, drawn by noVNC, opt-in with `LAB_VM_CONSOLE=1`; Tart VMs start with `--vnc-experimental`, the lab's UTM VMs get `-vnc 127.0.0.1:N` (a clone a free display of its own); the lab agent finds each running VM's port (`src/mordor/lab/consoles.py`) and tunnels to it on loopback by VM name; the backend's websocket relay takes signed-in admins only, locally and on a server. Described in `lab/README.md` (VM Consoles). noVNC is `@novnc/novnc` 1.5.0, exact-pinned (MPL-2.0). Still to do: Vagrant/VirtualBox VMs have no console.
 
 **Done when** an admin opens a lab VM's console from the browser on a team server, and a non-admin can't reach the relay at all.
 
