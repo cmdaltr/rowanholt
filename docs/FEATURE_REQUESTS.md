@@ -63,13 +63,7 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 
 ## FR-04: Lab VM consoles in the browser
 
-**Why.** When the lab's VMs run on a team server, admins never sit at the host. Today, seeing a VM's screen means a remote-desktop session to the server.
-
-**What it takes.**
-- A Console button per VM on Aragorn › Lab.
-- Each VM serves its screen over VNC on the host's loopback: QEMU's `-vnc 127.0.0.1:N` in a UTM bundle's `config.plist` (found through UTM's registry), or Tart's `--vnc-experimental`.
-- The backend relays a WebSocket to that port for signed-in admins only, asking the lab agent which port belongs to which VM.
-- noVNC 1.5.0 (vendored, pinned, MPL-2.0) draws it, with keyboard, mouse and Ctrl+Alt+Del.
+Built 8 November 2026 on `feat/lab-consoles`: **Console** per Tart and UTM VM on Aragorn › Lab, drawn by noVNC; Tart VMs start with `--vnc-experimental`, the lab's UTM VMs get `-vnc 127.0.0.1:N` (a clone a free display of its own); the lab agent finds each running VM's port (`src/mordor/lab/consoles.py`) and tunnels to it on loopback by VM name; the backend's websocket relay takes signed-in admins only, locally and on a server. Described in `lab/README.md` (VM Consoles). Still to do: `@novnc/novnc` 1.5.0 into `package.json` and the lock file, exact-pinned (the registry couldn't be reached when it was built, so the frontend doesn't build until it's installed); Vagrant/VirtualBox VMs have no console.
 
 **Done when** an admin opens a lab VM's console from the browser on a team server, and a non-admin can't reach the relay at all.
 
