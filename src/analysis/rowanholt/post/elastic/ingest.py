@@ -191,15 +191,18 @@ def to_document(record: Dict[str, Any], host: str, artefact: str) -> Dict[str, A
 
     A JSON Lines record whose timestamp is null gets no @timestamp: its writer chose the
     artefact's time field, so any other field would be a guess, and a value Elasticsearch can't
-    parse as a date gets the whole document refused. An older case's record has no envelope, so
-    its time is looked for as before (normalize_timestamp), and kept only when it parses.
+    parse as a date gets the whole document refused. The one exception is the artefact's own
+    ``timestamp``, which the envelope's displaced to ``orig_timestamp``: Artemis's event times, which
+    a worker on Python 3.10 wrote as null until 8 November 2026 (every event log of a case processed
+    before then). An older case's record has no envelope, so its time is looked for as before
+    (normalize_timestamp), and kept only when it parses.
     """
     doc = _text_nodes(dict(record))
     doc["hostname"] = record.get("host") or host
     if not doc.get("artefact"):
         doc["artefact"] = artefact
     if all(field in record for field in ENVELOPE):
-        stamp = iso_timestamp(record.get("timestamp"))
+        stamp = iso_timestamp(record.get("timestamp")) or iso_timestamp(record.get("orig_timestamp"))
     else:
         stamp = iso_timestamp(normalize_timestamp(dict(record)).get("@timestamp"))
     if stamp:

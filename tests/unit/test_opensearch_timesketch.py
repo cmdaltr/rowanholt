@@ -124,6 +124,15 @@ def test_events_carry_time_host_and_technique():
     assert event["message"].startswith("evt/Security: EventID=4624")
 
 
+def test_an_event_whose_envelope_lost_its_time_keeps_its_own():
+    """Cases processed on Python 3.10 before 8 November 2026: Artemis's times null in the envelope."""
+    record = {"host": "LAB-WIN11", "artefact": "evt/Microsoft-Windows-PowerShell%4Operational", "source_path": "",
+              "timestamp": None, "techniques": ["T1059.001"], "orig_timestamp": "2026-11-05T10:35:12.667746000Z"}
+    event = timesketch.to_event(record, "LAB-WIN11", record["artefact"])
+    assert event["datetime"].startswith("2026-11-05T10:35:12") and event["mitre_technique_id"] == "T1059.001"
+    assert timesketch.to_event(dict(record, orig_timestamp=None), "LAB-WIN11", "x") is None
+
+
 def test_plaso_keeps_its_message_and_untimed_records_are_counted(tmp_path):
     host = make_host(tmp_path)
     out = io.BytesIO()
