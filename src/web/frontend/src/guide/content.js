@@ -91,7 +91,7 @@ export const GUIDE_PAGES = [
       {
         id: 'elrond.source',
         title: 'Evidence source',
-        what: 'Where the evidence comes from: local images (E01, raw, VMDK, memory), a Gandalf acquisition, a Mordor dataset or cloud storage.',
+        what: 'Where the evidence comes from: local images (E01, raw, VMDK, memory), a Gandalf acquisition, network evidence (PCAPs, Zeek logs, NetFlow exports), a Mordor dataset or cloud storage.',
         who: 'Forensic analysts.',
         when: 'Choose Gandalf for live collections: Elrond checks every file against Gandalf\'s SHA-256 log before using it.',
       },

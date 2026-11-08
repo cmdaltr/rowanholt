@@ -1258,7 +1258,10 @@ def build_elrond_command(job):
     # No --Auto flag needed
 
     # Collection mode (mutually exclusive)
-    if opts.gandalf:
+    if getattr(opts, "network", False):
+        # Network mode: PCAPs, Zeek logs and NetFlow exports (nothing to collect from)
+        cmd.append("--Network")
+    elif opts.gandalf:
         # Gandalf mode: process pre-collected artifacts (no collection)
         cmd.append("--Gandalf")
     else:

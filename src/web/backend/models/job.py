@@ -27,8 +27,10 @@ class AnalysisOptions(BaseModel):
     # Main operation modes (mutually exclusive)
     # local: Collect artifacts from disk image and process (default)
     # gandalf: Process pre-collected Gandalf artifacts (no collection)
+    # network: Process network evidence: PCAP through Zeek, Zeek logs, NetFlow exports
     local: bool = True  # Default mode - collect from disk image
     gandalf: bool = False  # Alternative mode - process pre-collected artifacts
+    network: bool = False  # PCAPs, Zeek logs and NetFlow exports (elrond.py --Network)
 
     # Analysis options
     analysis: bool = False

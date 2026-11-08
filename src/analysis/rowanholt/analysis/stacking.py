@@ -440,8 +440,10 @@ def reasons(family: str, value: str, with_it: int, hosts: int, baseline: Optiona
 
 
 def hosts(output_directory: str) -> List[str]:
+    """The case's host folders; a network capture's folder (artefacts/network.info) isn't a host."""
     return sorted(os.path.join(output_directory, d) for d in os.listdir(output_directory)
-                  if os.path.isdir(os.path.join(output_directory, d, "artefacts", "cooked")))
+                  if os.path.isdir(os.path.join(output_directory, d, "artefacts", "cooked"))
+                  and not os.path.isfile(os.path.join(output_directory, d, "artefacts", "network.info")))
 
 
 def stack(per_host: Dict[str, Dict[Tuple[str, str], Tuple[str, str, str, Tuple[str, ...]]]],

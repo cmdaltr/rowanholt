@@ -118,6 +118,16 @@ parser.add_argument(
     default=False,
 )
 parser.add_argument(
+    "--Network",
+    help="Read network evidence: PCAP/PCAPNG captures (through Zeek), Zeek logs (TSV or JSON) and NetFlow/IPFIX "
+    "text exports (nfdump -o csv, SiLK rwcut); a source that's a capture, a log or a folder of them becomes its own "
+    "folder in the case. Other sources still need --Collect or --Gandalf; Example syntax: elrond.py CASE capture.pcap "
+    "/path/to/output --Network --extractIocs",
+    action="store_const",
+    const=True,
+    default=False,
+)
+parser.add_argument(
     "--extractIocs",
     help="Extract IOCs from processed files collected from disk; WARNING: This can take a long time!",
     action="store_const",
@@ -323,6 +333,7 @@ yara = args.Yara
 exhaustive = args.eXhaustive
 threathunt = args.ThreatHunt
 mordor = args.Mordor  # Input type flag for Mordor datasets
+network = args.Network  # Input type flag for PCAP, Zeek logs and NetFlow exports
 archive = args.Ziparchive
 index_only = args.Index
 
@@ -599,7 +610,8 @@ if __name__ == "__main__":
     if len(directory) >= 2:
         # Check if the last path is an image file or a directory
         last_path = directory[-1]
-        if is_image_file(last_path):
+        # a file last is a source (a capture, with --Network), not the destination
+        if is_image_file(last_path) or (network and os.path.isfile(last_path)):
             # All paths are image files - use current directory as destination
             sources = directory
             destination = None
@@ -610,6 +622,22 @@ if __name__ == "__main__":
     else:
         sources = directory  # Single source
         destination = None  # Will default to "./" in main()
+
+    # Network evidence is its own branch of the graph (PHASE 4a): the host phases below see only
+    # the other sources, and with none of those they're skipped
+    network_sources = []
+    if network:
+        from rowanholt.process.network import iter_sources
+
+        network_sources, sources = iter_sources(sources)
+        if not network_sources:
+            print("\n  Error: --Network found no PCAP, Zeek log or NetFlow export in the sources\n")
+            sys.exit(1)
+        if sources and not (collect or gandalf):
+            print("\n  Error: {} isn't network evidence: give --Collect or --Gandalf for it too\n".format(", ".join(sources)))
+            sys.exit(1)
+    output_directory = os.path.join(destination or "./", "")
+    network_done = []
 
     # Phased multi-image processing:
     # Phase 1: Mount all images (mount img1, mount img2, mount img3)
@@ -623,8 +651,9 @@ if __name__ == "__main__":
     # =========================================================================
     # CLEANUP: Unmount any stale mounts from previous runs
     # =========================================================================
-    print("\n  -> Cleaning up stale mounts from previous runs...")
-    cleanup_stale_mounts(elrond_mount.copy(), ewf_mount.copy())
+    if sources:
+        print("\n  -> Cleaning up stale mounts from previous runs...")
+        cleanup_stale_mounts(elrond_mount.copy(), ewf_mount.copy())
 
     # =========================================================================
     # PHASE 1: Mount all images
@@ -716,7 +745,7 @@ if __name__ == "__main__":
             }
             print(f"  -> Mounted: {len(imgs)} image(s) from {source}")
 
-    if not mounted_data:
+    if not mounted_data and not network_sources:
         print("\n   ERROR: nothing could be mounted from {}\n".format(", ".join(failed_sources) or "the sources"), flush=True)
         sys.exit(2)
     print("\n  ----------------------------------------\n  -> Completed Identification Phase.\n")
@@ -891,8 +920,8 @@ if __name__ == "__main__":
     # ========== PHASE 3b: DEFERRED MEMORY PROCESSING ==========
     # Process any memory images that were identified during the identification phase
     # This runs ONCE after all disk images are processed
-    has_deferred_memory = bool(load_memory_profiles(output_directory))
-    if volatility or has_deferred_memory:
+    has_deferred_memory = bool(mounted_data) and bool(load_memory_profiles(output_directory))
+    if mounted_data and (volatility or has_deferred_memory):
         process_deferred_memory(
             verbosity,
             output_directory,
@@ -973,8 +1002,37 @@ if __name__ == "__main__":
 
     print("\n  ----------------------------------------\n  -> Completed Analysis Phase.\n", flush=True)
 
+    # ========== PHASE 4a: NETWORK EVIDENCE (PCAP through Zeek, Zeek logs, NetFlow) ==========
+    # After the hosts' analysis, so what's seen on the wire is matched to their IOCs
+    if network_sources:
+        from rowanholt.process.network import NetworkEvidenceError, process_network_source
+
+        print("\n  -> \033[1;36mCommencing Network Phase...\033[1;m\n  ----------------------------------------", flush=True)
+        os.makedirs(output_directory, exist_ok=True)
+        for idx, source in enumerate(network_sources):
+            print(f"  -> [{idx + 1}/{len(network_sources)}] Network evidence: {', '.join(source)}", flush=True)
+            try:
+                done = process_network_source(source, output_directory, verbosity, "processing", extractiocs,
+                                              iocsfile[0] if iocsfile else None)
+            except (NetworkEvidenceError, OSError, ValueError) as e:
+                print(f"  -> ERROR: network evidence '{', '.join(source)}' wasn't processed: {e}", flush=True)
+                continue
+            network_done.append(done["host"])
+            print("     '{}': {} records in {}; techniques {}".format(
+                done["host"], done["records"], ", ".join(done["tables"]) or "no tables",
+                ", ".join(done["techniques"]) or "none"), flush=True)
+            for skipped in done["skipped"]:
+                print(f"     WARNING: {skipped}", flush=True)
+            if "matches" in done:
+                print(f"     {done['matches']} IOCs seen on the wire are on the case's hosts too "
+                      "(analysis/network_matches.jsonl)", flush=True)
+        print("  ----------------------------------------\n  -> Completed Network Phase.\n", flush=True)
+        if not network_done and not mounted_data:
+            print("\n   ERROR: none of the network evidence could be processed\n", flush=True)
+            sys.exit(2)
+
     # ========== PHASE 4b: THREAT INTELLIGENCE (the whole case at once) ==========
-    if threatintel and mounted_data:
+    if threatintel and (mounted_data or network_done):
         print("\n  -> \033[1;36mCommencing Threat Intelligence Phase...\033[1;m\n  ----------------------------------------", flush=True)
         try:
             from rowanholt.threat_intel import load_all
@@ -1013,7 +1071,18 @@ if __name__ == "__main__":
             print(f"  -> WARNING: stacking failed: {e}", flush=True)
 
     # ========== PHASE 5: SIEM INDEXING (Splunk/Elastic/Navigator) ==========
-    if splunk or elastic:
+    if (splunk or elastic) and network_done and not mounted_data:
+        # Network evidence only: index the case folder as --Index does (every processed folder in it)
+        from rowanholt.post.index_only import IndexOnlyError, index_case
+        try:
+            index_case(output_directory, case, verbosity, splunk, elastic, navigator)
+        except IndexOnlyError as e:
+            print(f"\n  Error: {e}\n")
+    elif splunk or elastic:
+        if network_done:
+            # The network folders go to the SIEMs with the first host's
+            from rowanholt.process.network import network_hosts
+            mounted_data[next(iter(mounted_data))]["allimgs"].update(network_hosts(output_directory))
         # Build phase name based on selected SIEM tools
         siem_tools = []
         if splunk:
@@ -1097,10 +1166,10 @@ if __name__ == "__main__":
         export_failed = export_targets(case_directory, case, "veryverbose", opensearch, timesketch)
 
     # ========== PHASE 6: ARCHIVE (if requested) ==========
-    if archive and mounted_data:
+    if archive and (mounted_data or network_done):
         # Get output directory from first mounted image
-        first_source = next(iter(mounted_data))
-        output_directory = mounted_data[first_source]["output_directory"]
+        if mounted_data:
+            output_directory = mounted_data[next(iter(mounted_data))]["output_directory"]
         verbosity = veryverbose
 
         archive_artefacts(verbosity, output_directory)

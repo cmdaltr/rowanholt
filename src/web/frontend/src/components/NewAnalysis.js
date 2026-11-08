@@ -17,7 +17,7 @@ const FILE_REQUIREMENTS = {
 function NewAnalysis() {
   const navigate = useNavigate();
   const [caseNumber, setCaseNumber] = useState('');
-  const [analysisMode, setAnalysisMode] = useState(''); // '', 'local', 'gandalf', 'cloud', 'mordor', or 'json'
+  const [analysisMode, setAnalysisMode] = useState(''); // '', 'local', 'gandalf', 'network', 'cloud', 'mordor', or 'json'
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [destinationPath, setDestinationPath] = useState('');
   const [options, setOptions] = useState({});
@@ -197,6 +197,8 @@ function NewAnalysis() {
         setError('Please select a Mordor dataset');
       } else if (analysisMode === 'cloud') {
         setError('Please enter a cloud storage URL');
+      } else if (analysisMode === 'network') {
+        setError('Please select at least one capture, Zeek log or NetFlow export');
       } else {
         setError('Please select at least one disk or memory image');
       }
@@ -369,11 +371,14 @@ function NewAnalysis() {
             timesketch: opts.timesketch || false,
             navigator: opts.navigator || false,
             gandalf: opts.gandalf || false,
+            network: opts.network || false,
           });
 
           // Set analysis mode based on options
           if (opts.gandalf) {
             setAnalysisMode('gandalf');
+          } else if (opts.network) {
+            setAnalysisMode('network');
           } else {
             setAnalysisMode('local');
           }
@@ -425,7 +430,9 @@ function NewAnalysis() {
     try {
       // Determine the actual mode - 'json' mode uses whatever was loaded from the file
       // 'mordor' mode is treated like 'local' for file selection but enables mordor processing
-      const effectiveMode = analysisMode === 'json' ? (options.gandalf ? 'gandalf' : 'local') : analysisMode;
+      const effectiveMode = analysisMode === 'json'
+        ? (options.gandalf ? 'gandalf' : options.network ? 'network' : 'local')
+        : analysisMode;
 
       const jobData = {
         case_number: caseNumber,
@@ -435,6 +442,7 @@ function NewAnalysis() {
           ...options,
           local: effectiveMode === 'local' || effectiveMode === 'cloud' || effectiveMode === 'mordor',
           gandalf: effectiveMode === 'gandalf',
+          network: effectiveMode === 'network',
           mordor: effectiveMode === 'mordor',
           force_overwrite: forceOverwrite,
         },
@@ -979,6 +987,21 @@ function NewAnalysis() {
                 </label>
                 <label
                   style={{ display: 'flex', alignItems: 'center', cursor: isCaseNumberValid ? 'pointer' : 'not-allowed', opacity: isCaseNumberValid ? 1 : 0.5, fontSize: '1.2rem', whiteSpace: 'nowrap' }}
+                  title="PCAP/PCAPNG captures (through Zeek), Zeek logs and NetFlow/IPFIX exports (nfdump CSV, SiLK rwcut)"
+                >
+                  <input
+                    type="radio"
+                    name="analysisMode"
+                    value="network"
+                    checked={analysisMode === 'network'}
+                    onChange={(e) => setAnalysisMode(e.target.value)}
+                    disabled={!isCaseNumberValid}
+                    style={{ marginRight: '0.5rem', width: '16px', height: '16px' }}
+                  />
+                  Network
+                </label>
+                <label
+                  style={{ display: 'flex', alignItems: 'center', cursor: isCaseNumberValid ? 'pointer' : 'not-allowed', opacity: isCaseNumberValid ? 1 : 0.5, fontSize: '1.2rem', whiteSpace: 'nowrap' }}
                   title="Cloud Storage"
                 >
                   <input
@@ -1047,12 +1070,22 @@ function NewAnalysis() {
               <label>
                 {analysisMode === 'gandalf' && 'Select Gandalf Acquisitions *'}
                 {analysisMode === 'local' && 'Select Disk/Memory Images *'}
+                {analysisMode === 'network' && 'Select Captures, Zeek Logs or NetFlow Exports *'}
                 {analysisMode === 'mordor' && 'Select Mordor Dataset *'}
                 {analysisMode === 'cloud' && 'Cloud Storage URL *'}
               </label>
 
               {/* Local: File Browser */}
               {analysisMode === 'local' && (
+                <FileBrowser
+                  onSelectFiles={setSelectedFiles}
+                  selectedFiles={selectedFiles}
+                  disabled={!isCaseNumberValid}
+                />
+              )}
+
+              {/* Network: captures, Zeek logs and NetFlow exports (logs from one folder become one case folder) */}
+              {analysisMode === 'network' && (
                 <FileBrowser
                   onSelectFiles={setSelectedFiles}
                   selectedFiles={selectedFiles}
@@ -1219,6 +1252,7 @@ function NewAnalysis() {
                 {analysisMode === 'mordor' && 'Please select a Mordor dataset to configure processing options.'}
                 {analysisMode === 'cloud' && 'Please enter a cloud storage URL to configure processing options.'}
                 {analysisMode === 'local' && 'Please select at least one disk or memory image to configure processing options.'}
+                {analysisMode === 'network' && 'Please select at least one capture, Zeek log or NetFlow export to configure processing options.'}
                 {analysisMode === 'gandalf' && 'Please select a Gandalf acquisition to configure processing options.'}
                 {analysisMode === 'json' && 'Please load a JSON configuration file to configure processing options.'}
               </div>
