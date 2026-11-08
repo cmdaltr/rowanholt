@@ -165,7 +165,7 @@ _3. Additional optional features_
 - **Eru, the AI analyst** - Natural-language questions over a case with a local model (Ollama); fixed questions answered from the case files when there's no model
 - **Memory Forensics** - Volatility 3 integration for memory analysis
 - **Timeline Generation** - Plaso/log2timeline for comprehensive timelines
-- **SIEM Integration** - Direct export to Splunk and Elasticsearch
+- **SIEM Integration** - Direct export to Splunk, Elasticsearch, OpenSearch (and Wazuh) and Timesketch
 
 ### 🎯 Architecture
 
@@ -500,7 +500,7 @@ Work a case together from **Browse Case** on a completed job, on one machine or 
 - **[Functionality](docs/FUNCTIONALITY.md)** - Supported artefact types and parsing
 - **[Cloud Forensics](docs/CLI.md#cloud-forensics)** - AWS, Azure, and GCP investigations
 - **[Eru](docs/ERU.md)** - AI analyst
-- **[SIEM Integration](docs/CLI.md#siem-integration)** - Splunk and Elasticsearch
+- **[SIEM Integration](docs/CLI.md#siem-integration)** - Splunk, Elasticsearch, OpenSearch/Wazuh and Timesketch
 
 ### Technical Documentation
 - **[Architecture](docs/ARCHITECTURE.md)** - Components and job flow

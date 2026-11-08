@@ -376,8 +376,10 @@ Memory analysis reads memory images from `SOURCE_DIR` alongside the disk images;
 |---|---|
 | `--Splunk` | Index output into the local Splunk instance |
 | `--Elastic` | Index output into the local Elasticsearch instance |
+| `--OpenSearch` | Index output into OpenSearch, or Wazuh's indexer (`OPENSEARCH_URL`; see [SIEM Integration](#siem-integration)) |
+| `--Timesketch` | Send each host's timed records to Timesketch as a timeline (`TIMESKETCH_URL`) |
 | `--Navigator` | Build an ATT&CK Navigator layer from the case's `mitre_techniques.txt` |
-| `--Index` | Index a case already processed into Splunk, Elastic and/or the Navigator (with the options above), without mounting, extracting or processing again; the one directory is the case's folder |
+| `--Index` | Index a case already processed into Splunk, Elastic, OpenSearch, Timesketch and/or the Navigator (with the options above), without mounting, extracting or processing again; the one directory is the case's folder |
 | `--Ziparchive` | Zip raw data after processing |
 | `--Delete` | Delete raw data after processing |
 
@@ -569,7 +571,7 @@ It serves the chat UI at `http://localhost:5687/ai/chat/<case>` and JSON endpoin
 
 ## SIEM Integration
 
-There is no standalone SIEM exporter. Splunk and Elastic indexing runs inside Elrond:
+There is no standalone SIEM exporter. Splunk, Elastic, OpenSearch and Timesketch exports run inside Elrond:
 
 ```bash
 python3 src/analysis/elrond.py CASE-001 /evidence /output/CASE-001 --Collect --Process --Analysis --Splunk --Elastic --Navigator
@@ -583,7 +585,24 @@ or for a completed web job with `POST /api/jobs/{job_id}/export-siem`. Start the
 | `ELASTICSEARCH_HOST`, `ELASTICSEARCH_PORT`, `ELASTIC_USERNAME`, `ELASTIC_PASSWORD` | Elasticsearch |
 | `KIBANA_HOST`, `KIBANA_PORT` | Kibana dashboards |
 
-In Docker the worker gets `SPLUNK_HOST`, `SPLUNK_PASSWORD` and `ELASTICSEARCH_HOST` from `docker-compose.yml`. Splunk ingests through file monitors on a fixed `/tmp` path, so case output written elsewhere (an external drive, for example) is indexed in Elastic but not Splunk (known issue).
+### OpenSearch and Wazuh
+
+`--OpenSearch` (the job form's **OpenSearch / Wazuh**) sends Elastic's documents (the same field names, `@timestamp`, `hostname`, `artefact` and the `mitre_technique_*` fields) to an OpenSearch that's already running, into one index per case, `rowanholt-<case>`, deleted and made afresh on every export. With `OPENSEARCH_DASHBOARDS_URL` it saves an index pattern for it on `@timestamp`. Wazuh's indexer is OpenSearch: point `OPENSEARCH_URL` at it (`https://<wazuh>:9200`), with a user who may write `rowanholt-*` indices, its root CA as `OPENSEARCH_CA`, and the Wazuh dashboard as `OPENSEARCH_DASHBOARDS_URL`. Certificates are checked unless `OPENSEARCH_VERIFY=false`.
+
+### Timesketch
+
+`--Timesketch` makes a sketch named after the case (or uses the one that's there) and uploads a timeline per host: every record of the host's tables that has a time, the Plaso timeline among them, with `hostname`, `artefact`, `source_path` and the `mitre_technique_*` fields, searchable as `mitre_technique_id:T1059.001`. Records with no time can't go on a timeline; it says how many. Timesketch is where the case gets annotated, so an export never deletes: a host already in the sketch is left as it is, and sent again only after its timeline is deleted there. Timesketch needs `UPLOAD_ENABLED = True` in its `timesketch.conf`, and the user a local login.
+
+| Variable | Used for |
+|---|---|
+| `OPENSEARCH_URL`, `OPENSEARCH_USERNAME`, `OPENSEARCH_PASSWORD` | OpenSearch or Wazuh's indexer |
+| `OPENSEARCH_CA`, `OPENSEARCH_VERIFY` | A private CA bundle (a path inside the worker); `false` skips certificate checks |
+| `OPENSEARCH_INDEX_PREFIX`, `OPENSEARCH_DASHBOARDS_URL` | The index name's prefix (`rowanholt-`); OpenSearch Dashboards or the Wazuh dashboard |
+| `TIMESKETCH_URL`, `TIMESKETCH_USERNAME`, `TIMESKETCH_PASSWORD`, `TIMESKETCH_CA`, `TIMESKETCH_VERIFY` | Timesketch |
+
+Both are checked before anything is processed: configured, reachable, and the login accepted. After a full run they export once for the whole case; if one fails, the run exits 1 with the case processed, and `--Index --OpenSearch` (or `--Timesketch`) sends it again.
+
+In Docker the worker gets `SPLUNK_HOST`, `SPLUNK_PASSWORD` and `ELASTICSEARCH_HOST` from `docker-compose.yml`, and the `OPENSEARCH_*` and `TIMESKETCH_*` settings from `.env`. Splunk ingests through file monitors on a fixed `/tmp` path, so case output written elsewhere (an external drive, for example) is indexed in Elastic but not Splunk (known issue).
 
 ---
 

@@ -1349,6 +1349,10 @@ def build_elrond_command(job):
         cmd.append("--Splunk")
     if opts.elastic:
         cmd.append("--Elastic")
+    if opts.opensearch:
+        cmd.append("--OpenSearch")
+    if opts.timesketch:
+        cmd.append("--Timesketch")
     if opts.navigator:
         cmd.append("--Navigator")
 

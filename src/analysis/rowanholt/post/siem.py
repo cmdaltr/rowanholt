@@ -95,6 +95,37 @@ def ensure_remote_siem_reachable(splunk: bool, elastic: bool, timeout: float = 5
         )
 
 
+def ensure_export_targets(opensearch: bool, timesketch: bool, timeout: float = 5.0) -> None:
+    """Fail before processing if OpenSearch or Timesketch was asked for and isn't configured,
+    reachable, or accepting the configured login."""
+    import urllib.parse
+
+    if opensearch:
+        from rowanholt.post.opensearch import OpenSearchError, OpenSearchTarget, http_request
+        try:
+            target = OpenSearchTarget.from_env()
+        except OpenSearchError as e:
+            raise SIEMUnavailableError(f"OpenSearch export requested but {e}") from e
+        url = urllib.parse.urlsplit(target.url)
+        _check_reachable("OpenSearch", url.hostname or "", str(url.port or (443 if url.scheme == "https" else 9200)),
+                         timeout, delays=(2, 4))
+        try:
+            status, _ = http_request(target)("GET", f"{target.url}/", None, {})
+        except OSError as e:  # a TLS failure: the certificate isn't trusted (OPENSEARCH_CA)
+            raise SIEMUnavailableError(f"OpenSearch at {target.url} couldn't be reached over TLS ({e})") from e
+        if status in (401, 403):
+            raise SIEMUnavailableError(f"OpenSearch at {target.url} refused the login ({status}): check OPENSEARCH_USERNAME and OPENSEARCH_PASSWORD")
+    if timesketch:
+        from rowanholt.post.timesketch import TimesketchClient, TimesketchError, TimesketchTarget
+        try:
+            client = TimesketchClient(TimesketchTarget.from_env())
+            client.login()
+        except TimesketchError as e:
+            raise SIEMUnavailableError(f"Timesketch export requested but {e}") from e
+        except OSError as e:
+            raise SIEMUnavailableError(f"Timesketch export requested but it couldn't be reached ({e})") from e
+
+
 def siem_hosts(allimgs) -> list:
     """[(host folder, '<name>::<platform>')] for each allimgs entry, once each. Memory
     images carry their name in the key and a directory as the value, so reading the

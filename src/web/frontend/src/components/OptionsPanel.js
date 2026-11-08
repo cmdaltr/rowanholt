@@ -96,6 +96,8 @@ function OptionsPanel({ options, onChange, disabled = false, hasImages = false, 
       options: [
         { key: 'splunk', label: 'Splunk', description: 'Index into local Splunk instance', time: 10 },
         { key: 'elastic', label: 'Elastic', description: 'Index into local Elastic instance', time: 10 },
+        { key: 'opensearch', label: 'OpenSearch / Wazuh', description: 'Index into OpenSearch or Wazuh (set up in .env)', time: 10 },
+        { key: 'timesketch', label: 'Timesketch', description: 'A timeline per host in Timesketch (set up in .env)', time: 10 },
         { key: 'navigator', label: 'MITRE Navigator', description: 'Map to ATT&CK framework', time: 3 },
       ],
     },

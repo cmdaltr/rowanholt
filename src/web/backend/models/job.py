@@ -77,6 +77,8 @@ class AnalysisOptions(BaseModel):
     # Output options
     splunk: bool = False
     elastic: bool = False
+    opensearch: bool = False  # OpenSearch or Wazuh's indexer (OPENSEARCH_URL)
+    timesketch: bool = False  # a timeline per host in Timesketch (TIMESKETCH_URL)
     navigator: bool = False
     threat_intel: bool = False  # match the case against the stored threat intelligence indicators
 
