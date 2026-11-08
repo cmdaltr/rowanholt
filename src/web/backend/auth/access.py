@@ -162,7 +162,7 @@ async def middleware(request: Request, call_next):
 def websocket_user(websocket: HTTPConnection) -> Optional[dict]:
     """The caller of a websocket under /api, or None if refused. middleware() only sees HTTP
     requests, so a websocket route asks this itself (at the handshake and again while open):
-    the same token, sign-in and job checks, read as a GET. Browsers send cookies with a
+    the same token, sign-in, admin-area and job checks, read as a GET. Browsers send cookies with a
     websocket to any site that opens one, so one from a page on another origin is refused
     (an origin check is the only CSRF defence a websocket has)."""
     origin = websocket.headers.get("origin")
@@ -176,6 +176,8 @@ def websocket_user(websocket: HTTPConnection) -> Optional[dict]:
         return user or LOCAL_USER
     if not user:
         return None
+    if path.startswith(ADMIN_PREFIXES) and not is_admin(user):
+        return None  # as the middleware's admin areas (the lab's consoles are a websocket)
     match = JOB_PATH.match(path)
     if match and not can_access_job(user, match.group(1)):
         return None
