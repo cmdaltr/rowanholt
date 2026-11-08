@@ -299,7 +299,7 @@ python3 src/analysis/elrond.py CASE_ID SOURCE_DIR [DEST_DIR] [OPTIONS]
 ```
 
 - `CASE_ID`: case or incident identifier
-- `SOURCE_DIR`: directory holding the evidence (disk and memory images, Gandalf archives or Mordor datasets)
+- `SOURCE_DIR`: directory holding the evidence (disk and memory images, Gandalf archives, Mordor datasets or phones' backups and extractions)
 - `DEST_DIR`: output directory (default: current directory)
 
 Elrond defines long options only. argparse accepts any unambiguous prefix (`--Coll` for `--Collect`), but there are no single-letter flags. The web UI and API build the same command (`build_elrond_command` in `src/web/backend/tasks_docker.py`).
@@ -315,6 +315,29 @@ Memory analysis reads memory images from `SOURCE_DIR` alongside the disk images;
 | `--Collect` | Disk and memory images (E01, raw/dd, VMDK, VHD/VHDX); Elrond mounts them and collects artefacts |
 | `--Gandalf` | Gandalf acquisitions (`.zip`, `.7z`, `.tar.gz`) in a directory ending `acquisitions/`; each host is extracted to `DEST_DIR/<host>/artefacts/raw/` and processed like a collected disk image |
 | `--Mordor` | OTRF Mordor attack-simulation datasets |
+| `--Mobile` | Phones: an iTunes/Finder backup folder, an Android ADB backup (`.ab`), an Android bug report (`.zip`), or a full file system extraction from a commercial tool (its folder, or a `.zip`, `.tar` or `.tar.gz`); `SOURCE_DIR` is one of them or a folder holding several. Parsed with iLEAPP (iOS) and ALEAPP (Android); see [Phones](#phones---mobile) |
+| `--backupPasswordStdin` | With `--Mobile`: the password of encrypted backups, read from the first line of standard input (asked for, without echo, at a terminal). Never an argument, never written to the case or the audit log |
+
+#### Phones (`--Mobile`)
+
+Rowanholt doesn't extract from devices: that's a different job with its own tools and legal footing. It reads what the extraction tool or `adb` produced. Each item becomes a host, `DEST_DIR/<host>/`, named from the backup's `Info.plist` (device name) or the file or folder's name, with `host.info` (`<host>::iOS` or `<host>::Android`) and `mobile_evidence.json` (what it is and where). The evidence stays where it is: `raw/` is empty.
+
+| Evidence | What happens |
+|---|---|
+| iTunes/Finder backup | iLEAPP `-t itunes`. Encrypted: iLEAPP decrypts it with the password, which reaches it on its standard input (its own prompt, which reads standard input when it has no terminal; it runs in a session of its own) |
+| ADB backup (`.ab`) | Elrond opens it (zlib; AES-256 with the password for an encrypted one) and lays its `apps/<package>/<db,sp,f,r,ef...>/` members out where they were on the phone (`data/data/<package>/databases/...`, `data/media/0/...`) in `<host>/mobile/adb_filesystem/`; ALEAPP `-t fs` reads that |
+| Bug report (`.zip`) | ALEAPP `-t zip` (its `bugreport*` modules) |
+| File system extraction | iLEAPP or ALEAPP `-t fs`, `zip`, `tar` or `gz`, by what's in it: `private/var/mobile/...` is an iPhone, `data/data/...`, `data/system/...` an Android phone, up to two folders down (`filesystem1/`, `Dump/`) |
+
+The tool's report is kept in `<host>/mobile/iLEAPP/` or `ALEAPP/` (HTML, TSV, timeline, LAVA), its console output in `<host>/mobile/<tool>.log`. Each TSV export becomes `artefacts/cooked/ileapp/<artefact>.jsonl` or `aleapp/<artefact>.jsonl` (in parts below 9 MB, so IOC extraction reads them all), the record's `timestamp` from the first time-like column whose values are times. Elrond reads device management itself into `cooked/mobile_management.jsonl`, since neither tool reports it: iOS configuration profiles (`Library/ConfigurationProfiles/profile-*.stub`), MDM enrolment (`MDM.plist`) and automated enrolment (`CloudConfigurationDetails.plist`), and Android device administrators (`data/system/device_policies.xml`) and device and profile owners (`device_owner_2.xml`). Techniques come from the MITRE ATT&CK Mobile matrix, only where the setting is the technique's own mechanism: MDM enrolment, or a profile that enrols in MDM or installs a root certificate, is **T1632.001** (Code Signing Policy Modification); an Android device administrator or owner is **T1626.001** (Device Administrator Permissions). A company's own MDM looks the same; the `Flag` says what it is. Every cooked record with a time goes, in order, into `artefacts/mobile_timeline.jsonl`, which Splunk, Elastic and Eru index beside the Plaso timeline. IOC extraction (`--extractIocs`) reads the cooked tables as for any host. `--Timeline`, `--Userprofiles`, `--vss` and `--collectFiles` don't apply.
+
+An encrypted iTunes backup's configuration profiles aren't read (iLEAPP decrypts the backup, Elrond doesn't); its other artefacts are. If the password turns up in iLEAPP's own output files, Elrond names the files in the audit log (never the password) so they can be checked before the case is shared.
+
+```bash
+# An encrypted iPhone backup and an Android extraction, from a folder holding both
+printf '%s\n' "$BACKUP_PASSWORD" | python3 src/analysis/elrond.py CASE-PHONES /evidence/phones/ /output/CASE-PHONES \
+  --Mobile --backupPasswordStdin --Analysis --extractIocs
+```
 
 ---
 

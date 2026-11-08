@@ -77,18 +77,11 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 
 ## FR-05: Mobile device forensics (iOS, Android)
 
-**Why.** Phones are in scope for most intrusions that involve people: MFA prompts, messaging, mobile device management (MDM) profiles.
+Built 8 November 2026 (`feat/mobile-forensics`): `elrond.py --Mobile` (and the job form's Mobile source) takes iTunes/Finder backups, encrypted ones with the password on standard input (`--backupPasswordStdin`; the web app hands it to the worker through Redis, never the job), ADB backups (opened and laid out as a file system by Elrond), bug reports and full file system extractions (folders or archives). iLEAPP v2026.4.6 and ALEAPP v2026.4.5 run as subprocesses from their own virtualenvs in the worker image; their TSV exports are cooked into `cooked/ileapp/` and `cooked/aleapp/`, with `artefacts/mobile_timeline.jsonl` and IOC extraction as for any host; device management (configuration profiles, MDM, Android device administrators and owners) is read by Elrond and tagged **T1632.001** and **T1626.001** from ATT&CK Mobile. Documented in `docs/CLI.md` (Phones). Tested only against synthetic fixtures shaped like the tools' output: neither tool has been run by Rowanholt yet, and the worker image with them hasn't been built.
 
-**What it takes.**
-- **Input:** iTunes/Finder backups (encrypted, with the password), Android ADB backups and bug reports, and full file system extractions from a commercial tool's output folder. Rowanholt doesn't do device extraction itself, which is a deliberately different job with its own tooling and legal footing.
-- **Parsing:**
-  - iLEAPP and ALEAPP as subprocess tools, defined in `tools/definitions.py` like the others, into `cooked/`;
-  - techniques from the Mobile ATT&CK matrix;
-  - IOCs through the existing extractor.
+**Done when** (not yet) an iOS backup and an Android extraction each produce a case with a timeline, cooked artefacts and mobile techniques, with known answers from test images.
 
-**Done when** an iOS backup and an Android extraction each produce a case with a timeline, cooked artefacts and mobile techniques, with known answers from test images.
-
-**Depends on** public test images (for example Josh Hickman's) in the lab.
+**Depends on** public test images (for example Josh Hickman's) in the lab, and a rebuild of the worker image.
 
 ## FR-06: Network forensics (PCAP, Zeek, NetFlow)
 
