@@ -77,12 +77,21 @@ setup_server() {
 
 # ── Setup (the packaged app) ──────────────────────────────────────────────────
 check_docker() {
-    if ! command -v docker &>/dev/null; then
+    local packages="your distribution's docker.io and docker-compose-v2 packages, or Docker's own"
+    local guide=https://docs.docker.com/engine/install/ missing="Docker, which isn't installed"
+    # Rocky, RHEL and Alma ship Podman, and podman-docker answers to `docker`
+    if grep -qiE '^ID(_LIKE)?=.*(rhel|fedora|centos)' /etc/os-release 2>/dev/null; then
+        packages="docker-ce and docker-compose-plugin from Docker's own repository; Podman isn't supported"
+        guide=https://docs.docker.com/engine/install/rhel/
+    fi
+    command -v docker &>/dev/null && docker --version 2>/dev/null | grep -qi podman \
+        && missing="Docker Engine, but 'docker' here is Podman"
+    if ! command -v docker &>/dev/null || [[ "$missing" == *Podman ]]; then
         if ! has_zenity; then
-            notify "Rowanholt needs Docker: https://docs.docker.com/engine/install/"
+            notify "Rowanholt needs Docker Engine: $guide"
         elif zenity --question --title=Rowanholt --width=440 --ok-label="Open install guide" --cancel-label=Close \
-            --text="Rowanholt runs on Docker, which isn't installed.\n\nInstall Docker Engine and its compose plugin (your distribution's docker.io and docker-compose-v2 packages, or Docker's own), then open Rowanholt again." 2>/dev/null; then
-            xdg-open https://docs.docker.com/engine/install/ &>/dev/null &
+            --text="Rowanholt runs on $missing.\n\nInstall Docker Engine and its compose plugin ($packages), then open Rowanholt again." 2>/dev/null; then
+            xdg-open "$guide" &>/dev/null &
         fi
         exit 1
     fi

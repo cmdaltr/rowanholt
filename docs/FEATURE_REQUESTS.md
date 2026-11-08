@@ -42,18 +42,9 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 
 ## FR-03: Desktop app RPM for Rocky Linux 9 / RHEL 9
 
-**Why.** It completes the desktop downloads for RHEL-family desktops. That's lower value than FR-01: analysts on Linux mostly run Ubuntu, SIFT or Kali, which the `.deb` covers.
+**Built 8 November 2026.** `app/linux/package-rpm.sh` and the `linux-rpm` job in `desktop-release.yml` (built, linted, installed and removed in `rockylinux:9`); `app/README.md`.
 
-**What it takes.**
-- `app/linux/package-rpm.sh`, mirroring `package-deb.sh`:
-  - the same `/opt/rowanholt` layout, menu entry and icon;
-  - `Requires: zenity` and `Recommends: docker-ce docker-compose-plugin`.
-- Built by `rpmbuild` in a `rockylinux:9` container as a fourth job in `desktop-release.yml`, checked with `rpm -qpl` and `rpmlint`.
-- The SELinux work from FR-01, for the evidence folders setup writes.
-
-**Done when** the release attaches `rowanholt-<version>.noarch.rpm`, `dnf install` adds the menu entry, and first-run setup starts the stack on a Rocky 9 desktop.
-
-**Depends on** FR-01 (SELinux); a Rocky 9 desktop VM.
+**Done when** first-run setup starts the stack on a Rocky 9 desktop with SELinux enforcing (a desktop VM: the container check can't run the menu entry or Docker). Then this entry goes.
 
 ## FR-04: Lab VM consoles in the browser
 
