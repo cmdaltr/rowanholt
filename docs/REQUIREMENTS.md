@@ -113,6 +113,12 @@ wsl --install -d Ubuntu-22.04
 ### Event Log Analysis (Windows)
 - **Artemis** - Comprehensive Rust-based forensic parser (fast)
 
+### Phones (`--Mobile`)
+- **iLEAPP** v2026.4.6 - iOS backups (encrypted too) and file system extractions
+- **ALEAPP** v2026.4.5 - Android file system extractions, bug reports, and ADB backups (laid out by Elrond)
+
+Both are in the worker image (`src/web/backend/Dockerfile.forensics`, step 4h), each cloned at its release tag into `/opt/<tool>/src` with its own Python 3.12 virtualenv (`/opt/<tool>/venv`, from the deadsnakes PPA: they need 3.11+), so their pinned dependencies stay out of Elrond's Python. Elrond runs them as `/usr/local/bin/ileapp` and `aleapp` (`src/analysis/tools/definitions.py`). Outside the image, install them the same way and put launchers of those names on the `PATH`.
+
 ### File System Analysis
 - **The Sleuth Kit (TSK)** - File system analysis tools
 - **libewf** - Expert Witness Format support (E01 images)

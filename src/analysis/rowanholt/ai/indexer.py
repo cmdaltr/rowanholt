@@ -558,9 +558,10 @@ Response: {json.dumps(proto_payload.get('response', {}))}
                         continue
                     artefact = prefix + str(path.relative_to(folder).with_suffix(""))
                     add(artefact, self.index_table(str(path), host.name, artefact))
-            timeline = table_path(host / "artefacts", "plaso_timeline")
-            if timeline.is_file():
-                add("plaso_timeline", self.index_table(str(timeline), host.name, "plaso_timeline"))
+            for name in ("plaso_timeline", "mobile_timeline"):  # a disk's, a phone's
+                timeline = table_path(host / "artefacts", name)
+                if timeline.is_file():
+                    add(name, self.index_table(str(timeline), host.name, name))
         if root not in hosts:
             for name in ("stacking", "threat_groups"):
                 table = table_path(root, name)

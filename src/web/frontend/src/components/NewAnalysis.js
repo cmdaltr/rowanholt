@@ -17,7 +17,7 @@ const FILE_REQUIREMENTS = {
 function NewAnalysis() {
   const navigate = useNavigate();
   const [caseNumber, setCaseNumber] = useState('');
-  const [analysisMode, setAnalysisMode] = useState(''); // '', 'local', 'gandalf', 'network', 'cloud', 'mordor', or 'json'
+  const [analysisMode, setAnalysisMode] = useState(''); // '', 'local', 'gandalf', 'network', 'cloud', 'mordor', 'mobile' or 'json'
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [destinationPath, setDestinationPath] = useState('');
   const [options, setOptions] = useState({});
@@ -40,6 +40,8 @@ function NewAnalysis() {
   const [loadingMordorDatasets, setLoadingMordorDatasets] = useState(false);
   // Cloud-specific state
   const [cloudUrl, setCloudUrl] = useState('');
+  // Mobile: an encrypted backup's password, sent with the job and never saved with it
+  const [backupPassword, setBackupPassword] = useState('');
 
   // Clear error when options change
   const handleOptionsChange = (newOptions) => {
@@ -131,6 +133,7 @@ function NewAnalysis() {
     setSelectedFiles([]);
     setSelectedMordorDataset('');
     setCloudUrl('');
+    setBackupPassword('');
   }, [analysisMode]);
 
   // Validate case number and get validation message
@@ -199,6 +202,8 @@ function NewAnalysis() {
         setError('Please enter a cloud storage URL');
       } else if (analysisMode === 'network') {
         setError('Please select at least one capture, Zeek log or NetFlow export');
+      } else if (analysisMode === 'mobile') {
+        setError('Please select at least one phone backup or extraction');
       } else {
         setError('Please select at least one disk or memory image');
       }
@@ -434,19 +439,32 @@ function NewAnalysis() {
         ? (options.gandalf ? 'gandalf' : options.network ? 'network' : 'local')
         : analysisMode;
 
+      // Phones are collected already: the disk-collection options don't apply (Elrond refuses them)
+      const mobileOff = effectiveMode === 'mobile' ? {
+        vss: false, userprofiles: false, timeline: false, collectFiles: false, collect_files_all: false,
+        collect_files_archive: false, collect_files_bin: false, collect_files_docs: false,
+        collect_files_hidden: false, collect_files_lnk: false, collect_files_mail: false,
+        collect_files_scripts: false, collect_files_unalloc: false, collect_files_virtual: false,
+        collect_files_web: false,
+      } : {};
       const jobData = {
         case_number: caseNumber,
         source_paths: selectedFiles,
         destination_path: destinationPath || null,
         options: {
           ...options,
+          ...mobileOff,
           local: effectiveMode === 'local' || effectiveMode === 'cloud' || effectiveMode === 'mordor',
           gandalf: effectiveMode === 'gandalf',
           network: effectiveMode === 'network',
           mordor: effectiveMode === 'mordor',
+          mobile: effectiveMode === 'mobile',
           force_overwrite: forceOverwrite,
         },
       };
+      if (effectiveMode === 'mobile' && backupPassword) {
+        jobData.backup_password = backupPassword;
+      }
 
       const job = await createJob(jobData);
       navigate(`/jobs/${job.id}`);
@@ -1031,6 +1049,21 @@ function NewAnalysis() {
                   Mordor
                 </label>
                 <label
+                  style={{ display: 'flex', alignItems: 'center', cursor: isCaseNumberValid ? 'pointer' : 'not-allowed', opacity: isCaseNumberValid ? 1 : 0.5, fontSize: '1.2rem', whiteSpace: 'nowrap' }}
+                  title="Phones: iTunes/Finder backups, Android ADB backups and bug reports, full file system extractions"
+                >
+                  <input
+                    type="radio"
+                    name="analysisMode"
+                    value="mobile"
+                    checked={analysisMode === 'mobile'}
+                    onChange={(e) => setAnalysisMode(e.target.value)}
+                    disabled={!isCaseNumberValid}
+                    style={{ marginRight: '0.5rem', width: '16px', height: '16px' }}
+                  />
+                  Mobile
+                </label>
+                <label
                   style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', opacity: 1, fontSize: '1.2rem', whiteSpace: 'nowrap' }}
                   title="Load configuration from JSON file"
                 >
@@ -1072,6 +1105,7 @@ function NewAnalysis() {
                 {analysisMode === 'local' && 'Select Disk/Memory Images *'}
                 {analysisMode === 'network' && 'Select Captures, Zeek Logs or NetFlow Exports *'}
                 {analysisMode === 'mordor' && 'Select Mordor Dataset *'}
+                {analysisMode === 'mobile' && 'Select Phone Backups or Extractions *'}
                 {analysisMode === 'cloud' && 'Cloud Storage URL *'}
               </label>
 
@@ -1091,6 +1125,41 @@ function NewAnalysis() {
                   selectedFiles={selectedFiles}
                   disabled={!isCaseNumberValid}
                 />
+              )}
+
+              {/* Mobile: files (.ab, bug report .zip, extraction archives) or folders (backups, extractions) */}
+              {analysisMode === 'mobile' && (
+                <div>
+                  <p style={{ color: '#888', marginBottom: '0.75rem', fontSize: '0.9rem' }}>
+                    An iTunes/Finder backup folder, an ADB backup (.ab), a bug report (.zip), or a full file system
+                    extraction from your extraction tool (its folder, or a .zip/.tar). Select a folder with
+                    "Select this folder". Rowanholt doesn't extract from phones itself.
+                  </p>
+                  <FileBrowser
+                    onSelectFiles={setSelectedFiles}
+                    selectedFiles={selectedFiles}
+                    disabled={!isCaseNumberValid}
+                    allowFolders
+                  />
+                  <div style={{ marginTop: '1rem' }}>
+                    <label htmlFor="backupPassword" style={{ display: 'block', marginBottom: '0.5rem' }}>
+                      Backup password (encrypted backups only)
+                    </label>
+                    <input
+                      id="backupPassword"
+                      type="password"
+                      autoComplete="off"
+                      value={backupPassword}
+                      onChange={(e) => setBackupPassword(e.target.value)}
+                      disabled={!isCaseNumberValid}
+                      placeholder="Leave empty for an unencrypted backup or an extraction"
+                      style={{ width: '100%', padding: '0.75rem', fontSize: '1rem' }}
+                    />
+                    <div style={{ color: '#888', fontSize: '0.85rem', marginTop: '0.4rem' }}>
+                      Used for this run only: it isn't saved with the job, and a restarted job won't have it.
+                    </div>
+                  </div>
+                </div>
               )}
 
               {/* Gandalf: Gandalf Job Browser */}
@@ -1254,6 +1323,7 @@ function NewAnalysis() {
                 {analysisMode === 'local' && 'Please select at least one disk or memory image to configure processing options.'}
                 {analysisMode === 'network' && 'Please select at least one capture, Zeek log or NetFlow export to configure processing options.'}
                 {analysisMode === 'gandalf' && 'Please select a Gandalf acquisition to configure processing options.'}
+                {analysisMode === 'mobile' && 'Please select a phone backup or extraction to configure processing options.'}
                 {analysisMode === 'json' && 'Please load a JSON configuration file to configure processing options.'}
               </div>
             )}

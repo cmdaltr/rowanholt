@@ -89,6 +89,10 @@ def drop_case_inputs(inputs: str, case: str) -> str:
     return inputs
 
 
+# The timelines beside a host's artefacts/cooked/: a disk image's (Plaso), a phone's
+TIMELINES = ("plaso_timeline", "mobile_timeline")
+
+
 def host_monitors(host_dir: str, host: str, index: str, salt: str = "") -> List[str]:
     """The monitors for one host's tables: artefacts/cooked/ and analysis/ recursively for every
     .jsonl (so each artefact is indexed, not only those named one by one), the Plaso timeline,
@@ -101,8 +105,9 @@ def host_monitors(host_dir: str, host: str, index: str, salt: str = "") -> List[
     for folder in ("artefacts/cooked", "analysis"):
         if os.path.isdir(f"{host_dir}/{folder}"):
             stanzas.append(monitor_stanza(f"{host_dir}/{folder}", host, index, SOURCETYPE, TABLES, salt=salt))
-    if os.path.isfile(f"{host_dir}/artefacts/plaso_timeline.jsonl"):
-        stanzas.append(monitor_stanza(f"{host_dir}/artefacts/plaso_timeline.jsonl", host, index, SOURCETYPE, salt=salt))
+    for timeline in TIMELINES:  # a disk's Plaso timeline, a phone's (process/mobile.py)
+        if os.path.isfile(f"{host_dir}/artefacts/{timeline}.jsonl"):
+            stanzas.append(monitor_stanza(f"{host_dir}/artefacts/{timeline}.jsonl", host, index, SOURCETYPE, salt=salt))
     memory = memory_outputs(host_dir)
     if any(path.endswith(".jsonl") for path in memory):
         stanzas.append(monitor_stanza(f"{host_dir}/memory_*.jsonl", host, index, SOURCETYPE, salt=salt))
@@ -122,8 +127,9 @@ def indexed_tables(host_dir: str) -> List[str]:
             dirs.sort()
             found.extend(os.path.relpath(os.path.join(root, name), host_dir)
                          for name in sorted(files) if name.endswith(".jsonl"))
-    if os.path.isfile(f"{host_dir}/artefacts/plaso_timeline.jsonl"):
-        found.append("artefacts/plaso_timeline.jsonl")
+    for timeline in TIMELINES:
+        if os.path.isfile(f"{host_dir}/artefacts/{timeline}.jsonl"):
+            found.append(f"artefacts/{timeline}.jsonl")
     found.extend(os.path.basename(path) for path in memory_outputs(host_dir))
     return found
 

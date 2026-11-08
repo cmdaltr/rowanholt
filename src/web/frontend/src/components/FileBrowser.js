@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { browsePath } from '../api';
 
-function FileBrowser({ onSelectFiles, selectedFiles = [], disabled = false }) {
+// allowFolders: a folder can be selected too (Mobile: an iTunes/Finder backup or an extraction is a folder)
+function FileBrowser({ onSelectFiles, selectedFiles = [], disabled = false, allowFolders = false }) {
   const [currentPath, setCurrentPath] = useState(null);
   const [rootPath, setRootPath] = useState(null);  // Separate state for dropdown selection
   const [allowedPaths, setAllowedPaths] = useState([]);
@@ -153,6 +154,32 @@ function FileBrowser({ onSelectFiles, selectedFiles = [], disabled = false }) {
         <div>
           <strong>Current Path:</strong> {currentPath || 'Loading...'}
         </div>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        {allowFolders && currentPath && (
+          <button
+            type="button"
+            onClick={() => {
+              if (disabled || isJobsPath(currentPath)) return;
+              onSelectFiles(selectedFiles.includes(currentPath)
+                ? selectedFiles.filter(p => p !== currentPath)
+                : [...selectedFiles, currentPath]);
+            }}
+            disabled={disabled || loading || isJobsPath(currentPath)}
+            title="Select the folder you're in (a backup or an extraction folder)"
+            style={{
+              padding: '0.5rem 1rem',
+              borderRadius: '4px',
+              border: '1px solid #3f4b2a',
+              background: selectedFiles.includes(currentPath) ? 'rgba(167, 219, 108, 0.2)' : 'rgba(240, 219, 165, 0.1)',
+              color: '#f0dba5',
+              cursor: disabled || loading ? 'not-allowed' : 'pointer',
+              fontFamily: "'Cinzel', 'Times New Roman', serif",
+              fontSize: '0.9rem'
+            }}
+          >
+            {selectedFiles.includes(currentPath) ? 'Folder selected' : 'Select this folder'}
+          </button>
+        )}
         <button
           onClick={() => currentPath && loadPath(currentPath)}
           disabled={disabled || loading}
@@ -172,6 +199,7 @@ function FileBrowser({ onSelectFiles, selectedFiles = [], disabled = false }) {
         >
           Refresh
         </button>
+        </div>
       </div>
 
       {error && <div className="error">{error}</div>}

@@ -13,6 +13,7 @@ from rowanholt.core.core import collect_process_keyword_analysis_timeline
 from rowanholt.audit import write_audit_log_entry
 from rowanholt.core.gandalf import assess_gandalf
 from rowanholt.core.identify import identify_memory_image
+from rowanholt.core.mobile import ingest_mobile
 from rowanholt.meta import extract_metadata
 from rowanholt.mount import mount_images
 from rowanholt.mount import unmount_images
@@ -119,6 +120,7 @@ def main(
     phase=None,  # Phase control: "mount", "collect", "process", or None for full pipeline
     mounted_imgs=None,  # Pre-populated imgs dict from mount phase (for collect/process phases)
     clamav=False,  # --ClamAV: scan collected files and user-writable folders (post/clam.py)
+    mobile=False,  # --Mobile: phones' backups and extractions (core/mobile.py), with gandalf set
 ):
     partitions = []
     unmounted = []  # images found that no mount method could open (E9)
@@ -755,6 +757,11 @@ def main(
                     allimgs[memimg] = mempath
                 allimgs = OrderedDict(sorted(allimgs.items(), key=lambda x: x[1]))
                 print()
+    elif mobile and not (phase in ("collect", "process", "analyse", "index") and mounted_imgs):
+        # Mobile source node (in place of mount + collect): each backup or extraction becomes a
+        # host, "<host>::iOS" or "<host>::Android"; process/mobile.py runs iLEAPP/ALEAPP over it
+        ingest_mobile(output_directory, verbosity,
+                      os.path.join(d, specific_image_file) if specific_image_file else d, allimgs)
     elif gandalf and not (phase in ("collect", "process", "analyse", "index") and mounted_imgs):
         # Gandalf source node (in place of mount + collect): ingest each acquisition
         # into <output>/<host>/artefacts/raw/ and register it like a mounted image.

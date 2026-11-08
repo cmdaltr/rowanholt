@@ -89,6 +89,9 @@ def host_tables(host_dir: str) -> List[Tuple[str, str]]:
         timeline = os.path.join(host_dir, "artefacts", f"plaso_timeline{suffix}")
         if os.path.isfile(timeline):
             (new if suffix == SUFFIX else old).append((timeline, "plaso_timeline"))
+    mobile_timeline = os.path.join(host_dir, "artefacts", f"mobile_timeline{SUFFIX}")  # a phone's (process/mobile.py)
+    if os.path.isfile(mobile_timeline):
+        new.append((mobile_timeline, "mobile_timeline"))
     for path in memory_outputs(host_dir):
         (new if path.endswith(SUFFIX) else old).append((path, os.path.splitext(os.path.basename(path))[0]))
     return new or old

@@ -7,7 +7,7 @@ Database models for analysis jobs and results.
 from datetime import datetime
 from enum import Enum
 from typing import Optional, Dict, Any, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 
 
 class JobStatus(str, Enum):
@@ -31,6 +31,7 @@ class AnalysisOptions(BaseModel):
     local: bool = True  # Default mode - collect from disk image
     gandalf: bool = False  # Alternative mode - process pre-collected artifacts
     network: bool = False  # PCAPs, Zeek logs and NetFlow exports (elrond.py --Network)
+    mobile: bool = False  # Phones: iTunes/Finder and ADB backups, bug reports, file system extractions (--Mobile)
 
     # Analysis options
     analysis: bool = False
@@ -102,6 +103,10 @@ class JobCreate(BaseModel):
     source_paths: list[str] = Field(..., description="List of source paths to disk/memory images")
     destination_path: Optional[str] = Field(None, description="Destination directory for output")
     options: AnalysisOptions = Field(default_factory=AnalysisOptions)
+    # An encrypted phone backup's password: handed to the worker through Redis (backup_secrets.py),
+    # never stored with the job, never in its dumps or its repr
+    backup_password: Optional[SecretStr] = Field(None, exclude=True, repr=False,
+                                                 description="Password of an encrypted phone backup (Mobile jobs)")
 
 
 class PendingAction(BaseModel):

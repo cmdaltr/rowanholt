@@ -33,3 +33,36 @@ class ToolDefinition:
         """Validate and convert platform strings to enums if needed."""
         if self.platforms and isinstance(self.platforms[0], str):
             self.platforms = [ToolPlatform(p) for p in self.platforms]
+
+
+# Phones (--Mobile): run by rowanholt/process/mobile.py as subprocesses, each from its own
+# virtualenv in the worker image (src/web/backend/Dockerfile.forensics, step 4h), pinned there
+# to the release tag in min_version
+ILEAPP = ToolDefinition(
+    name="iLEAPP",
+    description="iOS Logs, Events, And Plists Parser: iTunes/Finder backups (encrypted too) and full file system extractions",
+    platforms=[ToolPlatform.LINUX],
+    executable_name="ileapp",
+    common_paths={"linux": ["/usr/local/bin"]},
+    install_methods={"linux": "Worker image: git clone --branch v2026.4.6 https://github.com/abrignoni/iLEAPP, "
+                              "its requirements.txt in a Python 3.12 venv at /opt/ileapp/venv"},
+    version_command="ileapp --version",
+    min_version="v2026.4.6",
+    required=False,
+    category="mobile",
+)
+ALEAPP = ToolDefinition(
+    name="ALEAPP",
+    description="Android Logs, Events, And Protobuf Parser: file system extractions, bug reports and ADB backups "
+                "(which Elrond lays out as a file system first)",
+    platforms=[ToolPlatform.LINUX],
+    executable_name="aleapp",
+    common_paths={"linux": ["/usr/local/bin"]},
+    install_methods={"linux": "Worker image: git clone --branch v2026.4.5 https://github.com/abrignoni/ALEAPP, "
+                              "its requirements.txt in a Python 3.12 venv at /opt/aleapp/venv"},
+    version_command="aleapp --version",
+    min_version="v2026.4.5",
+    required=False,
+    category="mobile",
+)
+MOBILE_TOOLS: Dict[str, ToolDefinition] = {"ileapp": ILEAPP, "aleapp": ALEAPP}

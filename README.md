@@ -251,6 +251,7 @@ Process and analyze forensic evidence with integrated tools.
 - Plaso/log2timeline (timeline generation)
 - RegRipper (registry parsing)
 - Artemis (event logs, $MFT, $UsnJrnl, prefetch, SRUM, jump lists, shimcache)
+- iLEAPP and ALEAPP (phones: iTunes/Finder and ADB backups, bug reports, file system extractions; `--Mobile`)
 - YARA and ClamAV (signature scanning)
 - The Sleuth Kit, libewf, apfs-fuse (images and file systems)
 - 25+ additional forensic utilities
@@ -570,6 +571,7 @@ Rowanholt integrates many excellent open-source forensic tools:
 - **Plaso/log2timeline** - Timeline generation
 - **RegRipper** - Registry analysis
 - **Artemis** - Windows, Linux and macOS artefact parsing
+- **iLEAPP and ALEAPP** - iOS and Android artefact parsing
 - **YARA** - Signature scanning
 - **The Sleuth Kit** - File system analysis
 - **MITRE ATT&CK** - Adversary tactics and techniques

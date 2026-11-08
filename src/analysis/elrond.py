@@ -15,6 +15,7 @@ from rowanholt.mount import unmount_images, cleanup_stale_mounts
 from rowanholt.audit import write_audit_log_entry
 from rowanholt.post.clean import archive_artefacts
 from rowanholt.post.siem import SIEMUnavailableError, ensure_export_targets, ensure_remote_siem_reachable
+from rowanholt.core.mobile import read_backup_password, set_backup_password
 
 
 parser = argparse.ArgumentParser()
@@ -123,6 +124,24 @@ parser.add_argument(
     "text exports (nfdump -o csv, SiLK rwcut); a source that's a capture, a log or a folder of them becomes its own "
     "folder in the case. Other sources still need --Collect or --Gandalf; Example syntax: elrond.py CASE capture.pcap "
     "/path/to/output --Network --extractIocs",
+    action="store_const",
+    const=True,
+    default=False,
+)
+parser.add_argument(
+    "--Mobile",
+    help="Read phones: iTunes/Finder backups, Android ADB backups (.ab) and bug reports, and full file system "
+    "extractions from a commercial tool (folders or .zip/.tar archives), parsed with iLEAPP and ALEAPP. The directory "
+    "is one of them, or a folder holding several. Rowanholt doesn't extract from devices itself",
+    action="store_const",
+    const=True,
+    default=False,
+)
+parser.add_argument(
+    "--backupPasswordStdin",
+    help="With --Mobile: read the password of encrypted backups (iTunes/Finder or ADB) from the first line of "
+    "standard input, or ask for it when that's a terminal. It's never taken on the command line, and never "
+    "written to the case or its audit log",
     action="store_const",
     const=True,
     default=False,
@@ -334,6 +353,7 @@ exhaustive = args.eXhaustive
 threathunt = args.ThreatHunt
 mordor = args.Mordor  # Input type flag for Mordor datasets
 network = args.Network  # Input type flag for PCAP, Zeek logs and NetFlow exports
+mobile = args.Mobile  # Input type flag for phones (core/mobile.py)
 archive = args.Ziparchive
 index_only = args.Index
 
@@ -520,7 +540,15 @@ if __name__ == "__main__":
     # Gandalf archives and Mordor datasets are collected already: the presets below only
     # switch on collection options (user profiles, the disk timeline) when there's a disk
     # to collect from. Asked for by name, they still fail the check in main().
-    precollected = gandalf or mordor
+    if mobile and (mordor or args.Gandalf or collect):
+        print("\n  Error: --Mobile is an evidence source of its own: it can't be used with --Collect, --Gandalf or --Mordor\n")
+        sys.exit(1)
+    if args.backupPasswordStdin and not mobile:
+        print("\n  Error: --backupPasswordStdin is for encrypted phone backups, with --Mobile\n")
+        sys.exit(1)
+    if args.backupPasswordStdin:
+        set_backup_password(read_backup_password())
+    precollected = gandalf or mordor or mobile
     if exhaustive:
         brisk = True
         delete = True
@@ -553,6 +581,9 @@ if __name__ == "__main__":
         splunk = True
         elastic = True
         userprofiles = userprofiles or not precollected
+    if mobile:
+        # Phones are collected already, as Gandalf archives are: no mounting, no collection
+        gandalf = True
     if mordor:
         # Mordor input type: Treat like Gandalf (pre-collected artefacts)
         # Mordor datasets are pre-collected attack simulation data from OTRF
@@ -722,6 +753,7 @@ if __name__ == "__main__":
                 quotes,
                 asciitext,
                 clamav=clamav,
+                mobile=mobile,
                 skip_unmount=(idx > 0),  # Don't unmount after first image
                 phase="mount",
             )
@@ -818,6 +850,7 @@ if __name__ == "__main__":
             quotes,
             asciitext,
             clamav=clamav,
+            mobile=mobile,
             skip_unmount=True,  # Don't unmount - images are still mounted
             phase="collect",
             mounted_imgs=data,
@@ -890,6 +923,7 @@ if __name__ == "__main__":
                 quotes,
                 asciitext,
                 clamav=clamav,
+                mobile=mobile,
                 skip_unmount=True,  # Don't unmount between processing
                 phase="process",
                 mounted_imgs=data,
@@ -989,6 +1023,7 @@ if __name__ == "__main__":
                 quotes,
                 asciitext,
                 clamav=clamav,
+                mobile=mobile,
                 skip_unmount=True,
                 phase="analyse",
                 mounted_imgs=data,
@@ -1149,6 +1184,7 @@ if __name__ == "__main__":
                 quotes,
                 asciitext,
                 clamav=clamav,
+                mobile=mobile,
                 skip_unmount=True,
                 phase="index",
                 mounted_imgs=data,
@@ -1160,9 +1196,10 @@ if __name__ == "__main__":
 
     # ========== OpenSearch and Timesketch: once for the whole case ==========
     export_failed = []
-    if (opensearch or timesketch) and mounted_data:
+    if (opensearch or timesketch) and (mounted_data or network_done):
         from rowanholt.post.index_only import export_targets
-        case_directory = mounted_data[next(iter(mounted_data))]["output_directory"]
+        # A network-only run has no mounted source: its folders are in output_directory, the case's
+        case_directory = mounted_data[next(iter(mounted_data))]["output_directory"] if mounted_data else output_directory
         export_failed = export_targets(case_directory, case, "veryverbose", opensearch, timesketch)
 
     # ========== PHASE 6: ARCHIVE (if requested) ==========
