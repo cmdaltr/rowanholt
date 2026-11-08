@@ -25,20 +25,11 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 
 ## FR-02: Team servers on Windows Server
 
-**Why.** Some teams only get Windows Server from IT.
+**Built 8 November 2026, not yet run on Windows Server.** `scripts/server/windows/Install-RowanholtServer.ps1` and `Start-RowanholtServer.ps1`, `docs/SERVER.md` (Windows Server): its own WSL 2 distribution with Docker Engine, the same `server init`, the certificate from the Windows store, evidence through `/mnt/<drive>`, portproxy and a firewall rule, and a boot task that needs nobody signed in. Parsed by PowerShell 7 only; Windows PowerShell 5.1, WSL and the task are untried.
 
-**What it takes.**
-- Rowanholt's images are Linux containers. Docker Desktop isn't supported or licensed for Windows Server, and Windows Server's native container runtime runs Windows containers only. The route is WSL 2 (Windows Server 2022 and 2025) with Docker Engine inside an Ubuntu distribution, or a Hyper-V Linux VM.
-- In both cases the server is really Linux, so the work is set-up and plumbing:
-  - a PowerShell `server init` that sets up WSL and Docker;
-  - evidence on Windows volumes reached through `/mnt/<drive>`, which is slow for large images (copying to the WSL filesystem is the usual answer, and the guide must say so);
-  - port forwarding from the host to WSL for 443;
-  - starting the stack at boot without a signed-in user, through a scheduled task.
-- **Certificates.** The organisation's certificate, from the Windows certificate store, exported for Caddy.
+**Done when** a Windows Server 2022 host runs the server profile through WSL 2, survives a reboot without anyone signing in, and analyses evidence from a Windows volume. Then this entry goes.
 
-**Done when** a Windows Server 2022 host runs the server profile through WSL 2, survives a reboot without anyone signing in, and analyses evidence from a Windows volume.
-
-**Depends on** FR-01's server checks; a Windows Server 2022 VM in the lab.
+**Depends on** a Windows Server 2022 VM: an x86 host, since WSL 2 needs nested virtualisation, which Apple silicon's VMs don't have.
 
 ## FR-03: Desktop app RPM for Rocky Linux 9 / RHEL 9
 
