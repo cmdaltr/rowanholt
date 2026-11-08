@@ -46,11 +46,14 @@ ARCHIVES = (".zip", ".tar", ".tar.gz", ".tgz", ".tar.xz")
 # Paths only a phone's file system has, as an extraction tool lays it out (any prefix before them)
 IOS_MARKERS = ("private/var/mobile/", "private/var/containers/", "var/mobile/Library/",
                "System/Library/CoreServices/SystemVersion.plist")
-ANDROID_MARKERS = ("data/data/", "data/system/packages.xml", "data/system_ce/", "system/build.prop",
-                   "data/user_de/")
+ANDROID_MARKERS = ("data/data/", "data/system/", "data/system_ce/", "data/user_de/", "data/misc/",
+                   "system/build.prop")
 # How far into an archive to look for the markers before giving up on it
 MEMBER_LIMIT = 200_000
-DIR_DEPTH = 4
+# The folders an extraction tool puts around the phone's own (Cellebrite's EXTRACTION_FFS/filesystem1/,
+# Magnet's Dump/): the markers may start this deep, and no deeper
+WRAPPER_DEPTH = 2
+DIR_DEPTH = WRAPPER_DEPTH + 3
 
 
 class _Secret:
@@ -188,14 +191,25 @@ def _member_names(path: Path) -> Iterable[str]:
             yield member.name
 
 
-def platform_of(names: Iterable[str]) -> Optional[str]:
-    """iOS or Android from the paths in an extraction: the first marker either has."""
+def _marker_depth(candidate: str, markers: Iterable[str]) -> Optional[int]:
+    """How many folders deep the first of the markers starts in a path, or None."""
+    for marker in markers:
+        at = candidate.find("/" + marker)
+        if at >= 0:
+            return candidate[:at].count("/")
+    return None
+
+
+def platform_of(names: Iterable[str], max_depth: int = WRAPPER_DEPTH) -> Optional[str]:
+    """iOS or Android from the paths in an extraction: the first marker either has, starting no
+    deeper than max_depth folders in (an extraction tool's own folders: filesystem1/, Dump/...).
+    Deeper, it's a folder holding extractions, not one."""
     for name in names:
         candidate = "/" + name.replace("\\", "/").lstrip("./")
-        if any("/" + marker in candidate for marker in IOS_MARKERS):
-            return IOS
-        if any("/" + marker in candidate for marker in ANDROID_MARKERS):
-            return ANDROID
+        for platform, markers in ((IOS, IOS_MARKERS), (ANDROID, ANDROID_MARKERS)):
+            depth = _marker_depth(candidate, markers)
+            if depth is not None and depth <= max_depth:
+                return platform
     return None
 
 
@@ -257,21 +271,28 @@ def classify(path: Path) -> Optional[MobileEvidence]:
 
 
 def find_evidence(source: Path) -> List[MobileEvidence]:
-    """The mobile evidence in a source: the source itself, or each item directly inside it."""
+    """The mobile evidence in a source: the source itself, or each item directly inside it.
+
+    A folder is a folder of evidence when two or more items in it are evidence, or one is that
+    isn't an extraction folder (a backup, an .ab, an archive); otherwise it's one extraction,
+    whose tool may have put the phone's file system a folder or two down (filesystem1/)."""
     source = Path(source)
-    evidence = classify(source)
-    if evidence:
-        return [evidence]
-    found = []
-    if source.is_dir():
-        for child in sorted(source.iterdir()):
-            if child.name.startswith((".", "._")):
-                continue
-            item = classify(child)
-            if item:
-                found.append(item)
-            else:
-                print("   '{}' isn't mobile evidence Elrond reads; skipping it".format(child.name))
+    if not source.is_dir() or _itunes_backup(source):
+        evidence = classify(source)
+        return [evidence] if evidence else []
+    found, skipped = [], []
+    for child in sorted(source.iterdir()):
+        if child.name.startswith((".", "._")):
+            continue
+        item = classify(child)
+        (found if item else skipped).append(item or child.name)
+    folder_of_evidence = len(found) >= 2 or any(item.input_type != "fs" or item.kind == "adb_backup" for item in found)
+    if not folder_of_evidence:
+        own = _filesystem_folder(source)
+        if own:
+            return [own]
+    for name in skipped:
+        print("   '{}' isn't mobile evidence Elrond reads; skipping it".format(name))
     return found
 
 
