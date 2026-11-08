@@ -19,6 +19,9 @@ $Distro = $config.Distribution
 function Write-Log([string]$Text) { Add-Content -Path $Log -Value "[$(Get-Date -Format s)] $Text" }
 
 Write-Log 'Starting Rowanholt'
+# WSL's MSI (Install-RowanholtServer.ps1), not System32's wsl.exe, which on Server 2022 predates it
+$wslExe = Join-Path $env:ProgramFiles 'WSL\wsl.exe'
+if (Test-Path $wslExe) { Set-Alias -Name wsl.exe -Value $wslExe -Scope Script }
 & wsl.exe -d $Distro -u root -- "$($config.Root)/rowanholt" start *>> $Log
 if ($LASTEXITCODE -ne 0) { Write-Log "rowanholt start failed ($LASTEXITCODE)"; exit 1 }
 

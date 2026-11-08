@@ -87,17 +87,42 @@ if ($Credential.UserName -notmatch "(^|\\)$([regex]::Escape($env:USERNAME))$") {
 }
 New-Item -ItemType Directory -Force -Path $State, $WslPath | Out-Null
 
-# 1. WSL 2
-& wsl.exe --status *> $null
-if ($LASTEXITCODE -ne 0) {
-    Write-Host 'Turning WSL 2 on...'
-    & wsl.exe --install --no-distribution
-    & wsl.exe --status *> $null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host 'WSL needs a reboot to finish. Restart Windows, then run this script again.'
-        exit 3010
+# 1. WSL 2. Windows Server 2022's own wsl.exe predates --install --no-distribution and --status
+# (it prints its usage, so the check below never passed and the script asked for a reboot forever):
+# the two features are turned on here and WSL itself is Microsoft's MSI, in Program Files
+$reboot = $false
+foreach ($feature in 'Microsoft-Windows-Subsystem-Linux', 'VirtualMachinePlatform') {
+    if ((Get-WindowsOptionalFeature -Online -FeatureName $feature).State -ne 'Enabled') {
+        Write-Host "Turning $feature on..."
+        if ((Enable-WindowsOptionalFeature -Online -FeatureName $feature -All -NoRestart).RestartNeeded) { $reboot = $true }
     }
 }
+$wslExe = Join-Path $env:ProgramFiles 'WSL\wsl.exe'
+if (-not (Test-Path $wslExe)) {
+    Write-Host 'Installing WSL from its latest release...'
+    $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/microsoft/WSL/releases/latest' -UseBasicParsing
+    $asset = $release.assets | Where-Object name -like '*.x64.msi' | Select-Object -First 1
+    if (-not $asset) { throw "No x64 MSI in WSL's release $($release.tag_name)." }
+    $msi = Join-Path $State $asset.name
+    $ProgressPreference = 'SilentlyContinue'
+    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $msi -UseBasicParsing
+    # GitHub gives each asset's SHA-256
+    if ($asset.digest -match '^sha256:([0-9a-f]{64})$' -and (Get-FileHash $msi -Algorithm SHA256).Hash -ne $Matches[1].ToUpper()) {
+        Remove-Item $msi; throw 'The WSL MSI failed its SHA-256 check.'
+    }
+    $install = Start-Process msiexec.exe -Wait -PassThru -ArgumentList '/i', "`"$msi`"", '/qn', '/norestart'
+    Remove-Item $msi
+    if ($install.ExitCode -eq 3010) { $reboot = $true }
+    elseif ($install.ExitCode -ne 0) { throw "Installing WSL failed (msiexec $($install.ExitCode))." }
+}
+if ($reboot) {
+    Write-Host 'WSL needs a reboot to finish. Restart Windows, then run this script again.'
+    exit 3010
+}
+# Every wsl.exe below is this one, not System32's
+Set-Alias -Name wsl.exe -Value $wslExe -Scope Script
+& wsl.exe --status *> $null
+if ($LASTEXITCODE -ne 0) { throw "WSL is installed but doesn't start ($wslExe --status). Is nested virtualisation on in the VM?" }
 & wsl.exe --update | Out-Null
 
 # The proxy is reached through Windows' own addresses (portproxy, below), not WSL's localhost
