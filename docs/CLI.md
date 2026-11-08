@@ -11,7 +11,7 @@ Every command below can be run through the `rowanholt` command from any director
 1. [The `rowanholt` command](#the-rowanholt-command)
 2. [Overview](#overview)
 3. [Gandalf - Acquisition](#gandalf---acquisition)
-4. [Elrond - Analysis](#elrond---analysis)
+4. [Elrond - Analysis](#elrond---analysis) ([Case report](#case-report))
 5. [MITRE ATT&CK Tools](#mitre-attck-tools)
 6. [Cloud Forensics](#cloud-forensics)
 7. [Eru (AI Analyst)](#eru-ai-analyst)
@@ -380,6 +380,7 @@ Memory analysis reads memory images from `SOURCE_DIR` alongside the disk images;
 | `--Index` | Index a case already processed into Splunk, Elastic and/or the Navigator (with the options above), without mounting, extracting or processing again; the one directory is the case's folder |
 | `--Ziparchive` | Zip raw data after processing |
 | `--Delete` | Delete raw data after processing |
+| `--Report` | Write the case report, `<case>_report.md` and `<case>_report.docx`, into the case's folder when the run ends (see [Case report](#case-report)) |
 
 SIEM options fail fast if the service is unreachable. Start them with `docker compose --profile siem up -d`.
 
@@ -415,7 +416,32 @@ python3 src/analysis/elrond.py CASE-001 /evidence /output/CASE-001 --Collect --P
 # SIEM export with Navigator layer
 python3 src/analysis/elrond.py CASE-001 /evidence /output/CASE-001 \
   --Collect --Process --Analysis --Splunk --Elastic --Navigator
+
+# The case report, from a case processed earlier (run from src/analysis)
+cd src/analysis && python3 -m rowanholt.report /output/CASE-001 --out ~/reports
 ```
+
+---
+
+### Case report
+
+`--Report`, or `python3 -m rowanholt.report <case folder>` for a case already processed, writes a report built from the case directory alone, in Markdown and DOCX. It reads the hosts' `artefacts/cooked/` and `analysis/` tables, their Gandalf files and the case's own files, and never `raw/`:
+
+| Section | From |
+|---|---|
+| Hosts and timespan | Each host's OS (`host.info` or the audit log), tables and records, when Gandalf collected it (`gandalf_log.audit`) and Elrond processed it (the audit log); the earliest and latest record times and the first and last rows tagged with a technique, each cited |
+| ATT&CK techniques | Every technique in `mitre_techniques.txt` or a row's `techniques`, with its name and tactics, and up to five rows per table cited for each (the count of the rest, to filter for in the case browser). Techniques recorded with no row naming them are listed apart, as leads |
+| Indicators | `analysis/iocs`: counts by type, watchlist matches, the most frequent 25 of each type; `threat_intel_matches` and the case's `threat_groups` |
+| Evidence integrity | `gandalf_integrity` per host (verified, MISMATCH, missing, unhashed), with every file that didn't verify cited |
+| Method | `rowanholt_method.json`: the command, options, evidence, the tools found with their versions, Python and platform; the audit log's stages and failures |
+
+Every claim is cited by host, file (relative to the host's folder, as the case browser lists it), row (the line number) and the first 12 hex digits of the row's SHA-256, computed as the case browser and findings compute it. A row's "parsed from" is the collected file in `artefacts/raw/` it came from.
+
+Elrond records `rowanholt_method.json` in the case folder once the evidence is identified, and again with the finish time when the run ends. Cases processed before it have no method file, and the report says so. Times before 1980 (FILETIME and epoch zeros) are left out of the timespan.
+
+`python3 -m rowanholt.report` takes `--case` (default: the case Elrond recorded, else the folder's name), `--out` (default: the case's folder) and `--format markdown docx`. Reading a large case takes as long as reading its tables: about four minutes for three Windows hosts (7 GB of tables) on a USB disk.
+
+The web app's case browser has the curated version: **Report (DOCX)** and **Report (Markdown)** put the analysts' confirmed findings first, then the open leads and dismissed rows, then this report as an appendix ([API.md](API.md#case-browser-and-collaboration)). The backend reads the same package from Elrond's source (`docker-compose.yml` mounts `rowanholt/report` and the ATT&CK names into it).
 
 ---
 
@@ -433,6 +459,8 @@ Taken from the October 2026 test runs:
 <output>/<case>/
 ├── rowanholt_audit.log            # CSV: timestamp (UTC), image, stage, entry
 ├── mitre_techniques.txt           # ATT&CK techniques identified
+├── rowanholt_method.json          # the run's command, options and tool versions (the report's method)
+├── <case>_report.md, .docx        # the case report (if --Report)
 ├── <case>_navigator.json          # ATT&CK Navigator layer (if -N)
 ├── .memory_profiles.json          # memory jobs only
 ├── <disk image>/

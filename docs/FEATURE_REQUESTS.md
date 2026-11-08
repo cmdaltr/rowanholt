@@ -106,21 +106,13 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 
 ## FR-07: Automated reporting
 
-**Why.** Every case ends in a report, and today the analyst writes it from scratch out of the case directory.
+**Built 8 November 2026**: `rowanholt/report` writes the case report (hosts and timespan, techniques with their rows cited, indicators, Gandalf's integrity check, Elrond's options and tool versions) in Markdown and DOCX from the case directory, through Elrond's `--Report` or `python3 -m rowanholt.report`, and the case browser downloads the curated version, confirmed findings first and the rest as appendices (`docs/CLI.md`, Case report).
 
-**What it takes.**
-- A report generated from a case:
-  - summary of hosts and timespan;
-  - ATT&CK techniques, with the artefacts behind each;
-  - indicators;
-  - Gandalf's integrity result;
-  - Elrond's options and tool versions as the method.
-- DOCX and Markdown output.
-- Once collaboration's findings exist (`docs/ROADMAP.md`), the report is built from confirmed findings first, and the rest is an appendix.
+**Not yet met in "Done when"** (every claim followed back to the evidence):
+- Techniques Elrond records in `mitre_techniques.txt` without tagging a row have nothing to cite: 6 of the 20 on the Windows lab case of 7 November (T1003, T1059, T1070.004, T1110, T1110.001, T1219). The report lists them apart as leads; the processors that record them need to tag the rows they come from.
+- Not run end to end: `--Report` in the worker on a fresh lab run, and the download from the running stack.
 
-**Done when** a finished case produces a report a reviewer can follow back to the evidence for every claim, with no edits needed to make it accurate.
-
-**Depends on** the findings work in `docs/ROADMAP.md` for the curated version; the uncurated one can come first.
+**Depends on** a rebuilt worker image (Elrond is copied into it) and a backend restart for its new mounts.
 
 ## FR-08: More SIEM integrations
 
