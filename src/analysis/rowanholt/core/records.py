@@ -64,6 +64,18 @@ def _from_epoch(number: float) -> Optional[str]:
     return None
 
 
+def _long_fraction(candidate: str) -> Optional[datetime]:
+    """An ISO time with more fractional digits than Python before 3.11 parses (Artemis's event
+    times have nine), cut to six. Only the digits straight after the point are the fraction: the
+    zone's digits after them are not (they made every such time unreadable on Python 3.10)."""
+    head, _, rest = candidate.partition(".")
+    digits = re.match(r"\d*", rest).group()
+    try:
+        return datetime.fromisoformat(f"{head}.{digits[:6].ljust(6, '0')}{rest[len(digits):]}")
+    except ValueError:
+        return None
+
+
 def iso_timestamp(value: Any) -> Optional[str]:
     """``value`` as ISO 8601 UTC (``2026-10-29T14:03:11Z``), or None when it isn't a time."""
     if value is None or isinstance(value, bool):
@@ -89,13 +101,9 @@ def iso_timestamp(value: Any) -> Optional[str]:
     except ValueError:
         pass
     if "." in candidate:  # more than six fractional digits (NTFS's 100 ns)
-        head, _, rest = candidate.partition(".")
-        digits = "".join(c for c in rest if c.isdigit())
-        zone = rest[len(digits):]
-        try:
-            return _iso(datetime.fromisoformat(f"{head}.{digits[:6].ljust(6, '0')}{zone}"))
-        except ValueError:
-            pass
+        moment = _long_fraction(candidate)
+        if moment:
+            return _iso(moment)
     for fmt in _FORMATS:
         try:
             return _iso(datetime.strptime(text, fmt))
