@@ -498,6 +498,8 @@ python3 src/analysis/elrond.py CASE-001 /evidence/zeek/sensor-1 /evidence/flows.
 
 Every claim is cited by host, file (relative to the host's folder, as the case browser lists it), row (the line number) and the first 12 hex digits of the row's SHA-256, computed as the case browser and findings compute it. A row's "parsed from" is the collected file in `artefacts/raw/` it came from.
 
+Run end to end on 8 November 2026: a job started from the web app over the three-host Windows lab case, a row flagged and confirmed in the case browser, and the report downloaded as DOCX and Markdown, confirmed finding first, all 20 techniques with rows cited and none recorded without one.
+
 Elrond records `rowanholt_method.json` in the case folder once the evidence is identified, and again with the finish time when the run ends. Cases processed before it have no method file, and the report says so. Times before 1980 (FILETIME and epoch zeros) are left out of the timespan.
 
 `python3 -m rowanholt.report` takes `--case` (default: the case Elrond recorded, else the folder's name), `--out` (default: the case's folder) and `--format markdown docx`. Reading a large case takes as long as reading its tables: about four minutes for three Windows hosts (7 GB of tables) on a USB disk.

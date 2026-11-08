@@ -41,6 +41,42 @@ const download = (name, text, type) => {
 
 const when = (iso) => (iso ? iso.slice(0, 16).replace('T', ' ') : '');
 
+// The envelope's host, artefact and source path are the same on every row of a table: the heading says them once
+const ENVELOPE = new Set(['host', 'artefact', 'source_path']);
+
+// A cooked table's name as people read it: no folder, no extension, Windows' %4 back to a slash
+const tableName = (path) => path.split('/').pop().replace(/\.(jsonl|csv|json)$/, '').replace(/%4/g, '/').replace(/^gandalf\+/, '');
+
+// A host's tables by folder (evt, tasks, registry…), the loose ones first
+const byFolder = (files) => {
+  const groups = {};
+  files.forEach((file) => {
+    const parts = file.path.replace(/^artefacts\/cooked\//, '').split('/');
+    const folder = parts.length > 1 ? parts[0] : '';
+    (groups[folder] = groups[folder] || []).push(file);
+  });
+  return Object.entries(groups).sort(([a], [b]) => (a === '' ? -1 : b === '' ? 1 : a.localeCompare(b)));
+};
+
+// A cell holding JSON, laid out; anything else as it is
+const pretty = (value) => {
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === 'object' && parsed !== null ? JSON.stringify(parsed, null, 2) : String(value);
+  } catch {
+    return value;
+  }
+};
+
+const techniqueList = (value) => {
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
 // A case's tables, read-only, with findings flagged on their rows, notes, who has which host,
 // and what everyone has done. Live over a websocket, polling while that's down.
 function CaseBrowser() {
@@ -60,6 +96,7 @@ function CaseBrowser() {
   const [findingNote, setFindingNote] = useState({});
   const [people, setPeople] = useState([]);
   const [building, setBuilding] = useState(''); // the case report's format while it's being built
+  const [expanded, setExpanded] = useState(null); // the row ref opened to show its whole record
 
   const loadOverview = useCallback(async () => {
     try {
@@ -141,6 +178,7 @@ function CaseBrowser() {
     setOffset(0);
     setTable(null);
     setFlagging(null);
+    setExpanded(null);
   };
 
   const submitFlag = (event) => {
@@ -172,6 +210,7 @@ function CaseBrowser() {
   const flaggedRefs = new Set(findings.filter((f) => selected && f.host === selected.host && f.artefact === selected.path)
     .map((f) => f.row_ref));
   const caseNotes = notes.filter((n) => n.finding_id === null);
+  const columns = table ? table.columns.filter((c) => !ENVELOPE.has(c)) : [];
   const title = job ? `Case ${job.case_number}` : 'Case';
 
   return (
@@ -204,27 +243,32 @@ function CaseBrowser() {
       {error && <div className="error">{error}</div>}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(16rem, 1fr) 3fr', gap: '1rem', alignItems: 'start' }}>
-        <div data-guide="case.hosts" className="card" style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+        <div data-guide="case.hosts" className="card case-browser" style={{ maxHeight: '80vh', overflowY: 'auto' }}>
           <h3>Hosts</h3>
           {!overview ? <p>Loading…</p> : overview.hosts.map((host) => (
             <details key={host.host} open={overview.hosts.length === 1}>
               <summary><strong>{host.host}</strong> <span style={{ color: '#888' }}>{host.assignee ? `· ${host.assignee}` : ''} · {host.status}</span></summary>
-              <div style={{ display: 'flex', gap: '0.25rem', margin: '0.5rem 0' }}>
-                <input type="text" list="case-people" placeholder="Assignee" defaultValue={host.assignee} style={{ flex: 1, minWidth: 0 }}
+              <div className="case-host-controls">
+                <input type="text" list="case-people" placeholder="Assigned to" aria-label="Assigned to" defaultValue={host.assignee}
                   onBlur={(e) => e.target.value !== host.assignee && act(() => assignHost(jobId, host.host, { assignee: e.target.value }))} />
-                <select value={host.status} onChange={(e) => act(() => assignHost(jobId, host.host, { status: e.target.value }))}>
+                <select aria-label="Status" value={host.status} onChange={(e) => act(() => assignHost(jobId, host.host, { status: e.target.value }))}>
                   {HOST_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
-              {host.files.map((file) => (
-                <div key={file.path}>
-                  <button type="button" onClick={() => open(host.host, file.path)}
-                    style={{ background: 'none', border: 'none', padding: '0.1rem 0', cursor: 'pointer', textAlign: 'left',
-                      color: selected?.host === host.host && selected?.path === file.path ? '#66d9ef' : '#f0dba5' }}>
-                    {file.path.replace(/^artefacts\/cooked\//, '')}
+              {byFolder(host.files).map(([folder, files]) => {
+                const links = files.map((file) => (
+                  <button key={file.path} type="button" title={file.path} onClick={() => open(host.host, file.path)}
+                    className={`case-table-link${selected?.host === host.host && selected?.path === file.path ? ' selected' : ''}`}>
+                    {tableName(file.path)}
                   </button>
-                </div>
-              ))}
+                ));
+                return folder ? (
+                  <details key={folder} className="case-folder" open={files.some((f) => selected?.host === host.host && selected?.path === f.path)}>
+                    <summary>{folder} <span className="case-count">{files.length}</span></summary>
+                    {links}
+                  </details>
+                ) : <div key="(loose)">{links}</div>;
+              })}
             </details>
           ))}
           {overview?.case_files.length > 0 && (
@@ -232,9 +276,9 @@ function CaseBrowser() {
               <summary><strong>Case files</strong></summary>
               {overview.case_files.map((file) => (
                 <div key={file.path}>
-                  <button type="button" onClick={() => open(CASE_HOST, file.path)}
-                    style={{ background: 'none', border: 'none', padding: '0.1rem 0', cursor: 'pointer', color: '#f0dba5' }}>
-                    {file.path}
+                  <button type="button" title={file.path} onClick={() => open(CASE_HOST, file.path)}
+                    className={`case-table-link${selected?.host === CASE_HOST && selected?.path === file.path ? ' selected' : ''}`}>
+                    {tableName(file.path)}
                   </button>
                 </div>
               ))}
@@ -243,11 +287,16 @@ function CaseBrowser() {
           <datalist id="case-people">{people.map((p) => <option key={p.username} value={p.username} />)}</datalist>
         </div>
 
-        <div data-guide="case.table" className="card" style={{ minWidth: 0 }}>
+        <div data-guide="case.table" className="card case-browser" style={{ minWidth: 0 }}>
           {!selected ? <p>Pick a table on the left.</p> : (
             <>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'baseline' }}>
-                <h3 style={{ wordBreak: 'break-all', flex: 1 }}>{selected.host === CASE_HOST ? '' : `${selected.host}: `}{selected.path}</h3>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <h3 style={{ margin: 0 }}>{selected.host === CASE_HOST ? '' : `${selected.host}: `}{tableName(selected.path)}</h3>
+                  <div className="case-source">
+                    {selected.path}{table?.rows[0]?.cells.source_path ? ` · from ${table.rows[0].cells.source_path}` : ''}
+                  </div>
+                </div>
                 <button type="button" title={query ? 'The rows matching the filter' : 'Every row'}
                   onClick={() => act(async () => download(
                     `${selected.host === CASE_HOST ? '' : `${selected.host}_`}${selected.path.split('/').pop().replace(/\.[^.]+$/, '')}.csv`,
@@ -260,25 +309,45 @@ function CaseBrowser() {
               {table && (
                 <>
                   <div className="table-container" style={{ overflowX: 'auto', maxHeight: '60vh' }}>
-                    <table style={{ fontSize: '0.8rem' }}>
+                    <table className="case-rows">
                       <thead>
-                        <tr><th>Row</th>{selected.host !== CASE_HOST && <th />}{table.columns.map((c) => <th key={c}>{c}</th>)}</tr>
+                        <tr><th>Row</th>{columns.map((c) => <th key={c}>{c.replace(/_/g, ' ')}</th>)}</tr>
                       </thead>
                       <tbody>
                         {table.rows.map((row) => (
-                          <tr key={row.ref} style={flaggedRefs.has(row.ref) ? { background: 'rgba(237, 85, 101, 0.12)' } : undefined}>
-                            <td>{row.ref}</td>
-                            {selected.host !== CASE_HOST && (
-                              <td>
-                                <button type="button" title="Flag as finding" style={{ padding: '0.1rem 0.4rem' }}
-                                  onClick={() => setFlagging({ ref: row.ref, title: '', technique: '', status: 'lead' })}>⚑</button>
+                          <React.Fragment key={row.ref}>
+                            <tr className={`${flaggedRefs.has(row.ref) ? 'flagged' : ''}${expanded === row.ref ? ' open' : ''}`}
+                              onClick={() => setExpanded(expanded === row.ref ? null : row.ref)} title="Show the whole row">
+                              <td className="case-row-ref">
+                                {selected.host !== CASE_HOST && (
+                                  <button type="button" title="Flag as finding" className="case-flag"
+                                    onClick={(e) => { e.stopPropagation(); setFlagging({ ref: row.ref, title: '', technique: '', status: 'lead' }); }}>⚑</button>
+                                )}
+                                {row.ref}
                               </td>
+                              {columns.map((c) => (
+                                <td key={c}>
+                                  {c === 'techniques'
+                                    ? techniqueList(row.cells[c]).map((t) => <span key={t} className="case-technique">{t}</span>)
+                                    : row.cells[c]}
+                                </td>
+                              ))}
+                            </tr>
+                            {expanded === row.ref && (
+                              <tr className="case-row-detail">
+                                <td colSpan={columns.length + 1}>
+                                  <dl>
+                                    {table.columns.filter((c) => row.cells[c] !== '' && row.cells[c] !== 'null' && row.cells[c] !== '[]').map((c) => (
+                                      <React.Fragment key={c}>
+                                        <dt>{c.replace(/_/g, ' ')}</dt>
+                                        <dd><pre>{pretty(row.cells[c])}</pre></dd>
+                                      </React.Fragment>
+                                    ))}
+                                  </dl>
+                                </td>
+                              </tr>
                             )}
-                            {table.columns.map((c) => (
-                              <td key={c} style={{ maxWidth: '28rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                                title={row.cells[c]}>{row.cells[c]}</td>
-                            ))}
-                          </tr>
+                          </React.Fragment>
                         ))}
                       </tbody>
                     </table>
