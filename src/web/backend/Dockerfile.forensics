@@ -226,6 +226,27 @@ RUN pip3 install --no-cache-dir volatility3 && \
 # warns instead of failing the build; --ClamAV then says it has no signatures until a rebuild
 RUN freshclam --quiet --stdout || echo "WARNING: freshclam failed; rebuild the worker to give --ClamAV signatures"
 
+# 4h: Zeek for --Network (PCAP -> conn, dns, http, ssl, files logs), from Zeek's own packages
+# (the security:zeek project on openSUSE's build service, as zeek.org's install guide gives).
+# zeek-7.0 is the 7.0 LTS series, so the pin is the series: the build service keeps only each
+# package's latest build, and an exact =7.0.x pin would stop building at the next patch release.
+# It installs to /opt/zeek. If the repository has no build for this architecture (it is built for
+# x86_64 first), the image still builds: --Network then cooks Zeek logs and NetFlow exports and
+# says each PCAP was skipped
+ARG ZEEK_SERIES=7.0
+RUN apt-get update && apt-get install -y --no-install-recommends gnupg \
+    && echo "deb http://download.opensuse.org/repositories/security:/zeek/xUbuntu_22.04/ /" \
+        > /etc/apt/sources.list.d/security:zeek.list \
+    && curl -fsSL "https://download.opensuse.org/repositories/security:zeek/xUbuntu_22.04/Release.key" \
+        | gpg --dearmor > /etc/apt/trusted.gpg.d/security_zeek.gpg \
+    && apt-get update \
+    && (apt-get install -y --no-install-recommends "zeek-${ZEEK_SERIES}" \
+        && ln -sf /opt/zeek/bin/zeek /usr/local/bin/zeek \
+        && zeek --version \
+        || echo "WARNING: Zeek ${ZEEK_SERIES} isn't available for $(dpkg --print-architecture); --Network will skip PCAPs") \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 # =============================================================================
 # Step 5/5: Rowanholt source code configuration
 # - Copy elrond forensics source code (avoids OneDrive file locking issues)
