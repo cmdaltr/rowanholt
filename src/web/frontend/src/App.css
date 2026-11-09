@@ -82,7 +82,7 @@ body {
 .nav-right {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 1rem;
 }
 
 /* Each group packs towards its outer edge (10px past the content edge), leaving clear space by the logo */
@@ -3192,18 +3192,6 @@ a.mt-pill-link:hover { border-color: #66d9ef; }
   transition: all 0.3s ease;
 }
 .App-header nav .nav-guide:hover { background: rgba(167, 219, 108, 0.2); color: #a7db6c; }
-.App-header nav .nav-welcome {
-  background: transparent;
-  border: none;
-  color: #f0dba5;
-  padding: 0.5rem 0.4rem;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  box-shadow: none;
-  transition: all 0.3s ease;
-}
-.App-header nav .nav-welcome:hover { background: rgba(167, 219, 108, 0.2); color: #a7db6c; transform: none; }
 
 .guide-backdrop {
   position: fixed;

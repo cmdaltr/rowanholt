@@ -22,7 +22,7 @@ import CaseBrowser from './components/CaseBrowser';
 import StartOffer from './components/StartOffer';
 import './App.css';
 
-function Navigation({ onGuide, onWelcome }) {
+function Navigation({ onGuide }) {
   const navigate = useNavigate();
   const { user, logout, isAuthenticated } = useAuth();
 
@@ -45,7 +45,7 @@ function Navigation({ onGuide, onWelcome }) {
       <div className="nav-right">
         <Link to="/jobs">Jobs</Link>
         <Link to="/help">About</Link>
-        <button type="button" className="nav-guide" onClick={onGuide}>Guide</button>
+        <button type="button" className="nav-guide" onClick={onGuide} title="The guide and a tip">Guide</button>
         <Link to={isAuthenticated ? "/account" : "/login"}>Account</Link>
         <button
           onClick={isAuthenticated ? handleLogout : undefined}
@@ -60,15 +60,6 @@ function Navigation({ onGuide, onWelcome }) {
           </svg>
           <span>Log out</span>
         </button>
-        <button type="button" className="nav-welcome" onClick={onWelcome} title="Welcome: the guide and a tip" aria-label="Show the welcome: the guide and a tip">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            {/* The Doors of Durin: speak, friend, and enter */}
-            <path d="M5 22V11a7 7 0 0 1 14 0v11" />
-            <path d="M3 22h18" />
-            <path d="M12 14v8" />
-            <path d="M12 6.5v3M10.5 8h3" />
-          </svg>
-        </button>
       </div>
     </nav>
   );
@@ -76,7 +67,6 @@ function Navigation({ onGuide, onWelcome }) {
 
 function AppContent() {
   const [scrollProgress, setScrollProgress] = useState(0);
-  const [guideRequested, setGuideRequested] = useState(false);
   const [offerRequested, setOfferRequested] = useState(false);
   const closeOfferRequest = useCallback(() => setOfferRequested(false), []);
   const mapBackground = `${process.env.PUBLIC_URL}/images/middle_earth.png`;
@@ -95,11 +85,10 @@ function AppContent() {
       }}
     >
       <header className="App-header">
-        <Navigation onGuide={() => setGuideRequested(true)} onWelcome={() => setOfferRequested(true)} />
+        <Navigation onGuide={() => setOfferRequested(true)} />
       </header>
 
-        <StartOffer guideRequested={guideRequested} onGuideClosed={() => setGuideRequested(false)}
-          offerRequested={offerRequested} onOfferClosed={closeOfferRequest} />
+        <StartOffer offerRequested={offerRequested} onOfferClosed={closeOfferRequest} />
 
         <main className="App-main">
           <Routes>

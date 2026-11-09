@@ -10,9 +10,9 @@ const NOT_YET = ['/login', '/register', '/forgot-password', '/reset-password'];
 
 /**
  * At start-up: a quote, then the guide on offer and a tip side by side, each with its own "every start" tickbox.
- * The navigation's Guide link opens the guide directly (guideRequested); its Doors of Durin open this (offerRequested).
+ * The navigation's Guide link opens this on demand (offerRequested); the guide itself is one click on.
  */
-function StartOffer({ guideRequested, onGuideClosed, offerRequested, onOfferClosed }) {
+function StartOffer({ offerRequested, onOfferClosed }) {
   const { user, loading } = useAuth();
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -31,7 +31,7 @@ function StartOffer({ guideRequested, onGuideClosed, offerRequested, onOfferClos
     if (wanted.guide || wanted.tips) setOffer(true);
   }, [loading, pathname, user]);
 
-  // The Doors of Durin in the navigation: the welcome, with a fresh tip, whatever the tickboxes say
+  // The navigation's Guide link: the welcome, with a fresh tip, whatever the tickboxes say
   useEffect(() => {
     if (!offerRequested) return;
     setPrefs(startPrefs(user));
@@ -40,24 +40,12 @@ function StartOffer({ guideRequested, onGuideClosed, offerRequested, onOfferClos
     onOfferClosed?.();
   }, [offerRequested, user, onOfferClosed]);
 
-  useEffect(() => {
-    if (guideRequested) {
-      setOffer(false);
-      setGuide(true);
-    }
-  }, [guideRequested]);
-
   const toggle = (which, value) => {
     setPrefs((p) => ({ ...p, [which]: value }));
     setStartPref(user, which, value);
   };
 
-  const closeGuide = () => {
-    setGuide(false);
-    onGuideClosed?.();
-  };
-
-  if (guide) return <Guide onClose={closeGuide} />;
+  if (guide) return <Guide onClose={() => setGuide(false)} />;
   if (!offer) return null;
 
   return (

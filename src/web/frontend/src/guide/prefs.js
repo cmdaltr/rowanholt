@@ -46,7 +46,7 @@ export function nextTip(user, exclude) {
 
 // Once per start, where a start is the first visit after a twelve-hour gap. Kept in localStorage,
 // not sessionStorage: a session doesn't survive new tabs or the desktop app's reloads, so the
-// offer kept coming back. The Doors of Durin in the navigation show it on demand.
+// offer kept coming back. The navigation's Guide link shows it on demand.
 const OFFERED = 'rowanholt.offeredAt';
 const START_GAP_MS = 12 * 60 * 60 * 1000;
 
