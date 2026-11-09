@@ -39,10 +39,10 @@ function Navigation({ onGuide, onWelcome }) {
         <Link to="/elrond">Elrond</Link>
         <Link to="/mordor">Mordor</Link>
         <Link to="/pippin">Pippin</Link>
+        <Link to="/ai">Eru</Link>
         {user?.role === 'admin' && <Link to="/aragorn">Aragorn</Link>}
       </div>
       <div className="nav-right">
-        <Link to="/ai">Ask Eru</Link>
         <Link to="/jobs">Jobs</Link>
         <Link to="/help">About</Link>
         <button type="button" className="nav-guide" onClick={onGuide}>Guide</button>

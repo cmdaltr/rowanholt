@@ -6,10 +6,49 @@ const gandalfImage = `${process.env.PUBLIC_URL}/images/gandalf.png`;
 const elrondImage = `${process.env.PUBLIC_URL}/images/elrond.png`;
 const pippinImage = `${process.env.PUBLIC_URL}/images/pippin.png`;
 const aragornImage = `${process.env.PUBLIC_URL}/images/aragorn.png`;
+const eruImage = `${process.env.PUBLIC_URL}/images/eru.png`;
 const mordorClosedImage = `${process.env.PUBLIC_URL}/images/mordor_closed.jpg`;
 const mordorOpenImage = `${process.env.PUBLIC_URL}/images/mordor_open.jpg`;
 
+// The banners, left to right (the Aragorn page itself is for admins)
+const JOURNEYS = [
+  { to: '/gandalf', image: gandalfImage, name: 'Gandalf', role: 'Acquisition',
+    text: 'Collect evidence from live or remote systems with encrypted packaging.' },
+  { to: '/elrond', image: elrondImage, name: 'Elrond', role: 'Analysis',
+    text: 'Process timelines, memory and artifacts to map incidents to MITRE ATT&CK.' },
+  { to: '/pippin', image: pippinImage, name: 'Pippin', role: 'Threat Intelligence',
+    text: 'Import indicators, match cases against them and see whose tradecraft the evidence resembles.' },
+  { to: '/aragorn', image: aragornImage, name: 'Aragorn', role: 'Administration',
+    text: "Keep the realm: Rowanholt's containers, users, settings and the test lab." },
+  { to: '/ai', image: eruImage, name: 'Eru', role: 'Analyst',
+    text: 'Ask about a case and get answers drawn from its own files, each citing the rows it came from.' },
+];
+
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+// One row of banners: the hovered or focused one opens to show its text, Gandalf when none is
+const JourneyBanners = ({ offset }) => {
+  const [open, setOpen] = useState(0);
+
+  return (
+    <section data-guide="home.journeys" className="journey-banners"
+      style={{ transform: `translateY(${offset}px)` }}>
+      {JOURNEYS.map((j, i) => (
+        <Link key={j.to} to={j.to}
+          className={`journey-banner${i === open ? ' is-open' : ''}`}
+          onMouseEnter={() => setOpen(i)} onFocus={() => setOpen(i)}
+          aria-label={`${j.name} ${j.role}`}>
+          <img src={j.image} alt="" />
+          <span className="journey-banner__name">{j.name}</span>
+          <div className="journey-banner__content">
+            <h2>{j.name} <span>{j.role}</span></h2>
+            <p>{j.text}</p>
+          </div>
+        </Link>
+      ))}
+    </section>
+  );
+};
 
 const Home = ({ onScrollProgress }) => {
   const [progress, setProgress] = useState(0);
@@ -119,43 +158,7 @@ const Home = ({ onScrollProgress }) => {
         />
       </section>
 
-      <section data-guide="home.journeys"
-        className="journey-grid"
-        style={{ transform: `translateY(${cardOffset}px)` }}
-      >
-        <Link to="/gandalf" className="journey-card">
-          <div className="journey-card__image"><img src={gandalfImage} alt="Gandalf Acquisition" /></div>
-          <div className="journey-card__content">
-            <h2>Gandalf Acquisition</h2>
-            <p>Collect evidence from live or remote systems with encrypted packaging.</p>
-          </div>
-        </Link>
-
-        <Link to="/elrond" className="journey-card">
-          <div className="journey-card__image"><img src={elrondImage} alt="Elrond Analysis" /></div>
-          <div className="journey-card__content">
-            <h2>Elrond Analysis</h2>
-            <p>Process timelines, memory and artifacts to map incidents to MITRE ATT&CK.</p>
-          </div>
-        </Link>
-
-        {/* Second row: Pippin under Gandalf, Aragorn under Elrond (the Aragorn page itself is for admins) */}
-        <Link to="/pippin" className="journey-card">
-          <div className="journey-card__image"><img src={pippinImage} alt="Pippin Threat Intelligence" /></div>
-          <div className="journey-card__content">
-            <h2>Pippin Threat Intelligence</h2>
-            <p>Import indicators, match cases against them and see whose tradecraft the evidence resembles.</p>
-          </div>
-        </Link>
-
-        <Link to="/aragorn" className="journey-card">
-          <div className="journey-card__image"><img src={aragornImage} alt="Aragorn Administration" /></div>
-          <div className="journey-card__content">
-            <h2>Aragorn Administration</h2>
-            <p>Keep the realm: Rowanholt's containers, users, settings and the test lab.</p>
-          </div>
-        </Link>
-      </section>
+      <JourneyBanners offset={cardOffset} />
 
       <section data-guide="home.mordor"
         className="mordor-section"

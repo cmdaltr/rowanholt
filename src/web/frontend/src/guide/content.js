@@ -18,9 +18,9 @@ export const GUIDE_PAGES = [
       },
       {
         id: 'home.journeys',
-        title: 'Gandalf, Elrond, Pippin and Aragorn',
-        what: 'Gandalf collects artefacts from live hosts; Elrond processes disk images, memory images, Gandalf archives and datasets into timelines, CSVs and ATT&CK mappings; Pippin holds the threat intelligence cases are matched against; Aragorn (admins) runs Rowanholt itself.',
-        who: 'Incident responders (Gandalf), forensic analysts (Elrond), threat intelligence analysts (Pippin) and administrators (Aragorn).',
+        title: 'Gandalf, Elrond, Pippin, Aragorn and Eru',
+        what: 'Gandalf collects artefacts from live hosts; Elrond processes disk images, memory images, Gandalf archives and datasets into timelines, CSVs and ATT&CK mappings; Pippin holds the threat intelligence cases are matched against; Aragorn (admins) runs Rowanholt itself; Eru answers questions about a case from its files.',
+        who: 'Incident responders (Gandalf), forensic analysts (Elrond), threat intelligence analysts (Pippin), administrators (Aragorn) and anyone working a case (Eru).',
         when: 'Gandalf while a host is still up and you need its volatile state; Elrond once you have evidence on disk.',
       },
       {
@@ -236,7 +236,7 @@ export const GUIDE_PAGES = [
   {
     id: 'eru',
     route: '/ai',
-    title: 'Ask Eru',
+    title: 'Eru',
     intro: 'Rowanholt\'s analyst: questions about a case, answered from its files.',
     sections: [
       {

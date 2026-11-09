@@ -85,8 +85,9 @@ body {
   justify-content: space-between;
 }
 
-.nav-left { grid-column: 1; }
-.nav-right { grid-column: 3; }
+/* Each group reaches 10px past its content edge, away from the logo; space-between keeps the gaps even */
+.nav-left { grid-column: 1; margin-left: -10px; }
+.nav-right { grid-column: 3; margin-right: -10px; }
 
 @media (max-width: 1000px) {
   .App-header nav { grid-template-columns: 1fr 8rem 1fr; }
@@ -1114,17 +1115,116 @@ table input[type="checkbox"] {
   pointer-events: none;
 }
 
-/* The home page's logo: 20% smaller than the other pages' heroes */
+/* The home page's logo: 28% smaller than the other pages' heroes */
 .hero-image--home {
-  width: 48%;
+  width: 43.2%;
 }
 
-.journey-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));  /* two columns: Gandalf over Pippin, Elrond over Aragorn */
-  gap: 1.5rem;
+/* The characters: one row of banners, the open one wide enough for its text, the rest narrow
+   strips showing the figure and a vertical name */
+.journey-banners {
+  display: flex;
+  gap: 0.75rem;
+  height: 460px;
   will-change: transform;
-  margin-bottom: 0;
+}
+
+.journey-banner {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #3f4b2a;
+  border-radius: 12px;
+  background: rgba(21, 26, 12, 0.9);
+  text-decoration: none;
+  color: inherit;
+  transition: flex-grow 0.45s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.journey-banner.is-open {
+  flex-grow: 4;
+  border-color: #6b5a2e;
+  box-shadow: 0 16px 35px rgba(0, 0, 0, 0.45);
+}
+
+.journey-banner img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  opacity: 0.55;
+  transition: opacity 0.45s ease;
+}
+
+.journey-banner.is-open img {
+  object-fit: contain;
+  object-position: center 0.5rem;
+  height: calc(100% - 3.5rem);
+  opacity: 1;
+}
+
+.journey-banner__name {
+  position: absolute;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  writing-mode: vertical-rl;
+  rotate: 180deg;
+  color: #f0dba5;
+  font-family: 'Cinzel', 'Times New Roman', serif;
+  font-size: 1.25rem;
+  letter-spacing: 0.12em;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+  transition: opacity 0.3s ease;
+}
+
+.journey-banner.is-open .journey-banner__name { opacity: 0; }
+
+.journey-banner__content {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 1rem 1.25rem 1.25rem;
+  background: linear-gradient(transparent, rgba(12, 15, 7, 0.95) 30%);
+  opacity: 0;
+  transition: opacity 0.3s ease 0.1s;
+  pointer-events: none;
+}
+
+.journey-banner.is-open .journey-banner__content { opacity: 1; }
+
+.journey-banner h2 {
+  margin: 0 0 0.35rem;
+  color: #f0dba5;
+  font-family: 'Cinzel', 'Times New Roman', serif;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.journey-banner h2 span {
+  color: #a7db6c;
+  font-size: 0.75em;
+  margin-left: 0.35rem;
+}
+
+.journey-banner__content p {
+  margin: 0;
+  color: #e9e3cf;
+  font-family: 'Georgia', 'Garamond', serif;
+  font-size: 1rem;
+}
+
+/* Narrow screens: the banners stack, each a short open card */
+@media (max-width: 640px) {
+  .journey-banners { flex-direction: column; height: auto; }
+  .journey-banner, .journey-banner.is-open { flex: none; height: 220px; }
+  .journey-banner img, .journey-banner.is-open img { height: 100%; object-fit: cover; opacity: 0.45; }
+  .journey-banner__name { display: none; }
+  .journey-banner__content { opacity: 1; }
 }
 
 .journey-card {
@@ -1138,8 +1238,6 @@ table input[type="checkbox"] {
   display: flex;
   flex-direction: column;
 }
-
-@media (max-width: 640px) { .journey-grid { grid-template-columns: 1fr; } }
 
 /* Each portrait is drawn 20% smaller (zoomed out, centred) in a frame 15% shorter than before,
    so more of the figure shows and the bottom is trimmed. Mordor's photo fills the width, so it's
@@ -2311,7 +2409,7 @@ table input[type="checkbox"] {
   }
 
   .hero-image--home {
-    width: 80%;
+    width: 72%;
   }
 
   .checkbox-group {
