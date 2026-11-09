@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Home from './components/Home';
 import GandalfLanding from './components/GandalfLanding';
@@ -34,7 +34,6 @@ function Navigation({ onGuide }) {
   return (
     <nav>
       <div className="nav-left">
-        <Link to="/">Home</Link>
         <Link to="/gandalf">Gandalf</Link>
         <Link to="/elrond">Elrond</Link>
         <Link to="/mordor">Mordor</Link>
@@ -65,7 +64,19 @@ function Navigation({ onGuide }) {
   );
 }
 
+// Every page's Rowanholt logo is the way home (the navigation has no Home link)
+function useLogoGoesHome() {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  return useCallback((event) => {
+    const logo = event.target.closest?.('img.hero-image');
+    if (logo && pathname !== '/') navigate('/');
+  }, [navigate, pathname]);
+}
+
 function AppContent() {
+  const goHome = useLogoGoesHome();
+  const { pathname } = useLocation();
   const [scrollProgress, setScrollProgress] = useState(0);
   const [offerRequested, setOfferRequested] = useState(false);
   const closeOfferRequest = useCallback(() => setOfferRequested(false), []);
@@ -73,7 +84,8 @@ function AppContent() {
 
   return (
     <div
-      className="App"
+      className={pathname === '/' ? 'App App--home' : 'App'}
+      onClick={goHome}
       style={{
         backgroundImage: `url(${mapBackground})`,
         backgroundSize: 'cover',

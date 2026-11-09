@@ -85,9 +85,12 @@ body {
   gap: 1rem;
 }
 
-/* Each group packs towards its outer edge (10px past the content edge), leaving clear space by the logo */
-.nav-left { grid-column: 1; justify-content: flex-start; margin-left: -10px; }
-.nav-right { grid-column: 3; justify-content: flex-end; margin-right: -10px; }
+/* Each group packs towards its outer edge (the content's edge), leaving clear space by the logo */
+.nav-left { grid-column: 1; justify-content: flex-start; }
+.nav-right { grid-column: 3; justify-content: flex-end; }
+
+/* The logo on every other page goes home */
+.App:not(.App--home) img.hero-image { cursor: pointer; }
 
 @media (max-width: 1000px) {
   .App-header nav { grid-template-columns: 1fr 8rem 1fr; }
