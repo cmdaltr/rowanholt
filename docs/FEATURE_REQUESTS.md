@@ -6,14 +6,7 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 
 | ID | Request | Area |
 |---|---|---|
-| FR-03 | Desktop app RPM for Rocky Linux 9 / RHEL 9: built, first run on a desktop untried | Desktop app |
 | FR-05 | Mobile device forensics (iOS, Android): built, needs test images | Gandalf, Elrond |
-
-## FR-03: Desktop app RPM for Rocky Linux 9 / RHEL 9
-
-**Built 8 November 2026.** `app/linux/package-rpm.sh` and the `linux-rpm` job in `desktop-release.yml` (built, linted, installed and removed in `rockylinux:9`); `app/README.md`.
-
-**Done when** first-run setup starts the stack on a Rocky 9 desktop with SELinux enforcing (a desktop VM: the container check can't run the menu entry or Docker). Then this entry goes.
 
 ## FR-05: Mobile device forensics (iOS, Android)
 
