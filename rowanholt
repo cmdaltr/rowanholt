@@ -242,7 +242,7 @@ stack() {
             echo "Starting Rowanholt..."
             prepare_app_copy
             compose_cmd up -d $BUILD_FLAG || exit 1
-            [ -n "$BUILD_FLAG" ] && cat "$ROOT/.rowanholt-version" > "$ROOT/.rowanholt-built"
+            [ -n "$BUILD_FLAG" ] && printf '%s\n' "$BUILT_VERSION" > "$ROOT/.rowanholt-built"
             print_urls
             # Not `$FOLLOW_LOGS && ...`: without --logs that leaves start's exit status at 1
             if $FOLLOW_LOGS; then compose_cmd logs -f; fi
@@ -301,7 +301,7 @@ start_with_progress() {
     "$PYTHON" "$ROOT/src/common/startup_progress.py" "${args[@]}" -- $DC $COMPOSE_FILES
     status=$?
     [ $status -eq 0 ] || exit $status
-    [ -n "$BUILD_FLAG" ] && cat "$ROOT/.rowanholt-version" > "$ROOT/.rowanholt-built"
+    [ -n "$BUILD_FLAG" ] && printf '%s\n' "$BUILT_VERSION" > "$ROOT/.rowanholt-built"
     [ "$PROGRESS" = zenity ] || print_urls
 }
 
@@ -322,18 +322,27 @@ server_preflight() {
 
 # A copy the desktop app installed (not a git clone) carries .rowanholt-version. It gets
 # a .env with its own SECRET_KEY on first start, and its images are rebuilt once after
-# each update, since the worker image copies the source in at build time.
+# each update, since the worker image copies the source in at build time. A server's git
+# checkout is rebuilt the same way after a pull or checkout, by commit: otherwise its
+# worker goes on running the Elrond it was first built with. A desktop checkout isn't
+# (development rebuilds when it chooses).
 prepare_app_copy() {
     BUILD_FLAG=""
-    [ -f "$ROOT/.rowanholt-version" ] || return 0
-    if [ ! -f "$ROOT/.env" ] && [ -f "$ROOT/.env.example" ]; then
-        local key
-        key="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
-        sed "s/^SECRET_KEY=.*/SECRET_KEY=$key/" "$ROOT/.env.example" > "$ROOT/.env"
-        chmod 600 "$ROOT/.env"
-        echo "Created .env with a new SECRET_KEY."
+    BUILT_VERSION=""
+    if [ -f "$ROOT/.rowanholt-version" ]; then
+        BUILT_VERSION="$(cat "$ROOT/.rowanholt-version")"
+        if [ ! -f "$ROOT/.env" ] && [ -f "$ROOT/.env.example" ]; then
+            local key
+            key="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
+            sed "s/^SECRET_KEY=.*/SECRET_KEY=$key/" "$ROOT/.env.example" > "$ROOT/.env"
+            chmod 600 "$ROOT/.env"
+            echo "Created .env with a new SECRET_KEY."
+        fi
+    elif $SERVER && [ -d "$ROOT/.git" ]; then
+        BUILT_VERSION="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null)"
     fi
-    if [ "$(cat "$ROOT/.rowanholt-version")" != "$(cat "$ROOT/.rowanholt-built" 2>/dev/null)" ]; then
+    [ -n "$BUILT_VERSION" ] || return 0
+    if [ "$BUILT_VERSION" != "$(cat "$ROOT/.rowanholt-built" 2>/dev/null)" ]; then
         echo "New Rowanholt version: rebuilding the images (this takes a while)..."
         BUILD_FLAG="--build"
     fi
