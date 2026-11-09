@@ -7,9 +7,7 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 | ID | Request | Area |
 |---|---|---|
 | FR-01 | Team servers on Linux beyond Ubuntu (RHEL, Rocky, Alma): built, not yet run on Rocky | Server |
-| FR-02 | Team servers on Windows Server: built, not yet run on Windows Server | Server |
 | FR-03 | Desktop app RPM for Rocky Linux 9 / RHEL 9: built, first run on a desktop untried | Desktop app |
-| FR-04 | Lab VM consoles in the browser: built, not yet run on a server | Aragorn, server |
 | FR-05 | Mobile device forensics (iOS, Android): built, needs test images | Gandalf, Elrond |
 
 ## FR-01: Team servers on Linux beyond Ubuntu
@@ -25,14 +23,6 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 **Built 8 November 2026.** `app/linux/package-rpm.sh` and the `linux-rpm` job in `desktop-release.yml` (built, linted, installed and removed in `rockylinux:9`); `app/README.md`.
 
 **Done when** first-run setup starts the stack on a Rocky 9 desktop with SELinux enforcing (a desktop VM: the container check can't run the menu entry or Docker). Then this entry goes.
-
-## FR-04: Lab VM consoles in the browser
-
-Built 8 November 2026 on `feat/lab-consoles`: **Console** per Tart and UTM VM on Aragorn › Lab, drawn by noVNC, opt-in with `LAB_VM_CONSOLE=1`; Tart VMs start with `--vnc-experimental`, the lab's UTM VMs get `-vnc 127.0.0.1:N` (a clone a free display of its own); the lab agent finds each running VM's port (`src/mordor/lab/consoles.py`) and tunnels to it on loopback by VM name; the backend's websocket relay takes signed-in admins only, locally and on a server. Described in `lab/README.md` (VM Consoles). noVNC is `@novnc/novnc` 1.5.0, exact-pinned (MPL-2.0). Still to do: Vagrant/VirtualBox VMs have no console.
-
-**Done when** an admin opens a lab VM's console from the browser on a team server, and a non-admin can't reach the relay at all.
-
-**Depends on** the lab agent running on the server host. See `docs/SERVER.md`.
 
 ## FR-05: Mobile device forensics (iOS, Android)
 

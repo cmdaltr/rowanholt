@@ -230,8 +230,6 @@ Failed password sign-ins are counted in Redis, so restarts don't reset them. Fiv
 
 The backend migrates its database on start with Alembic (`src/web/backend/alembic/`), under a Postgres advisory lock so the backend and the worker starting together don't race. A database from before migrations is recognised and stamped, not recreated. A worker image built before Alembic was added keeps creating any missing tables itself, as it always did.
 
-## Requested
+## Lab VM consoles
 
-These are feature requests in `docs/FEATURE_REQUESTS.md`:
-
-- **FR-04:** lab VM consoles in the browser. Built (**Console** on Aragorn › Lab; `lab/README.md`, VM Consoles), not yet tried on a server. The console is a websocket under `/api/lab/consoles/`, which Caddy's `/api/*` proxy carries as it does any websocket (uvicorn's 20-second pings keep an idle console inside the 30-minute timeouts there), and it needs the lab agent on the server host itself, with Tart or UTM VMs: the backend reaches the agent at `LAB_AGENT_URL`, and the agent the VMs on the host's loopback.
+**Console** on Aragorn › Lab (`lab/README.md`, VM Consoles) works on a server as it does locally. The console is a websocket under `/api/lab/consoles/`, which Caddy's `/api/*` proxy carries as it does any websocket (uvicorn's 20-second pings keep an idle console inside the 30-minute timeouts there). It needs the lab agent on the server host itself, started with `LAB_VM_CONSOLE=1`, and Tart or UTM VMs there, so the host is a Mac: the backend reaches the agent at `LAB_AGENT_URL`, and the agent the VMs on the host's loopback. The relay takes signed-in admins only: a user's token, as a bearer header or the session cookie, is refused at the websocket upgrade (403) before the agent hears of it, and so is no token at all. Checked on 9 November 2026 on an Apple-silicon Mac serving `--tls tailscale`, with a Tart macOS VM.
