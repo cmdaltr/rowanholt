@@ -32,14 +32,32 @@ html, body {
   overflow: hidden;
 }
 
+/* Reading text is a book serif in ordinary case; Cinzel, all capitals, is for headings, the
+   navigation, buttons, labels and table headings, where a few words at a time read well */
+:root {
+  --font-display: 'Cinzel', 'Times New Roman', serif;
+  --font-body: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
 body {
-  font-family: 'Cinzel', 'Times New Roman', serif;
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: #0c1208;
   color: #e5e0d0;
+  letter-spacing: 0.005em;
+}
+
+h1, h2, h3, h4, h5, h6, nav, button, th, label, legend, .App-footer {
+  font-family: var(--font-display);
   letter-spacing: 0.03em;
 }
+
+input, textarea, select { font-family: var(--font-body); letter-spacing: 0; }
+code, pre, kbd, samp { font-family: var(--font-mono); letter-spacing: 0; }
 
 .App {
   height: 100vh;

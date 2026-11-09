@@ -37,7 +37,7 @@ function Navigation({ onGuide }) {
         <Link to="/gandalf">Gandalf</Link>
         <Link to="/elrond">Elrond</Link>
         <Link to="/pippin">Pippin</Link>
-        {user?.role === 'admin' && <Link to="/aragorn">Aragorn</Link>}
+        <Link to="/aragorn">Aragorn</Link>
         <Link to="/ai">Aulë</Link>
       </div>
       {/* Mordor opens the right: the datasets sit beside the jobs they feed */}
