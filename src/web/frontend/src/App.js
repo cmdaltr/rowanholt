@@ -24,7 +24,7 @@ import './App.css';
 
 function Navigation({ onGuide }) {
   const navigate = useNavigate();
-  const { user, logout, isAuthenticated } = useAuth();
+  const { logout, isAuthenticated } = useAuth();
 
   const handleLogout = async () => {
     await logout();
