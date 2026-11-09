@@ -182,7 +182,7 @@ print_urls() {
         echo "  Navigator:     http://localhost:5602"
     fi
     echo ""
-    echo "  Credentials:   admin / rowanholt"
+    echo "  Sign in:       admin, with DEFAULT_ADMIN_PASSWORD from .env (else default_admin_password in src/web/backend/config.py)"
     echo ""
 }
 

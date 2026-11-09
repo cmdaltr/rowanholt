@@ -21,12 +21,10 @@ const GandalfLanding = () => {
       <header>
         <h2>Gandalf Remote Acquisition</h2>
         <p>
-          Securely acquire artifacts from local or remote hosts using PowerShell, Python or Bash.
+          Securely acquire artifacts with PowerShell, Python or Bash, run on the target itself or
+          on a host that reaches it over SSH or PowerShell Remoting: choose what to collect, then
+          copy the command and run it there.
         </p>
-        <div className="validation-message info">
-          Gandalf runs on the target, or on a host that reaches it over SSH or PowerShell Remoting:
-          choose what to collect, then copy the command and run it there.
-        </div>
       </header>
 
       <NewAcquisition />
