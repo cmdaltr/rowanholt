@@ -3,7 +3,7 @@ Volatility symbol tables for memory images (Aragorn's Settings): the tables Rowa
 adding one from files an administrator brings.
 
 The tables are the repository's symbols/linux and symbols/mac, mounted here and in the worker
-(Elrond's memory/symbols keeps their index). A ready table is indexed here; a vmlinux, or a
+(Elrond's memory/symbols keeps their index). A debug package, a vmlinux, or a
 macOS kernel and its dSYM DWARF file from a Kernel Debug Kit, goes to the worker, which has
 dwarf2json, as `rowanholt symbols add` would.
 """
@@ -33,6 +33,7 @@ router = APIRouter(prefix="/api/symbols", tags=["symbols"])
 SYMBOLS_DIR = Path(os.environ.get("ROWANHOLT_SYMBOLS_DIR", "/opt/rowanholt/symbols"))
 INCOMING = "incoming"
 TABLE = re.compile(r"\.json(\.xz)?$")
+PACKAGE = re.compile(r"\.(d?deb|rpm)$", re.IGNORECASE)
 LOG_LINES = 50
 _cache = None
 
@@ -93,17 +94,22 @@ def _name(upload: Optional[UploadFile]) -> str:
 
 @router.post("/add")
 async def add_symbols(
-    kind: str = Form(..., pattern="^(table|vmlinux|kdk)$"),
+    kind: str = Form(..., pattern="^(package|table|vmlinux|kdk)$"),
     file: UploadFile = File(...),
     system_map: Optional[UploadFile] = File(None),
     dwarf: Optional[UploadFile] = File(None),
     user: dict = Depends(require_admin),
 ) -> dict:
-    """Add a table: kind table (an ISF, .json or .json.xz), vmlinux (with System.map if there is
-    one), or kdk (file: the KDK's kernel, dwarf: its kernel.dSYM/Contents/Resources/DWARF file)."""
+    """Add a table: kind package (a kernel's debug package, .ddeb, .deb or .rpm), table (an ISF,
+    .json or .json.xz), vmlinux (with System.map if there is one), or kdk (file: the KDK's kernel,
+    dwarf: its kernel.dSYM/Contents/Resources/DWARF file)."""
     work = SYMBOLS_DIR / INCOMING / uuid.uuid4().hex
     try:
-        if kind == "table":
+        if kind == "package":
+            if not PACKAGE.search(_name(file)):
+                raise HTTPException(status_code=400, detail="A debug package is a .ddeb, .deb or .rpm file")
+            args = ["--package", str(_save(file, work / _name(file)))]
+        elif kind == "table":
             if not TABLE.search(_name(file)):
                 raise HTTPException(status_code=400, detail="A symbol table is a .json or .json.xz file")
             args = ["--table", str(_save(file, work / _name(file)))]

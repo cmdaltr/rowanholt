@@ -409,6 +409,13 @@ export const GUIDE_PAGES = [
         when: 'A service is misbehaving and you\'d rather not open a terminal. Andúril holds the Docker socket, so it\'s off until enabled.',
       },
       {
+        id: 'aragorn.samples',
+        title: 'Sample data',
+        what: 'Public forensic images as ready cases (a Windows disk and memory, Linux disk and memory, a Mac, an Android phone and an iPhone): fetched with their publishers\' hashes checked, then imported as jobs.',
+        who: 'Rowanholt administrators.',
+        when: 'Trying Rowanholt out, training, or checking a change against images with published answers.',
+      },
+      {
         id: 'aragorn.symbols',
         title: 'Memory symbol tables',
         what: 'The Volatility symbol tables Rowanholt has for Linux and macOS kernels, where each came from, and an upload for one it can\'t fetch: a table, a vmlinux, or a macOS Kernel Debug Kit\'s kernel.',

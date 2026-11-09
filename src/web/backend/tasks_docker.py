@@ -589,6 +589,29 @@ def add_symbol_table(self, args: list, folder: str) -> dict:
 
 
 @celery_app.task(bind=True)
+def fetch_sample(self, sample_id: str) -> dict:
+    """Aragorn's fetch of a sample (sample_routes.py): Elrond's rowanholt/samples downloads each
+    file, checks its hash and unpacks it, reporting progress as the task's state."""
+    try:
+        from rowanholt.samples import samples
+    except ImportError:
+        sys.path.insert(0, "/opt/elrond-src")
+        from rowanholt.samples import samples
+    root = samples.samples_dir()
+
+    def progress(name, done, total):
+        self.update_state(state="PROGRESS", meta={"file": name, "bytes": done, "total": total})
+    try:
+        s = samples.sample(sample_id)
+        for entry in s["files"]:
+            samples.fetch_file(s, entry, root, progress)
+        found = samples.unpack(s, root)
+        return {"ok": True, "output": "Ready: " + ", ".join(p.name for p in found)}
+    except (samples.SampleError, OSError) as exc:
+        return {"ok": False, "output": str(exc)}
+
+
+@celery_app.task(bind=True)
 def start_analysis(self, job_id: str):
     """
     Start Elrond analysis task in dockerized environment.

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { listSymbolTables, addSymbolTable, getSymbolTask } from '../api';
 
 const KINDS = {
+  package: "A kernel's debug package (.ddeb, .deb or .rpm): the job's message names it",
   table: 'A symbol table (.json or .json.xz)',
   vmlinux: "A Linux kernel's vmlinux (with System.map if you have it)",
   kdk: "A macOS kernel and its dSYM DWARF file, from Apple's Kernel Debug Kit",
@@ -15,7 +16,7 @@ const sizeOf = (n) => (n >= 1 << 20 ? `${(n / (1 << 20)).toFixed(1)} MB` : `${Ma
 function SymbolTables() {
   const [state, setState] = useState(null);
   const [error, setError] = useState('');
-  const [kind, setKind] = useState('table');
+  const [kind, setKind] = useState('package');
   const [files, setFiles] = useState({});
   const [busy, setBusy] = useState('');
 
@@ -95,7 +96,7 @@ function SymbolTables() {
           {Object.entries(KINDS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
         </select>
         <div>
-          <label>{kind === 'kdk' ? 'Kernel (System/Library/Kernels/kernel…)' : kind === 'vmlinux' ? 'vmlinux' : 'Table'}{' '}
+          <label>{{ kdk: 'Kernel (System/Library/Kernels/kernel…)', vmlinux: 'vmlinux', package: 'Package', table: 'Table' }[kind]}{' '}
             <input type="file" onChange={pick('file')} required disabled={!!busy} />
           </label>
         </div>

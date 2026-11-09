@@ -1,0 +1,127 @@
+{
+  "about": "Public forensic images Rowanholt imports as ready cases (rowanholt samples; samples.py). Folders are relative to ROWANHOLT_SAMPLES_DIR. Hashes are the publisher's; sha256_from fetches one from its publisher's API at download time; none published means the SHA-256 is recorded on first download (SHA256SUMS) and checked from then on.",
+  "samples": [
+    {
+      "id": "szechuan-desktop",
+      "title": "The Stolen Szechuan Sauce: DESKTOP-SDN1RPT, disk and memory",
+      "covers": ["windows-disk", "windows-memory"],
+      "os": "Windows 10",
+      "publisher": "DFIR Madness (James Smith), 2020",
+      "page": "https://dfirmadness.com/the-stolen-szechuan-sauce/",
+      "answers": "https://dfirmadness.com/answers-to-szechuan-case-001/",
+      "terms": "Free for teaching and learning, crediting the site and its authors; no formal licence",
+      "catches": "MD5 is the only hash published",
+      "folder": "samples/windows",
+      "files": [
+        {"name": "DESKTOP-E01.zip", "url": "https://dfirmadness.com/case001/DESKTOP-E01.zip", "md5": "71c5c3509331f472abcdf81eb6efff07"},
+        {"name": "DESKTOP-SDN1RPT-memory.zip", "url": "https://dfirmadness.com/case001/DESKTOP-SDN1RPT-memory.zip", "md5": "cf31e2635c77811aaa1bb04a92a721e2"}
+      ],
+      "images": ["*.E01", "*.mem", "*.raw", "*.vmem"],
+      "options": {"analysis": true, "extract_iocs": true, "memory": true, "navigator": true}
+    },
+    {
+      "id": "13cubed-linux-memory",
+      "title": "13Cubed Linux memory challenge",
+      "covers": ["linux-memory"],
+      "os": "Ubuntu 22.04, 6.5.0-41-generic",
+      "publisher": "13Cubed (Richard Davis)",
+      "page": "https://www.13cubed.com/",
+      "answers": "",
+      "terms": "None stated",
+      "catches": "No hash or licence published: the SHA-256 is recorded on first download",
+      "folder": "samples/linux-memory",
+      "files": [
+        {"name": "linux_challenge.zip", "url": "https://cdn.13cubed.com/downloads/linux_challenge.zip"}
+      ],
+      "images": ["*.lime", "*.mem", "*.raw", "*.bin", "*.dmp", "*.elf"],
+      "options": {"analysis": true, "extract_iocs": true, "memory": true, "navigator": true}
+    },
+    {
+      "id": "magnet-2022-linux",
+      "title": "Magnet Forensics 2022 CTF: Linux",
+      "covers": ["linux-disk"],
+      "os": "Linux",
+      "publisher": "Magnet Forensics, via Digital Corpora",
+      "page": "https://digitalcorpora.org/corpora/scenarios/magnet-ctf-2022/",
+      "answers": "",
+      "terms": "None stated; the image's rights aren't clear",
+      "catches": "14.6 GB",
+      "folder": "samples/linux-disk",
+      "files": [
+        {"name": "2022 CTF - Linux.7z", "url": "https://digitalcorpora.s3.amazonaws.com/corpora/scenarios/magnet/2022%20CTF%20-%20Linux.7z", "sha256_from": "digitalcorpora"}
+      ],
+      "images": ["*.E01", "*.vmdk", "*.raw", "*.dd", "*.img", "*.qcow2"],
+      "options": {"analysis": true, "extract_iocs": true, "timeline": false, "navigator": true}
+    },
+    {
+      "id": "mvs2026-mac",
+      "title": "Magnet Virtual Summit 2026 CTF: MacBook Pro",
+      "covers": ["macos-disk"],
+      "os": "macOS 15 Sequoia",
+      "publisher": "Hexordia and Magnet Forensics",
+      "page": "https://www.magnetforensics.com/blog/announcing-the-winners-of-the-2026-magnet-virtual-summit-ctf/",
+      "answers": "",
+      "terms": "None stated",
+      "catches": "What the zip holds isn't documented (a disk image is assumed); questions published, no answers",
+      "folder": "samples/macos-mvs2026",
+      "files": [
+        {"name": "MacBookPro.zip", "url": "https://mvs26.hexordiactf.com/MacBookPro.zip", "sha256": "78f3339ee2fb1879860053635325a2f8e9d9a2f34c59bdce73e20c5048435333"}
+      ],
+      "images": ["*.E01", "*.dmg", "*.sparseimage", "*.raw", "*.dd", "*.img", "*.aff4"],
+      "options": {"analysis": true, "extract_iocs": true, "navigator": true}
+    },
+    {
+      "id": "android14",
+      "title": "Android 14 public image (Pixel 7a)",
+      "covers": ["android"],
+      "os": "Android 14",
+      "publisher": "Josh Hickman, via Digital Corpora",
+      "page": "https://digitalcorpora.org/corpora/cell-phones/android-14/",
+      "answers": "https://digitalcorpora.s3.amazonaws.com/corpora/mobile/android_14/Android14-ImageCreation.pdf",
+      "terms": "Public research image (Digital Corpora)",
+      "catches": "18.4 GB",
+      "folder": "phones",
+      "files": [
+        {"name": "Android_14_Public_Image.tar.gz", "url": "https://digitalcorpora.s3.amazonaws.com/corpora/mobile/android_14/Android_14_Public_Image.tar.gz", "sha256": "4e1698460550e20f3b334ae9df96ee1cd78314bdc0fe5de5183fd5d7e1c8967e"}
+      ],
+      "images": ["Android_14_Public_Image"],
+      "options": {"local": false, "mobile": true, "navigator": true}
+    },
+    {
+      "id": "ios17",
+      "title": "iOS 17 public image: full file system extraction",
+      "covers": ["ios"],
+      "os": "iOS 17",
+      "publisher": "Josh Hickman, via Digital Corpora",
+      "page": "https://digitalcorpora.org/corpora/cell-phones/ios-17/",
+      "answers": "https://digitalcorpora.s3.amazonaws.com/corpora/mobile/iOS17/iOS17-ImageCreation.pdf",
+      "terms": "Public research image (Digital Corpora)",
+      "catches": "22.1 GB; the same download holds the encrypted backup (ios17-backup)",
+      "folder": "phones",
+      "files": [
+        {"name": "iOS_17_Public_Image.tar.gz", "url": "https://digitalcorpora.s3.amazonaws.com/corpora/mobile/iOS17/iOS_17_Public_Image.tar.gz", "sha256": "a8192126fcb495aeba32885a8be576a306cd2c5d7ea740375d5ef2b8e9399502"}
+      ],
+      "images": ["EXTRACTION_FFS.zip"],
+      "options": {"local": false, "mobile": true, "navigator": true}
+    },
+    {
+      "id": "ios17-backup",
+      "title": "iOS 17 public image: encrypted iTunes backup",
+      "covers": ["ios"],
+      "os": "iOS 17",
+      "publisher": "Josh Hickman, via Digital Corpora",
+      "page": "https://digitalcorpora.org/corpora/cell-phones/ios-17/",
+      "answers": "https://digitalcorpora.s3.amazonaws.com/corpora/mobile/iOS17/iOS17-ImageCreation.pdf",
+      "terms": "Public research image (Digital Corpora)",
+      "catches": "The backup's password is the image's published one (its creation PDF)",
+      "folder": "phones",
+      "files": [
+        {"name": "iOS_17_Public_Image.tar.gz", "url": "https://digitalcorpora.s3.amazonaws.com/corpora/mobile/iOS17/iOS_17_Public_Image.tar.gz", "sha256": "a8192126fcb495aeba32885a8be576a306cd2c5d7ea740375d5ef2b8e9399502"}
+      ],
+      "unpack": ["00008030-001259123E50802E.zip"],
+      "images": ["00008030-001259123E50802E"],
+      "backup_password": "MyPassword123",
+      "options": {"local": false, "mobile": true, "navigator": true}
+    }
+  ]
+}

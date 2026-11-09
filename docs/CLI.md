@@ -46,7 +46,8 @@ It follows its own link back to the repository, so moving the clone means runnin
 | `rowanholt analyse <args>` | Elrond (`analyze` works too) |
 | `rowanholt mordor <command>` | Security datasets: `list`, `download`, `info`, `local`, `verify`, `refresh`, `stats` |
 | `rowanholt anduril <command>` | Container administration (also `aragorn`) |
-| `rowanholt symbols fetch\|add\|list` | Volatility symbol tables for Linux and macOS memory, in the worker (`symbols/README.md`) |
+| `rowanholt samples list\|fetch\|import` | Public forensic images as ready cases (below) |
+| `rowanholt symbols fetch\|what\|add\|list` | Volatility symbol tables for Linux and macOS memory, in the worker (`symbols/README.md`) |
 | `rowanholt web` | The web UI and API without Docker |
 | `rowanholt lab <command>` | The test lab, `lab/lab.sh` |
 | `rowanholt scripts` | Lists every script under `scripts/` |
@@ -562,13 +563,36 @@ Taken from the October 2026 test runs:
 
 Shadow copies (`--vss`) get their own `<image> (volume shadow copy #N)` entries in the audit log.
 
+### Sample data
+
+`rowanholt samples` imports public forensic images as ready cases. The catalogue is `src/analysis/rowanholt/samples/catalogue.json`:
+
+| Sample | Covers | From |
+|---|---|---|
+| `szechuan-desktop` | Windows disk and memory, one machine | DFIR Madness, The Stolen Szechuan Sauce (MD5 only) |
+| `13cubed-linux-memory` | Linux memory (Ubuntu 22.04) | 13Cubed (no hash published: recorded on first download) |
+| `magnet-2022-linux` | Linux disk | Magnet 2022 CTF via Digital Corpora (SHA-256 from its API) |
+| `mvs2026-mac` | macOS 15 disk | Magnet Virtual Summit 2026 CTF |
+| `android14`, `ios17`, `ios17-backup` | Android 14, iOS 17 (file system extraction, and the encrypted backup with its published password) | Josh Hickman via Digital Corpora |
+
+```bash
+export ROWANHOLT_SAMPLES_DIR=/Volumes/Data/samples    # a folder the worker reads; tens of GB per sample
+rowanholt samples list
+rowanholt samples fetch szechuan-desktop 13cubed-linux-memory   # or --all
+rowanholt samples import szechuan-desktop                       # case SAMPLE-SZECHUAN-DESKTOP
+```
+
+A fetch resumes a part-downloaded file, and keeps a file under its own name only once it matches its publisher's hash. A file that doesn't match is left as `<name>.bad`. The fetch then unpacks each archive beside it. An import starts the case through the API, as the web app's form does: `ROWANHOLT_API` (default `http://localhost:5688`), and `ROWANHOLT_TOKEN` on a team server. `--force` replaces a case folder that's already there. Aragorn's Settings tab lists the same samples, with Fetch (run in the worker) and Import.
+
 ### Memory symbol tables
 
 Volatility 3 reads a Linux or macOS memory image only with a symbol table for its exact kernel. Elrond finds one from the image's kernel banner before the memory plugins run. It looks first at the tables it already has, then the prebuilt collection, then the distribution's debug package, built with dwarf2json (Ubuntu, Debian, Rocky, Alma). Each download is checked against its publisher's hash and audit-logged. An image with no table is skipped, and the audit log says why. With `ROWANHOLT_SYMBOL_DOWNLOADS=off` (team servers), nothing is fetched, Windows PDBs included, and the reason names the command that fetches the table:
 
 ```bash
 rowanholt symbols fetch --banner '<the banner from the audit log>'
-rowanholt symbols add --vmlinux vmlinux-<release>       # a kernel no source publishes
+rowanholt symbols what <image>                          # what to get, and where, when it can't be fetched
+rowanholt symbols add --package <.ddeb|.deb|.rpm>       # that file, as a table
+rowanholt symbols add --kdk <KDK .dmg> --banner '<b>'   # macOS, on the Mac
 rowanholt symbols list
 ```
 

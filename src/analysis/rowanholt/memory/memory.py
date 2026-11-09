@@ -135,11 +135,17 @@ def ensure_symbols(output_directory, verbosity, artefact):
     banners = symbols.banners_from(KERNEL_BANNERS.get(artefact, ""))
     if not banners:
         return True
-    try:
-        result = symbols.resolve(banners[0], audit)
-    except Exception as e:  # a fault here mustn't end the case: Volatility then runs without a table
-        print(f"     WARNING: couldn't resolve symbols for '{name}': {e}")
-        return True
+    # The most often seen banner is the image's own kernel; the next ones are tried in case it
+    # isn't (a banner in a file the image held in its page cache)
+    result = None
+    for banner in banners[:3]:
+        try:
+            result = symbols.resolve(banner, audit)
+        except Exception as e:  # a fault here mustn't end the case: Volatility then runs without a table
+            print(f"     WARNING: couldn't resolve symbols for '{name}': {e}")
+            return True
+        if result.ok:
+            break
     if result.status in ("fetched", "built"):
         print(f"     {result.message}")
     elif not result.ok:

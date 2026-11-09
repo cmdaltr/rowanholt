@@ -30,8 +30,9 @@ Forensics (run from the directory you're working in; relative paths stay relativ
   acquire <args>                    Gandalf through the Python CLI (rowanholt acquire --help)
   analyse <args>                    Elrond (rowanholt analyse --help); 'analyze' works too
   mordor <command>                  Security datasets: list, download, info, local, verify, ...
-  symbols fetch|add|list            Volatility symbol tables for memory images, in the worker
-                                    (fetch <image> or --banner '<banner>'; symbols/README.md)
+  samples list|fetch|import         Public forensic images as ready cases (ROWANHOLT_SAMPLES_DIR)
+  symbols fetch|what|add|list       Volatility symbol tables for memory images, in the worker
+                                    (fetch <image>; what <image>; add --package|--kdk <.dmg>|--vmlinux|--table)
   web                               The web UI and API without Docker
   mcp                               Aulë's MCP server over stdio, for Claude Desktop, Claude Code and the like
                                     (ROWANHOLT_API, ROWANHOLT_TOKEN; needs requirements/mcp.txt; docs/AULE.md)
@@ -264,6 +265,71 @@ stack() {
             compose_cmd ps
             ;;
     esac
+}
+
+# rowanholt symbols, in the worker, which has Volatility, dwarf2json and the symbols folders.
+# Files the worker can't see (it mounts /tmp/rowanholt, and /Volumes on a Mac) are staged under
+# /tmp/rowanholt first, and a KDK's .dmg or .pkg is unpacked here on the Mac (hdiutil, pkgutil:
+# the worker can't open Apple's package format); the staging folder is removed afterwards
+symbols_visible() {
+    case "$1" in
+        /tmp/rowanholt/*) return 0 ;;
+        /Volumes/*) [ "$(uname)" = Darwin ] ;;
+        *) return 1 ;;
+    esac
+}
+
+symbols_unpack_kdk() {  # <.dmg|.pkg> <staging folder>: prints the expanded KDK's folder
+    local file="$1" stage="$2" mnt pkg
+    [ "$(uname)" = Darwin ] || { echo "A KDK's .dmg or .pkg is unpacked on a Mac; unpack it there and pass the folder" >&2; return 1; }
+    pkg="$file"
+    if [[ "$file" == *.dmg ]]; then
+        mnt="$(mktemp -d)"
+        hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$file" >/dev/null || { rmdir "$mnt"; return 1; }
+        pkg="$(find "$mnt" -maxdepth 2 -name '*.pkg' | head -1)"
+        [ -n "$pkg" ] || { hdiutil detach -quiet "$mnt"; echo "No .pkg in $file" >&2; return 1; }
+    fi
+    echo "Unpacking $(basename "$pkg") (a few minutes)..." >&2
+    pkgutil --expand-full "$pkg" "$stage/kdk" >/dev/null
+    local status=$?
+    [ -n "${mnt:-}" ] && hdiutil detach -quiet "$mnt"
+    [ $status -eq 0 ] || return 1
+    echo "$stage/kdk"
+}
+
+symbols_command() {
+    ensure_docker
+    docker ps --format '{{.Names}}' | grep -qx rowanholt-celery-worker \
+        || { echo "The worker isn't running: rowanholt start" >&2; exit 1; }
+    local stage="" args=() prev="" arg path status
+    for arg in "$@"; do
+        if [ -e "$arg" ] && [[ "$prev" != --banner ]] && [[ "$prev" != --kernel ]]; then
+            path="$(cd "$(dirname "$arg")" && pwd)/$(basename "$arg")"
+            if [[ "$prev" == --kdk && ( "$path" == *.dmg || "$path" == *.pkg ) ]]; then
+                [ -n "$stage" ] || stage="$(mkdir -p /tmp/rowanholt && mktemp -d /tmp/rowanholt/symbols-XXXXXX)"
+                path="$(symbols_unpack_kdk "$path" "$stage")" || { rm -rf "$stage"; exit 1; }
+            elif ! symbols_visible "$path"; then
+                [ -n "$stage" ] || stage="$(mkdir -p /tmp/rowanholt && mktemp -d /tmp/rowanholt/symbols-XXXXXX)"
+                if [ -d "$path" ]; then
+                    # A KDK folder: only its kernels are needed
+                    mkdir -p "$stage/$(basename "$path")/System/Library"
+                    cp -R "$path/System/Library/Kernels" "$stage/$(basename "$path")/System/Library/" || { rm -rf "$stage"; exit 1; }
+                else
+                    cp "$path" "$stage/" || { rm -rf "$stage"; exit 1; }
+                fi
+                path="$stage/$(basename "$path")"
+            fi
+            arg="$path"
+        fi
+        args+=("$arg")
+        prev="$arg"
+    done
+    TTY=-i; [ -t 0 ] && [ -t 1 ] && TTY=-it
+    docker exec "$TTY" -e ROWANHOLT_SYMBOL_DOWNLOADS=on rowanholt-celery-worker \
+        /usr/bin/python3 -m rowanholt.memory.symbols "${args[@]}"
+    status=$?
+    [ -n "$stage" ] && rm -rf "$stage"
+    exit $status
 }
 
 # An install from before the rename starts on new, empty volumes and without its .env
@@ -504,16 +570,10 @@ case "$COMMAND" in
     analyse|analyze) exec "$PYTHON" "$ROOT/src/cli/rowanholt.py" analyze "$@" ;;
     anduril|aragorn) exec "$PYTHON" "$ROOT/src/cli/rowanholt.py" anduril "$@" ;;
     mordor) exec "$PYTHON" "$ROOT/src/cli/mordor.py" "$@" ;;
+    samples) exec "$PYTHON" "$ROOT/src/cli/samples.py" "$@" ;;
     # In the worker, which has Volatility, dwarf2json and the symbols folders; an image or file
     # must be at a path the worker mounts (/Volumes, /tmp/rowanholt, an evidence folder)
-    symbols)
-        ensure_docker
-        docker ps --format '{{.Names}}' | grep -qx rowanholt-celery-worker \
-            || { echo "The worker isn't running: rowanholt start" >&2; exit 1; }
-        TTY=-i; [ -t 0 ] && [ -t 1 ] && TTY=-it
-        exec docker exec "$TTY" -e ROWANHOLT_SYMBOL_DOWNLOADS=on rowanholt-celery-worker \
-            /usr/bin/python3 -m rowanholt.memory.symbols "$@"
-        ;;
+    symbols) symbols_command "$@" ;;
     # stdout is the MCP protocol: nothing else may print to it
     mcp) PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}" exec "${ROWANHOLT_MCP_PYTHON:-$PYTHON}" -m aule_mcp.server "$@" ;;
     scripts) list_scripts ;;

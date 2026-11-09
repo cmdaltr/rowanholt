@@ -15,6 +15,7 @@ for those the analyst builds from files they bring (build.py).
 import gzip
 import json
 import re
+import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -73,6 +74,20 @@ def _json(url: str, get: Fetch) -> object:
         return json.loads(get(url))
     except ValueError as exc:
         raise SourceError(f"{url}: not JSON ({exc})")
+    except urllib.error.HTTPError as exc:
+        if exc.code in (403, 429) and "api.github.com" in url:
+            raise SourceError("GitHub's API limit for unsigned requests (60 an hour) is used up; try again within the hour")
+        raise SourceError(f"{url}: HTTP {exc.code}")
+
+
+_INDEX: Dict[int, Dict[str, List[str]]] = {}
+
+
+def prebuilt_index(get: Fetch = fetch) -> Dict[str, List[str]]:
+    """The prebuilt collection's banner index, fetched once per process (it's several MB)."""
+    if id(get) not in _INDEX:
+        _INDEX[id(get)] = _json(PREBUILT_INDEX, get)
+    return _INDEX[id(get)]
 
 
 def normalise_banner(banner: str) -> str:
@@ -82,7 +97,7 @@ def normalise_banner(banner: str) -> str:
 
 def prebuilt(kernel: Kernel, get: Fetch = fetch, index: Optional[Dict[str, List[str]]] = None) -> Download:
     """The collection's table for exactly this banner, with its release asset's SHA-256."""
-    index = index if index is not None else _json(PREBUILT_INDEX, get)
+    index = index if index is not None else prebuilt_index(get)
     wanted = normalise_banner(kernel.banner)
     urls = next((u for b, u in index.items() if normalise_banner(b) == wanted), None)
     if not urls:

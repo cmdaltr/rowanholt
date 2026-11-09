@@ -27,6 +27,7 @@ try:
     from .anduril_routes import router as anduril_router  # Anduril Docker administration
     from .lab_routes import router as lab_router  # Test lab, via the host's lab agent
     from .symbol_routes import router as symbol_router  # Volatility symbol tables (Aragorn)
+    from .sample_routes import router as sample_router  # Sample data as ready cases (Aragorn)
     from .threat_intel_routes import router as threat_intel_router  # Threat intelligence indicators
     from . import threat_intel_store
     from . import case_routes  # The case browser, findings, notes and assignments
@@ -53,6 +54,7 @@ except ImportError:
     from anduril_routes import router as anduril_router  # Anduril Docker administration
     from lab_routes import router as lab_router  # Test lab, via the host's lab agent
     from symbol_routes import router as symbol_router  # Volatility symbol tables (Aragorn)
+    from sample_routes import router as sample_router  # Sample data as ready cases (Aragorn)
     from threat_intel_routes import router as threat_intel_router  # Threat intelligence indicators
     import threat_intel_store
     import case_routes  # The case browser, findings, notes and assignments
@@ -186,6 +188,7 @@ app.include_router(ai_router)
 app.include_router(mordor_router)
 app.include_router(lab_router)
 app.include_router(symbol_router)
+app.include_router(sample_router)
 app.include_router(threat_intel_router)
 app.include_router(case_routes.router)
 

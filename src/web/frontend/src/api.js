@@ -481,3 +481,13 @@ export const addSymbolTable = async (kind, file, extra = {}) => {
 
 export const getSymbolTask = async (taskId) =>
   (await api.get(`/api/symbols/tasks/${encodeURIComponent(taskId)}`)).data;
+
+// Sample data: public forensic images as ready cases (Aragorn's Settings; admin-only)
+export const listSamples = async () => (await api.get('/api/samples')).data;
+
+export const fetchSample = async (id) => (await api.post(`/api/samples/${encodeURIComponent(id)}/fetch`)).data;
+
+export const getSampleTask = async (taskId) =>
+  (await api.get(`/api/samples/tasks/${encodeURIComponent(taskId)}`)).data;
+
+export const sampleJobRequest = async (id) => (await api.post(`/api/samples/${encodeURIComponent(id)}/import`)).data;

@@ -92,6 +92,11 @@ class Banners(unittest.TestCase):
         output = str(f"Volatility 3\n\nOffset\tBanner\n\n0x1000\t{UBUNTU}\n0x2000\t{UBUNTU}\n".encode())[2:-1]
         self.assertEqual(resolve.banners_from(output), [UBUNTU])
 
+    def test_the_most_often_seen_banner_first(self):
+        # A Linux image holding a Mac's banner in its page cache: seen once, the kernel's thrice
+        lines = [f"0x{i}\t{b}" for i, b in enumerate([DARWIN, UBUNTU, UBUNTU, DEBIAN, UBUNTU])]
+        self.assertEqual(resolve.banners_from("\n".join(lines)), [UBUNTU, DARWIN, DEBIAN])
+
 
 class Sources(unittest.TestCase):
     def test_prebuilt_by_exact_banner_with_release_digest(self):
@@ -152,6 +157,20 @@ class Sources(unittest.TestCase):
     def test_only_https(self):
         with self.assertRaises(sources.SourceError):
             sources.fetch("http://example.org/")
+
+    def test_githubs_rate_limit_is_named(self):
+        import urllib.error
+
+        def limited(url):
+            raise urllib.error.HTTPError(url, 403, "rate limit exceeded", {}, None)
+        with self.assertRaisesRegex(sources.SourceError, "60 an hour"):
+            sources._json(sources.GITHUB_RELEASE.format(tag="t"), limited)
+
+    def test_the_index_is_fetched_once(self):
+        get = Publisher({sources.PREBUILT_INDEX: {}})
+        sources.prebuilt_index(get)
+        sources.prebuilt_index(get)
+        self.assertEqual(get.asked, [sources.PREBUILT_INDEX])
 
 
 class Downloads(unittest.TestCase):
@@ -239,13 +258,16 @@ class Resolving(unittest.TestCase):
             result = self.resolve(UBUNTU, allow_downloads=True)
         self.assertEqual(result.status, "unavailable")
         self.assertIn("dwarf2json isn't installed", result.message)
-        self.assertIn("rowanholt symbols add --vmlinux", result.message)
+        self.assertIn("linux-image-unsigned-5.15.0-91-generic-dbgsym_5.15.0-91.101_amd64.ddeb", result.message)
+        self.assertIn("rowanholt symbols add --package", result.message)
 
     def test_macos_points_at_its_kdk(self):
         (self.root / "mac").mkdir()
         with mock.patch.object(sources, "prebuilt", side_effect=sources.SourceError("not in the prebuilt collection")):
             result = self.resolve(DARWIN, allow_downloads=True)
-        self.assertIn("Kernel Debug Kit for xnu-8020.140.49~2", result.message)
+        self.assertIn("Kernel Debug Kit for macOS 12.6", result.message)
+        self.assertIn("xnu-8020.140.49~2", result.message)
+        self.assertIn("--kernel kernel", result.message)
 
 
 class InTheMemoryStep(unittest.TestCase):
@@ -260,6 +282,17 @@ class InTheMemoryStep(unittest.TestCase):
             log = Path(case, "rowanholt_audit.log").read_text()
         self.assertIn(",symbols,mem.lime,", log)
         self.assertIn("rowanholt symbols fetch --banner", log)
+
+    def test_a_stray_banner_doesnt_stop_the_kernels(self):
+        from rowanholt.memory import memory
+
+        results = {DARWIN: resolve.Result("unavailable", "no KDK"), UBUNTU: resolve.Result("fetched", "ok")}
+        output = "\n".join(f"0x{i}\t{b}" for i, b in enumerate([DARWIN, DARWIN, UBUNTU]))
+        with tempfile.TemporaryDirectory() as case, \
+                mock.patch.object(memory.symbols, "resolve", side_effect=lambda b, audit: results[b]) as called, \
+                mock.patch.dict(memory.KERNEL_BANNERS, {"/e/m.lime": output}):
+            self.assertTrue(memory.ensure_symbols(case, "", "/e/m.lime"))
+        self.assertEqual([c.args[0] for c in called.call_args_list], [DARWIN, UBUNTU])
 
     def test_a_windows_image_is_left_to_volatility(self):
         from rowanholt.memory import memory
@@ -287,6 +320,98 @@ class TheCommand(unittest.TestCase):
             self.assertEqual(cli.main(["add", "--table", str(table)]), 0)
             self.assertEqual(cache.find("linux", DEBIAN, Path(root))["source"], "added")
             self.assertIn("symbols added mine.json.xz", Path(root, "linux", cache.LOG).read_text())
+
+
+class WhatToGet(unittest.TestCase):
+    def test_macos_versions(self):
+        from rowanholt.memory.symbols import guide
+
+        self.assertEqual(guide.macos_version("23.4.0"), "14.4")
+        self.assertEqual(guide.macos_version("20.3.0"), "11.3")
+        self.assertEqual(guide.macos_version("19.6.0"), "10.15.6")
+        self.assertEqual(guide.macos_version("25.1.0"), "26.1")
+
+    def test_kdk_kernel_from_the_banner(self):
+        from rowanholt.memory.symbols import guide
+
+        self.assertEqual(guide.kdk_kernel(DARWIN), "kernel")
+        arm = "Darwin Kernel Version 23.4.0: Fri Mar 15 00:12:49 PDT 2024; root:xnu-10063.101.17~1/RELEASE_ARM64_T6000"
+        self.assertEqual(guide.kdk_kernel(arm), "kernel.release.t6000")
+
+    def test_each_distribution_names_its_file(self):
+        from rowanholt.memory.symbols import guide
+
+        self.assertIn("https://snapshot.debian.org/binary/linux-image-6.1.0-18-amd64-dbg/", guide.what_to_get(parse(DEBIAN)))
+        self.assertIn("https://dl.rockylinux.org/vault/rocky/9.3/BaseOS/x86_64/debug/tree/Packages/k/"
+                      "kernel-debuginfo-5.14.0-362.8.1.el9_3.x86_64.rpm", guide.what_to_get(parse(ROCKY)))
+        self.assertIn("https://kojipkgs.fedoraproject.org/packages/kernel/6.5.6/300.fc39/x86_64/"
+                      "kernel-debuginfo-6.5.6-300.fc39.x86_64.rpm", guide.what_to_get(parse(FEDORA)))
+        rhel = parse(ROCKY.replace("iad1-prod-build001.bld.equ.rockylinux.org", "x86-vm-07.build.eng.bos.redhat.com"))
+        self.assertIn("dnf download", guide.what_to_get(rhel))
+
+
+class Packages(unittest.TestCase):
+    def test_kinds(self):
+        self.assertEqual(build.package_kind(Path("k.ddeb")), "deb")
+        self.assertEqual(build.package_kind(Path("k.RPM")), "rpm")
+        with self.assertRaises(build.BuildError):
+            build.package_kind(Path("k.zip"))
+
+    def test_the_largest_vmlinux_without_a_release(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            boot = Path(tmp, "usr/lib/debug/boot")
+            boot.mkdir(parents=True)
+            Path(boot, "vmlinux-6.8.0-31-generic").write_bytes(b"x" * 100)
+            Path(boot, "vmlinux.lds").write_bytes(b"x")
+            self.assertEqual(build._find_vmlinux(Path(tmp)).name, "vmlinux-6.8.0-31-generic")
+
+    def test_add_package_builds_and_indexes(self):
+        from rowanholt.memory.symbols import __main__ as cli
+
+        def fake_extract(package, kind, release, workdir):
+            vmlinux = Path(workdir, "vmlinux")
+            vmlinux.write_bytes(b"\0" + UBUNTU.encode() + b"\n")
+            return vmlinux
+
+        def fake_table(vmlinux, table, system_map=None):
+            table.parent.mkdir(parents=True, exist_ok=True)
+            table.write_bytes(isf(UBUNTU))
+            return table
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.dict(os.environ, {"ROWANHOLT_SYMBOLS_DIR": root}), \
+                mock.patch.object(build, "extract_vmlinux", side_effect=fake_extract) as extract, \
+                mock.patch.object(build, "linux_table", side_effect=fake_table):
+            package = Path(tmp, "linux-image-unsigned-5.15.0-91-generic-dbgsym_5.15.0-91.101_amd64.ddeb")
+            package.write_bytes(b"")
+            self.assertEqual(cli.main(["add", "--package", str(package)]), 0)
+            self.assertEqual(extract.call_args[0][1:3], ("deb", ""))
+            entry = cache.find("linux", UBUNTU, Path(root))
+            self.assertEqual(entry["file"], "ubuntu-5.15.0-91-generic-x86_64.json.xz")
+            self.assertTrue(entry["source"].startswith("built (linux-image-unsigned"))
+
+    def test_add_kdk_picks_the_banner_kernel(self):
+        from rowanholt.memory.symbols import __main__ as cli
+
+        arm = "Darwin Kernel Version 23.4.0: Fri Mar 15 00:12:49 PDT 2024; root:xnu-10063.101.17~1/RELEASE_ARM64_T6000"
+        built = []
+
+        def fake_mac(dwarf, kernel, table):
+            built.append(kernel.name)
+            data = base64.b64encode(arm.encode()).decode()
+            table.write_bytes(lzma.compress(json.dumps({"symbols": {"version": {"constant_data": data}}}).encode()))
+            return table
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as kdk, \
+                mock.patch.dict(os.environ, {"ROWANHOLT_SYMBOLS_DIR": root}), \
+                mock.patch.object(build, "mac_table", side_effect=fake_mac):
+            kernels = Path(kdk, "Library/Developer/KDKs/KDK_14.4_23E214.kdk/System/Library/Kernels")
+            for name in ("kernel", "kernel.release.t6000"):
+                (kernels / f"{name}.dSYM/Contents/Resources/DWARF").mkdir(parents=True)
+                (kernels / name).write_bytes(b"")
+                (kernels / f"{name}.dSYM/Contents/Resources/DWARF/{name}").write_bytes(b"")
+            self.assertEqual(cli.main(["add", "--kdk", kdk, "--banner", arm]), 0)
+            self.assertEqual(built, ["kernel.release.t6000"])
+            self.assertEqual(cache.find("mac", arm, Path(root))["source"], "built (KDK)")
+            self.assertEqual(cli.main(["add", "--kdk", kdk, "--kernel", "kernel.release.t8103"]), 1)
 
 
 if __name__ == "__main__":

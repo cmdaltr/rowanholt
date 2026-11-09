@@ -66,11 +66,25 @@ class SymbolTables(BackendCase):
         self.assertTrue(Path(folder, "System/Library/Kernels/kernel.dSYM/Contents/Resources/DWARF/kernel").is_file())
         self.assertEqual(Path(folder).parent, self.root / "incoming")
 
+    def test_a_debug_package_goes_to_the_worker(self):
+        task = mock.Mock(id="t-2")
+        with mock.patch("tasks_docker.add_symbol_table.delay", return_value=task) as delay:
+            resp = self.client.post("/api/symbols/add", headers=self.admin, data={"kind": "package"},
+                                    files={"file": ("kernel-debuginfo-5.14.0.x86_64.rpm", b"rpm")})
+        self.assertEqual(resp.status_code, 200, resp.text)
+        args, folder = delay.call_args[0]
+        self.assertEqual(args, ["--package", str(Path(folder, "kernel-debuginfo-5.14.0.x86_64.rpm"))])
+        resp = self.client.post("/api/symbols/add", headers=self.admin, data={"kind": "package"},
+                                files={"file": ("kernel.zip", b"x")})
+        self.assertEqual(resp.status_code, 400)
+
     def test_a_table_must_look_like_one(self):
+        incoming = self.root / "incoming"
+        before = set(incoming.glob("*")) if incoming.exists() else set()
         resp = self.client.post("/api/symbols/add", headers=self.admin, data={"kind": "table"},
                                 files={"file": ("notes.txt", b"x")})
         self.assertEqual(resp.status_code, 400)
-        self.assertEqual(list((self.root / "incoming").glob("*")) if (self.root / "incoming").exists() else [], [])
+        self.assertEqual(set(incoming.glob("*")) if incoming.exists() else set(), before)
 
 
 if __name__ == "__main__":

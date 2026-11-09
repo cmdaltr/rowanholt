@@ -69,6 +69,8 @@ services:
       - ROWANHOLT_NUM_CTX=${ROWANHOLT_NUM_CTX:-8192}
       # Shown on Aragorn's symbol tables (the worker's setting, which it acts on)
       - ROWANHOLT_SYMBOL_DOWNLOADS=${ROWANHOLT_SYMBOL_DOWNLOADS:-on}
+      # Sample data (rowanholt samples, Aragorn): a folder the worker reads as well
+      - ROWANHOLT_SAMPLES_DIR=${ROWANHOLT_SAMPLES_DIR:-/tmp/rowanholt/samples}
       # Online lookups (.env.example): Pippin's VirusTotal button needs "virustotal" and the key
       - ROWANHOLT_ONLINE_LOOKUPS=${ROWANHOLT_ONLINE_LOOKUPS:-}
       - VIRUSTOTAL_API_KEY=${VIRUSTOTAL_API_KEY:-}
@@ -80,6 +82,7 @@ services:
       - ./src/analysis/rowanholt/report:/opt/elrond-src/rowanholt/report:ro # the case report (/api/jobs/{id}/case/full-report)
       - ./src/analysis/rowanholt/post/mitre:/opt/elrond-src/rowanholt/post/mitre:ro # the pinned ATT&CK release: technique names in the report, Navigator layers
       - ./src/analysis/rowanholt/memory/symbols:/opt/elrond-src/rowanholt/memory/symbols:ro # the symbol tables' index (/api/symbols)
+      - ./src/analysis/rowanholt/samples:/opt/elrond-src/rowanholt/samples:ro # the sample data catalogue (/api/samples)
       - ./symbols:/opt/rowanholt/symbols # Volatility symbol tables: Aragorn lists them and takes uploads (incoming/, built by the worker)
       - anduril_token:/run/anduril:ro # Written by anduril
       # Platform-specific mounts - uncomment for your OS:
@@ -185,6 +188,8 @@ services:
       # Volatility symbol tables fetched for a memory image's kernel (memory/symbols: hash-checked,
       # audit-logged); off also runs Volatility --offline (no Windows PDBs). Team servers: off
       - ROWANHOLT_SYMBOL_DOWNLOADS=${ROWANHOLT_SYMBOL_DOWNLOADS:-on}
+      # Sample data: Aragorn's fetches download here (rowanholt/samples)
+      - ROWANHOLT_SAMPLES_DIR=${ROWANHOLT_SAMPLES_DIR:-/tmp/rowanholt/samples}
     volumes:
       - ./src/web/backend:/app
       # NOTE: elrond source is now copied into the image during build (see Dockerfile.forensics)

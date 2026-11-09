@@ -61,21 +61,33 @@ def _run(args, **kwargs) -> subprocess.CompletedProcess:
         raise BuildError(f"{args[0]} took over {BUILD_TIMEOUT // 60} minutes")
 
 
-def _find_vmlinux(root: Path, release: str) -> Path:
-    # Ubuntu and Debian: usr/lib/debug/boot/vmlinux-<release>; RPMs and Debian's other copy:
-    # usr/lib/debug/lib/modules/<release>/vmlinux
-    for candidate in (root / "usr/lib/debug/boot" / f"vmlinux-{release}",
-                      root / "usr/lib/debug/lib/modules" / release / "vmlinux"):
-        if candidate.is_file():
-            return candidate
-    found = sorted(p for p in root.rglob("vmlinux*") if p.is_file() and release in str(p))
+def _find_vmlinux(root: Path, release: str = "") -> Path:
+    """The package's vmlinux: Ubuntu and Debian's usr/lib/debug/boot/vmlinux-<release>, the RPMs'
+    usr/lib/debug/lib/modules/<release>/vmlinux; with no release given, the largest vmlinux."""
+    if release:
+        for candidate in (root / "usr/lib/debug/boot" / f"vmlinux-{release}",
+                          root / "usr/lib/debug/lib/modules" / release / "vmlinux"):
+            if candidate.is_file():
+                return candidate
+    found = [p for p in root.rglob("vmlinux*") if p.is_file() and (not release or release in str(p))]
     if not found:
-        raise BuildError(f"no vmlinux for {release} in the package")
-    return found[0]
+        raise BuildError(f"no vmlinux{' for ' + release if release else ''} in the package")
+    return max(found, key=lambda p: p.stat().st_size)
+
+
+def package_kind(package: Path) -> str:
+    """deb for a .deb or .ddeb, rpm for an .rpm."""
+    suffix = package.suffix.lower()
+    if suffix in (".deb", ".ddeb"):
+        return "deb"
+    if suffix == ".rpm":
+        return "rpm"
+    raise BuildError(f"{package.name}: a debug package is a .deb, .ddeb or .rpm")
 
 
 def extract_vmlinux(package: Path, kind: str, release: str, workdir: Path) -> Path:
-    """The kernel's vmlinux (with its DWARF) out of a .deb/.ddeb or an .rpm."""
+    """The kernel's vmlinux (with its DWARF) out of a .deb/.ddeb or an .rpm ("" release: whichever
+    kernel the package holds)."""
     unpacked = workdir / "unpacked"
     unpacked.mkdir(parents=True, exist_ok=True)
     if kind == "deb":

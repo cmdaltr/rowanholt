@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, List, Optional
 
-from . import build, cache, sources
+from . import build, cache, guide, sources
 from .banner import Kernel, parse
 
 logger = logging.getLogger(__name__)
@@ -53,15 +53,17 @@ def fetch_command(banner: str) -> str:
 
 def banners_from(output: str) -> List[str]:
     """The kernel banners in banners.Banners output, which memory.py has as the repr of its
-    bytes (literal \\n and \\t); Linux and Darwin ones, first seen first, no repeats."""
+    bytes (literal \\n and \\t): Linux and Darwin ones, the most often seen first. The image's
+    own kernel's banner is in it several times (linux_banner, vmcoreinfo, the log buffer); a
+    banner seen once is more likely a file's contents in the page cache."""
     if "\\n" in output and "\n" not in output:
         output = codecs.decode(output, "unicode_escape", errors="replace")
-    found: List[str] = []
+    counts: dict = {}
     for line in output.splitlines():
         text = line.split("\t", 1)[-1].strip()
-        if (text.startswith("Linux version") or text.startswith("Darwin Kernel Version")) and text not in found:
-            found.append(text)
-    return found
+        if text.startswith("Linux version") or text.startswith("Darwin Kernel Version"):
+            counts[text] = counts.get(text, 0) + 1
+    return sorted(counts, key=lambda b: -counts[b])  # stable: first seen first among equals
 
 
 def table_banner(table: Path) -> str:
@@ -115,7 +117,8 @@ def resolve(banner: str, audit: Audit = lambda line: None, root: Optional[Path] 
         allow_downloads = downloads_enabled()
     if not allow_downloads:
         return Result("offline", f"no symbols for {kernel.release} here, and symbol downloads are off "
-                      f"(ROWANHOLT_SYMBOL_DOWNLOADS). To fetch them: {fetch_command(kernel.banner)}", kernel)
+                      f"(ROWANHOLT_SYMBOL_DOWNLOADS). To fetch them: {fetch_command(kernel.banner)}; "
+                      f"or, where nothing can be fetched, get {guide.what_to_get(kernel)}", kernel)
 
     table = root / kernel.os / f"{kernel.name}.json.xz"
     reasons = []
@@ -140,9 +143,5 @@ def resolve(banner: str, audit: Audit = lambda line: None, root: Optional[Path] 
         audit(f"symbols {status} {table.name} (sha256 {entry['sha256']}) from {item.source}")
         return Result(status, f"symbols for {kernel.release} {status} from {item.source}", kernel, table)
 
-    if kernel.os == "mac":
-        reasons.append(f"build one from the Kernel Debug Kit for xnu-{kernel.package_version} "
-                       "(developer.apple.com/download/all) with rowanholt symbols add --kdk")
-    else:
-        reasons.append("build one from the kernel's vmlinux with rowanholt symbols add --vmlinux")
+    reasons.append("to add it, get " + guide.what_to_get(kernel))
     return Result("unavailable", f"no symbols found for {kernel.release}: " + "; ".join(reasons), kernel)

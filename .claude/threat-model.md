@@ -95,6 +95,12 @@ The worker can now go online for memory images: Elrond finds the Volatility symb
 
 Re-review if a source is added, a check is dropped, downloads are turned on by default for servers, or Aulë or a non-admin is given a way to trigger a fetch.
 
+## Sample data downloads (9 November 2026, Ben asked for it; not yet reviewed)
+
+`rowanholt samples` and Aragorn's Sample data card download public forensic images (`src/analysis/rowanholt/samples/`). The CLI runs on the host, and Aragorn's Fetch runs in the worker: a new outbound path from the worker, admin-only (`/api/samples` is in `ADMIN_PREFIXES`, so aule-mcp tokens are refused). The URLs are fixed in the catalogue, HTTPS only, with redirects off HTTPS refused. Each file is checked against its publisher's hash before it's kept: MD5 for DFIR Madness, the only hash it publishes; SHA-256 from Digital Corpora's search API (fetched at download time, from the same publisher as the file); none for 13Cubed, whose first download's SHA-256 is recorded and held to. Archives are unpacked with path traversal refused (zip and tar members with absolute or `..` paths; tar links and devices skipped; 7z by `7z x`). The images are attack scenarios and may hold live malware: they're unpacked as data and analysed by Elrond as any evidence is, never executed. An import is an ordinary job, made by the analyst who clicks it.
+
+Re-review if a sample's URL is taken from anywhere but the catalogue, a check is dropped, or fetches are offered to Aulë or non-admins.
+
 ## Chain of custody note
 
 Evidence packages are SHA256-hashed at acquisition time. Do not modify anything under `evidence/` or `cases/<CASE-ID>/raw/`. Processed output under `cases/<CASE-ID>/output/` is writable.

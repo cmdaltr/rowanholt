@@ -35,19 +35,29 @@ For those, an image whose table can't be found is skipped, and the audit log say
 rowanholt symbols fetch --banner 'Linux version 5.15.0-91-generic (buildd@lcy02-amd64-045) ...'
 ```
 
-## By hand
+## When it can't be fetched
 
-`rowanholt symbols` runs in the worker. Images and files must be at a path the worker mounts: `/Volumes`, `/tmp/rowanholt`, or an evidence folder.
+The job's audit log names the exact file to get and where it's published, and `rowanholt symbols what <image>` (or `--banner`) says the same before a job. That's the only manual step. One command then turns the file into a table:
+
+| Kernel | What to get | Then |
+|---|---|---|
+| Ubuntu, Debian, Rocky, Alma (offline, or a build since removed) | The debug package the message names (`.ddeb`, `-dbg` `.deb`, `kernel-debuginfo` `.rpm`) | `rowanholt symbols add --package <file>` |
+| Fedora, CentOS Stream, Oracle Linux | `kernel-debuginfo-<version>.rpm`: the message gives the Koji, mirror or oss.oracle.com URL | `rowanholt symbols add --package <file>` |
+| RHEL | `dnf download --enablerepo='*debug*' kernel-debuginfo-<version>` on a subscribed host | `rowanholt symbols add --package <file>` |
+| macOS | The Kernel Debug Kit for the image's macOS version and build, from developer.apple.com/download/all (Apple ID). The message gives the macOS version, from the Darwin version, and the xnu build | `rowanholt symbols add --kdk <the .dmg> --banner '<banner>'`, on the Mac |
+| Anything else | The kernel's `vmlinux` with debug info | `rowanholt symbols add --vmlinux <file> [--system-map <file>]` |
+
+Each runs in the worker. A file the worker can't see is copied under `/tmp/rowanholt` for the run and removed afterwards; the worker sees `/tmp/rowanholt`, and `/Volumes` on a Mac. A KDK `.dmg` or `.pkg` is unpacked on the Mac first (`hdiutil`, `pkgutil --expand-full`), because the worker can't open Apple's package format. `--banner` picks the KDK's kernel that matches: `kernel` for `RELEASE_X86_64`, `kernel.release.t6000` and the like for Apple silicon. `--kernel` names one outright.
 
 ```bash
-rowanholt symbols fetch /Volumes/Evidence/host.lime      # the image's kernel (a Windows image: its PDB)
-rowanholt symbols add --vmlinux vmlinux-6.8.0-31-generic --system-map System.map-6.8.0-31-generic
-rowanholt symbols add --kdk /Volumes/Data/KDK_14.4_23E214.kdk --kernel kernel.release.t6000
+rowanholt symbols what /Volumes/Evidence/host.lime
+rowanholt symbols add --package ~/Downloads/kernel-debuginfo-6.5.6-300.fc39.x86_64.rpm
+rowanholt symbols add --kdk ~/Downloads/Kernel_Debug_Kit_14.4_build_23E214.dmg --banner 'Darwin Kernel Version 23.4.0: ...'
 rowanholt symbols add --table ubuntu-6.8.0-31-generic.json.xz
 rowanholt symbols list
 ```
 
-For a macOS kernel, install the Kernel Debug Kit for the image's xnu build (developer.apple.com/download/all; the job's message names the build). Pass the KDK folder, choosing the kernel that matches the banner's `RELEASE_` suffix: `kernel` for x86_64, `kernel.release.t6000` and the like for Apple silicon. Aragorn's Settings tab takes the same uploads (a table, a vmlinux, or a KDK's kernel and its dSYM DWARF file) and lists every table with where it came from.
+Aragorn's Settings tab takes the same files as uploads and lists every table with where it came from. The uploads are a debug package, a table, a vmlinux, or a KDK's kernel and its dSYM DWARF file; a `.dmg` needs the CLI on a Mac.
 
 `build-ubuntu-isf.sh` builds an Ubuntu table in a throwaway container, from before the worker could. Its default is the test image's `5.8.0-44-generic`, for which no prebuilt table is published.
 
