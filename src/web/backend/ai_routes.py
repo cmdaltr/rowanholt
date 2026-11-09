@@ -1,7 +1,7 @@
 """
 AI Assistant API Routes
 
-FastAPI routes for Eru AI assistant functionality.
+FastAPI routes for Aulë AI assistant functionality.
 """
 
 import os
@@ -15,13 +15,13 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 try:
-    from . import case_files, eru_context, eru_offline
+    from . import case_files, aule_context, aule_offline
     from .auth import access
     from .storage import JobStorage
 except ImportError:  # main.py imports the routes as top-level modules too
     import case_files
-    import eru_context
-    import eru_offline
+    import aule_context
+    import aule_offline
     from auth import access
     from storage import JobStorage
 
@@ -35,7 +35,7 @@ ROWANHOLT_DATA_DIR = os.getenv("ROWANHOLT_DATA_DIR", "/opt/rowanholt/data")
 # For Docker on macOS, use host.docker.internal to reach host machine's Ollama
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://host.docker.internal:11434")
 DEFAULT_MODEL = os.getenv("ROWANHOLT_MODEL_NAME", "llama3.2:3b")
-# Ollama's own default window (2048 tokens) is shorter than the case context Eru sends
+# Ollama's own default window (2048 tokens) is shorter than the case context Aulë sends
 NUM_CTX = int(os.getenv("ROWANHOLT_NUM_CTX", "8192"))
 
 
@@ -62,18 +62,35 @@ class ChatResponse(BaseModel):
     processing_time: Optional[float] = None
 
 
+def old_model_name(model: str) -> Optional[str]:
+    """What an aule model (src/models/Modelfile.aule*) was called before Aulë was renamed from Eru,
+    or None: aule-qwen was eru-qwen, aule:latest was eru:latest."""
+    if model == "aule" or model.startswith(("aule-", "aule:")):
+        return "eru" + model[len("aule"):]
+    return None
+
+
+def _installed(model: str, models: List[str]) -> bool:
+    return model in models or any(model in m for m in models)
+
+
 # LLM Interface
 class OllamaClient:
     """Simple Ollama HTTP client."""
 
     def __init__(self, host: str = OLLAMA_HOST, model: str = DEFAULT_MODEL):
         self.host = host
+        # The model asked for; self.model is the one used, its eru name when only that is pulled
+        self.configured = model
         self.model = model
+        self._resolved = False
 
     async def generate(self, prompt: str, system: str = None) -> str:
         """Generate a response from Ollama."""
         import httpx
 
+        if not self._resolved:
+            await self.check_available()
         url = f"{self.host}/api/generate"
 
         payload = {
@@ -94,7 +111,7 @@ class OllamaClient:
                 return data.get("response", "")
         except httpx.HTTPError as e:
             logger.error(f"Ollama HTTP error: {e}")
-            reason = eru_offline.unavailable_reason(await self.check_available(), self.host, self.model)
+            reason = aule_offline.unavailable_reason(await self.check_available(), self.host, self.model)
             raise HTTPException(status_code=503, detail=reason or f"LLM service unavailable: {e}")
         except Exception as e:
             logger.error(f"Ollama error: {e}")
@@ -112,23 +129,34 @@ class OllamaClient:
                 data = response.json()
 
                 models = [m.get("name") for m in data.get("models", [])]
+                self.model = self.choose_model(models)
+                self._resolved = True
 
                 return {
                     "available": True,
                     "models": models,
                     "default_model": self.model,
-                    "model_loaded": self.model in models or any(self.model in m for m in models)
+                    "model_loaded": _installed(self.model, models)
                 }
         except Exception as e:
             logger.debug(f"Ollama not available: {e}")
             return {"available": False, "error": str(e)}
+
+    def choose_model(self, models: List[str]) -> str:
+        """The configured model, or its eru name when only that one is pulled (old_model_name)."""
+        old = old_model_name(self.configured)
+        if old and not _installed(self.configured, models) and _installed(old, models):
+            if self.model != old:
+                logger.info(f"{self.configured} isn't pulled but {old}, its name before Aulë, is: using {old}")
+            return old
+        return self.configured
 
 
 # Initialize Ollama client
 ollama = OllamaClient()
 
 # Forensic assistant system prompt
-FORENSIC_SYSTEM_PROMPT = """You are Eru, an AI forensic analysis assistant for Rowanholt, a digital forensics acceleration suite.
+FORENSIC_SYSTEM_PROMPT = """You are Aulë, an AI forensic analysis assistant for Rowanholt, a digital forensics acceleration suite.
 
 Your expertise includes:
 - Windows, macOS, and Linux forensics
@@ -168,19 +196,19 @@ async def get_ai_status():
     return {
         "llm_available": usable,
         "ollama_running": bool(status.get("available")),
-        "model_name": DEFAULT_MODEL if usable else None,
+        "model_name": ollama.model if usable else None,
         "models": status.get("models", []),
         "ollama_host": OLLAMA_HOST,
         "data_dir": ROWANHOLT_DATA_DIR,
-        # Why free text won't work, for Ask Eru to show; empty when it will
-        "reason": "" if usable else eru_offline.unavailable_reason(status, OLLAMA_HOST, DEFAULT_MODEL),
+        # Why free text won't work, for Ask Aulë to show; empty when it will
+        "reason": "" if usable else aule_offline.unavailable_reason(status, OLLAMA_HOST, DEFAULT_MODEL),
     }
 
 
 @router.get("/offline/questions")
 async def list_offline_questions():
-    """Questions Eru answers from the case files alone, with no LLM."""
-    return {"questions": eru_offline.catalogue()}
+    """Questions Aulë answers from the case files alone, with no LLM."""
+    return {"questions": aule_offline.catalogue()}
 
 
 @router.post("/offline/answer")
@@ -193,7 +221,7 @@ async def answer_offline_question(request: OfflineRequest, http_request: Request
     if request.case_id and not case_path:
         raise HTTPException(status_code=404, detail="Case not found")
     try:
-        result = eru_offline.answer_with_rows(request.question_id, case_path)
+        result = aule_offline.answer_with_rows(request.question_id, case_path)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"No offline question '{request.question_id}'")
     # The rows it cited are flagged on job_id's case; a case directory with no job behind it can't be flagged
@@ -231,7 +259,7 @@ async def list_indexed_cases(request: Request):
             if job.status.value == "completed" and job.destination_path:
                 dest_path = Path(job.destination_path)
                 if dest_path.exists():
-                    # One entry per job: two jobs can share a case number, and Eru reads the one chosen
+                    # One entry per job: two jobs can share a case number, and Aulë reads the one chosen
                     vector_db = dest_path / "vector_db"
                     cooked = dest_path / "cooked"
                     cases.append({
@@ -275,7 +303,7 @@ async def general_chat(request: ChatRequest):
 
         return ChatResponse(
             response=response,
-            model=DEFAULT_MODEL,
+            model=ollama.model,
             processing_time=processing_time
         )
 
@@ -391,7 +419,7 @@ Question: {request.question}
 
 Provide a detailed forensic analysis answer based on the case data provided."""
 
-    response = await ollama.generate(prompt=prompt, system=f"{FORENSIC_SYSTEM_PROMPT}\n\n{eru_context.CITE_INSTRUCTIONS}")
+    response = await ollama.generate(prompt=prompt, system=f"{FORENSIC_SYSTEM_PROMPT}\n\n{aule_context.CITE_INSTRUCTIONS}")
 
     processing_time = time.time() - start_time
 
@@ -401,7 +429,7 @@ Provide a detailed forensic analysis answer based on the case data provided."""
         "sources": [],
         "confidence": 0.7,
         "processing_time": processing_time,
-        "rows": _rows_for(eru_context.cited(response, context), job_id),
+        "rows": _rows_for(aule_context.cited(response, context), job_id),
         "job_id": job_id,
     }
 
@@ -438,17 +466,17 @@ Analyze the evidence and suggest 5 specific investigation paths. For each:
 
 Format as a numbered list."""
 
-    response = await ollama.generate(prompt=prompt, system=f"{FORENSIC_SYSTEM_PROMPT}\n\n{eru_context.CITE_INSTRUCTIONS}")
+    response = await ollama.generate(prompt=prompt, system=f"{FORENSIC_SYSTEM_PROMPT}\n\n{aule_context.CITE_INSTRUCTIONS}")
 
     # Parse response into suggestions
     suggestions = _parse_suggestions(response)
     for suggestion in suggestions:
-        suggestion["rows"] = _rows_for(eru_context.cited(f"{suggestion['title']} {suggestion['description']}", context), job_id)
+        suggestion["rows"] = _rows_for(aule_context.cited(f"{suggestion['title']} {suggestion['description']}", context), job_id)
 
     return {
         "case_id": case_id,
         "suggestions": suggestions,
-        "rows": _rows_for(eru_context.cited(response, context), job_id),
+        "rows": _rows_for(aule_context.cited(response, context), job_id),
         "job_id": job_id,
     }
 
@@ -486,13 +514,13 @@ Generate a comprehensive executive summary including:
 
 Be thorough but concise."""
 
-    response = await ollama.generate(prompt=prompt, system=f"{FORENSIC_SYSTEM_PROMPT}\n\n{eru_context.CITE_INSTRUCTIONS}")
+    response = await ollama.generate(prompt=prompt, system=f"{FORENSIC_SYSTEM_PROMPT}\n\n{aule_context.CITE_INSTRUCTIONS}")
 
     return {
         "case_id": case_id,
         "executive_summary": response,
         "generated_at": datetime.now().isoformat(),
-        "rows": _rows_for(eru_context.cited(response, context), job_id),
+        "rows": _rows_for(aule_context.cited(response, context), job_id),
         "job_id": job_id,
     }
 
@@ -550,10 +578,10 @@ async def _find_case(case_id: str, user: Optional[dict] = None,
     return None, None
 
 
-def _case_context(case_path: str, question: str) -> eru_context.Context:
+def _case_context(case_path: str, question: str) -> aule_context.Context:
     """The numbered case context for the model, the analysts' findings first."""
-    findings = eru_offline.FINDINGS(case_path) if eru_offline.FINDINGS else []
-    return eru_context.build(case_path, question, findings)
+    findings = aule_offline.FINDINGS(case_path) if aule_offline.FINDINGS else []
+    return aule_context.build(case_path, question, findings)
 
 
 def _rows_for(rows: List[Dict[str, str]], job_id: Optional[str]) -> List[Dict[str, str]]:

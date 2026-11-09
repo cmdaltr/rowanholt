@@ -330,6 +330,7 @@ async def create_token(body: TokenRequest, user: dict = Depends(access.current_u
     name = body.name.strip()
     if not name or len(name) > 100:
         raise HTTPException(status_code=400, detail="Give the token a name of up to 100 characters")
+    body.scope = tokens.scope_of(body.scope)  # "eru-mcp" is still taken, as aule-mcp
     if body.scope not in tokens.SCOPES:
         raise HTTPException(status_code=400, detail=f"Scope is one of: {', '.join(tokens.SCOPES)}")
     if not 1 <= body.days <= tokens.MAX_DAYS:

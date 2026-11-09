@@ -6,7 +6,7 @@ src/mordor. The worker image has it already, at /opt/elrond-src.
 
 Each indicator's expiry is in threat_intel_validity beside it (rowanholt/threat_intel/validity.py):
 expired indicators stay listed, marked, but are left out of what Elrond matches (export_csv) and
-what Eru and /enrich check (indicators()), until a refreshed import or an admin brings them back.
+what Aulë and /enrich check (indicators()), until a refreshed import or an admin brings them back.
 """
 
 import logging

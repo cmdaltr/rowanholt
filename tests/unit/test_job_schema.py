@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "web" / "ba
 
 import storage  # noqa: E402
 
-HEAD = "c71d4e9a2b58"  # the newest file in src/web/backend/alembic/versions
+HEAD = "f2b7c9d4e816"  # the newest file in src/web/backend/alembic/versions
 
 
 def heads(url: str) -> list:
@@ -64,6 +64,35 @@ class MigrationTest(unittest.TestCase):
         storage.JobStorage(url)
         storage.JobStorage(url)
         self.assertEqual(heads(url), [HEAD])
+
+    def test_eru_mcp_tokens_become_aule_mcp_and_back(self):
+        """Aulë was Eru: stored eru-mcp scopes are renamed on the way up and named again on the way down."""
+        from alembic import command
+        from alembic.config import Config
+        url = self.url("scopes")
+        storage.JobStorage(url)
+        engine = create_engine(url)
+        with engine.begin() as connection:
+            connection.execute(text("UPDATE alembic_version SET version_num = 'c71d4e9a2b58'"))
+            for n, scope in enumerate(("eru-mcp", "full")):
+                connection.execute(text(
+                    "INSERT INTO api_tokens (id, user_id, username, name, token_hash, prefix, scope, created_at, "
+                    "expires_at) VALUES (:id, 'u1', 'alice', 'mcp', :hash, 'rvt_ab', :scope, "
+                    "'2026-11-01 10:00:00', '2027-11-01 10:00:00')"), {"id": f"t{n}", "hash": f"h{n}", "scope": scope})
+
+        def scopes() -> list:
+            with engine.connect() as connection:
+                return [row[0] for row in connection.execute(text("SELECT scope FROM api_tokens ORDER BY id"))]
+
+        storage.JobStorage(url)
+        self.assertEqual((heads(url), scopes()), ([HEAD], ["aule-mcp", "full"]))
+        config = Config()
+        config.set_main_option("script_location", str(Path(storage.__file__).resolve().parent / "alembic"))
+        with engine.begin() as connection:
+            config.attributes["connection"] = connection
+            config.attributes["target_metadata"] = storage.Base.metadata
+            command.downgrade(config, "c71d4e9a2b58")
+        self.assertEqual(scopes(), ["eru-mcp", "full"])
 
     def test_models_match_the_migrations(self):
         from alembic.autogenerate import compare_metadata

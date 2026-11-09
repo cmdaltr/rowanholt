@@ -1,5 +1,5 @@
 """Online lookups (src/web/backend/threat_intel_lookup.py): off by default, only IPs, domains and
-hashes that may leave, any analyst but never Eru, cached, and VirusTotal's answers read right.
+hashes that may leave, any analyst but never Aulë, cached, and VirusTotal's answers read right.
 Nothing is sent anywhere: the fetcher is swapped for one that records what it was asked.
 
 Run from tests/unit: python3 -m unittest test_threat_intel_lookup.py
@@ -88,11 +88,11 @@ class OnlineLookupTest(BackendCase):
         self.assertEqual(self.look("[198.51.100.7]").status_code, 400)  # documentation range: not global
         self.assertEqual(self.look("[8.8.8.8]").json()["value"], "8.8.8.8")
 
-    def test_never_for_eru(self):
+    def test_never_for_aule(self):
         made = self.client.post("/api/auth/tokens", headers=self.alice,
-                                json={"name": "eru", "scope": "eru-mcp", "days": 30}).json()
+                                json={"name": "aule", "scope": "aule-mcp", "days": 30}).json()
         self.assertEqual(self.look("8.8.8.8", bearer(made["token"])).status_code, 403)
-        self.assertEqual(self.look("8.8.8.8", {**self.alice, "X-Rowanholt-Agent": "eru-mcp"}).status_code, 403)
+        self.assertEqual(self.look("8.8.8.8", {**self.alice, "X-Rowanholt-Agent": "aule-mcp"}).status_code, 403)
         self.assertEqual(self.asked, [])
         full = self.client.post("/api/auth/tokens", headers=self.alice,
                                 json={"name": "script", "scope": "full", "days": 30}).json()

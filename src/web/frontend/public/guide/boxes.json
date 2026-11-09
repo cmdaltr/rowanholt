@@ -160,36 +160,36 @@
    ]
   }
  },
- "eru": {
-  "image": "eru.jpg",
+ "aule": {
+  "image": "aule.jpg",
   "width": 1440,
   "height": 823,
   "boxes": {
-   "eru.help": [
+   "aule.help": [
     54,
     24,
     1332,
     202
    ],
-   "eru.case": [
+   "aule.case": [
     54,
     241,
     1332,
     71
    ],
-   "eru.chat": [
+   "aule.chat": [
     54,
     335,
     1332,
     57
    ],
-   "eru.quick": [
+   "aule.quick": [
     54,
     407,
     1332,
     323
    ],
-   "eru.ask": [
+   "aule.ask": [
     54,
     753,
     1332,

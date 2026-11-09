@@ -56,25 +56,28 @@ services:
       - OIDC_ADMIN_GROUP=${OIDC_ADMIN_GROUP:-}
       - OIDC_ALLOWED_GROUP=${OIDC_ALLOWED_GROUP:-}
 
-  # Eru's MCP server at https://<host>/mcp, for MCP hosts on analysts' machines. Off unless the
-  # "mcp" profile is on (COMPOSE_PROFILES=mcp); read-only unless ERU_MCP_ARGS=--allow-writes.
-  # Takes eru-mcp API tokens only (threat model review, 4 November 2026).
-  eru-mcp:
+  # Aulë's MCP server at https://<host>/mcp, for MCP hosts on analysts' machines. Off unless the
+  # "mcp" profile is on (COMPOSE_PROFILES=mcp); read-only unless AULE_MCP_ARGS=--allow-writes.
+  # Takes aule-mcp API tokens only (threat model review, 4 November 2026). Aulë was Eru: an .env's
+  # ERU_MCP_ARGS still counts, and the service still answers to eru-mcp on the network.
+  aule-mcp:
     profiles: ["mcp"]
     build:
       context: .
-      dockerfile: deploy/server/Dockerfile.eru-mcp
-    container_name: rowanholt-eru-mcp
+      dockerfile: deploy/server/Dockerfile.aule-mcp
+    container_name: rowanholt-aule-mcp
     restart: unless-stopped
     environment:
-      - ERU_MCP_ARGS=${ERU_MCP_ARGS:-}
+      - AULE_MCP_ARGS=${AULE_MCP_ARGS:-${ERU_MCP_ARGS:-}}
       - ROWANHOLT_API=http://backend:5688
       - ROWANHOLT_PUBLIC_URL=${ROWANHOLT_PUBLIC_URL:-https://${ROWANHOLT_HOSTNAME:?Run rowanholt server init first}}
       - ROWANHOLT_OTHER_URLS=${ROWANHOLT_OTHER_URLS:-}
     depends_on:
       - backend
     networks:
-      - rowanholt-network
+      rowanholt-network:
+        aliases:
+          - eru-mcp
 
   frontend:
     build:

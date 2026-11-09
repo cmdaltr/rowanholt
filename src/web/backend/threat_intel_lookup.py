@@ -2,7 +2,7 @@
 the button. Off unless .env sets ROWANHOLT_ONLINE_LOOKUPS=virustotal and VIRUSTOTAL_API_KEY.
 
 The value leaves the building, so: only the backend calls out, only for a value an analyst typed or
-picked, never from Elrond or Eru (an eru-mcp token or Eru's agent header is refused), never a private
+picked, never from Elrond or Aulë (an aule-mcp token or Aulë's agent header is refused), never a private
 or reserved address or an internal-looking name, and each lookup is logged with who asked.
 """
 

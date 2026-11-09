@@ -1,4 +1,4 @@
-"""What Eru's model is given (src/web/backend/eru_context.py): numbered rows from the per-host case
+"""What Aulë's model is given (src/web/backend/aule_context.py): numbered rows from the per-host case
 layout, and only rows it was shown come back as citations. The end-to-end test asks a case through
 the real backend (test_server_access.BackendCase) with the model mocked."""
 import re
@@ -13,7 +13,7 @@ import test_server_access  # noqa: F401,E402  (sets the backend's environment be
 from test_server_access import BackendCase, TestClient  # noqa: E402
 
 import case_files  # noqa: E402
-import eru_context  # noqa: E402
+import aule_context  # noqa: E402
 
 
 def make_case(root: Path) -> Path:
@@ -30,13 +30,13 @@ def make_case(root: Path) -> Path:
 
 
 def test_terms():
-    assert eru_context.terms("What ran X7KQ.EXE on the host, and when?") == ["x7kq.exe"]
-    assert eru_context.terms("what happened") == []
+    assert aule_context.terms("What ran X7KQ.EXE on the host, and when?") == ["x7kq.exe"]
+    assert aule_context.terms("what happened") == []
 
 
 def test_context_is_numbered_from_the_hosts(tmp_path):
     root = make_case(tmp_path / "CASE")
-    context = eru_context.build(str(root), "Did x7kq.exe run?")
+    context = aule_context.build(str(root), "Did x7kq.exe run?")
     text = context.text()
     assert "WS01" in text and "T1547.001" in text
     tag = next(t for t, row in context.rows.items() if row["file"] == "artefacts/cooked/prefetch.csv")
@@ -50,24 +50,24 @@ def test_context_is_numbered_from_the_hosts(tmp_path):
 
 def test_only_shown_tags_are_cited(tmp_path):
     root = make_case(tmp_path / "CASE")
-    context = eru_context.build(str(root), "x7kq.exe")
+    context = aule_context.build(str(root), "x7kq.exe")
     context.text()
     real = next(iter(context.rows))
-    assert eru_context.cited(f"It ran [{real}], twice [{real}], and [R999].", context) == [{**context.rows[real], "tag": real}]
+    assert aule_context.cited(f"It ran [{real}], twice [{real}], and [R999].", context) == [{**context.rows[real], "tag": real}]
     # Several tags in one bracket, as models often write them
     first, second = list(context.rows)[:2]
-    assert [r["tag"] for r in eru_context.cited(f"Both ran [{first}, {second}]; again [{second};{first}].", context)] \
+    assert [r["tag"] for r in aule_context.cited(f"Both ran [{first}, {second}]; again [{second};{first}].", context)] \
         == [first, second]
     tags = list(context.rows)
     numbers = sorted(int(tag[1:]) for tag in tags)
     low, high = numbers[0], numbers[-1]
-    spelt = [r["tag"] for r in eru_context.cited(f"All of them [R{low}–R{high}], one [R{low}-{low}].", context)]
+    spelt = [r["tag"] for r in aule_context.cited(f"All of them [R{low}–R{high}], one [R{low}-{low}].", context)]
     assert sorted(spelt, key=lambda tag: int(tag[1:])) == [f"R{n}" for n in numbers]
-    assert eru_context.cited(f"[R{low}–R{low + 500}]", context) == []  # too wide to be a citation
+    assert aule_context.cited(f"[R{low}–R{low + 500}]", context) == []  # too wide to be a citation
     # A row cut off the end of the context wasn't shown, so it can't be cited
-    with mock.patch.object(eru_context, "MAX_CHARS", 10):
+    with mock.patch.object(aule_context, "MAX_CHARS", 10):
         context.text()
-    assert eru_context.cited(f"[{real}]", context) == []
+    assert aule_context.cited(f"[{real}]", context) == []
 
 
 def test_json_lines_artefacts_are_searched(tmp_path):
@@ -79,7 +79,7 @@ def test_json_lines_artefacts_are_searched(tmp_path):
         [{"name": "Spooler", "path": "spoolsv.exe"},
          {"name": "LabSvc", "path": "C:\\Users\\Public\\labsvc.exe", "data": {"start": "auto"}}],
         host="WS01", artefact="services", source_path="raw/registry/SYSTEM", techniques=["T1543.003"])
-    context = eru_context.build(str(root), "What is labsvc.exe?")
+    context = aule_context.build(str(root), "What is labsvc.exe?")
     text = context.text()
     tag = next(t for t, row in context.rows.items() if row["file"] == "artefacts/cooked/services.jsonl")
     line = next(l for l in text.splitlines() if l.startswith(f"[{tag}]"))
@@ -102,7 +102,7 @@ class SuggestionParsingTest(unittest.TestCase):
 
 
 @unittest.skipIf(TestClient is None, "backend requirements (fastapi) not installed")
-class EruQueryTest(BackendCase):
+class AuleQueryTest(BackendCase):
     def test_query_cites_rows_it_was_given(self):
         job = self.create_job(self.alice, "CASE-CTX-1")
         make_case(self.evidence / "out" / "CASE-CTX-1")
@@ -145,3 +145,25 @@ class EruQueryTest(BackendCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipIf(TestClient is None, "backend requirements (fastapi) not installed")
+class AuleModelNameTest(unittest.TestCase):
+    """An aule model falls back to its name from before Aulë was renamed from Eru, when only that's pulled."""
+
+    def test_old_names(self):
+        import ai_routes
+        self.assertEqual(ai_routes.old_model_name("aule-qwen"), "eru-qwen")
+        self.assertEqual(ai_routes.old_model_name("aule"), "eru")
+        self.assertEqual(ai_routes.old_model_name("aule:latest"), "eru:latest")
+        self.assertIsNone(ai_routes.old_model_name("llama3.2:3b"))
+        self.assertIsNone(ai_routes.old_model_name("auler"))
+
+    def test_choosing_the_model(self):
+        import ai_routes
+        client = ai_routes.OllamaClient(host="http://ollama", model="aule-qwen")
+        self.assertEqual(client.choose_model(["eru-qwen:latest", "llama3.2:3b"]), "eru-qwen")
+        self.assertEqual(client.choose_model(["eru-qwen:latest", "aule-qwen:latest"]), "aule-qwen")
+        self.assertEqual(client.choose_model(["llama3.2:3b"]), "aule-qwen")  # neither: ask for the new name
+        plain = ai_routes.OllamaClient(host="http://ollama", model="llama3.2:3b")
+        self.assertEqual(plain.choose_model(["eru-qwen:latest"]), "llama3.2:3b")

@@ -60,7 +60,7 @@ It isn't a replacement for a forensic suite when the job is reviewing one device
 
 **One free, self-hosted pipeline from collection to report.** Acquisition, analysis, ATT&CK mapping, threat intelligence, stacking, collaboration and an AI analyst in one install, under MIT. The commercial tools that cover this much are quoted per endpoint or per investigator.
 
-**Evidence never leaves the building.** Eru runs on a local model through Ollama, and answers its fixed questions straight from the case files when there's no model at all. Nothing is sent to a hosted AI service, which matters for air-gapped labs and for evidence under legal hold.
+**Evidence never leaves the building.** Aulë runs on a local model through Ollama, and answers its fixed questions straight from the case files when there's no model at all. Nothing is sent to a hosted AI service, which matters for air-gapped labs and for evidence under legal hold.
 
 **Attribution that says how sure it is.** Pippin ranks threat groups by what matched and labels the basis of each: atomic indicators, specific procedures, common tooling, or technique overlap only. Elements dozens of groups share are marked common, and built-in commands never match, so a shared PowerShell switch never reads like attribution.
 

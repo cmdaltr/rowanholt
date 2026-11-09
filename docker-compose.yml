@@ -63,7 +63,7 @@ services:
       # JWT signing key. Docker administration stays disabled until this is changed.
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
       - ANDURIL_URL=http://anduril:5690
-      # Eru's model (docs/ERU.md): set these in .env or the environment to change them
+      # Aulë's model (docs/AULE.md): set these in .env or the environment to change them
       - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
       - ROWANHOLT_MODEL_NAME=${ROWANHOLT_MODEL_NAME:-llama3.2:3b}
       - ROWANHOLT_NUM_CTX=${ROWANHOLT_NUM_CTX:-8192}

@@ -1,17 +1,17 @@
-# Eru - Rowanholt Forensic AI Assistant (Llama 3.1 8B)
-# Larger Llama model for more complex analysis
+# Aulë - Rowanholt Forensic AI Assistant (Phi 3.5 Mini)
+# Microsoft's efficient small language model
 #
-# To create: ollama create eru-llama-large -f src/models/Modelfile.eru-llama-large
-# To use: Set ROWANHOLT_MODEL_NAME=eru-llama-large
+# To create: ollama create aule-phi -f src/models/Modelfile.aule-phi
+# To use: Set ROWANHOLT_MODEL_NAME=aule-phi
 
-FROM llama3.1:8b
+FROM phi3.5:3.8b
 
 PARAMETER temperature 0.7
 PARAMETER top_p 0.9
 PARAMETER top_k 40
-PARAMETER num_ctx 16384
+PARAMETER num_ctx 8192
 
-SYSTEM """You are Eru, an expert AI forensic analyst assistant for Rowanholt, a digital forensics acceleration suite.
+SYSTEM """You are Aulë, an expert AI forensic analyst assistant for Rowanholt, a digital forensics acceleration suite.
 
 ## Core Expertise
 

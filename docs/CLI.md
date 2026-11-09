@@ -14,7 +14,7 @@ Every command below can be run through the `rowanholt` command from any director
 4. [Elrond - Analysis](#elrond---analysis) ([Case report](#case-report))
 5. [MITRE ATT&CK Tools](#mitre-attck-tools)
 6. [Cloud Forensics](#cloud-forensics)
-7. [Eru (AI Analyst)](#eru-ai-analyst)
+7. [Aulë (AI Analyst)](#aulë-ai-analyst)
 8. [SIEM Integration](#siem-integration)
 9. [Docker Administration (Anduril)](#docker-administration-anduril)
 10. [Utility Commands](#utility-commands)
@@ -66,7 +66,7 @@ Forensic commands keep the directory you call them from, so relative evidence an
 | Elrond | `src/analysis/elrond.py` | Collection, processing and analysis of images and acquisitions |
 | MITRE tools | `src.analysis.mitre.cli`, `src.analysis.mitre.coverage_cli` | ATT&CK data, technique mapping, coverage |
 | Cloud tools | `src.analysis.rowanholt.cloud.cli` | AWS, Azure and GCP acquisition and log analysis; Kubernetes audit logs |
-| AI tools (Eru) | `src.analysis.rowanholt.ai.cli` | Natural-language queries over case output |
+| AI tools (Aulë) | `src.analysis.rowanholt.ai.cli` | Natural-language queries over case output |
 
 The web UI and API (see [API.md](API.md)) drive Elrond through the same command line.
 
@@ -358,7 +358,7 @@ For chain of custody, every file of each item is hashed (SHA-256) when it's regi
 | Bug report (`.zip`) | ALEAPP `-t zip` (its `bugreport*` modules) |
 | File system extraction | iLEAPP or ALEAPP `-t fs`, `zip`, `tar` or `gz`, by what's in it: `private/var/mobile/...` is an iPhone, `data/data/...`, `data/system/...` an Android phone, up to two folders down (`filesystem1/`, `Dump/`) |
 
-The tool's report is kept in `<host>/mobile/iLEAPP/` or `ALEAPP/` (HTML, TSV, timeline, LAVA), its console output in `<host>/mobile/<tool>.log`. Each TSV export becomes `artefacts/cooked/ileapp/<artefact>.jsonl` or `aleapp/<artefact>.jsonl` (in parts below 9 MB, so IOC extraction reads them all), the record's `timestamp` from the first time-like column whose values are times. Elrond reads device management itself into `cooked/mobile_management.jsonl`, since neither tool reports it: iOS configuration profiles (`Library/ConfigurationProfiles/profile-*.stub`), MDM enrolment (`MDM.plist`) and automated enrolment (`CloudConfigurationDetails.plist`), and Android device administrators (`data/system/device_policies.xml`) and device and profile owners (`device_owner_2.xml`). Techniques come from the MITRE ATT&CK Mobile matrix, only where the setting is the technique's own mechanism: MDM enrolment, or a profile that enrols in MDM or installs a root certificate, is **T1632.001** (Code Signing Policy Modification); an Android device administrator or owner is **T1626.001** (Device Administrator Permissions). A company's own MDM looks the same; the `Flag` says what it is. Every cooked record with a time goes, in order, into `artefacts/mobile_timeline.jsonl`, which Splunk, Elastic and Eru index beside the Plaso timeline. IOC extraction (`--extractIocs`) reads the cooked tables as for any host. `--Timeline`, `--Userprofiles`, `--vss` and `--collectFiles` don't apply.
+The tool's report is kept in `<host>/mobile/iLEAPP/` or `ALEAPP/` (HTML, TSV, timeline, LAVA), its console output in `<host>/mobile/<tool>.log`. Each TSV export becomes `artefacts/cooked/ileapp/<artefact>.jsonl` or `aleapp/<artefact>.jsonl` (in parts below 9 MB, so IOC extraction reads them all), the record's `timestamp` from the first time-like column whose values are times. Elrond reads device management itself into `cooked/mobile_management.jsonl`, since neither tool reports it: iOS configuration profiles (`Library/ConfigurationProfiles/profile-*.stub`), MDM enrolment (`MDM.plist`) and automated enrolment (`CloudConfigurationDetails.plist`), and Android device administrators (`data/system/device_policies.xml`) and device and profile owners (`device_owner_2.xml`). Techniques come from the MITRE ATT&CK Mobile matrix, only where the setting is the technique's own mechanism: MDM enrolment, or a profile that enrols in MDM or installs a root certificate, is **T1632.001** (Code Signing Policy Modification); an Android device administrator or owner is **T1626.001** (Device Administrator Permissions). A company's own MDM looks the same; the `Flag` says what it is. Every cooked record with a time goes, in order, into `artefacts/mobile_timeline.jsonl`, which Splunk, Elastic and Aulë index beside the Plaso timeline. IOC extraction (`--extractIocs`) reads the cooked tables as for any host. `--Timeline`, `--Userprofiles`, `--vss` and `--collectFiles` don't apply.
 
 An encrypted iTunes backup's configuration profiles aren't read (iLEAPP decrypts the backup, Elrond doesn't); its other artefacts are. If the password turns up in iLEAPP's own output files, Elrond names the files in the audit log (never the password) so they can be checked before the case is shared.
 
@@ -634,9 +634,9 @@ python3 -m src.analysis.rowanholt.cloud.cli k8s analyze-logs -f eks-audit.json -
 
 ---
 
-## Eru (AI Analyst)
+## Aulë (AI Analyst)
 
-In the web app this is **Ask Eru**; without Ollama it falls back to fixed questions answered from the case files ([ERU.md](ERU.md)). From the command line, Eru indexes case output into a vector store and answers questions over it with a local LLM (Ollama by default, or llama.cpp).
+In the web app this is **Ask Aulë**; without Ollama it falls back to fixed questions answered from the case files ([AULE.md](AULE.md)). From the command line, Aulë indexes case output into a vector store and answers questions over it with a local LLM (Ollama by default, or llama.cpp).
 
 ```bash
 python3 -m src.analysis.rowanholt.ai.cli COMMAND ...

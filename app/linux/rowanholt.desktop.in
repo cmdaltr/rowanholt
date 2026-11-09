@@ -2,12 +2,12 @@
 Type=Application
 Name=Rowanholt
 GenericName=DFIR Platform
-Comment=Gandalf, Elrond and Eru: acquisition, analysis and the AI analyst
+Comment=Gandalf, Elrond and Aulë: acquisition, analysis and the AI analyst
 Exec=@EXEC@
 Icon=rowanholt
 Terminal=false
 Categories=Development;Security;
-Keywords=DFIR;forensics;Gandalf;Elrond;Eru;
+Keywords=DFIR;forensics;Gandalf;Elrond;Aulë;
 StartupNotify=true
 StartupWMClass=Rowanholt
 Actions=Setup;Stop;

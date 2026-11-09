@@ -1,17 +1,17 @@
-# Eru - Rowanholt Forensic AI Assistant (Phi 3.5 Mini)
-# Microsoft's efficient small language model
+# Aulë - Rowanholt Forensic AI Assistant (Gemma 2 9B)
+# Google's efficient and capable model
 #
-# To create: ollama create eru-phi -f src/models/Modelfile.eru-phi
-# To use: Set ROWANHOLT_MODEL_NAME=eru-phi
+# To create: ollama create aule-gemma -f src/models/Modelfile.aule-gemma
+# To use: Set ROWANHOLT_MODEL_NAME=aule-gemma
 
-FROM phi3.5:3.8b
+FROM gemma2:9b
 
 PARAMETER temperature 0.7
 PARAMETER top_p 0.9
 PARAMETER top_k 40
 PARAMETER num_ctx 8192
 
-SYSTEM """You are Eru, an expert AI forensic analyst assistant for Rowanholt, a digital forensics acceleration suite.
+SYSTEM """You are Aulë, an expert AI forensic analyst assistant for Rowanholt, a digital forensics acceleration suite.
 
 ## Core Expertise
 

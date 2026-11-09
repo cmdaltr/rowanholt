@@ -23,7 +23,7 @@ const day = (iso) => (iso ? iso.slice(0, 10) : '');
 const inDays = (days) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
 
 // The indicators Elrond matches a case against (Threat intelligence on Elrond's page, or
-// --threatIntel) and Eru enriches single values with. On a team server only admins add or
+// --threatIntel) and Aulë enriches single values with. On a team server only admins add or
 // remove them (auth/access.py), so the import controls are hidden from everyone else.
 function ThreatIntel() {
   const { user } = useAuth();
@@ -147,7 +147,7 @@ function ThreatIntel() {
   return (
     <div className="job-list journey-detail">
       <PageHero title="Pippin">
-        Threat intelligence: the indicators that Elrond matches cases against and Eru checks single values with: the Iran APT
+        Threat intelligence: the indicators that Elrond matches cases against and Aulë checks single values with: the Iran APT
         workbook, STIX 2.1 bundles, TAXII 2.1 collections, MITRESaw procedures or a watchlist.
       </PageHero>
 
@@ -162,7 +162,7 @@ function ThreatIntel() {
           <>
             <p>
               {summary.total.toLocaleString()} indicators about {summary.groups} groups.
-              {summary.expired > 0 && ` ${summary.expired.toLocaleString()} have expired: they stay listed but cases aren't matched against them, and Eru doesn't check values with them, until a fresh import of their source or an administrator extends them.`}
+              {summary.expired > 0 && ` ${summary.expired.toLocaleString()} have expired: they stay listed but cases aren't matched against them, and Aulë doesn't check values with them, until a fresh import of their source or an administrator extends them.`}
             </p>
             <div className="table-container">
               <table>
