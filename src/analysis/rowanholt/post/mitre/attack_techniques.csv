@@ -1,0 +1,832 @@
+domain,technique_id,name,tactics,tactic_ids,platforms,url
+enterprise-attack,T1001,Data Obfuscation,Command and Control,command-and-control,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1001
+enterprise-attack,T1001.001,Junk Data,Command and Control,command-and-control,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1001/001
+enterprise-attack,T1001.002,Steganography,Command and Control,command-and-control,Linux; macOS; Windows; ESXi,https://attack.mitre.org/techniques/T1001/002
+enterprise-attack,T1001.003,Protocol or Service Impersonation,Command and Control,command-and-control,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1001/003
+enterprise-attack,T1003,OS Credential Dumping,Credential Access,credential-access,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1003
+enterprise-attack,T1003.001,LSASS Memory,Credential Access,credential-access,Windows,https://attack.mitre.org/techniques/T1003/001
+enterprise-attack,T1003.002,Security Account Manager,Credential Access,credential-access,Windows,https://attack.mitre.org/techniques/T1003/002
+enterprise-attack,T1003.003,NTDS,Credential Access,credential-access,Windows,https://attack.mitre.org/techniques/T1003/003
+enterprise-attack,T1003.004,LSA Secrets,Credential Access,credential-access,Windows,https://attack.mitre.org/techniques/T1003/004
+enterprise-attack,T1003.005,Cached Domain Credentials,Credential Access,credential-access,Windows; Linux,https://attack.mitre.org/techniques/T1003/005
+enterprise-attack,T1003.006,DCSync,Credential Access,credential-access,Windows,https://attack.mitre.org/techniques/T1003/006
+enterprise-attack,T1003.007,Proc Filesystem,Credential Access,credential-access,Linux,https://attack.mitre.org/techniques/T1003/007
+enterprise-attack,T1003.008,/etc/passwd and /etc/shadow,Credential Access,credential-access,Linux,https://attack.mitre.org/techniques/T1003/008
+enterprise-attack,T1005,Data from Local System,Collection,collection,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1005
+enterprise-attack,T1006,Direct Volume Access,Stealth,stealth,Network Devices; Windows,https://attack.mitre.org/techniques/T1006
+enterprise-attack,T1007,System Service Discovery,Discovery,discovery,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1007
+enterprise-attack,T1008,Fallback Channels,Command and Control,command-and-control,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1008
+enterprise-attack,T1010,Application Window Discovery,Discovery,discovery,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1010
+enterprise-attack,T1011,Exfiltration Over Other Network Medium,Exfiltration,exfiltration,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1011
+enterprise-attack,T1011.001,Exfiltration Over Bluetooth,Exfiltration,exfiltration,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1011/001
+enterprise-attack,T1012,Query Registry,Discovery,discovery,Windows,https://attack.mitre.org/techniques/T1012
+enterprise-attack,T1014,Rootkit,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1014
+enterprise-attack,T1016,System Network Configuration Discovery,Discovery,discovery,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1016
+enterprise-attack,T1016.001,Internet Connection Discovery,Discovery,discovery,Windows; Linux; macOS; ESXi,https://attack.mitre.org/techniques/T1016/001
+enterprise-attack,T1016.002,Wi-Fi Discovery,Discovery,discovery,Linux; Windows; macOS,https://attack.mitre.org/techniques/T1016/002
+enterprise-attack,T1018,Remote System Discovery,Discovery,discovery,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1018
+enterprise-attack,T1020,Automated Exfiltration,Exfiltration,exfiltration,Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1020
+enterprise-attack,T1020.001,Traffic Duplication,Exfiltration,exfiltration,Network Devices; IaaS,https://attack.mitre.org/techniques/T1020/001
+enterprise-attack,T1021,Remote Services,Lateral Movement,lateral-movement,Linux; macOS; Windows; IaaS; ESXi,https://attack.mitre.org/techniques/T1021
+enterprise-attack,T1021.001,Remote Desktop Protocol,Lateral Movement,lateral-movement,Windows,https://attack.mitre.org/techniques/T1021/001
+enterprise-attack,T1021.002,SMB/Windows Admin Shares,Lateral Movement,lateral-movement,Windows,https://attack.mitre.org/techniques/T1021/002
+enterprise-attack,T1021.003,Distributed Component Object Model,Lateral Movement,lateral-movement,Windows,https://attack.mitre.org/techniques/T1021/003
+enterprise-attack,T1021.004,SSH,Lateral Movement,lateral-movement,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1021/004
+enterprise-attack,T1021.005,VNC,Lateral Movement,lateral-movement,Linux; Windows; macOS,https://attack.mitre.org/techniques/T1021/005
+enterprise-attack,T1021.006,Windows Remote Management,Lateral Movement,lateral-movement,Windows,https://attack.mitre.org/techniques/T1021/006
+enterprise-attack,T1021.007,Cloud Services,Lateral Movement,lateral-movement,IaaS; Identity Provider; Office Suite; SaaS,https://attack.mitre.org/techniques/T1021/007
+enterprise-attack,T1021.008,Direct Cloud VM Connections,Lateral Movement,lateral-movement,IaaS,https://attack.mitre.org/techniques/T1021/008
+enterprise-attack,T1025,Data from Removable Media,Collection,collection,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1025
+enterprise-attack,T1027,Obfuscated Files or Information,Stealth,stealth,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1027
+enterprise-attack,T1027.001,Binary Padding,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1027/001
+enterprise-attack,T1027.002,Software Packing,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1027/002
+enterprise-attack,T1027.003,Steganography,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1027/003
+enterprise-attack,T1027.004,Compile After Delivery,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1027/004
+enterprise-attack,T1027.005,Indicator Removal from Tools,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1027/005
+enterprise-attack,T1027.006,HTML Smuggling,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1027/006
+enterprise-attack,T1027.007,Dynamic API Resolution,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1027/007
+enterprise-attack,T1027.008,Stripped Payloads,Stealth,stealth,Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1027/008
+enterprise-attack,T1027.009,Embedded Payloads,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1027/009
+enterprise-attack,T1027.010,Command Obfuscation,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1027/010
+enterprise-attack,T1027.011,Fileless Storage,Stealth,stealth,Linux; Windows,https://attack.mitre.org/techniques/T1027/011
+enterprise-attack,T1027.012,LNK Icon Smuggling,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1027/012
+enterprise-attack,T1027.013,Encrypted/Encoded File,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1027/013
+enterprise-attack,T1027.014,Polymorphic Code,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1027/014
+enterprise-attack,T1027.015,Compression,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1027/015
+enterprise-attack,T1027.016,Junk Code Insertion,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1027/016
+enterprise-attack,T1027.017,SVG Smuggling,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1027/017
+enterprise-attack,T1027.018,Invisible Unicode,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1027/018
+enterprise-attack,T1029,Scheduled Transfer,Exfiltration,exfiltration,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1029
+enterprise-attack,T1030,Data Transfer Size Limits,Exfiltration,exfiltration,Linux; macOS; Windows; ESXi,https://attack.mitre.org/techniques/T1030
+enterprise-attack,T1033,System Owner/User Discovery,Discovery,discovery,Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1033
+enterprise-attack,T1036,Masquerading,Stealth,stealth,Containers; ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1036
+enterprise-attack,T1036.001,Invalid Code Signature,Stealth,stealth,macOS; Windows,https://attack.mitre.org/techniques/T1036/001
+enterprise-attack,T1036.002,Right-to-Left Override,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1036/002
+enterprise-attack,T1036.003,Rename Legitimate Utilities,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1036/003
+enterprise-attack,T1036.004,Masquerade Task or Service,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1036/004
+enterprise-attack,T1036.005,Match Legitimate Resource Name or Location,Stealth,stealth,Containers; ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1036/005
+enterprise-attack,T1036.006,Space after Filename,Stealth,stealth,Linux; macOS,https://attack.mitre.org/techniques/T1036/006
+enterprise-attack,T1036.007,Double File Extension,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1036/007
+enterprise-attack,T1036.008,Masquerade File Type,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1036/008
+enterprise-attack,T1036.009,Break Process Trees,Stealth,stealth,Linux; macOS,https://attack.mitre.org/techniques/T1036/009
+enterprise-attack,T1036.010,Masquerade Account Name,Stealth,stealth,Containers; IaaS; Identity Provider; Linux; macOS; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1036/010
+enterprise-attack,T1036.011,Overwrite Process Arguments,Stealth,stealth,Linux,https://attack.mitre.org/techniques/T1036/011
+enterprise-attack,T1036.012,Browser Fingerprint,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1036/012
+enterprise-attack,T1037,Boot or Logon Initialization Scripts,Persistence; Privilege Escalation,persistence;privilege-escalation,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1037
+enterprise-attack,T1037.001,Logon Script (Windows),Persistence; Privilege Escalation,persistence;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1037/001
+enterprise-attack,T1037.002,Login Hook,Persistence; Privilege Escalation,persistence;privilege-escalation,macOS,https://attack.mitre.org/techniques/T1037/002
+enterprise-attack,T1037.003,Network Logon Script,Persistence; Privilege Escalation,persistence;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1037/003
+enterprise-attack,T1037.004,RC Scripts,Persistence; Privilege Escalation,persistence;privilege-escalation,macOS; Linux; Network Devices; ESXi,https://attack.mitre.org/techniques/T1037/004
+enterprise-attack,T1037.005,Startup Items,Persistence; Privilege Escalation,persistence;privilege-escalation,macOS,https://attack.mitre.org/techniques/T1037/005
+enterprise-attack,T1039,Data from Network Shared Drive,Collection,collection,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1039
+enterprise-attack,T1040,Network Sniffing,Credential Access; Discovery,credential-access;discovery,IaaS; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1040
+enterprise-attack,T1041,Exfiltration Over C2 Channel,Exfiltration,exfiltration,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1041
+enterprise-attack,T1046,Network Service Discovery,Discovery,discovery,Containers; IaaS; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1046
+enterprise-attack,T1047,Windows Management Instrumentation,Execution,execution,Windows,https://attack.mitre.org/techniques/T1047
+enterprise-attack,T1048,Exfiltration Over Alternative Protocol,Exfiltration,exfiltration,ESXi; IaaS; Linux; macOS; Network Devices; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1048
+enterprise-attack,T1048.001,Exfiltration Over Symmetric Encrypted Non-C2 Protocol,Exfiltration,exfiltration,Linux; macOS; Windows; ESXi,https://attack.mitre.org/techniques/T1048/001
+enterprise-attack,T1048.002,Exfiltration Over Asymmetric Encrypted Non-C2 Protocol,Exfiltration,exfiltration,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1048/002
+enterprise-attack,T1048.003,Exfiltration Over Unencrypted Non-C2 Protocol,Exfiltration,exfiltration,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1048/003
+enterprise-attack,T1049,System Network Connections Discovery,Discovery,discovery,ESXi; IaaS; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1049
+enterprise-attack,T1052,Exfiltration Over Physical Medium,Exfiltration,exfiltration,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1052
+enterprise-attack,T1052.001,Exfiltration over USB,Exfiltration,exfiltration,Linux; Windows; macOS,https://attack.mitre.org/techniques/T1052/001
+enterprise-attack,T1053,Scheduled Task/Job,Execution; Persistence; Privilege Escalation,execution;persistence;privilege-escalation,Containers; ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1053
+enterprise-attack,T1053.002,At,Execution; Persistence; Privilege Escalation,execution;persistence;privilege-escalation,Windows; Linux; macOS,https://attack.mitre.org/techniques/T1053/002
+enterprise-attack,T1053.003,Cron,Execution; Persistence; Privilege Escalation,execution;persistence;privilege-escalation,Linux; macOS; ESXi,https://attack.mitre.org/techniques/T1053/003
+enterprise-attack,T1053.005,Scheduled Task,Execution; Persistence; Privilege Escalation,execution;persistence;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1053/005
+enterprise-attack,T1053.006,Systemd Timers,Execution; Persistence; Privilege Escalation,execution;persistence;privilege-escalation,Linux,https://attack.mitre.org/techniques/T1053/006
+enterprise-attack,T1053.007,Container Orchestration Job,Execution; Persistence; Privilege Escalation,execution;persistence;privilege-escalation,Containers,https://attack.mitre.org/techniques/T1053/007
+enterprise-attack,T1055,Process Injection,Stealth; Privilege Escalation,stealth;privilege-escalation,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1055
+enterprise-attack,T1055.001,Dynamic-link Library Injection,Stealth; Privilege Escalation,stealth;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1055/001
+enterprise-attack,T1055.002,Portable Executable Injection,Stealth; Privilege Escalation,stealth;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1055/002
+enterprise-attack,T1055.003,Thread Execution Hijacking,Stealth; Privilege Escalation,stealth;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1055/003
+enterprise-attack,T1055.004,Asynchronous Procedure Call,Stealth; Privilege Escalation,stealth;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1055/004
+enterprise-attack,T1055.005,Thread Local Storage,Stealth; Privilege Escalation,stealth;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1055/005
+enterprise-attack,T1055.008,Ptrace System Calls,Stealth; Privilege Escalation,stealth;privilege-escalation,Linux,https://attack.mitre.org/techniques/T1055/008
+enterprise-attack,T1055.009,Proc Memory,Stealth; Privilege Escalation,stealth;privilege-escalation,Linux,https://attack.mitre.org/techniques/T1055/009
+enterprise-attack,T1055.011,Extra Window Memory Injection,Stealth; Privilege Escalation,stealth;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1055/011
+enterprise-attack,T1055.012,Process Hollowing,Stealth; Privilege Escalation,stealth;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1055/012
+enterprise-attack,T1055.013,Process Doppelgänging,Stealth; Privilege Escalation,stealth;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1055/013
+enterprise-attack,T1055.014,VDSO Hijacking,Stealth; Privilege Escalation,stealth;privilege-escalation,Linux,https://attack.mitre.org/techniques/T1055/014
+enterprise-attack,T1055.015,ListPlanting,Stealth; Privilege Escalation,stealth;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1055/015
+enterprise-attack,T1056,Input Capture,Collection; Credential Access,collection;credential-access,Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1056
+enterprise-attack,T1056.001,Keylogging,Collection; Credential Access,collection;credential-access,Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1056/001
+enterprise-attack,T1056.002,GUI Input Capture,Collection; Credential Access,collection;credential-access,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1056/002
+enterprise-attack,T1056.003,Web Portal Capture,Collection; Credential Access,collection;credential-access,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1056/003
+enterprise-attack,T1056.004,Credential API Hooking,Collection; Credential Access,collection;credential-access,Windows; Linux; macOS,https://attack.mitre.org/techniques/T1056/004
+enterprise-attack,T1057,Process Discovery,Discovery,discovery,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1057
+enterprise-attack,T1059,Command and Scripting Interpreter,Execution,execution,Containers; ESXi; IaaS; Identity Provider; Linux; macOS; Network Devices; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1059
+enterprise-attack,T1059.001,PowerShell,Execution,execution,Windows; Linux; macOS,https://attack.mitre.org/techniques/T1059/001
+enterprise-attack,T1059.002,AppleScript,Execution,execution,macOS,https://attack.mitre.org/techniques/T1059/002
+enterprise-attack,T1059.003,Windows Command Shell,Execution,execution,Windows,https://attack.mitre.org/techniques/T1059/003
+enterprise-attack,T1059.004,Unix Shell,Execution,execution,ESXi; Linux; macOS; Network Devices,https://attack.mitre.org/techniques/T1059/004
+enterprise-attack,T1059.005,Visual Basic,Execution,execution,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1059/005
+enterprise-attack,T1059.006,Python,Execution,execution,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1059/006
+enterprise-attack,T1059.007,JavaScript,Execution,execution,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1059/007
+enterprise-attack,T1059.008,Network Device CLI,Execution,execution,Network Devices,https://attack.mitre.org/techniques/T1059/008
+enterprise-attack,T1059.009,Cloud API,Execution,execution,IaaS; Identity Provider; Office Suite; SaaS,https://attack.mitre.org/techniques/T1059/009
+enterprise-attack,T1059.010,AutoHotKey & AutoIT,Execution,execution,Windows,https://attack.mitre.org/techniques/T1059/010
+enterprise-attack,T1059.011,Lua,Execution,execution,Linux; Network Devices; Windows; macOS,https://attack.mitre.org/techniques/T1059/011
+enterprise-attack,T1059.012,Hypervisor CLI,Execution,execution,ESXi,https://attack.mitre.org/techniques/T1059/012
+enterprise-attack,T1059.013,Container CLI/API,Execution,execution,Containers,https://attack.mitre.org/techniques/T1059/013
+enterprise-attack,T1068,Exploitation for Privilege Escalation,Privilege Escalation,privilege-escalation,Containers; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1068
+enterprise-attack,T1069,Permission Groups Discovery,Discovery,discovery,Containers; IaaS; Identity Provider; Linux; macOS; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1069
+enterprise-attack,T1069.001,Local Groups,Discovery,discovery,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1069/001
+enterprise-attack,T1069.002,Domain Groups,Discovery,discovery,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1069/002
+enterprise-attack,T1069.003,Cloud Groups,Discovery,discovery,SaaS; IaaS; Office Suite; Identity Provider,https://attack.mitre.org/techniques/T1069/003
+enterprise-attack,T1070,Indicator Removal,Stealth,stealth,Containers; ESXi; Linux; macOS; Network Devices; Office Suite; Windows,https://attack.mitre.org/techniques/T1070
+enterprise-attack,T1070.003,Clear Command History,Stealth,stealth,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1070/003
+enterprise-attack,T1070.004,File Deletion,Stealth,stealth,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1070/004
+enterprise-attack,T1070.005,Network Share Connection Removal,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1070/005
+enterprise-attack,T1070.006,Timestomp,Stealth,stealth,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1070/006
+enterprise-attack,T1070.007,Clear Network Connection History and Configurations,Stealth,stealth,Linux; macOS; Windows; Network Devices,https://attack.mitre.org/techniques/T1070/007
+enterprise-attack,T1070.008,Clear Mailbox Data,Stealth,stealth,Linux; macOS; Office Suite; Windows,https://attack.mitre.org/techniques/T1070/008
+enterprise-attack,T1070.009,Clear Persistence,Stealth,stealth,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1070/009
+enterprise-attack,T1070.010,Relocate Malware,Stealth,stealth,Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1070/010
+enterprise-attack,T1071,Application Layer Protocol,Command and Control,command-and-control,Linux; macOS; Windows; Network Devices; ESXi,https://attack.mitre.org/techniques/T1071
+enterprise-attack,T1071.001,Web Protocols,Command and Control,command-and-control,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1071/001
+enterprise-attack,T1071.002,File Transfer Protocols,Command and Control,command-and-control,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1071/002
+enterprise-attack,T1071.003,Mail Protocols,Command and Control,command-and-control,Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1071/003
+enterprise-attack,T1071.004,DNS,Command and Control,command-and-control,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1071/004
+enterprise-attack,T1071.005,Publish/Subscribe Protocols,Command and Control,command-and-control,macOS; Linux; Windows; Network Devices,https://attack.mitre.org/techniques/T1071/005
+enterprise-attack,T1072,Software Deployment Tools,Execution; Lateral Movement,execution;lateral-movement,Linux; macOS; Network Devices; SaaS; Windows,https://attack.mitre.org/techniques/T1072
+enterprise-attack,T1074,Data Staged,Collection,collection,ESXi; IaaS; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1074
+enterprise-attack,T1074.001,Local Data Staging,Collection,collection,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1074/001
+enterprise-attack,T1074.002,Remote Data Staging,Collection,collection,ESXi; IaaS; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1074/002
+enterprise-attack,T1078,Valid Accounts,Stealth; Persistence; Privilege Escalation; Initial Access,stealth;persistence;privilege-escalation;initial-access,Containers; ESXi; IaaS; Identity Provider; Linux; macOS; Network Devices; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1078
+enterprise-attack,T1078.001,Default Accounts,Stealth; Persistence; Privilege Escalation; Initial Access,stealth;persistence;privilege-escalation;initial-access,Containers; ESXi; IaaS; Identity Provider; Linux; macOS; Network Devices; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1078/001
+enterprise-attack,T1078.002,Domain Accounts,Stealth; Persistence; Privilege Escalation; Initial Access,stealth;persistence;privilege-escalation;initial-access,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1078/002
+enterprise-attack,T1078.003,Local Accounts,Stealth; Persistence; Privilege Escalation; Initial Access,stealth;persistence;privilege-escalation;initial-access,Containers; ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1078/003
+enterprise-attack,T1078.004,Cloud Accounts,Stealth; Persistence; Privilege Escalation; Initial Access,stealth;persistence;privilege-escalation;initial-access,IaaS; Identity Provider; Office Suite; SaaS,https://attack.mitre.org/techniques/T1078/004
+enterprise-attack,T1080,Taint Shared Content,Lateral Movement,lateral-movement,Windows; SaaS; Linux; macOS; Office Suite,https://attack.mitre.org/techniques/T1080
+enterprise-attack,T1082,System Information Discovery,Discovery,discovery,ESXi; IaaS; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1082
+enterprise-attack,T1083,File and Directory Discovery,Discovery,discovery,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1083
+enterprise-attack,T1087,Account Discovery,Discovery,discovery,ESXi; IaaS; Identity Provider; Linux; macOS; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1087
+enterprise-attack,T1087.001,Local Account,Discovery,discovery,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1087/001
+enterprise-attack,T1087.002,Domain Account,Discovery,discovery,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1087/002
+enterprise-attack,T1087.003,Email Account,Discovery,discovery,Windows; Office Suite,https://attack.mitre.org/techniques/T1087/003
+enterprise-attack,T1087.004,Cloud Account,Discovery,discovery,IaaS; Identity Provider; Office Suite; SaaS,https://attack.mitre.org/techniques/T1087/004
+enterprise-attack,T1090,Proxy,Command and Control,command-and-control,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1090
+enterprise-attack,T1090.001,Internal Proxy,Command and Control,command-and-control,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1090/001
+enterprise-attack,T1090.002,External Proxy,Command and Control,command-and-control,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1090/002
+enterprise-attack,T1090.003,Multi-hop Proxy,Command and Control,command-and-control,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1090/003
+enterprise-attack,T1090.004,Domain Fronting,Command and Control,command-and-control,Linux; macOS; Windows; ESXi,https://attack.mitre.org/techniques/T1090/004
+enterprise-attack,T1091,Replication Through Removable Media,Lateral Movement; Initial Access,lateral-movement;initial-access,Windows,https://attack.mitre.org/techniques/T1091
+enterprise-attack,T1092,Communication Through Removable Media,Command and Control,command-and-control,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1092
+enterprise-attack,T1095,Non-Application Layer Protocol,Command and Control,command-and-control,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1095
+enterprise-attack,T1098,Account Manipulation,Persistence; Privilege Escalation,persistence;privilege-escalation,Containers; ESXi; IaaS; Identity Provider; Linux; macOS; Network Devices; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1098
+enterprise-attack,T1098.001,Additional Cloud Credentials,Persistence; Privilege Escalation,persistence;privilege-escalation,IaaS; Identity Provider; SaaS,https://attack.mitre.org/techniques/T1098/001
+enterprise-attack,T1098.002,Additional Email Delegate Permissions,Persistence; Privilege Escalation,persistence;privilege-escalation,Windows; Office Suite,https://attack.mitre.org/techniques/T1098/002
+enterprise-attack,T1098.003,Additional Cloud Roles,Persistence; Privilege Escalation,persistence;privilege-escalation,IaaS; Identity Provider; Office Suite; SaaS,https://attack.mitre.org/techniques/T1098/003
+enterprise-attack,T1098.004,SSH Authorized Keys,Persistence; Privilege Escalation,persistence;privilege-escalation,ESXi; IaaS; Linux; macOS; Network Devices,https://attack.mitre.org/techniques/T1098/004
+enterprise-attack,T1098.005,Device Registration,Persistence; Privilege Escalation,persistence;privilege-escalation,Windows; Identity Provider,https://attack.mitre.org/techniques/T1098/005
+enterprise-attack,T1098.006,Additional Container Cluster Roles,Persistence; Privilege Escalation,persistence;privilege-escalation,Containers,https://attack.mitre.org/techniques/T1098/006
+enterprise-attack,T1098.007,Additional Local or Domain Groups,Persistence; Privilege Escalation,persistence;privilege-escalation,Windows; macOS; Linux,https://attack.mitre.org/techniques/T1098/007
+enterprise-attack,T1102,Web Service,Command and Control,command-and-control,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1102
+enterprise-attack,T1102.001,Dead Drop Resolver,Command and Control,command-and-control,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1102/001
+enterprise-attack,T1102.002,Bidirectional Communication,Command and Control,command-and-control,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1102/002
+enterprise-attack,T1102.003,One-Way Communication,Command and Control,command-and-control,Linux; macOS; Windows; ESXi,https://attack.mitre.org/techniques/T1102/003
+enterprise-attack,T1104,Multi-Stage Channels,Command and Control,command-and-control,Linux; macOS; Windows; ESXi,https://attack.mitre.org/techniques/T1104
+enterprise-attack,T1105,Ingress Tool Transfer,Command and Control,command-and-control,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1105
+enterprise-attack,T1106,Native API,Execution,execution,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1106
+enterprise-attack,T1110,Brute Force,Credential Access,credential-access,Containers; ESXi; IaaS; Identity Provider; Linux; macOS; Network Devices; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1110
+enterprise-attack,T1110.001,Password Guessing,Credential Access,credential-access,Containers; ESXi; IaaS; Identity Provider; Linux; macOS; Network Devices; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1110/001
+enterprise-attack,T1110.002,Password Cracking,Credential Access,credential-access,Identity Provider; Linux; macOS; Network Devices; Office Suite; Windows,https://attack.mitre.org/techniques/T1110/002
+enterprise-attack,T1110.003,Password Spraying,Credential Access,credential-access,Containers; ESXi; IaaS; Identity Provider; Linux; Network Devices; Office Suite; SaaS; Windows; macOS,https://attack.mitre.org/techniques/T1110/003
+enterprise-attack,T1110.004,Credential Stuffing,Credential Access,credential-access,Containers; ESXi; IaaS; Identity Provider; Linux; macOS; Network Devices; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1110/004
+enterprise-attack,T1111,Multi-Factor Authentication Interception,Credential Access,credential-access,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1111
+enterprise-attack,T1112,Modify Registry,Defense Impairment; Persistence,defense-impairment;persistence,Windows,https://attack.mitre.org/techniques/T1112
+enterprise-attack,T1113,Screen Capture,Collection,collection,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1113
+enterprise-attack,T1114,Email Collection,Collection,collection,Windows; macOS; Linux; Office Suite,https://attack.mitre.org/techniques/T1114
+enterprise-attack,T1114.001,Local Email Collection,Collection,collection,Windows,https://attack.mitre.org/techniques/T1114/001
+enterprise-attack,T1114.002,Remote Email Collection,Collection,collection,Office Suite; Windows,https://attack.mitre.org/techniques/T1114/002
+enterprise-attack,T1114.003,Email Forwarding Rule,Collection,collection,Linux; macOS; Office Suite; Windows,https://attack.mitre.org/techniques/T1114/003
+enterprise-attack,T1115,Clipboard Data,Collection,collection,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1115
+enterprise-attack,T1119,Automated Collection,Collection,collection,IaaS; Linux; macOS; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1119
+enterprise-attack,T1120,Peripheral Device Discovery,Discovery,discovery,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1120
+enterprise-attack,T1123,Audio Capture,Collection,collection,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1123
+enterprise-attack,T1124,System Time Discovery,Discovery,discovery,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1124
+enterprise-attack,T1125,Video Capture,Collection,collection,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1125
+enterprise-attack,T1127,Trusted Developer Utilities Proxy Execution,Stealth; Execution,stealth;execution,Windows,https://attack.mitre.org/techniques/T1127
+enterprise-attack,T1127.001,MSBuild,Stealth; Execution,stealth;execution,Windows,https://attack.mitre.org/techniques/T1127/001
+enterprise-attack,T1127.002,ClickOnce,Stealth; Execution,stealth;execution,Windows,https://attack.mitre.org/techniques/T1127/002
+enterprise-attack,T1127.003,JamPlus,Stealth; Execution,stealth;execution,Windows,https://attack.mitre.org/techniques/T1127/003
+enterprise-attack,T1129,Shared Modules,Execution,execution,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1129
+enterprise-attack,T1132,Data Encoding,Command and Control,command-and-control,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1132
+enterprise-attack,T1132.001,Standard Encoding,Command and Control,command-and-control,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1132/001
+enterprise-attack,T1132.002,Non-Standard Encoding,Command and Control,command-and-control,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1132/002
+enterprise-attack,T1133,External Remote Services,Persistence; Initial Access,persistence;initial-access,Containers; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1133
+enterprise-attack,T1134,Access Token Manipulation,Stealth; Privilege Escalation,stealth;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1134
+enterprise-attack,T1134.001,Token Impersonation/Theft,Stealth; Privilege Escalation,stealth;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1134/001
+enterprise-attack,T1134.002,Create Process with Token,Stealth; Privilege Escalation,stealth;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1134/002
+enterprise-attack,T1134.003,Make and Impersonate Token,Stealth; Privilege Escalation,stealth;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1134/003
+enterprise-attack,T1134.004,Parent PID Spoofing,Stealth; Privilege Escalation,stealth;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1134/004
+enterprise-attack,T1134.005,SID-History Injection,Stealth; Privilege Escalation,stealth;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1134/005
+enterprise-attack,T1135,Network Share Discovery,Discovery,discovery,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1135
+enterprise-attack,T1136,Create Account,Persistence,persistence,Windows; IaaS; Linux; macOS; Network Devices; Containers; SaaS; Office Suite; Identity Provider; ESXi,https://attack.mitre.org/techniques/T1136
+enterprise-attack,T1136.001,Local Account,Persistence,persistence,Containers; ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1136/001
+enterprise-attack,T1136.002,Domain Account,Persistence,persistence,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1136/002
+enterprise-attack,T1136.003,Cloud Account,Persistence,persistence,IaaS; SaaS; Office Suite; Identity Provider,https://attack.mitre.org/techniques/T1136/003
+enterprise-attack,T1137,Office Application Startup,Persistence,persistence,Windows; Office Suite,https://attack.mitre.org/techniques/T1137
+enterprise-attack,T1137.001,Office Template Macros,Persistence,persistence,Office Suite; Windows,https://attack.mitre.org/techniques/T1137/001
+enterprise-attack,T1137.002,Office Test,Persistence,persistence,Windows; Office Suite,https://attack.mitre.org/techniques/T1137/002
+enterprise-attack,T1137.003,Outlook Forms,Persistence,persistence,Windows; Office Suite,https://attack.mitre.org/techniques/T1137/003
+enterprise-attack,T1137.004,Outlook Home Page,Persistence,persistence,Windows; Office Suite,https://attack.mitre.org/techniques/T1137/004
+enterprise-attack,T1137.005,Outlook Rules,Persistence,persistence,Windows; Office Suite,https://attack.mitre.org/techniques/T1137/005
+enterprise-attack,T1137.006,Add-ins,Persistence,persistence,Windows; Office Suite,https://attack.mitre.org/techniques/T1137/006
+enterprise-attack,T1140,Deobfuscate/Decode Files or Information,Stealth,stealth,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1140
+enterprise-attack,T1176,Software Extensions,Persistence,persistence,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1176
+enterprise-attack,T1176.001,Browser Extensions,Persistence,persistence,Linux; Windows; macOS,https://attack.mitre.org/techniques/T1176/001
+enterprise-attack,T1176.002,IDE Extensions,Persistence,persistence,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1176/002
+enterprise-attack,T1185,Browser Session Hijacking,Collection,collection,Windows,https://attack.mitre.org/techniques/T1185
+enterprise-attack,T1187,Forced Authentication,Credential Access,credential-access,Windows,https://attack.mitre.org/techniques/T1187
+enterprise-attack,T1189,Drive-by Compromise,Initial Access,initial-access,Identity Provider; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1189
+enterprise-attack,T1190,Exploit Public-Facing Application,Initial Access,initial-access,Containers; ESXi; IaaS; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1190
+enterprise-attack,T1195,Supply Chain Compromise,Initial Access,initial-access,Linux; Windows; macOS; SaaS,https://attack.mitre.org/techniques/T1195
+enterprise-attack,T1195.001,Compromise Software Dependencies and Development Tools,Initial Access,initial-access,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1195/001
+enterprise-attack,T1195.002,Compromise Software Supply Chain,Initial Access,initial-access,Linux; Windows; macOS,https://attack.mitre.org/techniques/T1195/002
+enterprise-attack,T1195.003,Compromise Hardware Supply Chain,Initial Access,initial-access,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1195/003
+enterprise-attack,T1197,BITS Jobs,Stealth; Persistence; Execution,stealth;persistence;execution,Windows,https://attack.mitre.org/techniques/T1197
+enterprise-attack,T1199,Trusted Relationship,Initial Access,initial-access,IaaS; Identity Provider; Linux; macOS; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1199
+enterprise-attack,T1200,Hardware Additions,Initial Access,initial-access,Windows; Linux; macOS,https://attack.mitre.org/techniques/T1200
+enterprise-attack,T1201,Password Policy Discovery,Discovery,discovery,Windows; Linux; macOS; IaaS; Network Devices; Identity Provider; SaaS; Office Suite,https://attack.mitre.org/techniques/T1201
+enterprise-attack,T1202,Indirect Command Execution,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1202
+enterprise-attack,T1203,Exploitation for Client Execution,Execution,execution,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1203
+enterprise-attack,T1204,User Execution,Execution,execution,Linux; Windows; macOS; IaaS; Containers,https://attack.mitre.org/techniques/T1204
+enterprise-attack,T1204.001,Malicious Link,Execution,execution,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1204/001
+enterprise-attack,T1204.002,Malicious File,Execution,execution,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1204/002
+enterprise-attack,T1204.003,Malicious Image,Execution,execution,IaaS; Containers,https://attack.mitre.org/techniques/T1204/003
+enterprise-attack,T1204.004,Malicious Copy and Paste,Execution,execution,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1204/004
+enterprise-attack,T1204.005,Malicious Library,Execution,execution,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1204/005
+enterprise-attack,T1205,Traffic Signaling,Stealth; Persistence; Command and Control,stealth;persistence;command-and-control,Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1205
+enterprise-attack,T1205.001,Port Knocking,Stealth; Persistence; Command and Control,stealth;persistence;command-and-control,Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1205/001
+enterprise-attack,T1205.002,Socket Filters,Stealth; Persistence; Command and Control,stealth;persistence;command-and-control,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1205/002
+enterprise-attack,T1207,Rogue Domain Controller,Defense Impairment,defense-impairment,Windows,https://attack.mitre.org/techniques/T1207
+enterprise-attack,T1210,Exploitation of Remote Services,Lateral Movement,lateral-movement,Linux; Windows; macOS; ESXi,https://attack.mitre.org/techniques/T1210
+enterprise-attack,T1211,Exploitation for Stealth,Stealth,stealth,Linux; Windows; macOS; SaaS; IaaS,https://attack.mitre.org/techniques/T1211
+enterprise-attack,T1212,Exploitation for Credential Access,Credential Access,credential-access,Linux; Windows; macOS; Identity Provider,https://attack.mitre.org/techniques/T1212
+enterprise-attack,T1213,Data from Information Repositories,Collection,collection,Linux; Windows; macOS; SaaS; IaaS; Office Suite,https://attack.mitre.org/techniques/T1213
+enterprise-attack,T1213.001,Confluence,Collection,collection,SaaS,https://attack.mitre.org/techniques/T1213/001
+enterprise-attack,T1213.002,Sharepoint,Collection,collection,Office Suite; Windows,https://attack.mitre.org/techniques/T1213/002
+enterprise-attack,T1213.003,Code Repositories,Collection,collection,SaaS,https://attack.mitre.org/techniques/T1213/003
+enterprise-attack,T1213.004,Customer Relationship Management Software,Collection,collection,SaaS,https://attack.mitre.org/techniques/T1213/004
+enterprise-attack,T1213.005,Messaging Applications,Collection,collection,Office Suite; SaaS,https://attack.mitre.org/techniques/T1213/005
+enterprise-attack,T1213.006,Databases,Collection,collection,IaaS; Linux; macOS; SaaS; Windows,https://attack.mitre.org/techniques/T1213/006
+enterprise-attack,T1216,System Script Proxy Execution,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1216
+enterprise-attack,T1216.001,PubPrn,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1216/001
+enterprise-attack,T1216.002,SyncAppvPublishingServer,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1216/002
+enterprise-attack,T1217,Browser Information Discovery,Discovery,discovery,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1217
+enterprise-attack,T1218,System Binary Proxy Execution,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1218
+enterprise-attack,T1218.001,Compiled HTML File,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1218/001
+enterprise-attack,T1218.002,Control Panel,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1218/002
+enterprise-attack,T1218.003,CMSTP,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1218/003
+enterprise-attack,T1218.004,InstallUtil,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1218/004
+enterprise-attack,T1218.005,Mshta,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1218/005
+enterprise-attack,T1218.007,Msiexec,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1218/007
+enterprise-attack,T1218.008,Odbcconf,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1218/008
+enterprise-attack,T1218.009,Regsvcs/Regasm,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1218/009
+enterprise-attack,T1218.010,Regsvr32,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1218/010
+enterprise-attack,T1218.011,Rundll32,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1218/011
+enterprise-attack,T1218.012,Verclsid,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1218/012
+enterprise-attack,T1218.013,Mavinject,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1218/013
+enterprise-attack,T1218.014,MMC,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1218/014
+enterprise-attack,T1218.015,Electron Applications,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1218/015
+enterprise-attack,T1219,Remote Access Tools,Command and Control,command-and-control,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1219
+enterprise-attack,T1219.001,IDE Tunneling,Command and Control,command-and-control,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1219/001
+enterprise-attack,T1219.002,Remote Desktop Software,Command and Control,command-and-control,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1219/002
+enterprise-attack,T1219.003,Remote Access Hardware,Command and Control,command-and-control,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1219/003
+enterprise-attack,T1220,XSL Script Processing,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1220
+enterprise-attack,T1221,Template Injection,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1221
+enterprise-attack,T1222,File and Directory Permissions Modification,Defense Impairment,defense-impairment,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1222
+enterprise-attack,T1222.001,Windows Permissions,Defense Impairment,defense-impairment,Windows,https://attack.mitre.org/techniques/T1222/001
+enterprise-attack,T1222.002,Linux and Mac Permissions,Defense Impairment,defense-impairment,Linux; macOS,https://attack.mitre.org/techniques/T1222/002
+enterprise-attack,T1480,Execution Guardrails,Stealth,stealth,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1480
+enterprise-attack,T1480.001,Environmental Keying,Stealth,stealth,Linux; Windows; macOS,https://attack.mitre.org/techniques/T1480/001
+enterprise-attack,T1480.002,Mutual Exclusion,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1480/002
+enterprise-attack,T1482,Domain Trust Discovery,Discovery,discovery,Windows,https://attack.mitre.org/techniques/T1482
+enterprise-attack,T1484,Domain or Tenant Policy Modification,Defense Impairment; Privilege Escalation,defense-impairment;privilege-escalation,Windows; Identity Provider,https://attack.mitre.org/techniques/T1484
+enterprise-attack,T1484.001,Group Policy Modification,Defense Impairment; Privilege Escalation,defense-impairment;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1484/001
+enterprise-attack,T1484.002,Trust Modification,Defense Impairment; Privilege Escalation,defense-impairment;privilege-escalation,Identity Provider; Windows,https://attack.mitre.org/techniques/T1484/002
+enterprise-attack,T1485,Data Destruction,Impact,impact,Containers; ESXi; IaaS; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1485
+enterprise-attack,T1485.001,Lifecycle-Triggered Deletion,Impact,impact,IaaS,https://attack.mitre.org/techniques/T1485/001
+enterprise-attack,T1486,Data Encrypted for Impact,Impact,impact,ESXi; IaaS; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1486
+enterprise-attack,T1489,Service Stop,Impact,impact,ESXi; IaaS; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1489
+enterprise-attack,T1490,Inhibit System Recovery,Impact,impact,Containers; ESXi; IaaS; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1490
+enterprise-attack,T1491,Defacement,Impact,impact,Windows; IaaS; Linux; macOS; ESXi,https://attack.mitre.org/techniques/T1491
+enterprise-attack,T1491.001,Internal Defacement,Impact,impact,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1491/001
+enterprise-attack,T1491.002,External Defacement,Impact,impact,Windows; IaaS; Linux; macOS,https://attack.mitre.org/techniques/T1491/002
+enterprise-attack,T1495,Firmware Corruption,Impact,impact,Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1495
+enterprise-attack,T1496,Resource Hijacking,Impact,impact,Windows; IaaS; Linux; macOS; Containers; SaaS,https://attack.mitre.org/techniques/T1496
+enterprise-attack,T1496.001,Compute Hijacking,Impact,impact,Windows; IaaS; Linux; macOS; Containers,https://attack.mitre.org/techniques/T1496/001
+enterprise-attack,T1496.002,Bandwidth Hijacking,Impact,impact,Linux; Windows; macOS; IaaS; Containers,https://attack.mitre.org/techniques/T1496/002
+enterprise-attack,T1496.003,SMS Pumping,Impact,impact,SaaS,https://attack.mitre.org/techniques/T1496/003
+enterprise-attack,T1496.004,Cloud Service Hijacking,Impact,impact,SaaS,https://attack.mitre.org/techniques/T1496/004
+enterprise-attack,T1497,Virtualization/Sandbox Evasion,Stealth; Discovery,stealth;discovery,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1497
+enterprise-attack,T1497.001,System Checks,Stealth; Discovery,stealth;discovery,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1497/001
+enterprise-attack,T1497.002,User Activity Based Checks,Stealth; Discovery,stealth;discovery,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1497/002
+enterprise-attack,T1497.003,Time Based Checks,Stealth; Discovery,stealth;discovery,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1497/003
+enterprise-attack,T1498,Network Denial of Service,Impact,impact,Windows; IaaS; Linux; macOS; Containers,https://attack.mitre.org/techniques/T1498
+enterprise-attack,T1498.001,Direct Network Flood,Impact,impact,Windows; IaaS; Linux; macOS,https://attack.mitre.org/techniques/T1498/001
+enterprise-attack,T1498.002,Reflection Amplification,Impact,impact,Windows; IaaS; Linux; macOS,https://attack.mitre.org/techniques/T1498/002
+enterprise-attack,T1499,Endpoint Denial of Service,Impact,impact,Windows; Linux; macOS; Containers; IaaS,https://attack.mitre.org/techniques/T1499
+enterprise-attack,T1499.001,OS Exhaustion Flood,Impact,impact,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1499/001
+enterprise-attack,T1499.002,Service Exhaustion Flood,Impact,impact,Windows; IaaS; Linux; macOS,https://attack.mitre.org/techniques/T1499/002
+enterprise-attack,T1499.003,Application Exhaustion Flood,Impact,impact,Windows; IaaS; Linux; macOS,https://attack.mitre.org/techniques/T1499/003
+enterprise-attack,T1499.004,Application or System Exploitation,Impact,impact,Windows; IaaS; Linux; macOS,https://attack.mitre.org/techniques/T1499/004
+enterprise-attack,T1505,Server Software Component,Persistence,persistence,Windows; Linux; macOS; Network Devices; ESXi,https://attack.mitre.org/techniques/T1505
+enterprise-attack,T1505.001,SQL Stored Procedures,Persistence,persistence,Windows; Linux,https://attack.mitre.org/techniques/T1505/001
+enterprise-attack,T1505.002,Transport Agent,Persistence,persistence,Linux; Windows,https://attack.mitre.org/techniques/T1505/002
+enterprise-attack,T1505.003,Web Shell,Persistence,persistence,Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1505/003
+enterprise-attack,T1505.004,IIS Components,Persistence,persistence,Windows,https://attack.mitre.org/techniques/T1505/004
+enterprise-attack,T1505.005,Terminal Services DLL,Persistence,persistence,Windows,https://attack.mitre.org/techniques/T1505/005
+enterprise-attack,T1505.006,vSphere Installation Bundles,Persistence,persistence,ESXi,https://attack.mitre.org/techniques/T1505/006
+enterprise-attack,T1518,Software Discovery,Discovery,discovery,ESXi; IaaS; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1518
+enterprise-attack,T1518.001,Security Software Discovery,Discovery,discovery,IaaS; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1518/001
+enterprise-attack,T1518.002,Backup Software Discovery,Discovery,discovery,Windows; macOS; Linux,https://attack.mitre.org/techniques/T1518/002
+enterprise-attack,T1525,Implant Internal Image,Persistence,persistence,IaaS; Containers,https://attack.mitre.org/techniques/T1525
+enterprise-attack,T1526,Cloud Service Discovery,Discovery,discovery,IaaS; Identity Provider; Office Suite; SaaS,https://attack.mitre.org/techniques/T1526
+enterprise-attack,T1528,Steal Application Access Token,Credential Access,credential-access,Containers; IaaS; Identity Provider; Office Suite; SaaS,https://attack.mitre.org/techniques/T1528
+enterprise-attack,T1529,System Shutdown/Reboot,Impact,impact,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1529
+enterprise-attack,T1530,Data from Cloud Storage,Collection,collection,IaaS; Office Suite; SaaS,https://attack.mitre.org/techniques/T1530
+enterprise-attack,T1531,Account Access Removal,Impact,impact,Linux; macOS; Windows; SaaS; IaaS; Office Suite; ESXi,https://attack.mitre.org/techniques/T1531
+enterprise-attack,T1534,Internal Spearphishing,Lateral Movement,lateral-movement,Linux; macOS; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1534
+enterprise-attack,T1535,Unused/Unsupported Cloud Regions,Stealth,stealth,IaaS,https://attack.mitre.org/techniques/T1535
+enterprise-attack,T1537,Transfer Data to Cloud Account,Exfiltration,exfiltration,IaaS; Office Suite; SaaS,https://attack.mitre.org/techniques/T1537
+enterprise-attack,T1538,Cloud Service Dashboard,Discovery,discovery,IaaS; SaaS; Office Suite; Identity Provider,https://attack.mitre.org/techniques/T1538
+enterprise-attack,T1539,Steal Web Session Cookie,Credential Access,credential-access,Linux; macOS; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1539
+enterprise-attack,T1542,Pre-OS Boot,Stealth; Persistence,stealth;persistence,Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1542
+enterprise-attack,T1542.001,System Firmware,Stealth; Persistence,stealth;persistence,Network Devices; Windows,https://attack.mitre.org/techniques/T1542/001
+enterprise-attack,T1542.002,Component Firmware,Stealth; Persistence,stealth;persistence,Windows; Linux; macOS,https://attack.mitre.org/techniques/T1542/002
+enterprise-attack,T1542.003,Bootkit,Stealth; Persistence,stealth;persistence,Linux; Windows,https://attack.mitre.org/techniques/T1542/003
+enterprise-attack,T1542.004,ROMMONkit,Stealth; Persistence,stealth;persistence,Network Devices,https://attack.mitre.org/techniques/T1542/004
+enterprise-attack,T1542.005,TFTP Boot,Stealth; Persistence,stealth;persistence,Network Devices,https://attack.mitre.org/techniques/T1542/005
+enterprise-attack,T1543,Create or Modify System Process,Persistence; Privilege Escalation,persistence;privilege-escalation,Containers; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1543
+enterprise-attack,T1543.001,Launch Agent,Persistence; Privilege Escalation,persistence;privilege-escalation,macOS,https://attack.mitre.org/techniques/T1543/001
+enterprise-attack,T1543.002,Systemd Service,Persistence; Privilege Escalation,persistence;privilege-escalation,Linux,https://attack.mitre.org/techniques/T1543/002
+enterprise-attack,T1543.003,Windows Service,Persistence; Privilege Escalation,persistence;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1543/003
+enterprise-attack,T1543.004,Launch Daemon,Persistence; Privilege Escalation,persistence;privilege-escalation,macOS,https://attack.mitre.org/techniques/T1543/004
+enterprise-attack,T1543.005,Container Service,Persistence; Privilege Escalation,persistence;privilege-escalation,Containers,https://attack.mitre.org/techniques/T1543/005
+enterprise-attack,T1546,Event Triggered Execution,Privilege Escalation; Persistence,privilege-escalation;persistence,Linux; macOS; Windows; SaaS; IaaS; Office Suite,https://attack.mitre.org/techniques/T1546
+enterprise-attack,T1546.001,Change Default File Association,Privilege Escalation; Persistence,privilege-escalation;persistence,Windows,https://attack.mitre.org/techniques/T1546/001
+enterprise-attack,T1546.002,Screensaver,Privilege Escalation; Persistence,privilege-escalation;persistence,Windows,https://attack.mitre.org/techniques/T1546/002
+enterprise-attack,T1546.003,Windows Management Instrumentation Event Subscription,Privilege Escalation; Persistence,privilege-escalation;persistence,Windows,https://attack.mitre.org/techniques/T1546/003
+enterprise-attack,T1546.004,Unix Shell Configuration Modification,Privilege Escalation; Persistence,privilege-escalation;persistence,Linux; macOS,https://attack.mitre.org/techniques/T1546/004
+enterprise-attack,T1546.005,Trap,Privilege Escalation; Persistence,privilege-escalation;persistence,macOS; Linux,https://attack.mitre.org/techniques/T1546/005
+enterprise-attack,T1546.006,LC_LOAD_DYLIB Addition,Privilege Escalation; Persistence,privilege-escalation;persistence,macOS,https://attack.mitre.org/techniques/T1546/006
+enterprise-attack,T1546.007,Netsh Helper DLL,Privilege Escalation; Persistence,privilege-escalation;persistence,Windows,https://attack.mitre.org/techniques/T1546/007
+enterprise-attack,T1546.008,Accessibility Features,Privilege Escalation; Persistence,privilege-escalation;persistence,Windows,https://attack.mitre.org/techniques/T1546/008
+enterprise-attack,T1546.009,AppCert DLLs,Privilege Escalation; Persistence,privilege-escalation;persistence,Windows,https://attack.mitre.org/techniques/T1546/009
+enterprise-attack,T1546.010,AppInit DLLs,Privilege Escalation; Persistence,privilege-escalation;persistence,Windows,https://attack.mitre.org/techniques/T1546/010
+enterprise-attack,T1546.011,Application Shimming,Privilege Escalation; Persistence,privilege-escalation;persistence,Windows,https://attack.mitre.org/techniques/T1546/011
+enterprise-attack,T1546.012,Image File Execution Options Injection,Privilege Escalation; Persistence,privilege-escalation;persistence,Windows,https://attack.mitre.org/techniques/T1546/012
+enterprise-attack,T1546.013,PowerShell Profile,Privilege Escalation; Persistence,privilege-escalation;persistence,Windows,https://attack.mitre.org/techniques/T1546/013
+enterprise-attack,T1546.014,Emond,Privilege Escalation; Persistence,privilege-escalation;persistence,macOS,https://attack.mitre.org/techniques/T1546/014
+enterprise-attack,T1546.015,Component Object Model Hijacking,Privilege Escalation; Persistence,privilege-escalation;persistence,Windows,https://attack.mitre.org/techniques/T1546/015
+enterprise-attack,T1546.016,Installer Packages,Privilege Escalation; Persistence,privilege-escalation;persistence,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1546/016
+enterprise-attack,T1546.017,Udev Rules,Persistence; Privilege Escalation,persistence;privilege-escalation,Linux,https://attack.mitre.org/techniques/T1546/017
+enterprise-attack,T1546.018,Python Startup Hooks,Persistence; Privilege Escalation,persistence;privilege-escalation,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1546/018
+enterprise-attack,T1547,Boot or Logon Autostart Execution,Persistence; Privilege Escalation,persistence;privilege-escalation,Linux; macOS; Windows; Network Devices,https://attack.mitre.org/techniques/T1547
+enterprise-attack,T1547.001,Registry Run Keys / Startup Folder,Persistence; Privilege Escalation,persistence;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1547/001
+enterprise-attack,T1547.002,Authentication Package,Persistence; Privilege Escalation,persistence;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1547/002
+enterprise-attack,T1547.003,Time Providers,Persistence; Privilege Escalation,persistence;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1547/003
+enterprise-attack,T1547.004,Winlogon Helper DLL,Persistence; Privilege Escalation,persistence;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1547/004
+enterprise-attack,T1547.005,Security Support Provider,Persistence; Privilege Escalation,persistence;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1547/005
+enterprise-attack,T1547.006,Kernel Modules and Extensions,Persistence; Privilege Escalation,persistence;privilege-escalation,macOS; Linux,https://attack.mitre.org/techniques/T1547/006
+enterprise-attack,T1547.007,Re-opened Applications,Persistence; Privilege Escalation,persistence;privilege-escalation,macOS,https://attack.mitre.org/techniques/T1547/007
+enterprise-attack,T1547.008,LSASS Driver,Persistence; Privilege Escalation,persistence;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1547/008
+enterprise-attack,T1547.009,Shortcut Modification,Persistence; Privilege Escalation,persistence;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1547/009
+enterprise-attack,T1547.010,Port Monitors,Persistence; Privilege Escalation,persistence;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1547/010
+enterprise-attack,T1547.012,Print Processors,Persistence; Privilege Escalation,persistence;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1547/012
+enterprise-attack,T1547.013,XDG Autostart Entries,Persistence; Privilege Escalation,persistence;privilege-escalation,Linux,https://attack.mitre.org/techniques/T1547/013
+enterprise-attack,T1547.014,Active Setup,Persistence; Privilege Escalation,persistence;privilege-escalation,Windows,https://attack.mitre.org/techniques/T1547/014
+enterprise-attack,T1547.015,Login Items,Persistence; Privilege Escalation,persistence;privilege-escalation,macOS,https://attack.mitre.org/techniques/T1547/015
+enterprise-attack,T1548,Abuse Elevation Control Mechanism,Privilege Escalation,privilege-escalation,Linux; macOS; Windows; IaaS; Office Suite; Identity Provider,https://attack.mitre.org/techniques/T1548
+enterprise-attack,T1548.001,Setuid and Setgid,Privilege Escalation,privilege-escalation,Linux; macOS,https://attack.mitre.org/techniques/T1548/001
+enterprise-attack,T1548.002,Bypass User Account Control,Privilege Escalation,privilege-escalation,Windows,https://attack.mitre.org/techniques/T1548/002
+enterprise-attack,T1548.003,Sudo and Sudo Caching,Privilege Escalation,privilege-escalation,Linux; macOS,https://attack.mitre.org/techniques/T1548/003
+enterprise-attack,T1548.004,Elevated Execution with Prompt,Privilege Escalation,privilege-escalation,macOS,https://attack.mitre.org/techniques/T1548/004
+enterprise-attack,T1548.005,Temporary Elevated Cloud Access,Privilege Escalation,privilege-escalation,IaaS; Office Suite; Identity Provider,https://attack.mitre.org/techniques/T1548/005
+enterprise-attack,T1548.006,TCC Manipulation,Privilege Escalation,privilege-escalation,macOS,https://attack.mitre.org/techniques/T1548/006
+enterprise-attack,T1550,Use Alternate Authentication Material,Lateral Movement,lateral-movement,Containers; IaaS; Identity Provider; Linux; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1550
+enterprise-attack,T1550.001,Application Access Token,Lateral Movement,lateral-movement,Containers; IaaS; Identity Provider; Office Suite; SaaS,https://attack.mitre.org/techniques/T1550/001
+enterprise-attack,T1550.002,Pass the Hash,Lateral Movement,lateral-movement,Windows,https://attack.mitre.org/techniques/T1550/002
+enterprise-attack,T1550.003,Pass the Ticket,Lateral Movement,lateral-movement,Windows,https://attack.mitre.org/techniques/T1550/003
+enterprise-attack,T1550.004,Web Session Cookie,Lateral Movement,lateral-movement,IaaS; Office Suite; SaaS,https://attack.mitre.org/techniques/T1550/004
+enterprise-attack,T1552,Unsecured Credentials,Credential Access,credential-access,Windows; SaaS; IaaS; Linux; macOS; Containers; Network Devices; Office Suite; Identity Provider,https://attack.mitre.org/techniques/T1552
+enterprise-attack,T1552.001,Credentials In Files,Credential Access,credential-access,Containers; IaaS; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1552/001
+enterprise-attack,T1552.002,Credentials in Registry,Credential Access,credential-access,Windows,https://attack.mitre.org/techniques/T1552/002
+enterprise-attack,T1552.003,Shell History,Credential Access,credential-access,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1552/003
+enterprise-attack,T1552.004,Private Keys,Credential Access,credential-access,Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1552/004
+enterprise-attack,T1552.005,Cloud Instance Metadata API,Credential Access,credential-access,IaaS,https://attack.mitre.org/techniques/T1552/005
+enterprise-attack,T1552.006,Group Policy Preferences,Credential Access,credential-access,Windows,https://attack.mitre.org/techniques/T1552/006
+enterprise-attack,T1552.007,Container API,Credential Access,credential-access,Containers,https://attack.mitre.org/techniques/T1552/007
+enterprise-attack,T1552.008,Chat Messages,Credential Access,credential-access,SaaS; Office Suite,https://attack.mitre.org/techniques/T1552/008
+enterprise-attack,T1553,Subvert Trust Controls,Defense Impairment,defense-impairment,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1553
+enterprise-attack,T1553.001,Gatekeeper Bypass,Defense Impairment,defense-impairment,macOS,https://attack.mitre.org/techniques/T1553/001
+enterprise-attack,T1553.002,Code Signing,Defense Impairment,defense-impairment,macOS; Windows,https://attack.mitre.org/techniques/T1553/002
+enterprise-attack,T1553.003,SIP and Trust Provider Hijacking,Defense Impairment,defense-impairment,Windows,https://attack.mitre.org/techniques/T1553/003
+enterprise-attack,T1553.004,Install Root Certificate,Defense Impairment,defense-impairment,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1553/004
+enterprise-attack,T1553.005,Mark-of-the-Web Bypass,Defense Impairment,defense-impairment,Windows,https://attack.mitre.org/techniques/T1553/005
+enterprise-attack,T1553.006,Code Signing Policy Modification,Defense Impairment,defense-impairment,macOS; Windows,https://attack.mitre.org/techniques/T1553/006
+enterprise-attack,T1554,Compromise Host Software Binary,Persistence,persistence,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1554
+enterprise-attack,T1555,Credentials from Password Stores,Credential Access,credential-access,IaaS; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1555
+enterprise-attack,T1555.001,Keychain,Credential Access,credential-access,macOS,https://attack.mitre.org/techniques/T1555/001
+enterprise-attack,T1555.002,Securityd Memory,Credential Access,credential-access,Linux; macOS,https://attack.mitre.org/techniques/T1555/002
+enterprise-attack,T1555.003,Credentials from Web Browsers,Credential Access,credential-access,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1555/003
+enterprise-attack,T1555.004,Windows Credential Manager,Credential Access,credential-access,Windows,https://attack.mitre.org/techniques/T1555/004
+enterprise-attack,T1555.005,Password Managers,Credential Access,credential-access,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1555/005
+enterprise-attack,T1555.006,Cloud Secrets Management Stores,Credential Access,credential-access,IaaS,https://attack.mitre.org/techniques/T1555/006
+enterprise-attack,T1556,Modify Authentication Process,Defense Impairment; Persistence; Credential Access,defense-impairment;persistence;credential-access,IaaS; Identity Provider; Linux; macOS; Network Devices; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1556
+enterprise-attack,T1556.001,Domain Controller Authentication,Defense Impairment; Persistence; Credential Access,defense-impairment;persistence;credential-access,Windows,https://attack.mitre.org/techniques/T1556/001
+enterprise-attack,T1556.002,Password Filter DLL,Defense Impairment; Persistence; Credential Access,defense-impairment;persistence;credential-access,Windows,https://attack.mitre.org/techniques/T1556/002
+enterprise-attack,T1556.003,Pluggable Authentication Modules,Defense Impairment; Persistence; Credential Access,defense-impairment;persistence;credential-access,Linux; macOS,https://attack.mitre.org/techniques/T1556/003
+enterprise-attack,T1556.004,Network Device Authentication,Defense Impairment; Persistence; Credential Access,defense-impairment;persistence;credential-access,Network Devices,https://attack.mitre.org/techniques/T1556/004
+enterprise-attack,T1556.005,Reversible Encryption,Defense Impairment; Persistence; Credential Access,defense-impairment;persistence;credential-access,Windows,https://attack.mitre.org/techniques/T1556/005
+enterprise-attack,T1556.006,Multi-Factor Authentication,Defense Impairment; Persistence; Credential Access,defense-impairment;persistence;credential-access,IaaS; Identity Provider; Linux; macOS; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1556/006
+enterprise-attack,T1556.007,Hybrid Identity,Defense Impairment; Persistence; Credential Access,defense-impairment;persistence;credential-access,IaaS; Identity Provider; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1556/007
+enterprise-attack,T1556.008,Network Provider DLL,Defense Impairment; Persistence; Credential Access,defense-impairment;persistence;credential-access,Windows,https://attack.mitre.org/techniques/T1556/008
+enterprise-attack,T1556.009,Conditional Access Policies,Defense Impairment; Persistence; Credential Access,defense-impairment;persistence;credential-access,IaaS; Identity Provider,https://attack.mitre.org/techniques/T1556/009
+enterprise-attack,T1557,Adversary-in-the-Middle,Credential Access; Collection,credential-access;collection,Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1557
+enterprise-attack,T1557.001,Name Resolution Poisoning and SMB Relay,Credential Access; Collection,credential-access;collection,Windows,https://attack.mitre.org/techniques/T1557/001
+enterprise-attack,T1557.002,ARP Cache Poisoning,Credential Access; Collection,credential-access;collection,Linux; Windows; macOS,https://attack.mitre.org/techniques/T1557/002
+enterprise-attack,T1557.003,DHCP Spoofing,Credential Access; Collection,credential-access;collection,Linux; Windows; macOS,https://attack.mitre.org/techniques/T1557/003
+enterprise-attack,T1557.004,Evil Twin,Credential Access; Collection,credential-access;collection,Network Devices,https://attack.mitre.org/techniques/T1557/004
+enterprise-attack,T1558,Steal or Forge Kerberos Tickets,Credential Access,credential-access,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1558
+enterprise-attack,T1558.001,Golden Ticket,Credential Access,credential-access,Windows,https://attack.mitre.org/techniques/T1558/001
+enterprise-attack,T1558.002,Silver Ticket,Credential Access,credential-access,Windows,https://attack.mitre.org/techniques/T1558/002
+enterprise-attack,T1558.003,Kerberoasting,Credential Access,credential-access,Windows,https://attack.mitre.org/techniques/T1558/003
+enterprise-attack,T1558.004,AS-REP Roasting,Credential Access,credential-access,Windows,https://attack.mitre.org/techniques/T1558/004
+enterprise-attack,T1558.005,Ccache Files,Credential Access,credential-access,Linux; macOS,https://attack.mitre.org/techniques/T1558/005
+enterprise-attack,T1559,Inter-Process Communication,Execution,execution,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1559
+enterprise-attack,T1559.001,Component Object Model,Execution,execution,Windows,https://attack.mitre.org/techniques/T1559/001
+enterprise-attack,T1559.002,Dynamic Data Exchange,Execution,execution,Windows,https://attack.mitre.org/techniques/T1559/002
+enterprise-attack,T1559.003,XPC Services,Execution,execution,macOS,https://attack.mitre.org/techniques/T1559/003
+enterprise-attack,T1560,Archive Collected Data,Collection,collection,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1560
+enterprise-attack,T1560.001,Archive via Utility,Collection,collection,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1560/001
+enterprise-attack,T1560.002,Archive via Library,Collection,collection,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1560/002
+enterprise-attack,T1560.003,Archive via Custom Method,Collection,collection,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1560/003
+enterprise-attack,T1561,Disk Wipe,Impact,impact,Linux; macOS; Windows; Network Devices,https://attack.mitre.org/techniques/T1561
+enterprise-attack,T1561.001,Disk Content Wipe,Impact,impact,Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1561/001
+enterprise-attack,T1561.002,Disk Structure Wipe,Impact,impact,Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1561/002
+enterprise-attack,T1563,Remote Service Session Hijacking,Lateral Movement,lateral-movement,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1563
+enterprise-attack,T1563.001,SSH Hijacking,Lateral Movement,lateral-movement,Linux; macOS,https://attack.mitre.org/techniques/T1563/001
+enterprise-attack,T1563.002,RDP Hijacking,Lateral Movement,lateral-movement,Windows,https://attack.mitre.org/techniques/T1563/002
+enterprise-attack,T1564,Hide Artifacts,Stealth,stealth,ESXi; Linux; macOS; Office Suite; Windows,https://attack.mitre.org/techniques/T1564
+enterprise-attack,T1564.001,Hidden Files and Directories,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1564/001
+enterprise-attack,T1564.002,Hidden Users,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1564/002
+enterprise-attack,T1564.003,Hidden Window,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1564/003
+enterprise-attack,T1564.004,NTFS File Attributes,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1564/004
+enterprise-attack,T1564.005,Hidden File System,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1564/005
+enterprise-attack,T1564.006,Run Virtual Instance,Stealth,stealth,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1564/006
+enterprise-attack,T1564.007,VBA Stomping,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1564/007
+enterprise-attack,T1564.008,Email Hiding Rules,Stealth,stealth,Windows; Linux; macOS; Office Suite,https://attack.mitre.org/techniques/T1564/008
+enterprise-attack,T1564.009,Resource Forking,Stealth,stealth,macOS,https://attack.mitre.org/techniques/T1564/009
+enterprise-attack,T1564.010,Process Argument Spoofing,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1564/010
+enterprise-attack,T1564.011,Ignore Process Interrupts,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1564/011
+enterprise-attack,T1564.012,File/Path Exclusions,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1564/012
+enterprise-attack,T1564.013,Bind Mounts,Stealth,stealth,Linux,https://attack.mitre.org/techniques/T1564/013
+enterprise-attack,T1564.014,Extended Attributes,Stealth,stealth,Linux; macOS,https://attack.mitre.org/techniques/T1564/014
+enterprise-attack,T1565,Data Manipulation,Impact,impact,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1565
+enterprise-attack,T1565.001,Stored Data Manipulation,Impact,impact,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1565/001
+enterprise-attack,T1565.002,Transmitted Data Manipulation,Impact,impact,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1565/002
+enterprise-attack,T1565.003,Runtime Data Manipulation,Impact,impact,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1565/003
+enterprise-attack,T1566,Phishing,Initial Access,initial-access,Identity Provider; Linux; macOS; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1566
+enterprise-attack,T1566.001,Spearphishing Attachment,Initial Access,initial-access,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1566/001
+enterprise-attack,T1566.002,Spearphishing Link,Initial Access,initial-access,Identity Provider; Linux; macOS; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1566/002
+enterprise-attack,T1566.003,Spearphishing via Service,Initial Access,initial-access,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1566/003
+enterprise-attack,T1566.004,Spearphishing Voice,Initial Access,initial-access,Linux; macOS; Windows; Identity Provider,https://attack.mitre.org/techniques/T1566/004
+enterprise-attack,T1567,Exfiltration Over Web Service,Exfiltration,exfiltration,ESXi; Linux; macOS; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1567
+enterprise-attack,T1567.001,Exfiltration to Code Repository,Exfiltration,exfiltration,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1567/001
+enterprise-attack,T1567.002,Exfiltration to Cloud Storage,Exfiltration,exfiltration,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1567/002
+enterprise-attack,T1567.003,Exfiltration to Text Storage Sites,Exfiltration,exfiltration,Linux; macOS; Windows; ESXi,https://attack.mitre.org/techniques/T1567/003
+enterprise-attack,T1567.004,Exfiltration Over Webhook,Exfiltration,exfiltration,ESXi; Linux; macOS; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1567/004
+enterprise-attack,T1568,Dynamic Resolution,Command and Control,command-and-control,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1568
+enterprise-attack,T1568.001,Fast Flux DNS,Command and Control,command-and-control,Linux; macOS; Windows; ESXi,https://attack.mitre.org/techniques/T1568/001
+enterprise-attack,T1568.002,Domain Generation Algorithms,Command and Control,command-and-control,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1568/002
+enterprise-attack,T1568.003,DNS Calculation,Command and Control,command-and-control,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1568/003
+enterprise-attack,T1569,System Services,Execution,execution,Windows; macOS; Linux,https://attack.mitre.org/techniques/T1569
+enterprise-attack,T1569.001,Launchctl,Execution,execution,macOS,https://attack.mitre.org/techniques/T1569/001
+enterprise-attack,T1569.002,Service Execution,Execution,execution,Windows,https://attack.mitre.org/techniques/T1569/002
+enterprise-attack,T1569.003,Systemctl,Execution,execution,Linux,https://attack.mitre.org/techniques/T1569/003
+enterprise-attack,T1570,Lateral Tool Transfer,Lateral Movement,lateral-movement,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1570
+enterprise-attack,T1571,Non-Standard Port,Command and Control,command-and-control,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1571
+enterprise-attack,T1572,Protocol Tunneling,Command and Control,command-and-control,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1572
+enterprise-attack,T1573,Encrypted Channel,Command and Control,command-and-control,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1573
+enterprise-attack,T1573.001,Symmetric Cryptography,Command and Control,command-and-control,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1573/001
+enterprise-attack,T1573.002,Asymmetric Cryptography,Command and Control,command-and-control,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1573/002
+enterprise-attack,T1574,Hijack Execution Flow,Stealth; Execution,stealth;execution,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1574
+enterprise-attack,T1574.001,DLL,Stealth; Execution,stealth;execution,Windows,https://attack.mitre.org/techniques/T1574/001
+enterprise-attack,T1574.004,Dylib Hijacking,Stealth; Execution,stealth;execution,macOS,https://attack.mitre.org/techniques/T1574/004
+enterprise-attack,T1574.005,Executable Installer File Permissions Weakness,Stealth; Execution,stealth;execution,Windows,https://attack.mitre.org/techniques/T1574/005
+enterprise-attack,T1574.006,Dynamic Linker Hijacking,Stealth; Execution,stealth;execution,Linux; macOS,https://attack.mitre.org/techniques/T1574/006
+enterprise-attack,T1574.007,Path Interception by PATH Environment Variable,Stealth; Execution,stealth;execution,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1574/007
+enterprise-attack,T1574.008,Path Interception by Search Order Hijacking,Stealth; Execution,stealth;execution,Windows,https://attack.mitre.org/techniques/T1574/008
+enterprise-attack,T1574.009,Path Interception by Unquoted Path,Stealth; Execution,stealth;execution,Windows,https://attack.mitre.org/techniques/T1574/009
+enterprise-attack,T1574.010,Services File Permissions Weakness,Stealth; Execution,stealth;execution,Windows,https://attack.mitre.org/techniques/T1574/010
+enterprise-attack,T1574.011,Services Registry Permissions Weakness,Stealth; Execution,stealth;execution,Windows,https://attack.mitre.org/techniques/T1574/011
+enterprise-attack,T1574.012,COR_PROFILER,Stealth; Execution,stealth;execution,Windows,https://attack.mitre.org/techniques/T1574/012
+enterprise-attack,T1574.013,KernelCallbackTable,Stealth; Execution,stealth;execution,Windows,https://attack.mitre.org/techniques/T1574/013
+enterprise-attack,T1574.014,AppDomainManager,Stealth; Execution,stealth;execution,Windows,https://attack.mitre.org/techniques/T1574/014
+enterprise-attack,T1578,Modify Cloud Compute Infrastructure,Defense Impairment,defense-impairment,IaaS,https://attack.mitre.org/techniques/T1578
+enterprise-attack,T1578.001,Create Snapshot,Defense Impairment,defense-impairment,IaaS,https://attack.mitre.org/techniques/T1578/001
+enterprise-attack,T1578.002,Create Cloud Instance,Defense Impairment,defense-impairment,IaaS,https://attack.mitre.org/techniques/T1578/002
+enterprise-attack,T1578.003,Delete Cloud Instance,Defense Impairment,defense-impairment,IaaS,https://attack.mitre.org/techniques/T1578/003
+enterprise-attack,T1578.004,Revert Cloud Instance,Defense Impairment,defense-impairment,IaaS,https://attack.mitre.org/techniques/T1578/004
+enterprise-attack,T1578.005,Modify Cloud Compute Configurations,Defense Impairment,defense-impairment,IaaS,https://attack.mitre.org/techniques/T1578/005
+enterprise-attack,T1580,Cloud Infrastructure Discovery,Discovery,discovery,IaaS,https://attack.mitre.org/techniques/T1580
+enterprise-attack,T1583,Acquire Infrastructure,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1583
+enterprise-attack,T1583.001,Domains,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1583/001
+enterprise-attack,T1583.002,DNS Server,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1583/002
+enterprise-attack,T1583.003,Virtual Private Server,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1583/003
+enterprise-attack,T1583.004,Server,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1583/004
+enterprise-attack,T1583.005,Botnet,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1583/005
+enterprise-attack,T1583.006,Web Services,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1583/006
+enterprise-attack,T1583.007,Serverless,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1583/007
+enterprise-attack,T1583.008,Malvertising,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1583/008
+enterprise-attack,T1584,Compromise Infrastructure,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1584
+enterprise-attack,T1584.001,Domains,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1584/001
+enterprise-attack,T1584.002,DNS Server,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1584/002
+enterprise-attack,T1584.003,Virtual Private Server,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1584/003
+enterprise-attack,T1584.004,Server,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1584/004
+enterprise-attack,T1584.005,Botnet,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1584/005
+enterprise-attack,T1584.006,Web Services,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1584/006
+enterprise-attack,T1584.007,Serverless,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1584/007
+enterprise-attack,T1584.008,Network Devices,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1584/008
+enterprise-attack,T1585,Establish Accounts,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1585
+enterprise-attack,T1585.001,Social Media Accounts,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1585/001
+enterprise-attack,T1585.002,Email Accounts,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1585/002
+enterprise-attack,T1585.003,Cloud Accounts,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1585/003
+enterprise-attack,T1586,Compromise Accounts,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1586
+enterprise-attack,T1586.001,Social Media Accounts,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1586/001
+enterprise-attack,T1586.002,Email Accounts,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1586/002
+enterprise-attack,T1586.003,Cloud Accounts,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1586/003
+enterprise-attack,T1587,Develop Capabilities,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1587
+enterprise-attack,T1587.001,Malware,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1587/001
+enterprise-attack,T1587.002,Code Signing Certificates,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1587/002
+enterprise-attack,T1587.003,Digital Certificates,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1587/003
+enterprise-attack,T1587.004,Exploits,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1587/004
+enterprise-attack,T1588,Obtain Capabilities,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1588
+enterprise-attack,T1588.001,Malware,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1588/001
+enterprise-attack,T1588.002,Tool,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1588/002
+enterprise-attack,T1588.003,Code Signing Certificates,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1588/003
+enterprise-attack,T1588.004,Digital Certificates,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1588/004
+enterprise-attack,T1588.005,Exploits,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1588/005
+enterprise-attack,T1588.006,Vulnerabilities,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1588/006
+enterprise-attack,T1588.007,Artificial Intelligence,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1588/007
+enterprise-attack,T1589,Gather Victim Identity Information,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1589
+enterprise-attack,T1589.001,Credentials,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1589/001
+enterprise-attack,T1589.002,Email Addresses,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1589/002
+enterprise-attack,T1589.003,Employee Names,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1589/003
+enterprise-attack,T1590,Gather Victim Network Information,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1590
+enterprise-attack,T1590.001,Domain Properties,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1590/001
+enterprise-attack,T1590.002,DNS,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1590/002
+enterprise-attack,T1590.003,Network Trust Dependencies,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1590/003
+enterprise-attack,T1590.004,Network Topology,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1590/004
+enterprise-attack,T1590.005,IP Addresses,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1590/005
+enterprise-attack,T1590.006,Network Security Appliances,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1590/006
+enterprise-attack,T1591,Gather Victim Org Information,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1591
+enterprise-attack,T1591.001,Determine Physical Locations,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1591/001
+enterprise-attack,T1591.002,Business Relationships,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1591/002
+enterprise-attack,T1591.003,Identify Business Tempo,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1591/003
+enterprise-attack,T1591.004,Identify Roles,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1591/004
+enterprise-attack,T1592,Gather Victim Host Information,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1592
+enterprise-attack,T1592.001,Hardware,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1592/001
+enterprise-attack,T1592.002,Software,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1592/002
+enterprise-attack,T1592.003,Firmware,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1592/003
+enterprise-attack,T1592.004,Client Configurations,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1592/004
+enterprise-attack,T1593,Search Open Websites/Domains,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1593
+enterprise-attack,T1593.001,Social Media,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1593/001
+enterprise-attack,T1593.002,Search Engines,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1593/002
+enterprise-attack,T1593.003,Code Repositories,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1593/003
+enterprise-attack,T1594,Search Victim-Owned Websites,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1594
+enterprise-attack,T1595,Active Scanning,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1595
+enterprise-attack,T1595.001,Scanning IP Blocks,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1595/001
+enterprise-attack,T1595.002,Vulnerability Scanning,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1595/002
+enterprise-attack,T1595.003,Wordlist Scanning,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1595/003
+enterprise-attack,T1596,Search Open Technical Databases,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1596
+enterprise-attack,T1596.001,DNS/Passive DNS,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1596/001
+enterprise-attack,T1596.002,WHOIS,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1596/002
+enterprise-attack,T1596.003,Digital Certificates,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1596/003
+enterprise-attack,T1596.004,CDNs,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1596/004
+enterprise-attack,T1596.005,Scan Databases,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1596/005
+enterprise-attack,T1597,Search Closed Sources,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1597
+enterprise-attack,T1597.001,Threat Intel Vendors,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1597/001
+enterprise-attack,T1597.002,Purchase Technical Data,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1597/002
+enterprise-attack,T1598,Phishing for Information,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1598
+enterprise-attack,T1598.001,Spearphishing Service,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1598/001
+enterprise-attack,T1598.002,Spearphishing Attachment,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1598/002
+enterprise-attack,T1598.003,Spearphishing Link,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1598/003
+enterprise-attack,T1598.004,Spearphishing Voice,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1598/004
+enterprise-attack,T1599,Network Boundary Bridging,Defense Impairment,defense-impairment,Network Devices,https://attack.mitre.org/techniques/T1599
+enterprise-attack,T1599.001,Network Address Translation Traversal,Defense Impairment,defense-impairment,Network Devices,https://attack.mitre.org/techniques/T1599/001
+enterprise-attack,T1600,Weaken Encryption,Defense Impairment,defense-impairment,Network Devices,https://attack.mitre.org/techniques/T1600
+enterprise-attack,T1600.001,Reduce Key Space,Defense Impairment,defense-impairment,Network Devices,https://attack.mitre.org/techniques/T1600/001
+enterprise-attack,T1600.002,Disable Crypto Hardware,Defense Impairment,defense-impairment,Network Devices,https://attack.mitre.org/techniques/T1600/002
+enterprise-attack,T1601,Modify System Image,Defense Impairment,defense-impairment,Network Devices,https://attack.mitre.org/techniques/T1601
+enterprise-attack,T1601.001,Patch System Image,Defense Impairment,defense-impairment,Network Devices,https://attack.mitre.org/techniques/T1601/001
+enterprise-attack,T1601.002,Downgrade System Image,Defense Impairment,defense-impairment,Network Devices,https://attack.mitre.org/techniques/T1601/002
+enterprise-attack,T1602,Data from Configuration Repository,Collection,collection,Network Devices,https://attack.mitre.org/techniques/T1602
+enterprise-attack,T1602.001,SNMP (MIB Dump),Collection,collection,Network Devices,https://attack.mitre.org/techniques/T1602/001
+enterprise-attack,T1602.002,Network Device Configuration Dump,Collection,collection,Network Devices,https://attack.mitre.org/techniques/T1602/002
+enterprise-attack,T1606,Forge Web Credentials,Credential Access,credential-access,SaaS; Windows; macOS; Linux; IaaS; Office Suite; Identity Provider,https://attack.mitre.org/techniques/T1606
+enterprise-attack,T1606.001,Web Cookies,Credential Access,credential-access,Linux; macOS; Windows; SaaS; IaaS,https://attack.mitre.org/techniques/T1606/001
+enterprise-attack,T1606.002,SAML Tokens,Credential Access,credential-access,SaaS; Windows; IaaS; Office Suite; Identity Provider,https://attack.mitre.org/techniques/T1606/002
+enterprise-attack,T1608,Stage Capabilities,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1608
+enterprise-attack,T1608.001,Upload Malware,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1608/001
+enterprise-attack,T1608.002,Upload Tool,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1608/002
+enterprise-attack,T1608.003,Install Digital Certificate,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1608/003
+enterprise-attack,T1608.004,Drive-by Target,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1608/004
+enterprise-attack,T1608.005,Link Target,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1608/005
+enterprise-attack,T1608.006,SEO Poisoning,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1608/006
+enterprise-attack,T1608.007,AI Result Poisoning,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1608/007
+enterprise-attack,T1609,Container Administration Command,Execution,execution,Containers,https://attack.mitre.org/techniques/T1609
+enterprise-attack,T1610,Deploy Container,Execution,execution,Containers,https://attack.mitre.org/techniques/T1610
+enterprise-attack,T1611,Escape to Host,Privilege Escalation,privilege-escalation,Windows; Linux; Containers; ESXi,https://attack.mitre.org/techniques/T1611
+enterprise-attack,T1612,Build Image on Host,Stealth,stealth,Containers,https://attack.mitre.org/techniques/T1612
+enterprise-attack,T1613,Container and Resource Discovery,Discovery,discovery,Containers,https://attack.mitre.org/techniques/T1613
+enterprise-attack,T1614,System Location Discovery,Discovery,discovery,IaaS; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1614
+enterprise-attack,T1614.001,System Language Discovery,Discovery,discovery,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1614/001
+enterprise-attack,T1615,Group Policy Discovery,Discovery,discovery,Windows,https://attack.mitre.org/techniques/T1615
+enterprise-attack,T1619,Cloud Storage Object Discovery,Discovery,discovery,IaaS,https://attack.mitre.org/techniques/T1619
+enterprise-attack,T1620,Reflective Code Loading,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1620
+enterprise-attack,T1621,Multi-Factor Authentication Request Generation,Credential Access,credential-access,Windows; Linux; macOS; IaaS; SaaS; Office Suite; Identity Provider,https://attack.mitre.org/techniques/T1621
+enterprise-attack,T1622,Debugger Evasion,Stealth; Discovery,stealth;discovery,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1622
+enterprise-attack,T1647,Plist File Modification,Defense Impairment,defense-impairment,macOS,https://attack.mitre.org/techniques/T1647
+enterprise-attack,T1648,Serverless Execution,Execution,execution,SaaS; IaaS; Office Suite,https://attack.mitre.org/techniques/T1648
+enterprise-attack,T1649,Steal or Forge Authentication Certificates,Credential Access,credential-access,Windows; Linux; macOS; Identity Provider,https://attack.mitre.org/techniques/T1649
+enterprise-attack,T1650,Acquire Access,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1650
+enterprise-attack,T1651,Cloud Administration Command,Execution,execution,IaaS,https://attack.mitre.org/techniques/T1651
+enterprise-attack,T1652,Device Driver Discovery,Discovery,discovery,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1652
+enterprise-attack,T1653,Power Settings,Persistence,persistence,Windows; Linux; macOS; Network Devices,https://attack.mitre.org/techniques/T1653
+enterprise-attack,T1654,Log Enumeration,Discovery,discovery,ESXi; IaaS; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1654
+enterprise-attack,T1657,Financial Theft,Impact,impact,Linux; macOS; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1657
+enterprise-attack,T1659,Content Injection,Initial Access; Command and Control,initial-access;command-and-control,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1659
+enterprise-attack,T1665,Hide Infrastructure,Command and Control,command-and-control,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1665
+enterprise-attack,T1666,Modify Cloud Resource Hierarchy,Defense Impairment,defense-impairment,IaaS,https://attack.mitre.org/techniques/T1666
+enterprise-attack,T1667,Email Bombing,Impact,impact,Linux; Office Suite; Windows; macOS,https://attack.mitre.org/techniques/T1667
+enterprise-attack,T1668,Exclusive Control,Persistence,persistence,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1668
+enterprise-attack,T1669,Wi-Fi Networks,Initial Access,initial-access,Linux; Network Devices; Windows; macOS,https://attack.mitre.org/techniques/T1669
+enterprise-attack,T1671,Cloud Application Integration,Persistence,persistence,Office Suite; SaaS,https://attack.mitre.org/techniques/T1671
+enterprise-attack,T1673,Virtual Machine Discovery,Discovery,discovery,ESXi; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1673
+enterprise-attack,T1674,Input Injection,Execution,execution,Windows; macOS; Linux,https://attack.mitre.org/techniques/T1674
+enterprise-attack,T1675,ESXi Administration Command,Execution,execution,ESXi,https://attack.mitre.org/techniques/T1675
+enterprise-attack,T1677,Poisoned Pipeline Execution,Execution,execution,SaaS,https://attack.mitre.org/techniques/T1677
+enterprise-attack,T1678,Delay Execution,Stealth,stealth,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1678
+enterprise-attack,T1679,Selective Exclusion,Stealth,stealth,Windows,https://attack.mitre.org/techniques/T1679
+enterprise-attack,T1680,Local Storage Discovery,Discovery,discovery,ESXi; IaaS; Linux; macOS; Windows,https://attack.mitre.org/techniques/T1680
+enterprise-attack,T1681,Search Threat Vendor Data,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1681
+enterprise-attack,T1682,Query Public AI Services,Reconnaissance,reconnaissance,PRE,https://attack.mitre.org/techniques/T1682
+enterprise-attack,T1683,Generate Content,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1683
+enterprise-attack,T1683.001,Written Content,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1683/001
+enterprise-attack,T1683.002,Audio-Visual Content,Resource Development,resource-development,PRE,https://attack.mitre.org/techniques/T1683/002
+enterprise-attack,T1684,Social Engineering,Stealth,stealth,Linux; macOS; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1684
+enterprise-attack,T1684.001,Impersonation,Stealth,stealth,Linux; macOS; Office Suite; SaaS; Windows,https://attack.mitre.org/techniques/T1684/001
+enterprise-attack,T1684.002,Email Spoofing,Stealth,stealth,Linux; macOS; Office Suite; Windows,https://attack.mitre.org/techniques/T1684/002
+enterprise-attack,T1685,Disable or Modify Tools,Defense Impairment,defense-impairment,Containers; ESXi; IaaS; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1685
+enterprise-attack,T1685.001,Disable or Modify Windows Event Log,Defense Impairment,defense-impairment,Windows,https://attack.mitre.org/techniques/T1685/001
+enterprise-attack,T1685.002,Disable or Modify Cloud Log,Defense Impairment,defense-impairment,IaaS; SaaS; Identity Provider; Office Suite,https://attack.mitre.org/techniques/T1685/002
+enterprise-attack,T1685.003,Modify or Spoof Tool UI,Defense Impairment,defense-impairment,Linux; macOS; Windows,https://attack.mitre.org/techniques/T1685/003
+enterprise-attack,T1685.004,Disable or Modify Linux Audit System Log,Defense Impairment,defense-impairment,Linux,https://attack.mitre.org/techniques/T1685/004
+enterprise-attack,T1685.005,Clear Windows Event Logs,Defense Impairment,defense-impairment,Windows,https://attack.mitre.org/techniques/T1685/005
+enterprise-attack,T1685.006,Clear Linux or Mac System Logs,Defense Impairment,defense-impairment,Linux; macOS,https://attack.mitre.org/techniques/T1685/006
+enterprise-attack,T1685.007,Impair Autonomous Defenses,Defense Impairment,defense-impairment,Windows; SaaS,https://attack.mitre.org/techniques/T1685/007
+enterprise-attack,T1686,Disable or Modify System Firewall,Defense Impairment,defense-impairment,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1686
+enterprise-attack,T1686.001,Cloud Firewall,Defense Impairment,defense-impairment,IaaS,https://attack.mitre.org/techniques/T1686/001
+enterprise-attack,T1686.002,Network Device Firewall,Defense Impairment,defense-impairment,Network Devices,https://attack.mitre.org/techniques/T1686/002
+enterprise-attack,T1686.003,Windows Host Firewall,Defense Impairment,defense-impairment,Windows,https://attack.mitre.org/techniques/T1686/003
+enterprise-attack,T1687,Exploitation for Defense Impairment,Defense Impairment,defense-impairment,IaaS; Linux; macOS; SaaS; Windows,https://attack.mitre.org/techniques/T1687
+enterprise-attack,T1688,Safe Mode Boot,Defense Impairment,defense-impairment,Windows,https://attack.mitre.org/techniques/T1688
+enterprise-attack,T1689,Downgrade Attack,Defense Impairment,defense-impairment,macOS; Windows; Linux,https://attack.mitre.org/techniques/T1689
+enterprise-attack,T1690,Prevent Command History Logging,Defense Impairment,defense-impairment,ESXi; Linux; macOS; Network Devices; Windows,https://attack.mitre.org/techniques/T1690
+enterprise-attack,T1696,Anti-Automation Evasion,Stealth,stealth,SaaS,https://attack.mitre.org/techniques/T1696
+enterprise-attack,T1696.001,Automate CAPTCHA Completion,Stealth,stealth,SaaS,https://attack.mitre.org/techniques/T1696/001
+enterprise-attack,T1696.002,Avoid CAPTCHA,Stealth,stealth,SaaS,https://attack.mitre.org/techniques/T1696/002
+enterprise-attack,T1697,Steal Application Specific Passwords,Credential Access,credential-access,Office Suite; Identity Provider; SaaS,https://attack.mitre.org/techniques/T1697
+enterprise-attack,T1698,Indirect Prompt Injection,Execution,execution,Windows; SaaS,https://attack.mitre.org/techniques/T1698
+enterprise-attack,T1699,Direct Prompt Injection,Execution,execution,Windows; SaaS,https://attack.mitre.org/techniques/T1699
+enterprise-attack,T1700,AI-Enabled Exfiltration,Exfiltration,exfiltration,Windows; SaaS,https://attack.mitre.org/techniques/T1700
+mobile-attack,T1398,Boot or Logon Initialization Scripts,Persistence,persistence,Android; iOS,https://attack.mitre.org/techniques/T1398
+mobile-attack,T1404,Exploitation for Privilege Escalation,Privilege Escalation,privilege-escalation,Android; iOS,https://attack.mitre.org/techniques/T1404
+mobile-attack,T1406,Obfuscated Files or Information,Defense Evasion,defense-evasion,Android; iOS,https://attack.mitre.org/techniques/T1406
+mobile-attack,T1406.001,Steganography,Defense Evasion,defense-evasion,Android,https://attack.mitre.org/techniques/T1406/001
+mobile-attack,T1406.002,Software Packing,Defense Evasion,defense-evasion,Android; iOS,https://attack.mitre.org/techniques/T1406/002
+mobile-attack,T1407,Download New Code at Runtime,Defense Evasion,defense-evasion,Android; iOS,https://attack.mitre.org/techniques/T1407
+mobile-attack,T1409,Stored Application Data,Collection,collection,Android; iOS,https://attack.mitre.org/techniques/T1409
+mobile-attack,T1414,Clipboard Data,Collection; Credential Access,collection;credential-access,Android; iOS,https://attack.mitre.org/techniques/T1414
+mobile-attack,T1417,Input Capture,Collection; Credential Access,collection;credential-access,Android; iOS,https://attack.mitre.org/techniques/T1417
+mobile-attack,T1417.001,Keylogging,Collection; Credential Access,collection;credential-access,Android; iOS,https://attack.mitre.org/techniques/T1417/001
+mobile-attack,T1417.002,GUI Input Capture,Credential Access; Collection,credential-access;collection,Android; iOS,https://attack.mitre.org/techniques/T1417/002
+mobile-attack,T1418,Software Discovery,Discovery,discovery,Android; iOS,https://attack.mitre.org/techniques/T1418
+mobile-attack,T1418.001,Security Software Discovery,Discovery,discovery,Android; iOS,https://attack.mitre.org/techniques/T1418/001
+mobile-attack,T1420,File and Directory Discovery,Discovery,discovery,Android; iOS,https://attack.mitre.org/techniques/T1420
+mobile-attack,T1421,System Network Connections Discovery,Discovery,discovery,Android,https://attack.mitre.org/techniques/T1421
+mobile-attack,T1422,System Network Configuration Discovery,Discovery,discovery,Android; iOS,https://attack.mitre.org/techniques/T1422
+mobile-attack,T1422.001,Internet Connection Discovery,Discovery,discovery,Android; iOS,https://attack.mitre.org/techniques/T1422/001
+mobile-attack,T1422.002,Wi-Fi Discovery,Discovery,discovery,Android; iOS,https://attack.mitre.org/techniques/T1422/002
+mobile-attack,T1423,Network Service Scanning,Discovery,discovery,Android; iOS,https://attack.mitre.org/techniques/T1423
+mobile-attack,T1424,Process Discovery,Discovery,discovery,Android; iOS,https://attack.mitre.org/techniques/T1424
+mobile-attack,T1426,System Information Discovery,Discovery,discovery,Android; iOS,https://attack.mitre.org/techniques/T1426
+mobile-attack,T1428,Exploitation of Remote Services,Lateral Movement,lateral-movement,Android; iOS,https://attack.mitre.org/techniques/T1428
+mobile-attack,T1429,Audio Capture,Collection,collection,Android; iOS,https://attack.mitre.org/techniques/T1429
+mobile-attack,T1430,Location Tracking,Collection; Discovery,collection;discovery,Android; iOS,https://attack.mitre.org/techniques/T1430
+mobile-attack,T1430.001,Remote Device Management Services,Collection; Discovery,collection;discovery,Android; iOS,https://attack.mitre.org/techniques/T1430/001
+mobile-attack,T1430.002,Impersonate SS7 Nodes,Collection; Discovery,collection;discovery,Android; iOS,https://attack.mitre.org/techniques/T1430/002
+mobile-attack,T1437,Application Layer Protocol,Command and Control,command-and-control,Android; iOS,https://attack.mitre.org/techniques/T1437
+mobile-attack,T1437.001,Web Protocols,Command and Control,command-and-control,Android; iOS,https://attack.mitre.org/techniques/T1437/001
+mobile-attack,T1451,SIM Card Swap,Initial Access,initial-access,Android; iOS,https://attack.mitre.org/techniques/T1451
+mobile-attack,T1453,Abuse Accessibility Features,Collection; Credential Access,collection;credential-access,Android,https://attack.mitre.org/techniques/T1453
+mobile-attack,T1456,Drive-By Compromise,Initial Access,initial-access,Android; iOS,https://attack.mitre.org/techniques/T1456
+mobile-attack,T1458,Replication Through Removable Media,Initial Access; Lateral Movement,initial-access;lateral-movement,Android; iOS,https://attack.mitre.org/techniques/T1458
+mobile-attack,T1461,Lockscreen Bypass,Initial Access,initial-access,Android; iOS,https://attack.mitre.org/techniques/T1461
+mobile-attack,T1464,Network Denial of Service,Impact,impact,Android; iOS,https://attack.mitre.org/techniques/T1464
+mobile-attack,T1471,Data Encrypted for Impact,Impact,impact,Android,https://attack.mitre.org/techniques/T1471
+mobile-attack,T1474,Supply Chain Compromise,Initial Access,initial-access,Android; iOS,https://attack.mitre.org/techniques/T1474
+mobile-attack,T1474.001,Compromise Software Dependencies and Development Tools,Initial Access,initial-access,Android; iOS,https://attack.mitre.org/techniques/T1474/001
+mobile-attack,T1474.002,Compromise Hardware Supply Chain,Initial Access,initial-access,Android; iOS,https://attack.mitre.org/techniques/T1474/002
+mobile-attack,T1474.003,Compromise Software Supply Chain,Initial Access,initial-access,Android; iOS,https://attack.mitre.org/techniques/T1474/003
+mobile-attack,T1476,Deliver Malicious Application via Other Means,Initial Access,initial-access,Android; iOS,https://attack.mitre.org/techniques/T1476
+mobile-attack,T1481,Web Service,Command and Control,command-and-control,Android; iOS,https://attack.mitre.org/techniques/T1481
+mobile-attack,T1481.001,Dead Drop Resolver,Command and Control,command-and-control,Android; iOS,https://attack.mitre.org/techniques/T1481/001
+mobile-attack,T1481.002,Bidirectional Communication,Command and Control,command-and-control,Android; iOS,https://attack.mitre.org/techniques/T1481/002
+mobile-attack,T1481.003,One-Way Communication,Command and Control,command-and-control,Android; iOS,https://attack.mitre.org/techniques/T1481/003
+mobile-attack,T1509,Non-Standard Port,Command and Control,command-and-control,Android; iOS,https://attack.mitre.org/techniques/T1509
+mobile-attack,T1512,Video Capture,Collection,collection,Android; iOS,https://attack.mitre.org/techniques/T1512
+mobile-attack,T1513,Screen Capture,Collection,collection,Android,https://attack.mitre.org/techniques/T1513
+mobile-attack,T1516,Input Injection,Defense Evasion; Impact,defense-evasion;impact,Android,https://attack.mitre.org/techniques/T1516
+mobile-attack,T1517,Access Notifications,Collection; Credential Access,collection;credential-access,Android,https://attack.mitre.org/techniques/T1517
+mobile-attack,T1521,Encrypted Channel,Command and Control,command-and-control,Android; iOS,https://attack.mitre.org/techniques/T1521
+mobile-attack,T1521.001,Symmetric Cryptography,Command and Control,command-and-control,Android; iOS,https://attack.mitre.org/techniques/T1521/001
+mobile-attack,T1521.002,Asymmetric Cryptography,Command and Control,command-and-control,Android; iOS,https://attack.mitre.org/techniques/T1521/002
+mobile-attack,T1521.003,SSL Pinning,Command and Control,command-and-control,Android; iOS,https://attack.mitre.org/techniques/T1521/003
+mobile-attack,T1532,Archive Collected Data,Collection,collection,Android; iOS,https://attack.mitre.org/techniques/T1532
+mobile-attack,T1533,Data from Local System,Collection,collection,Android; iOS,https://attack.mitre.org/techniques/T1533
+mobile-attack,T1541,Foreground Persistence,Defense Evasion; Persistence,defense-evasion;persistence,Android,https://attack.mitre.org/techniques/T1541
+mobile-attack,T1544,Ingress Tool Transfer,Command and Control,command-and-control,Android; iOS,https://attack.mitre.org/techniques/T1544
+mobile-attack,T1575,Native API,Defense Evasion; Execution,defense-evasion;execution,Android,https://attack.mitre.org/techniques/T1575
+mobile-attack,T1577,Compromise Application Executable,Persistence,persistence,Android,https://attack.mitre.org/techniques/T1577
+mobile-attack,T1582,SMS Control,Impact,impact,Android,https://attack.mitre.org/techniques/T1582
+mobile-attack,T1603,Scheduled Task/Job,Execution; Persistence,execution;persistence,Android; iOS,https://attack.mitre.org/techniques/T1603
+mobile-attack,T1604,Proxy Through Victim,Defense Evasion,defense-evasion,Android,https://attack.mitre.org/techniques/T1604
+mobile-attack,T1616,Call Control,Collection; Impact; Command and Control,collection;impact;command-and-control,Android,https://attack.mitre.org/techniques/T1616
+mobile-attack,T1617,Hooking,Defense Evasion,defense-evasion,Android,https://attack.mitre.org/techniques/T1617
+mobile-attack,T1623,Command and Scripting Interpreter,Execution,execution,Android; iOS,https://attack.mitre.org/techniques/T1623
+mobile-attack,T1623.001,Unix Shell,Execution,execution,Android; iOS,https://attack.mitre.org/techniques/T1623/001
+mobile-attack,T1624,Event Triggered Execution,Persistence,persistence,Android,https://attack.mitre.org/techniques/T1624
+mobile-attack,T1624.001,Broadcast Receivers,Persistence,persistence,Android,https://attack.mitre.org/techniques/T1624/001
+mobile-attack,T1625,Hijack Execution Flow,Persistence,persistence,Android,https://attack.mitre.org/techniques/T1625
+mobile-attack,T1625.001,System Runtime API Hijacking,Persistence,persistence,Android,https://attack.mitre.org/techniques/T1625/001
+mobile-attack,T1626,Abuse Elevation Control Mechanism,Privilege Escalation,privilege-escalation,Android,https://attack.mitre.org/techniques/T1626
+mobile-attack,T1626.001,Device Administrator Permissions,Privilege Escalation,privilege-escalation,Android,https://attack.mitre.org/techniques/T1626/001
+mobile-attack,T1627,Execution Guardrails,Defense Evasion,defense-evasion,Android; iOS,https://attack.mitre.org/techniques/T1627
+mobile-attack,T1627.001,Geofencing,Defense Evasion,defense-evasion,Android; iOS,https://attack.mitre.org/techniques/T1627/001
+mobile-attack,T1628,Hide Artifacts,Defense Evasion,defense-evasion,Android,https://attack.mitre.org/techniques/T1628
+mobile-attack,T1628.001,Suppress Application Icon,Defense Evasion,defense-evasion,Android,https://attack.mitre.org/techniques/T1628/001
+mobile-attack,T1628.002,User Evasion,Defense Evasion,defense-evasion,Android,https://attack.mitre.org/techniques/T1628/002
+mobile-attack,T1628.003,Conceal Multimedia Files,Defense Evasion,defense-evasion,Android,https://attack.mitre.org/techniques/T1628/003
+mobile-attack,T1629,Impair Defenses,Defense Evasion,defense-evasion,Android,https://attack.mitre.org/techniques/T1629
+mobile-attack,T1629.001,Prevent Application Removal,Defense Evasion,defense-evasion,Android,https://attack.mitre.org/techniques/T1629/001
+mobile-attack,T1629.002,Device Lockout,Defense Evasion,defense-evasion,Android,https://attack.mitre.org/techniques/T1629/002
+mobile-attack,T1629.003,Disable or Modify Tools,Defense Evasion,defense-evasion,Android,https://attack.mitre.org/techniques/T1629/003
+mobile-attack,T1630,Indicator Removal on Host,Defense Evasion,defense-evasion,iOS; Android,https://attack.mitre.org/techniques/T1630
+mobile-attack,T1630.001,Uninstall Malicious Application,Defense Evasion,defense-evasion,Android,https://attack.mitre.org/techniques/T1630/001
+mobile-attack,T1630.002,File Deletion,Defense Evasion,defense-evasion,Android,https://attack.mitre.org/techniques/T1630/002
+mobile-attack,T1630.003,Disguise Root/Jailbreak Indicators,Defense Evasion,defense-evasion,Android; iOS,https://attack.mitre.org/techniques/T1630/003
+mobile-attack,T1631,Process Injection,Defense Evasion; Privilege Escalation,defense-evasion;privilege-escalation,Android; iOS,https://attack.mitre.org/techniques/T1631
+mobile-attack,T1631.001,Ptrace System Calls,Defense Evasion; Privilege Escalation,defense-evasion;privilege-escalation,Android; iOS,https://attack.mitre.org/techniques/T1631/001
+mobile-attack,T1632,Subvert Trust Controls,Defense Evasion,defense-evasion,Android; iOS,https://attack.mitre.org/techniques/T1632
+mobile-attack,T1632.001,Code Signing Policy Modification,Defense Evasion,defense-evasion,Android; iOS,https://attack.mitre.org/techniques/T1632/001
+mobile-attack,T1633,Virtualization/Sandbox Evasion,Defense Evasion,defense-evasion,Android; iOS,https://attack.mitre.org/techniques/T1633
+mobile-attack,T1633.001,System Checks,Defense Evasion,defense-evasion,Android; iOS,https://attack.mitre.org/techniques/T1633/001
+mobile-attack,T1634,Credentials from Password Store,Credential Access,credential-access,iOS,https://attack.mitre.org/techniques/T1634
+mobile-attack,T1634.001,Keychain,Credential Access,credential-access,iOS,https://attack.mitre.org/techniques/T1634/001
+mobile-attack,T1635,Steal Application Access Token,Credential Access,credential-access,Android; iOS,https://attack.mitre.org/techniques/T1635
+mobile-attack,T1635.001,URI Hijacking,Credential Access,credential-access,Android; iOS,https://attack.mitre.org/techniques/T1635/001
+mobile-attack,T1636,Protected User Data,Collection,collection,Android; iOS,https://attack.mitre.org/techniques/T1636
+mobile-attack,T1636.001,Calendar Entries,Collection,collection,Android; iOS,https://attack.mitre.org/techniques/T1636/001
+mobile-attack,T1636.002,Call Log,Collection,collection,Android; iOS,https://attack.mitre.org/techniques/T1636/002
+mobile-attack,T1636.003,Contact List,Collection,collection,Android; iOS,https://attack.mitre.org/techniques/T1636/003
+mobile-attack,T1636.004,SMS Messages,Collection,collection,Android; iOS,https://attack.mitre.org/techniques/T1636/004
+mobile-attack,T1636.005,Accounts,Collection,collection,Android; iOS,https://attack.mitre.org/techniques/T1636/005
+mobile-attack,T1637,Dynamic Resolution,Command and Control,command-and-control,Android; iOS,https://attack.mitre.org/techniques/T1637
+mobile-attack,T1637.001,Domain Generation Algorithms,Command and Control,command-and-control,Android; iOS,https://attack.mitre.org/techniques/T1637/001
+mobile-attack,T1638,Adversary-in-the-Middle,Collection,collection,Android; iOS,https://attack.mitre.org/techniques/T1638
+mobile-attack,T1639,Exfiltration Over Alternative Protocol,Exfiltration,exfiltration,Android; iOS,https://attack.mitre.org/techniques/T1639
+mobile-attack,T1639.001,Exfiltration Over Unencrypted Non-C2 Protocol,Exfiltration,exfiltration,Android; iOS,https://attack.mitre.org/techniques/T1639/001
+mobile-attack,T1640,Account Access Removal,Impact,impact,Android,https://attack.mitre.org/techniques/T1640
+mobile-attack,T1641,Data Manipulation,Impact,impact,Android,https://attack.mitre.org/techniques/T1641
+mobile-attack,T1641.001,Transmitted Data Manipulation,Impact,impact,Android,https://attack.mitre.org/techniques/T1641/001
+mobile-attack,T1642,Endpoint Denial of Service,Impact,impact,Android; iOS,https://attack.mitre.org/techniques/T1642
+mobile-attack,T1643,Generate Traffic from Victim,Impact,impact,Android; iOS,https://attack.mitre.org/techniques/T1643
+mobile-attack,T1644,Out of Band Data,Command and Control,command-and-control,Android; iOS,https://attack.mitre.org/techniques/T1644
+mobile-attack,T1645,Compromise Client Software Binary,Persistence,persistence,Android; iOS,https://attack.mitre.org/techniques/T1645
+mobile-attack,T1646,Exfiltration Over C2 Channel,Exfiltration,exfiltration,Android; iOS,https://attack.mitre.org/techniques/T1646
+mobile-attack,T1655,Masquerading,Defense Evasion,defense-evasion,Android; iOS,https://attack.mitre.org/techniques/T1655
+mobile-attack,T1655.001,Match Legitimate Name or Location,Defense Evasion,defense-evasion,Android; iOS,https://attack.mitre.org/techniques/T1655/001
+mobile-attack,T1658,Exploitation for Client Execution,Execution,execution,Android; iOS,https://attack.mitre.org/techniques/T1658
+mobile-attack,T1660,Phishing,Initial Access,initial-access,Android; iOS,https://attack.mitre.org/techniques/T1660
+mobile-attack,T1661,Application Versioning,Initial Access; Defense Evasion,initial-access;defense-evasion,Android; iOS,https://attack.mitre.org/techniques/T1661
+mobile-attack,T1662,Data Destruction,Impact,impact,Android,https://attack.mitre.org/techniques/T1662
+mobile-attack,T1663,Remote Access Software,Command and Control,command-and-control,Android; iOS,https://attack.mitre.org/techniques/T1663
+mobile-attack,T1664,Exploitation for Initial Access,Initial Access,initial-access,Android; iOS,https://attack.mitre.org/techniques/T1664
+mobile-attack,T1670,Virtualization Solution,Defense Evasion,defense-evasion,Android,https://attack.mitre.org/techniques/T1670
+mobile-attack,T1676,Linked Devices,Collection; Persistence,collection;persistence,Android; iOS,https://attack.mitre.org/techniques/T1676

@@ -13,7 +13,7 @@ def create_transforms(
         "Artefact_|_/etc/profile|/etc/zshenv|/etc/zprofile|/etc/zlogin|profile\\.d|bash_profile|bashrc|bash_login|bash_logout|zshrc|zshenv|zlogout|zlogin|profile": "T1546.004 - Unix Shell Configuration Modification",  # usb, timeline
         "Artefact_|_/print processors/|/print_processors/": "T1547.012 - Print Processors",  # usb, timeline
         "Artefact_|_/security/policy/secrets": "T1003.004 - LSA Secrets",  # usb, timeline
-        "Artefact_|_/special/perf": "T1337.002 - Office Test",  # usb, timeline
+        "Artefact_|_/special/perf": "T1137.002 - Office Test",  # usb, timeline
         "Artefact_|_/var/log": "T1070.002 - Clear Linux or Mac System Logs",  # usb, timeline
         "Artefact_|_\\.7z|\\.arj|\\.tar|\\.tgz|\\.zip|makecab|tar|xcopy|diantz": "T1560.001 - Archive via Utility",  # usb, timeline
         "Artefact_|_\\.asc|\\.cer|\\.gpg|\\.key|\\.p12|\\.p7b|\\.pem|\\.pfx|\\.pgp|\\.ppk": "T1552.004 - Private Keys",  # usb, timeline
@@ -590,7 +590,7 @@ def create_transforms(
         "Message_|_/etc/profile|/etc/zshenv|/etc/zprofile|/etc/zlogin|profile\\.d|bash_profile|bashrc|bash_login|bash_logout|zshrc|zshenv|zlogout|zlogin|profile": "T1546.004 - Unix Shell Configuration Modification",  # unix-logs, timeline
         "Message_|_/print processors/|/print_processors/": "T1547.012 - Print Processors",  # unix-logs, timeline
         "Message_|_/security/policy/secrets": "T1003.004 - LSA Secrets",  # unix-logs, timeline
-        "Message_|_/special/perf": "T1337.002 - Office Test",  # unix-logs, timeline
+        "Message_|_/special/perf": "T1137.002 - Office Test",  # unix-logs, timeline
         "Message_|_/var/log": "T1070.002 - Clear Linux or Mac System Logs",  # unix-logs, timeline
         "Message_|_\\.7z|\\.arj|\\.tar|\\.tgz|\\.zip|tar|diantz": "T1560.001 - Archive via Utility",  # unix-logs, timeline
         "Message_|_\\.asc|\\.cer|\\.gpg|\\.key|\\.p12|\\.p7b|\\.pem|\\.pfx|\\.pgp|\\.ppk": "T1552.004 - Private Keys",  # unix-logs, timeline
@@ -863,7 +863,7 @@ def create_transforms(
         "Process_|_xwd|screencapture": "T1113 - Screen Capture",  # memory, unix-logs (*nix)
         "Registry_|_/print processors/|/print_processors/": "T1547.012 - Print Processors",  # registry
         "Registry_|_/security/policy/secrets": "T1003.004 - LSA Secrets",  # registry
-        "Registry_|_/special/perf": "T1337.002 - Office Test",  # registry
+        "Registry_|_/special/perf": "T1137.002 - Office Test",  # registry
         "Registry_|_active setup/installed components|active_setup/installed_components": "T1547.014 - Active Setup",  # registry
         "Registry_|_currentcontrolset/control/lsa": "T1003.001 - LSASS Memory|T1547.002 - Authentication Package|T1547.005 - Security Support Provider|T1556.002 - Password Filter DLL",  # registry
         "Registry_|_currentcontrolset/control/nls/language": "T1614.001 - System Language Discovery",  # registry

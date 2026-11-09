@@ -307,8 +307,16 @@ class ServerAccessTest(BackendCase):
         for uri in ("/assets//CASE-LAYER-1.json", "/assets/./CASE-LAYER-1.json", "//assets/CASE-LAYER-1.json",
                     "/assets/x/../CASE-LAYER-1.json", "/assets/%2E/CASE-LAYER-1.json"):
             self.assertEqual(layer(self.bob, uri), 403, uri)
-        # The Navigator itself, and its ATT&CK data
+        # The case's Mobile layer (a phone case's) follows it too
+        self.assertEqual(layer(self.alice, "/assets/CASE-LAYER-1.mobile.json"), 200)
+        self.assertEqual(layer(self.bob, "/assets/CASE-LAYER-1.mobile.json"), 403)
+        self.assertEqual(layer(self.bob, "/assets/x/../CASE-LAYER-1.mobile.json"), 403)
+        # A case named X.mobile is still its own case: Bob can't reach Alice's through it
+        self.create_job(self.alice, "CASE-LAYER-2.mobile")
+        self.assertEqual(layer(self.bob, "/assets/CASE-LAYER-2.mobile.json"), 403)
+        # The Navigator itself, and its ATT&CK data (both domains)
         self.assertEqual(layer(self.bob, "/assets/enterprise-attack.json"), 200)
+        self.assertEqual(layer(self.bob, "/assets/mobile-attack.json"), 200)
         self.assertEqual(layer(self.bob, "/"), 200)
         # A case run from the command line, with no job: admins only
         (self.settings.output_dir / "CLI-CASE-9").mkdir(parents=True, exist_ok=True)

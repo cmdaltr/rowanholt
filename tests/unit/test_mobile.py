@@ -321,12 +321,14 @@ class ManagementTest(unittest.TestCase):
         self.assertEqual(mobile_config.android_config_rows("data/system/device_policies.xml", b"ABX\x00\x01"), [])
 
     def test_mobile_techniques_have_names(self):
+        from rowanholt.post.mitre import attack_lookup
         from rowanholt.post.mitre.attack_data import enrich_technique
-        from rowanholt.post.mitre.mobile_attack import is_mobile_technique
 
-        self.assertEqual(enrich_technique("T1626.001")["mitre_tactics"], ["Privilege Escalation"])
-        self.assertTrue(is_mobile_technique("t1632.001"))
-        self.assertFalse(is_mobile_technique("T1059.001"))
+        admin = enrich_technique("T1626.001")
+        self.assertEqual(admin["mitre_tactics"], ["Privilege Escalation"])
+        self.assertEqual(admin["mitre_domain"], "mobile-attack")
+        self.assertEqual(attack_lookup.domain_of("t1632.001"), "mobile-attack")
+        self.assertEqual(attack_lookup.domain_of("T1059.001"), "enterprise-attack")
         self.assertNotEqual(enrich_technique("T1059.001")["mitre_technique_name"], "Unknown Technique")
 
 

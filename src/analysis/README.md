@@ -31,7 +31,7 @@
 - 🧠 **Memory Forensics**: Full Volatility 3 plugin suite
 - 🔍 **IOC Detection**: YARA rules and keyword searching
 - 🗂️ **Artifact Collection**: Automated collection of key forensic artifacts
-- 📈 **MITRE ATT&CK Mapping**: Comprehensive content-based technique detection with 600+ techniques, multi-tactic support, and ATT&CK Navigator visualization
+- 📈 **MITRE ATT&CK Mapping**: Comprehensive content-based technique detection (about 320 techniques, Enterprise and Mobile, at ATT&CK v20.1), multi-tactic support, and ATT&CK Navigator layers per domain
 - 🔐 **Malware Detection**: ClamAV integration for malware scanning
 - 📤 **SIEM Export**: Direct export to Splunk and Elastic
 

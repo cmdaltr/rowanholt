@@ -7,7 +7,7 @@ Primary method: Read techniques from mitre_techniques.txt file created during en
 This avoids re-reading large JSON files and prevents OOM issues.
 
 Author: Rowanholt DF Acceleration Suite
-Version: 2.2.0
+Version: 2.3.0
 """
 
 import json
@@ -16,8 +16,12 @@ import shutil
 from datetime import datetime
 from typing import List, Optional, Set
 
-from rowanholt.post.mitre.nav_attack import create_attack_navigator
+from rowanholt.post.mitre import attack_lookup
+from rowanholt.post.mitre.layers import build_layer, layer_file, navigator_config
 from rowanholt.post.mitre.enrichment import TECHNIQUES_FILE, get_techniques_from_file
+
+LAYER_COLOUR = "#00acb4"
+NAV_ASSETS_DIR = "/navigator/dist/assets"  # the Navigator serves from here, not its source folder
 
 
 def collect_techniques_from_file(artefacts_directory: str) -> Set[str]:
@@ -63,7 +67,8 @@ def collect_techniques_from_file(artefacts_directory: str) -> Set[str]:
 
 def write_navigator_layer(case: str, techniques: List[str], output_directory: Optional[str] = None) -> bool:
     """
-    Write Navigator layer JSON file.
+    Write the case's Navigator layers, one per ATT&CK domain its techniques belong to:
+    <case>.json (Enterprise) and <case>.mobile.json (Mobile), and point the Navigator at them.
 
     Args:
         case: Case name
@@ -71,211 +76,52 @@ def write_navigator_layer(case: str, techniques: List[str], output_directory: Op
         output_directory: Output directory for copy
 
     Returns:
-        True if successful
+        True if at least one layer was written
     """
-    # Navigator serves from /navigator/dist/assets, not the source folder
-    nav_assets_dir = "/navigator/dist/assets"
+    nav_assets_dir = NAV_ASSETS_DIR
 
-    # Build techniques list as proper JSON objects
-    technique_objects = []
-    for technique in techniques:
-        # Get technique entries from nav_attack (may return multiple for multi-tactic techniques)
-        nav_list = []
-        create_attack_navigator(nav_list, technique)
-
-        # Parse each entry and add to technique_objects
-        # nav_attack.py already replaces ±§§± with full JSON, entries end with '},\n        '
-        for entry in nav_list:
-            # Clean up the entry - remove trailing comma and whitespace
-            entry = entry.strip().rstrip(',').strip()
-
-            # Split on '},\n        {' to handle multi-tactic techniques
-            # But first wrap in array brackets to make it valid JSON
-            if entry.startswith('{') and '},\n        {' in entry:
-                # Multiple technique objects in one entry
-                json_array_str = '[' + entry + ']'
-                # Clean up any trailing commas before ]
-                json_array_str = json_array_str.replace(',\n        ]', ']').replace(',]', ']')
-                try:
-                    objs = json.loads(json_array_str)
-                    technique_objects.extend(objs)
-                except json.JSONDecodeError:
-                    # Try parsing individual objects
-                    for obj_str in entry.split('},\n        {'):
-                        obj_str = obj_str.strip().rstrip(',').strip()
-                        if not obj_str.startswith('{'):
-                            obj_str = '{' + obj_str
-                        if not obj_str.endswith('}'):
-                            obj_str = obj_str + '}'
-                        try:
-                            obj = json.loads(obj_str)
-                            technique_objects.append(obj)
-                        except json.JSONDecodeError:
-                            continue
-            else:
-                # Single technique object
-                if not entry.endswith('}'):
-                    entry = entry + '}'
-                try:
-                    obj = json.loads(entry)
-                    technique_objects.append(obj)
-                except json.JSONDecodeError:
-                    continue
-
-    if not technique_objects:
+    grouped = attack_lookup.by_domain(techniques)
+    unknown = grouped.pop(None, [])
+    if unknown:
+        print(f"     Not in ATT&CK v{attack_lookup.version()}, left out of the layer: {', '.join(unknown)}")
+    if not grouped:
         return False
 
-    # Deduplicate by (techniqueID, tactic) tuple
-    seen = set()
-    unique_techniques = []
-    for obj in technique_objects:
-        key = (obj.get("techniqueID", ""), obj.get("tactic", ""))
-        if key not in seen:
-            seen.add(key)
-            unique_techniques.append(obj)
-
-    # Build the complete Navigator layer structure
-    layer = {
-        "name": case,
-        "versions": {
-            "attack": "13",
-            "navigator": "5.1.0",
-            "layer": "4.5"
-        },
-        "domain": "enterprise-attack",
-        "description": "",
-        "filters": {
-            "platforms": ["Linux", "macOS", "Windows", "Containers"]
-        },
-        "sorting": 0,
-        "layout": {
-            "layout": "side",
-            "aggregateFunction": "average",
-            "showID": False,
-            "showName": True,
-            "showAggregateScores": False,
-            "countUnscored": False
-        },
-        "hideDisabled": False,
-        "techniques": unique_techniques,
-        "gradient": {
-            "colors": ["#ff6666ff", "#ffe766ff", "#8ec843ff"],
-            "minValue": 0,
-            "maxValue": 100
-        },
-        "legendItems": [{
-            "label": "Evidence of",
-            "color": "#00acb4"
-        }],
-        "metadata": [],
-        "showTacticRowBackground": False,
-        "tacticRowBackground": "#dddddd",
-        "selectTechniquesAcrossTactics": True,
-        "selectSubtechniquesWithParent": False
-    }
-
-    final_path = f"{nav_assets_dir}/{case}.json"
-
-    try:
-        with open(final_path, "w") as f:
-            json.dump(layer, f, indent=4)
-
-        # Write config.json
-        write_navigator_config(case, nav_assets_dir)
+    written = []
+    for domain, ids in grouped.items():
+        layer = build_layer(case, domain, {tid: (LAYER_COLOUR, "") for tid in ids},
+                            legend=[{"label": "Evidence of", "color": LAYER_COLOUR}])
+        name = layer_file(case, domain)
+        final_path = f"{nav_assets_dir}/{name}"
+        try:
+            with open(final_path, "w") as f:
+                json.dump(layer, f, indent=4)
+        except Exception as e:
+            print(f"     Error writing Navigator layer: {e}")
+            continue
+        written.append(name)
+        print(f"     {attack_lookup.DOMAIN_NAMES[domain]} layer: {len(ids)} techniques")
 
         # Copy to output directory
         if output_directory:
-            nav_dest = os.path.join(output_directory, f"{case}_navigator.json")
+            suffix = "_mobile" if domain == attack_lookup.MOBILE else ""
+            nav_dest = os.path.join(output_directory, f"{case}{suffix}_navigator.json")
             try:
                 shutil.copy2(final_path, nav_dest)
                 print(f"     Navigator layer copied to: {nav_dest}")
             except Exception as e:
                 print(f"     Warning: Could not copy Navigator JSON: {str(e)[:100]}")
 
-        return True
-
-    except Exception as e:
-        print(f"     Error writing Navigator layer: {e}")
+    if not written:
         return False
+    write_navigator_config(written, nav_assets_dir)
+    return True
 
 
-def write_navigator_config(case: str, nav_assets_dir: str):
-    """Write Navigator config.json."""
-    config_path = f"{nav_assets_dir}/config.json"
-
-    config = {
-        "versions": {
-            "enabled": True,
-            "entries": [{
-                "name": "ATT&CK v13",
-                "version": "13",
-                "domains": [{
-                    "name": "Enterprise",
-                    "identifier": "enterprise-attack",
-                    "data": ["assets/enterprise-attack.json"]
-                }]
-            }]
-        },
-        "custom_context_menu_items": [],
-        "default_layers": {
-            "enabled": True,
-            "urls": [f"assets/{case}.json"]
-        },
-        "comment_color": "yellow",
-        "link_color": "blue",
-        "metadata_color": "purple",
-        "banner": "",
-        "customize_features": [
-            {"name": "multiselect", "enabled": True, "description": ""},
-            {"name": "export_render", "enabled": True, "description": ""},
-            {"name": "export_excel", "enabled": True, "description": ""},
-            {"name": "legend", "enabled": True, "description": ""},
-            {"name": "background_color", "enabled": True, "description": ""},
-            {"name": "non_aggregate_score_color", "enabled": True, "description": ""},
-            {"name": "aggregate_score_color", "enabled": True, "description": ""},
-            {"name": "comment_underline", "enabled": True, "description": ""},
-            {"name": "metadata_underline", "enabled": True, "description": ""},
-            {"name": "link_underline", "enabled": True, "description": ""}
-        ],
-        "features": [
-            {"name": "leave_site_dialog", "enabled": True, "description": ""},
-            {"name": "tabs", "enabled": True, "description": ""},
-            {"name": "header", "enabled": True, "description": ""},
-            {"name": "selection_controls", "enabled": True, "description": "",
-             "subfeatures": [
-                {"name": "search", "enabled": True, "display_name": "search & multiselect", "description": ""},
-                {"name": "deselect_all", "enabled": True, "display_name": "deselect techniques", "description": ""},
-                {"name": "selecting_techniques", "enabled": True, "display_name": "selection behavior", "description": ""}
-             ]},
-            {"name": "layer_controls", "enabled": True, "description": "",
-             "subfeatures": [
-                {"name": "layer_settings", "enabled": True, "display_name": "layer settings", "description": ""},
-                {"name": "download_layer", "enabled": True, "display_name": "export", "description": ""},
-                {"name": "filters", "enabled": True, "display_name": "filters", "description": ""},
-                {"name": "sorting", "enabled": True, "display_name": "sorting", "description": ""},
-                {"name": "color_setup", "enabled": True, "display_name": "color setup", "description": ""},
-                {"name": "toggle_hide_disabled", "enabled": True, "display_name": "show/hide disabled", "description": ""},
-                {"name": "subtechniques", "enabled": True, "display_name": "sub-techniques", "description": ""}
-             ]},
-            {"name": "technique_controls", "enabled": True, "description": "",
-             "subfeatures": [
-                {"name": "disable_techniques", "enabled": True, "display_name": "toggle state", "description": ""},
-                {"name": "manual_color", "enabled": True, "display_name": "background color", "description": ""},
-                {"name": "scoring", "enabled": True, "display_name": "scoring", "description": ""},
-                {"name": "comments", "enabled": True, "display_name": "comment", "description": ""},
-                {"name": "links", "enabled": True, "display_name": "link", "description": ""},
-                {"name": "metadata", "enabled": True, "display_name": "metadata", "description": ""},
-                {"name": "clear_annotations", "enabled": True, "display_name": "clear annotations on selected", "description": ""}
-             ]},
-            {"name": "toolbar_controls", "enabled": True, "description": "",
-             "subfeatures": [
-                {"name": "sticky_toolbar", "enabled": True, "description": ""}
-             ]}
-        ]
-    }
-
-    with open(config_path, "w") as f:
-        json.dump(config, f, indent=2)
+def write_navigator_config(layer_names: List[str], nav_assets_dir: str):
+    """Write Navigator config.json: the pinned release's domains, opening on these layers."""
+    with open(f"{nav_assets_dir}/config.json", "w") as f:
+        json.dump(navigator_config([f"assets/{name}" for name in layer_names]), f, indent=2)
 
 
 def configure_navigator(verbosity, case, splunk, elastic, usercred, pswdcred, output_directory=None):
@@ -292,7 +138,7 @@ def configure_navigator(verbosity, case, splunk, elastic, usercred, pswdcred, ou
     print(f" -> {datetime.now().isoformat().replace('T', ' ')} -> mapping artefacts to MITRE ATT&CK Navigator...")
 
     # Check if Navigator is installed (serves from dist folder)
-    nav_assets_dir = "/navigator/dist/assets"
+    nav_assets_dir = NAV_ASSETS_DIR
     if not os.path.exists(nav_assets_dir):
         print(f" -> {datetime.now().isoformat().replace('T', ' ')} -> ATT&CK Navigator not installed - skipping")
         print(f"     (Navigator assets directory not found: {nav_assets_dir})")

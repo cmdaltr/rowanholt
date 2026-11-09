@@ -38,11 +38,26 @@ def _load_records():
 
 records = _load_records()
 
+
+def _load_attack_lookup():
+    """rowanholt/post/mitre/attack_lookup.py: imported in Elrond, loaded by path in the backend."""
+    try:
+        from rowanholt.post.mitre import attack_lookup as module
+        return module
+    except ImportError:
+        path = Path(__file__).resolve().parents[1] / "post" / "mitre" / "attack_lookup.py"
+        spec = importlib.util.spec_from_file_location("rowanholt_report_attack_lookup", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+
+attack_lookup = _load_attack_lookup()
+
 CASE_HOST = "(case)"
 METHOD_FILE = "rowanholt_method.json"
 AUDIT_LOG = "rowanholt_audit.log"
 TECHNIQUES_FILE = "mitre_techniques.txt"
-ATTACK_CSV = Path(__file__).resolve().parents[1] / "post" / "mitre" / "enterprise_attack.csv"
 TECHNIQUE = re.compile(r"^T\d{4}(?:\.\d{3})?$")
 ENVELOPE = tuple(records.ENVELOPE)
 CITES_PER_FILE = 5  # rows cited per technique per file; the rest are counted
@@ -618,28 +633,18 @@ def _recorded_techniques(report: CaseReport, root: Path) -> None:
 
 
 def attack_names(wanted: List[str]) -> Dict[str, Tuple[str, str]]:
-    """(name, tactics) for each technique, from post/mitre/enterprise_attack.csv; a
-    sub-technique's name is given with its parent's, as ATT&CK writes it."""
-    ids = set(wanted) | {t.split(".")[0] for t in wanted}
-    found: Dict[str, Tuple[str, str]] = {}
-    if not ATTACK_CSV.is_file():
-        return {}
-    with open(ATTACK_CSV, newline="", encoding="utf-8", errors="replace") as fh:
-        for row in csv.DictReader(fh):
-            tid = row.get("technique_id", "")
-            if tid in ids and tid not in found:
-                found[tid] = (row.get("technique_name", ""), row.get("tactics", ""))
-                if len(found) == len(ids):
-                    break
+    """(name, tactics) for each technique, Enterprise or Mobile, from the pinned ATT&CK release
+    (post/mitre/attack_lookup.py); a sub-technique's name is given with its parent's, as ATT&CK
+    writes it. A Mobile technique's tactics say so ("Defense Evasion (Mobile)")."""
     named = {}
     for tid in wanted:
-        if tid not in found:
+        found = attack_lookup.technique(tid)
+        if not found:
             continue
-        name, tactics = found[tid]
-        parent = found.get(tid.split(".")[0])
-        if "." in tid and parent and not name.startswith(parent[0]):
-            name = f"{parent[0]}: {name}"
-        named[tid] = (name, tactics)
+        tactics = ", ".join(found.tactics)
+        if found.domain == attack_lookup.MOBILE:
+            tactics = f"{tactics} (Mobile)"
+        named[tid] = (attack_lookup.full_name(tid), tactics)
     return named
 
 

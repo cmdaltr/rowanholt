@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 STATUSES = ("lead", "confirmed", "benign")
 HOST_STATUSES = ("to do", "in progress", "done")
 TECHNIQUE = re.compile(r"^T\d{4}(?:\.\d{3})?$")
+CONFIRMED_COLOUR = "#ed5565"
 EXCERPT = 600
 LIVE_EVERY = 2.0  # seconds between the live socket's checks
 # Aulë's MCP server (src/aule_mcp) sends this on every call, so what it writes reads as Aulë's, on the
@@ -549,31 +550,23 @@ def report_markdown(case_number: str, findings: List[Dict], notes: List[Dict]) -
     return "\n".join(lines).rstrip() + "\n"
 
 
-def navigator_layer(case_number: str, findings: List[Dict]) -> Dict:
-    """An ATT&CK Navigator layer of the confirmed findings' techniques, in post/mitre/nav_config.py's format."""
-    techniques: Dict[str, List[str]] = {}
+def navigator_layer(case_number: str, findings: List[Dict], domain: Optional[str] = None) -> Dict:
+    """An ATT&CK Navigator layer of the confirmed findings' techniques (post/mitre/layers.py).
+    A layer holds one domain: ``domain``, or else whichever of Enterprise and Mobile has more
+    of them (Enterprise on a tie). IDs the pinned ATT&CK release doesn't have are left out."""
+    layers = case_files.mitre_layers()
+    attack = layers.attack_lookup
+    titles: Dict[str, List[str]] = {}
     for f in findings:
         if f["status"] == "confirmed" and f["technique"]:
-            techniques.setdefault(f["technique"], []).append(f"#{f['id']} {f['title']}")
-    return {
-        "name": f"{case_number} (confirmed)",
-        "versions": {"attack": "13", "navigator": "5.1.0", "layer": "4.5"},
-        "domain": "enterprise-attack",
-        "description": "Techniques behind the analysts' confirmed findings only",
-        "filters": {"platforms": ["Linux", "macOS", "Windows", "Containers"]},
-        "sorting": 0,
-        "layout": {"layout": "side", "aggregateFunction": "average", "showID": True, "showName": True,
-                   "showAggregateScores": False, "countUnscored": False},
-        "hideDisabled": False,
-        "techniques": [{"techniqueID": t, "color": "#ed5565", "comment": "; ".join(titles)[:1000], "enabled": True,
-                        "showSubtechniques": "." in t} for t, titles in sorted(techniques.items())],
-        "legendItems": [{"label": "Confirmed finding", "color": "#ed5565"}],
-        "metadata": [],
-        "showTacticRowBackground": False,
-        "tacticRowBackground": "#dddddd",
-        "selectTechniquesAcrossTactics": True,
-        "selectSubtechniquesWithParent": False,
-    }
+            titles.setdefault(attack.normalise(f["technique"]), []).append(f"#{f['id']} {f['title']}")
+    grouped = attack.by_domain(titles)
+    if domain is None:
+        domain = max(attack.DOMAINS, key=lambda d: (len(grouped.get(d, [])), d == attack.ENTERPRISE))
+    return layers.build_layer(f"{case_number} (confirmed)", domain,
+                              {t: (CONFIRMED_COLOUR, "; ".join(titles[t])[:1000]) for t in grouped.get(domain, [])},
+                              description="Techniques behind the analysts' confirmed findings only",
+                              legend=[{"label": "Confirmed finding", "color": CONFIRMED_COLOUR}], show_ids=True)
 
 
 @router.get("/report", response_class=PlainTextResponse)
@@ -652,8 +645,8 @@ async def full_report(job_id: str, request: Request,
 
 
 @router.get("/layer")
-async def layer(job_id: str):
+async def layer(job_id: str, domain: Optional[str] = Query(None, pattern="^(enterprise|mobile)-attack$")):
     job = _jobs.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    return navigator_layer(job.case_number, store().findings(job_id))
+    return navigator_layer(job.case_number, store().findings(job_id), domain)

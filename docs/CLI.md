@@ -362,7 +362,7 @@ For chain of custody, every file of each item is hashed (SHA-256) when it's regi
 | Bug report (`.zip`) | ALEAPP `-t zip` (its `bugreport*` modules) |
 | File system extraction | iLEAPP or ALEAPP `-t fs`, `zip`, `tar` or `gz`, by what's in it: `private/var/mobile/...` is an iPhone, `data/data/...`, `data/system/...` an Android phone, up to two folders down (`filesystem1/`, `Dump/`) |
 
-The tool's report is kept in `<host>/mobile/iLEAPP/` or `ALEAPP/` (HTML, TSV, timeline, LAVA), its console output in `<host>/mobile/<tool>.log`. Each TSV export becomes `artefacts/cooked/ileapp/<artefact>.jsonl` or `aleapp/<artefact>.jsonl` (in parts below 9 MB, so IOC extraction reads them all), the record's `timestamp` from the first time-like column whose values are times. Elrond reads device management itself into `cooked/mobile_management.jsonl`, since neither tool reports it: iOS configuration profiles (`Library/ConfigurationProfiles/profile-*.stub`), MDM enrolment (`MDM.plist`) and automated enrolment (`CloudConfigurationDetails.plist`), and Android device administrators (`data/system/device_policies.xml`) and device and profile owners (`device_owner_2.xml`). Techniques come from the MITRE ATT&CK Mobile matrix, only where the setting is the technique's own mechanism: MDM enrolment, or a profile that enrols in MDM or installs a root certificate, is **T1632.001** (Code Signing Policy Modification); an Android device administrator or owner is **T1626.001** (Device Administrator Permissions). A company's own MDM looks the same; the `Flag` says what it is. Every cooked record with a time goes, in order, into `artefacts/mobile_timeline.jsonl`, which Splunk, Elastic and Aulë index beside the Plaso timeline. IOC extraction (`--extractIocs`) reads the cooked tables as for any host. `--Timeline`, `--Userprofiles`, `--vss` and `--collectFiles` don't apply.
+The tool's report is kept in `<host>/mobile/iLEAPP/` or `ALEAPP/` (HTML, TSV, timeline, LAVA), its console output in `<host>/mobile/<tool>.log`. Each TSV export becomes `artefacts/cooked/ileapp/<artefact>.jsonl` or `aleapp/<artefact>.jsonl` (in parts below 9 MB, so IOC extraction reads them all), the record's `timestamp` from the first time-like column whose values are times. Elrond reads device management itself into `cooked/mobile_management.jsonl`, since neither tool reports it: iOS configuration profiles (`Library/ConfigurationProfiles/profile-*.stub`), MDM enrolment (`MDM.plist`) and automated enrolment (`CloudConfigurationDetails.plist`), and Android device administrators (`data/system/device_policies.xml`) and device and profile owners (`device_owner_2.xml`). Techniques come from the MITRE ATT&CK Mobile matrix, only where the setting is the technique's own mechanism: MDM enrolment, or a profile that enrols in MDM or installs a root certificate, is **T1632.001** (Code Signing Policy Modification); an Android device administrator or owner is **T1626.001** (Device Administrator Permissions). A company's own MDM looks the same; the `Flag` says what it is. Both are ATT&CK Mobile techniques, so they go in the case's Mobile Navigator layer (`<case>.mobile.json`), not its Enterprise one. Every cooked record with a time goes, in order, into `artefacts/mobile_timeline.jsonl`, which Splunk, Elastic and Aulë index beside the Plaso timeline. IOC extraction (`--extractIocs`) reads the cooked tables as for any host. `--Timeline`, `--Userprofiles`, `--vss` and `--collectFiles` don't apply.
 
 An encrypted iTunes backup's configuration profiles aren't read (iLEAPP decrypts the backup, Elrond doesn't); its other artefacts are. If the password turns up in iLEAPP's own output files, Elrond names the files in the audit log (never the password) so they can be checked before the case is shared.
 
@@ -434,7 +434,7 @@ printf '%s\n' "$BACKUP_PASSWORD" | python3 src/analysis/elrond.py CASE-PHONES /e
 | `--Elastic` | Index output into the local Elasticsearch instance |
 | `--OpenSearch` | Index output into OpenSearch, or Wazuh's indexer (`OPENSEARCH_URL`; see [SIEM Integration](#siem-integration)) |
 | `--Timesketch` | Send each host's timed records to Timesketch as a timeline (`TIMESKETCH_URL`) |
-| `--Navigator` | Build an ATT&CK Navigator layer from the case's `mitre_techniques.txt` |
+| `--Navigator` | Build the case's ATT&CK Navigator layers from its `mitre_techniques.txt`: `<case>.json` for Enterprise and, when it has any, `<case>.mobile.json` for Mobile (see [ATT&CK release](#attck-release)) |
 | `--Index` | Index a case already processed into Splunk, Elastic, OpenSearch, Timesketch and/or the Navigator (with the options above), without mounting, extracting or processing again; the one directory is the case's folder |
 | `--Ziparchive` | Zip raw data after processing |
 | `--Delete` | Delete raw data after processing |
@@ -607,7 +607,19 @@ python3 -m src.analysis.mitre.coverage_cli init CASE-001 /output/CASE-001
 python3 -m src.analysis.mitre.coverage_cli dashboard CASE-001 /output/CASE-001 -o coverage.html
 ```
 
-The ATT&CK Navigator layer for a case comes from Elrond (`--Navigator`) or the API (`GET /api/jobs/{job_id}/navigator`), not from these tools.
+The ATT&CK Navigator layers for a case come from Elrond (`--Navigator`) or the API (`GET /api/jobs/{job_id}/navigator?domain=enterprise-attack|mobile-attack`), not from these tools.
+
+### ATT&CK release
+
+Rowanholt names and lays out techniques from one pinned ATT&CK release, both domains: `src/analysis/rowanholt/post/mitre/attack_techniques.csv` and `attack_release.json`, generated from MITRE's versioned STIX bundles ([attack-stix-data](https://github.com/mitre-attack/attack-stix-data)) and never edited by hand. The case report, Elastic's `mitre_*` fields, Splunk's `mitre.csv` lookup and the Navigator layers all read it.
+
+Cloud isn't a domain of its own: IaaS, SaaS, Office Suite, Identity Provider and Containers are Enterprise platforms, and a case's Enterprise layer lets every platform through, so cloud-only techniques (T1580, Cloud Infrastructure Discovery, is IaaS alone) show. Mobile is its own domain with its own matrix, so a case with Mobile techniques (phones, `--Mobile`) gets a second layer, `<case>.mobile.json`, opened with the Enterprise one; the web app's Navigator link opens a phone case's Mobile layer. A technique MITRE has since revoked still resolves, to its replacement: a case that recorded T1562.001 shows it as T1685, Disable or Modify Tools.
+
+The Navigator (v5.3.2) downloads the same release's two bundles the first time it starts after the release changes. To move to a new release, download both bundles of it and regenerate, then change the release in `docker-compose.yml`'s `navigator` service to match (`tests/unit/test_attack_domains.py` fails until it does):
+
+```bash
+python3 scripts/attack/build_attack_data.py enterprise-attack-20.1.json mobile-attack-20.1.json
+```
 
 ---
 
@@ -625,6 +637,8 @@ python3 -m src.analysis.rowanholt.cloud.cli {aws|azure|gcp|k8s} COMMAND [OPTIONS
 | `analyze-logs` | `-f LOG_FILE [-c CREDS] [-o DIR]` | Analyse acquired logs |
 
 `--region` applies to AWS (and Azure location), `--resource-group` to Azure, `--zone` to GCP.
+
+`analyze-logs` (and `acquire-logs --analyze`) adds the techniques it finds to `mitre_techniques.txt` in its output folder, as every other source of evidence does: with `-o` set to the case's folder, they're in its Navigator layer, its report and Pippin's matching.
 
 `k8s` takes only `analyze-logs`, with no credentials: an API server audit log exported from EKS, AKS, GKE or a self-managed cluster (JSON lines, a JSON array or an `EventList`), written as `k8s_audit.jsonl` and `k8s_audit_analysis.json` with the same flags and techniques as a node's collected audit log.
 

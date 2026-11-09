@@ -179,6 +179,11 @@ def test_findings_notes_and_output(client):
     assert "Same IP as the web shell" in report and "Scoped to one host so far" in report
     layer = api.get(f"{base}/layer").json()
     assert [t["techniqueID"] for t in layer["techniques"]] == ["T1053.003"]
+    assert layer["domain"] == "enterprise-attack" and "IaaS" in layer["filters"]["platforms"]
+    # One domain per layer: the confirmed findings have no Mobile technique
+    mobile = api.get(f"{base}/layer?domain=mobile-attack").json()
+    assert mobile["domain"] == "mobile-attack" and mobile["techniques"] == []
+    assert api.get(f"{base}/layer?domain=ics-attack").status_code == 422
 
     actions = [a["action"] for a in api.get(f"{base}/activity").json()]
     assert actions[0] == "exported" and actions.count("flagged") == 2 and "assigned" in actions

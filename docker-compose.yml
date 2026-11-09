@@ -76,7 +76,7 @@ services:
       - ./src/analysis/rowanholt/threat_intel:/opt/elrond-src/rowanholt/threat_intel:ro # threat intelligence parsing (/api/threat-intel)
       - ./src/analysis/rowanholt/core:/opt/elrond-src/rowanholt/core:ro # reading case tables (rowanholt/core/records.py)
       - ./src/analysis/rowanholt/report:/opt/elrond-src/rowanholt/report:ro # the case report (/api/jobs/{id}/case/full-report)
-      - ./src/analysis/rowanholt/post/mitre/enterprise_attack.csv:/opt/elrond-src/rowanholt/post/mitre/enterprise_attack.csv:ro # technique names in the report
+      - ./src/analysis/rowanholt/post/mitre:/opt/elrond-src/rowanholt/post/mitre:ro # the pinned ATT&CK release: technique names in the report, Navigator layers
       - anduril_token:/run/anduril:ro # Written by anduril
       # Platform-specific mounts - uncomment for your OS:
       # - /mnt:/mnt:ro              # Linux: Mount points (read-only)
@@ -461,17 +461,21 @@ services:
       if [ ! -d 'attack-navigator' ]; then
         echo 'Cloning ATT&CK Navigator...' &&
         apk add --no-cache git curl &&
-        git clone --depth 1 https://github.com/mitre-attack/attack-navigator.git &&
+        git clone --depth 1 --branch v5.3.2 https://github.com/mitre-attack/attack-navigator.git &&
         cd attack-navigator/nav-app &&
         echo 'Installing dependencies...' &&
         npm install &&
         echo 'Building Navigator (this may take a few minutes)...' &&
         NODE_OPTIONS='--max-old-space-size=3072' npm run build -- --output-path=/navigator/dist;
       fi &&
-      if [ ! -f '/navigator/dist/assets/enterprise-attack.json' ]; then
-        echo 'Downloading MITRE ATT&CK Enterprise v13.1 data...' &&
+      if [ \"$$(cat /navigator/dist/assets/attack-release 2>/dev/null)\" != '20.1' ]; then
+        echo 'Downloading MITRE ATT&CK v20.1 (Enterprise and Mobile)...' &&
+        apk add --no-cache curl &&
         mkdir -p /navigator/dist/assets &&
-        curl -sL 'https://raw.githubusercontent.com/mitre/cti/ATT%26CK-v13.1/enterprise-attack/enterprise-attack.json' -o /navigator/dist/assets/enterprise-attack.json;
+        for d in enterprise mobile; do
+          curl -fsSL \"https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/$$d-attack/$$d-attack-20.1.json\" -o \"/navigator/dist/assets/$$d-attack.json\" || exit 1;
+        done &&
+        echo 20.1 > /navigator/dist/assets/attack-release;
       fi &&
       echo 'Serving Navigator on port 4200...' &&
       npx serve -s /navigator/dist -l 4200

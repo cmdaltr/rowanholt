@@ -11,12 +11,15 @@ Comprehensive ATT&CK technique metadata including:
 This data is used to enrich JSON artefacts with full ATT&CK context,
 independent of any SIEM platform.
 
-Data source: MITRE ATT&CK Enterprise v14
+Groups, software and procedures: curated, from MITRE ATT&CK Enterprise v14.
+Names, tactics and domains: the pinned release (attack_lookup.py), Enterprise and Mobile.
 Author: Rowanholt DF Acceleration Suite
 Version: 1.0.0
 """
 
 from typing import Dict, List, Optional
+
+from rowanholt.post.mitre import attack_lookup
 
 
 # Complete ATT&CK technique metadata
@@ -1508,18 +1511,17 @@ def get_technique_data(technique_id: str) -> Optional[Dict]:
     Returns:
         Dictionary with technique metadata, or None if not found
     """
-    # Normalize technique ID
-    technique_id = technique_id.upper()
-    if not technique_id.startswith("T"):
-        technique_id = "T" + technique_id
-
-    data = ATTACK_TECHNIQUES.get(technique_id)
-    if data is None:  # the few Mobile techniques Elrond tags (phones, --Mobile)
-        try:
-            from rowanholt.post.mitre.mobile_attack import get_mobile_technique
-        except ImportError:
-            from .mobile_attack import get_mobile_technique
-        data = get_mobile_technique(technique_id)
+    technique_id = attack_lookup.normalise(technique_id)
+    published = attack_lookup.technique(technique_id)
+    curated = ATTACK_TECHNIQUES.get(technique_id)
+    if published is None:
+        return curated
+    # Name, tactics and domain from the pinned release (Enterprise or Mobile); groups,
+    # software and procedures from the curated entries above, where there is one
+    data = dict(curated or {})
+    data.update({"name": attack_lookup.full_name(technique_id), "tactics": published.tactics,
+                 "domain": published.domain, "platforms": published.platforms})
+    data.setdefault("description", "")
     return data
 
 
@@ -1560,6 +1562,7 @@ def enrich_technique(technique_id: str) -> Dict:
         return {
             "mitre_technique_id": technique_id,
             "mitre_technique_name": "Unknown Technique",
+            "mitre_domain": "",
             "mitre_tactics": [],
             "mitre_description": "",
             "mitre_groups": [],
@@ -1570,6 +1573,7 @@ def enrich_technique(technique_id: str) -> Dict:
     return {
         "mitre_technique_id": technique_id,
         "mitre_technique_name": data.get("name", ""),
+        "mitre_domain": data.get("domain", ""),
         "mitre_tactics": data.get("tactics", []),
         "mitre_description": data.get("description", ""),
         "mitre_groups": data.get("groups", []),

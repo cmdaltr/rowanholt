@@ -11,7 +11,7 @@ The MITRE ATT&CK Integration Module provides comprehensive content-based techniq
 
 - ✅ **Comprehensive Content Scanning**: Scans ALL JSON records (no sampling) for accurate detection
 - ✅ **Large File Streaming**: Supports files >10MB with chunked content scanning
-- ✅ **600+ ATT&CK Techniques**: Full MITRE ATT&CK v18.1 coverage with descriptions
+- ✅ **ATT&CK v20.1**: every Enterprise and Mobile technique named (`rowanholt/post/mitre/attack_lookup.py`); about 320 detected
 - ✅ **Multi-Tactic Support**: Techniques mapped to all relevant tactics (e.g., T1078 maps to 4 tactics)
 - ✅ **Pattern-Based Detection**: Content matching for PowerShell, mimikatz, lateral movement, etc.
 - ✅ **ATT&CK Navigator Integration**: Automatic layer file generation for visualization
@@ -505,7 +505,8 @@ techniques = mapper.map_artifact_to_techniques(
 - [ ] Automated threat hunting rules
 - [ ] Integration with threat intelligence feeds
 - [ ] Real-time technique detection
-- [ ] Mobile and ICS ATT&CK support
+- [x] Mobile ATT&CK (names, layers: `rowanholt/post/mitre/attack_lookup.py`, `layers.py`)
+- [ ] ICS ATT&CK support
 - [ ] Custom technique definitions
 
 ## References

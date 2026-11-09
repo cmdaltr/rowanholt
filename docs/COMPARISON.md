@@ -12,7 +12,7 @@ Rowanholt sits among a well-established set of DFIR tools, free and commercial. 
 | Disk images (E01, raw, VMDK) | ✓ | ✓ raw and E01 | ✓ | ✓ mounted | ✓ | ✓ |
 | Memory analysis | ✓ Volatility 3 | ◐ collection | ◐ Volatility module | — | — | — |
 | Super-timeline | ✓ Plaso | ◐ | ✓ | ◐ CSV | ✓ | ◐ |
-| ATT&CK mapping of findings | ✓ 600+ techniques, Navigator layer | ◐ built-in Sigma rules | — | — | ◐ Sigma analyser | — |
+| ATT&CK mapping of findings | ✓ ATT&CK v20.1, Enterprise and Mobile; about 320 techniques detected; Navigator layers | ◐ built-in Sigma rules | — | — | ◐ Sigma analyser | — |
 | Stacking across hosts | ✓ with a reason per row | ✓ hunts | — | — | — | — |
 | Threat intelligence matching | ✓ STIX 2.1, TAXII 2.1, MITRESaw, watchlists | ◐ IOC and YARA hunts | ◐ hash sets | — | ◐ analysers | ◐ YARA |
 | Containers and Kubernetes | ✓ Docker, static pods, audit logs | ◐ | — | — | ◐ Docker logs | ✓ Docker containers as targets |

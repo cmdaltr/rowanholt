@@ -1280,9 +1280,11 @@ async def trigger_siem_export(job_id: str):
 
 
 @app.get("/api/jobs/{job_id}/navigator")
-async def get_navigator_json(job_id: str):
+async def get_navigator_json(job_id: str, domain: Optional[str] = Query(None, pattern="^(enterprise|mobile)-attack$")):
     """
-    Get the MITRE ATT&CK Navigator JSON file for a job.
+    Get the MITRE ATT&CK Navigator JSON file for a job: its Enterprise layer
+    (<case>_navigator.json) or Mobile layer (<case>_mobile_navigator.json); with no domain
+    given, Enterprise when the case has one.
     """
     from pathlib import Path
     from fastapi.responses import FileResponse
@@ -1300,13 +1302,20 @@ async def get_navigator_json(job_id: str):
         else:
             raise HTTPException(status_code=404, detail="Job output directory not found")
 
-        # Search for navigator JSON file
-        navigator_files = list(output_dir.rglob("*navigator*.json"))
+        # Search for navigator JSON files, one per ATT&CK domain the case has
+        navigator_files = sorted(output_dir.rglob("*_navigator.json"))
+        mobile = [f for f in navigator_files if f.name.endswith("_mobile_navigator.json")]
+        enterprise = [f for f in navigator_files if f not in mobile]
+        if domain == "mobile-attack":
+            navigator_files = mobile
+        elif domain == "enterprise-attack":
+            navigator_files = enterprise
+        else:
+            navigator_files = enterprise or mobile
 
         if not navigator_files:
             raise HTTPException(status_code=404, detail="Navigator JSON file not found")
 
-        # Return the first navigator file found
         nav_file = navigator_files[0]
         return FileResponse(
             path=str(nav_file),

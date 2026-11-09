@@ -247,8 +247,10 @@ def visible_cases(user: dict) -> Optional[set]:
     return {job.case_number for job in _storage.list_jobs(limit=100000, job_ids=visible)}
 
 
-# The ATT&CK Navigator serves each case's layer as /assets/<case>.json (post/mitre/nav_config.py)
+# The ATT&CK Navigator serves each case's layers as /assets/<case>.json (Enterprise) and
+# /assets/<case>.mobile.json (Mobile) (post/mitre/layers.py)
 LAYER_PATH = re.compile(r"^/assets/([^/]+)\.json$")
+MOBILE_LAYER = ".mobile"
 
 
 def layer_allowed(user: dict, uri: str) -> bool:
@@ -261,12 +263,20 @@ def layer_allowed(user: dict, uri: str) -> bool:
     match = LAYER_PATH.match(posixpath.normpath("/" + path.lstrip("/")))
     if not match:
         return True
+    # X.mobile.json is case X's Mobile layer, unless a case is itself called X.mobile: both must pass
+    stem = match.group(1)
+    cases = {stem}
+    if stem.endswith(MOBILE_LAYER) and len(stem) > len(MOBILE_LAYER):
+        cases.add(stem[:-len(MOBILE_LAYER)])
+    return all(_case_layer_allowed(user, case) for case in cases)
+
+
+def _case_layer_allowed(user: dict, case: str) -> bool:
     cases = visible_cases(user)
-    if cases is None or match.group(1) in cases:
+    if cases is None or case in cases:
         return True
     # Not one of theirs: refuse it if it's anyone's case, and admins-only if it's a layer
     # with no job behind it (an Elrond run from the command line)
-    case = match.group(1)
     if any(job.case_number == case for job in _storage.list_jobs(limit=100000)):
         return False
     return not (settings.output_dir / case).is_dir()

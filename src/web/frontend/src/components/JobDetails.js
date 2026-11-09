@@ -252,7 +252,8 @@ function JobDetails() {
       case 'elastic':
         return `${serviceUrl(5601)}/app/discover#/?_g=(filters:!(),refreshInterval:(pause:!t,value:60000),time:(from:now-20y,to:now))&_a=(columns:!(),filters:!(),index:${job.case_number},interval:auto,query:(language:kuery,query:''),sort:!(!('@timestamp',desc)))`;
       case 'navigator':
-        const layerUrl = serviceUrl(5602, `/assets/${job.case_number}.json`);
+        // A phone case's techniques are ATT&CK Mobile's, in their own layer (post/mitre/layers.py)
+        const layerUrl = serviceUrl(5602, `/assets/${job.case_number}${job.options?.mobile ? '.mobile' : ''}.json`);
         return `${serviceUrl(5602)}/#layerURL=${encodeURIComponent(layerUrl)}`;
       default:
         return null;

@@ -28,7 +28,7 @@ PATTERN_MAPPINGS = {
         r"/etc/profile|/etc/zshenv|/etc/zprofile|/etc/zlogin|profile\.d|bash_profile|bashrc|bash_login|bash_logout|zshrc|zshenv|zlogout|zlogin": ["T1546.004"],
         r"/print processors/|/print_processors/": ["T1547.012"],
         r"/security/policy/secrets": ["T1003.004"],
-        r"/special/perf": ["T1337.002"],
+        r"/special/perf": ["T1137.002"],
         r"\.7z|\.arj|\.tar|\.tgz|\.zip|makecab|tar|xcopy|diantz": ["T1560.001"],
         r"\.key|\.p12|\.pfx|\.ppk": ["T1552.004"],
         r"\.chm|\.hh": ["T1218.001"],

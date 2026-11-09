@@ -20,6 +20,15 @@ from .azure import AzureForensics, ActivityLogAnalyzer
 from .gcp import GCPForensics, CloudLoggingAnalyzer
 from .base import CloudForensicsException
 from .k8s import analyse_audit_log
+from ..process.extractions.artemis import _record_techniques
+
+TECHNIQUES_FILE = "mitre_techniques.txt"  # post/mitre/enrichment.py's
+
+
+def record_case_techniques(output_dir: str, techniques) -> None:
+    """Add the techniques to the case's mitre_techniques.txt, which the Navigator layers, the
+    report, the SIEMs and Pippin read: as every other source of evidence does."""
+    _record_techniques(os.path.join(output_dir, TECHNIQUES_FILE), techniques)
 
 
 def load_credentials(provider: str, cred_file: Optional[str] = None) -> dict:
@@ -209,7 +218,9 @@ def acquire_logs_command(args):
 def analyze_logs_command(args):
     """Analyze cloud audit logs."""
     if args.provider == "k8s":
-        summary = analyse_audit_log(args.log_file, args.output or os.path.dirname(os.path.abspath(args.log_file)))
+        output_dir = args.output or os.path.dirname(os.path.abspath(args.log_file))
+        summary = analyse_audit_log(args.log_file, output_dir)
+        record_case_techniques(output_dir, summary["techniques"])
         print(f"\nKubernetes audit log: {summary['total_events']} events, {summary['flagged_events']} flagged")
         for technique, flagged in sorted(summary["techniques"].items()):
             print(f"    - {technique}: {len(flagged)} events")
@@ -260,6 +271,7 @@ def analyze_logs_command_impl(
 
         # Show MITRE ATT&CK mapping summary
         mitre_map = analyzer.map_to_mitre(findings)
+        record_case_techniques(output_dir, mitre_map)
         if mitre_map:
             print(f"\n  MITRE ATT&CK Techniques Detected:")
             for technique, events in mitre_map.items():

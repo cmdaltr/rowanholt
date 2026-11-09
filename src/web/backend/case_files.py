@@ -65,6 +65,27 @@ def report_package():
     return _report
 
 
+_layers = None
+
+
+def mitre_layers():
+    """Elrond's rowanholt/post/mitre/layers.py (Navigator layers, with the pinned ATT&CK release
+    beside it), loaded by path on first use as the report is."""
+    global _layers
+    if _layers is None:
+        for src in _elrond_sources():
+            path = Path(src, "rowanholt", "post", "mitre", "layers.py")
+            if path.is_file():
+                spec = importlib.util.spec_from_file_location("rowanholt_mitre_layers", path)
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                _layers = module
+                break
+        else:
+            raise ImportError("rowanholt/post/mitre not found: is Elrond's source mounted at ROWANHOLT_ELROND_SRC?")
+    return _layers
+
+
 tables = _load_tables()
 
 ROW_FILES = tables.TABLE_SUFFIXES

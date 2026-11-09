@@ -265,11 +265,11 @@ Process and analyze forensic evidence with integrated tools.
 Automatically map forensic findings to MITRE ATT&CK techniques with comprehensive content-based detection.
 
 **Features:**
-- Auto-updates from MITRE ATT&CK framework (v18.1)
+- One pinned MITRE ATT&CK release, v20.1, both domains: Enterprise (cloud platforms included) and Mobile
 - Content-based pattern matching for accurate technique detection
-- 600+ ATT&CK techniques with full descriptions
+- All 831 techniques of v20.1 named and laid out (706 Enterprise, 125 Mobile); about 320 detected by Elrond's own rules
 - Multi-tactic technique support (techniques mapped to all relevant tactics)
-- ATT&CK Navigator layer generation with automatic visualization
+- ATT&CK Navigator layers per case: Enterprise, and Mobile for phones
 - Splunk dashboards for each technique with tactic badges
 - Comprehensive JSON record scanning (all records, not sampled)
 - Large file streaming support for files >10MB
@@ -287,7 +287,7 @@ python3 -m src.analysis.mitre.cli dashboard -i mappings.json -o /output/dashboar
 ```
 
 **Coverage:**
-- 600+ ATT&CK techniques detected
+- About 320 ATT&CK techniques detected, across Enterprise and Mobile
 - All 14 tactics covered
 - Content-based pattern matching for accurate detection
 - Evidence source mapping with full metadata
@@ -631,7 +631,7 @@ And 25+ additional tools. See [REQUIREMENTS.md](docs/REQUIREMENTS.md) for the co
 - **Integrated Tools**: 30+
 - **Supported Platforms**: Windows, Linux, macOS
 - **Cloud Providers**: AWS, Azure, GCP
-- **MITRE ATT&CK Techniques**: 600+
+- **MITRE ATT&CK Techniques**: about 320 detected; all 831 of v20.1 (Enterprise and Mobile) named
 - **Artifact Types**: 50+
 
 ---
