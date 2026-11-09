@@ -24,7 +24,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Version
-VERSION="2.0.0"
+VERSION="2.1.0"
 
 # Default values
 ENCRYPTION_METHOD=""
@@ -34,6 +34,8 @@ MEMORY_DUMP=false
 ACCESS_TIMES=false
 COLLECT_FILES=false
 LIVE_CONTAINERS=false
+SHOW_PROGRESS=false
+NO_PROMPT=false
 HOSTS_FILE=""
 REMOTE_USER=""
 REMOTE_HOST=""
@@ -102,6 +104,9 @@ usage() {
     echo "  -h HOST   Remote hostname (for Remote mode)"
     echo "  -u USER   Remote username (for Remote mode)"
     echo "  -f FILE   Hosts file (for Remote mode batch)"
+    echo "  -p        Show progress: each artefact as it's taken"
+    echo "  -n        No questions: accept the defaults (the remote username is yours);"
+    echo "            an encryption password is still asked for"
     echo ""
     echo "Examples:"
     echo "  sudo $0 None Local"
@@ -173,7 +178,7 @@ parse_args() {
     esac
 
     # Parse options
-    while getopts "o:machlu:f:" opt; do
+    while getopts "o:machlu:f:pn" opt; do
         case $opt in
             o) OUTPUT_DIR="$OPTARG" ;;
             m) MEMORY_DUMP=true ;;
@@ -183,6 +188,8 @@ parse_args() {
             h) REMOTE_HOST="$OPTARG" ;;
             u) REMOTE_USER="$OPTARG" ;;
             f) HOSTS_FILE="$OPTARG" ;;
+            p) SHOW_PROGRESS=true ;;
+            n) NO_PROMPT=true ;;
             *) usage ;;
         esac
     done
@@ -221,6 +228,8 @@ log_audit() {
     case "$timestamp" in *N*) timestamp=$(date -u +"%Y-%m-%dT%H:%M:%S.000000Z") ;; esac  # BSD date has no %N
 
     echo "${timestamp},${hostname},${artefact},collected" >> "$log_file"
+    [ "$SHOW_PROGRESS" = true ] && echo "   -> ${timestamp} -> ${artefact}" >&2
+    return 0
 }
 
 # Copy a file into the acquisition directory. Hashing waits for write_manifest, once
@@ -288,6 +297,8 @@ log_live() {
     timestamp=$(date -u +"%Y-%m-%dT%H:%M:%S.%6NZ")
     case "$timestamp" in *N*) timestamp=$(date -u +"%Y-%m-%dT%H:%M:%S.000000Z") ;; esac
     echo "${timestamp},$2,$3,ran" >> "$1"
+    [ "$SHOW_PROGRESS" = true ] && echo "   -> ${timestamp} -> ran: $3" >&2
+    return 0
 }
 
 # -l: what Docker and Podman say about their running containers, which the files on disk
@@ -1166,8 +1177,14 @@ acquire_remote() {
     fi
 
     if [ -z "$REMOTE_USER" ]; then
-        echo -e "${BLUE}[*]${NC} Enter remote username:"
-        read -r REMOTE_USER
+        local default_user="${SUDO_USER:-$(id -un)}"
+        if [ "$NO_PROMPT" = true ]; then
+            REMOTE_USER="$default_user"
+        else
+            echo -e "${BLUE}[*]${NC} Enter remote username [${default_user}]:"
+            read -r REMOTE_USER
+            REMOTE_USER="${REMOTE_USER:-$default_user}"
+        fi
     fi
 
     local hosts=()
@@ -1210,7 +1227,7 @@ acquire_remote() {
         }
 
         # Execute remotely
-        if ! ssh "${REMOTE_USER}@${host}" "sudo bash ${remote_script} ${remote_encryption} Local -o /tmp/gandalf/acquisitions $([ "$MEMORY_DUMP" = true ] && echo -m) $([ "$LIVE_CONTAINERS" = true ] && echo -l)"; then
+        if ! ssh "${REMOTE_USER}@${host}" "sudo bash ${remote_script} ${remote_encryption} Local -o /tmp/gandalf/acquisitions $([ "$MEMORY_DUMP" = true ] && echo -m) $([ "$LIVE_CONTAINERS" = true ] && echo -l) $([ "$SHOW_PROGRESS" = true ] && echo -p)"; then
             echo -e "${RED}[ERROR]${NC} Remote execution failed on $host"
             ssh "${REMOTE_USER}@${host}" "sudo rm -rf /tmp/gandalf ${remote_script}" || true
             failed=$((failed + 1))

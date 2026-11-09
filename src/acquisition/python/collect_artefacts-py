@@ -20,6 +20,8 @@ def audit_log(gandalf_host, artefact):
                 now_time, gandalf_host.split("/")[-1], artefact
             )
         )
+    if SHOW_PROGRESS:
+        print("   -> {} -> {}".format(now_time, artefact))
 
 
 def audit_ran(gandalf_host, command):
@@ -27,6 +29,8 @@ def audit_ran(gandalf_host, command):
     now_time = "{}Z".format(str(datetime.now()).replace(" ", "T"))
     with open(os.path.join(gandalf_host, "log.audit"), "a") as gandalf_audit:
         gandalf_audit.write("{},{},{},ran\n".format(now_time, gandalf_host.split("/")[-1], command))
+    if SHOW_PROGRESS:
+        print("   -> {} -> ran: {}".format(now_time, command))
 
 
 def write_manifest(gandalf_host):
@@ -708,6 +712,8 @@ CONTAINER_MAX_FILES = 5000  # per container, in its writable-layer listing
 CONTAINER_COPY_MAX_FILES = 500  # executables copied per container, into container_layer/<id>/
 # gandalf.py -L sets it True (the line it appends below this template)
 LIVE_CONTAINERS = False
+# gandalf.py -P: each artefact printed as it's taken
+SHOW_PROGRESS = False
 LIVE_TOP = {"docker": ["-eo", "pid,ppid,user,etime,args"], "podman": ["pid", "ppid", "user", "etime", "args"]}
 CONTAINER_COPY_MAX_BYTES = 64 << 20
 LINUX_WEB_ROOTS = ("/var/www", "/srv/www", "/srv/http", "/usr/share/nginx/html")

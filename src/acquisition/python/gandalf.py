@@ -97,6 +97,23 @@ parser.add_argument(
     default=False,
 )
 
+parser.add_argument(
+    "-P",
+    "--ShowProgress",
+    help="Print each artefact as it is taken",
+    action="store_const",
+    const=True,
+    default=False,
+)
+parser.add_argument(
+    "-N",
+    "--NoPrompt",
+    help="Ask no questions and accept the defaults; an encryption or SSH password is still asked for",
+    action="store_const",
+    const=True,
+    default=False,
+)
+
 args = parser.parse_args()
 encryption_method = args.EncryptionMethod
 acquisition = args.Acquisition
@@ -105,6 +122,8 @@ mem = args.Memory
 access_times = args.AccessTimes
 files = args.CollectFiles
 live_containers = args.LiveContainers
+show_progress = args.ShowProgress
+no_prompt = args.NoPrompt
 
 system_artefacts = {
     # macOS artifacts
@@ -295,7 +314,8 @@ def generate_cipher():
         "    \033[1;30mEnter password to encrypt acquisition archive:\033[1;m "
     ).encode()
     password = bytes(pswd)
-    pswdsalt = input("    \033[1;30mEnter salt [isengard.pork]:\033[1;m ") or "isengard.pork"
+    pswdsalt = "" if no_prompt else input("    \033[1;30mEnter salt [isengard.pork]:\033[1;m ")
+    pswdsalt = pswdsalt or "isengard.pork"
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=32,
@@ -331,6 +351,8 @@ def configure_acquisition(
     with open(ACQUIRE_SCRIPT, "a") as acquire_artefacts:
         if live_containers:
             acquire_artefacts.write("\n\nLIVE_CONTAINERS = True\n")
+        if show_progress:
+            acquire_artefacts.write("\n\nSHOW_PROGRESS = True\n")
         acquire_artefacts.write(
             '\n\nacquire_artefacts(\n    "{}",\n    {},\n    "{}",\n    "{}",\n    "{}",\n    "{}",\n    {!r},\n    "{}",\n    "{}",\n)\n'.format(
                 encryption_method,
@@ -454,17 +476,20 @@ def main():
                 ext = ".enc"
             else:
                 pass
-            print(
-                "\n    '/tmp/gandalf/' will now be \033[1;31mdeleted\033[1;m. Ensure you have collected '{}/{}.zip{}'".format(
-                    gandalf_directory, hostlist[0], ext
+            archive = "{}/{}.zip{}".format(gandalf_directory, hostlist[0], ext)
+            if no_prompt:
+                # Nobody is there to take the archive before /tmp/gandalf goes, so it stays
+                print("\n    The archive is '{}'; '/tmp/gandalf/' is left for you to remove".format(archive))
+            else:
+                print(
+                    "\n    '/tmp/gandalf/' will now be \033[1;31mdeleted\033[1;m. Ensure you have collected '{}'".format(archive)
                 )
-            )
-            time.sleep(4)
-            input("      Collected? [Yes] ")
-            shutil.rmtree("/tmp/gandalf/")
+                time.sleep(4)
+                input("      Collected? [Yes] ")
+                shutil.rmtree("/tmp/gandalf/")
         os.remove(ACQUIRE_SCRIPT)
     else:  # Remote
-        if encryption_object == None:
+        if encryption_object == None and not no_prompt:
             confirm_encryption = input(
                 "     You have chosen to use no encryption when archiving the artefacts. This is not recommended.\n      Are you sure you want to proceed? y/N [N] :"
             )
@@ -487,8 +512,12 @@ def main():
                     pass
         for host in hostlist:
             print("    \033[1;30mConnecting to '{}'...\033[1;m".format(host))
-            ssh_ip = input("     \033[1;30mIP address:\033[1;m ")
-            ssh_user = input("     \033[1;30m  Username:\033[1;m ")
+            default_user = os.environ.get("SUDO_USER") or getpass.getuser()
+            if no_prompt:
+                ssh_ip, ssh_user = host, default_user
+            else:
+                ssh_ip = input("     \033[1;30mIP address [{}]:\033[1;m ".format(host)) or host
+                ssh_user = input("     \033[1;30m  Username [{}]:\033[1;m ".format(default_user)) or default_user
             ssh_pswd = getpass.getpass("     \033[1;30m  Password:\033[1;m ")
             gandalf_host = os.path.join(gandalf_directory, host)
             configure_acquisition(

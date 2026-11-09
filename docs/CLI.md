@@ -102,8 +102,10 @@ sudo python3 src/acquisition/python/gandalf.py ENCRYPTION ACQUISITION [OPTIONS]
 | `-A, --AccessTimes` | Record last-access times for every file |
 | `-F, --CollectFiles` | Collect files whose names match entries in `lists/files.list` |
 | `-L, --LiveContainers` | Linux: ask Docker and Podman about their running containers (see below) |
+| `-P, --ShowProgress` | Print each artefact as it's taken, as `log.audit` records it |
+| `-N, --NoPrompt` | Ask nothing that has a default: each host is reached by its name in `hosts.list` as the user running `sudo`, the salt is the default, and the unencrypted-remote warning is accepted. An archive left in `/tmp/gandalf` stays there. A password (encryption or SSH) is still asked for |
 
-Remote mode reads target hosts from `src/acquisition/lists/hosts.list` (lines starting `#` are skipped) and prompts for each host's IP address, username and password over SSH. Run it from `src/acquisition/`, because the script opens `lists/` and `tools/` relative to the current directory.
+Remote mode reads target hosts from `src/acquisition/lists/hosts.list` (lines starting `#` are skipped) and prompts for each host's IP address (the name in the list by default), username (yours by default) and password over SSH. Run it from `src/acquisition/`, because the script opens `lists/` and `tools/` relative to the current directory.
 
 ```bash
 cd src/acquisition
@@ -134,6 +136,8 @@ sudo ./src/acquisition/bash/gandalf.sh ENCRYPTION MODE [OPTIONS]
 | `-l` | Linux: ask Docker and Podman about their running containers (see below) |
 | `-h HOST`, `-u USER` | Remote host and user |
 | `-f FILE` | Hosts file for batch remote acquisition |
+| `-p` | Show progress: each artefact as it's taken, as `log.audit` records it (on stderr) |
+| `-n` | No questions: accept the defaults (without `-u`, the remote user is the one running `sudo`). A Password encryption password is still asked for |
 
 **Live containers (`-l`, `gandalf.py -L`, `Invoke-Gandalf.ps1 -LiveContainers`).** Off by default, because it asks the runtime rather than reading its files: Docker's and Podman's daemons log the calls, and an export reads the container's whole filesystem. Neither pauses nor stops a container. For each running container it saves `docker|podman inspect`, `top` (PID, PPID, user, elapsed time, command) and `export`, cut at `GANDALF_CONTAINER_EXPORT_MAX` bytes (2 GB by default; `0` leaves exports out), into `live_containers/<runtime>/<id>/`. Every command goes in `log.audit` with the status `ran` instead of `collected`, an export that was cut saying so. Rootless Podman keeps each user's containers to that user (root's `podman` doesn't list them), so every user with `~/.local/share/containers/storage` is asked as themselves too (`runuser -l`, or `su -l`), with their `/run/user/<uid>` when it exists, and the audit names them: `podman (rootless, alice) top <id>`. Elrond reads the processes into `container_processes.jsonl` (`suspicious command` flagged as for start-up scripts) and keeps `inspect.json` and `export.tar` in `raw/` for the analyst. On Windows, `-LiveContainers` asks Docker (Docker Desktop's, or Windows Server's) the same, into `raw\live_containers\docker\<id>\`; a Windows container's `top` can't take ps's columns, so it's kept as `top-windows.txt` and not parsed. The web app's New Acquisition page offers it for all three. CRIU checkpoints (process memory) stay out: they need Docker's experimental mode and can stop the container.
 
@@ -152,7 +156,7 @@ sudo ./src/acquisition/bash/gandalf.sh Key Remote -h 192.168.1.100 -u analyst
   -OutputDirectory C:\TEMP\gandalf\gandalf -Memory -ShowProgress -CollectFiles
 ```
 
-`-EncryptionObject` takes `Key`, `Password` or `None`; `-Acquisition` takes `Local` or `Remote` (remote targets come from `src\acquisition\lists\hosts.list`). The switches are `-Memory`, `-ShowProgress`, `-CollectFiles`, `-NoPrompt` (accept every default) and `-LiveContainers` (see live containers above). With no arguments it runs `-EncryptionObject None -Acquisition Local -OutputDirectory C:\TEMP\gandalf\gandalf`.
+`-EncryptionObject` takes `Key`, `Password` or `None`; `-Acquisition` takes `Local` or `Remote` (remote targets come from `src\acquisition\lists\hosts.list`). The switches are `-Memory`, `-ShowProgress`, `-CollectFiles`, `-NoPrompt` (accept every default; `-p`/`-n` in `gandalf.sh`, `-P`/`-N` in `gandalf.py`) and `-LiveContainers` (see live containers above). With no arguments it runs `-EncryptionObject None -Acquisition Local -OutputDirectory C:\TEMP\gandalf\gandalf`.
 
 #### Collection order and integrity
 
