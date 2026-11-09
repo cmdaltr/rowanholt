@@ -278,12 +278,6 @@ def build_server(api: RowanholtAPI, writes: bool = False, max_writes: int = MAX_
             return unavailable
         return api.post(api.path("ai", "cases", job(job_id)["case_number"], "query"), {"question": question}, job_id=job_id)
 
-    @server.tool(name="ask_eru", annotations=READ_ONLY)
-    def ask_eru(job_id: str, question: str) -> Dict[str, Any]:
-        """ask_aule by its name from before Aulë was renamed from Eru, for MCP hosts that still allow it
-        by that name: the same question, answered the same way."""
-        return ask_aule(job_id, question)
-
     @server.tool(annotations=READ_ONLY)
     def case_summary(job_id: str) -> Dict[str, Any]:
         """Aulë's summary of the case, from its local model. Says so when the model isn't available."""

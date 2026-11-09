@@ -23,7 +23,7 @@ try:
 except ImportError:  # requirements/mcp.txt not installed
     Client = None
 
-PHASE_1 = {"list_cases", "case_overview", "read_rows", "ask_offline", "ask_aule", "ask_eru", "case_summary", "suggestions",
+PHASE_1 = {"list_cases", "case_overview", "read_rows", "ask_offline", "ask_aule", "case_summary", "suggestions",
            "check_indicator", "rare_across_hosts", "findings", "report", "navigator_layer"}
 PHASE_2 = {"flag_lead", "add_note"}
 NEVER = ("start", "restart", "delete", "cancel", "acquire", "gandalf", "collect", "import", "upload", "share",
@@ -330,8 +330,6 @@ class AuleMcpTest(BackendCase):
         error, answer = self.call(self.alice, "ask_aule", job_id=job, question="What happened?")
         self.assertEqual(answer["available"], "no")
         self.assertIn("ask_offline", answer["instead"])
-        # The tool's name from before Aulë was renamed from Eru answers the same way
-        self.assertEqual(self.call(self.alice, "ask_eru", job_id=job, question="What happened?")[1], answer)
         self.assertEqual(self.call(self.alice, "findings", job_id=job), (False, []))
         error, layer = self.call(self.alice, "navigator_layer", job_id=job)
         self.assertEqual(layer["techniques"], [])

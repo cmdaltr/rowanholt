@@ -81,7 +81,7 @@ Re-review if the Service is shared outside the tailnet (Funnel or a shared node)
 
 ## Rename: Eru to Aulë (9 November 2026, not a review)
 
-The AI analyst was renamed from Eru to Aulë; the reviews above were made under the old name and their dates and conditions stand unchanged. Nothing a token, header or tool may do changed. The old names are kept as aliases, deliberately, like the Rivendell leftovers: the `eru-mcp` scope is read as `aule-mcp` wherever a scope is given or checked (`auth/tokens.py` `OLD_SCOPES`; stored scopes renamed by migration `f2b7c9d4e816`), `X-Rowanholt-Agent: eru-mcp` (and `X-Rivendell-Agent`) still marks a call as Aulë's, the MCP server answers `python -m eru_mcp.server` and the Compose network name `eru-mcp`, and it registers `ask_eru`, the same read-only call as `ask_aule` under its old name. `ask_eru` is a second registration of an existing tool, not a new capability: Ben to confirm it's acceptable without a fresh review, or drop it.
+The AI analyst was renamed from Eru to Aulë; the reviews above were made under the old name and their dates and conditions stand unchanged. Nothing a token, header or tool may do changed. The old names are kept as aliases, deliberately, like the Rivendell leftovers: the `eru-mcp` scope is read as `aule-mcp` wherever a scope is given or checked (`auth/tokens.py` `OLD_SCOPES`; stored scopes renamed by migration `f2b7c9d4e816`), `X-Rowanholt-Agent: eru-mcp` (and `X-Rivendell-Agent`) still marks a call as Aulë's, the MCP server answers `python -m eru_mcp.server` and the Compose network name `eru-mcp`. The MCP tool itself has only its new name, `ask_aule`: the `ask_eru` alias was dropped on 9 November 2026 (Ben), so no tool was added without a review.
 
 ## Chain of custody note
 

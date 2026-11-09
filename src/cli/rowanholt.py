@@ -24,7 +24,7 @@ from pathlib import Path
 ROWANHOLT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # anduril_cli
 
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 
 def print_banner():
     """Print Rowanholt banner"""

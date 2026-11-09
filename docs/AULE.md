@@ -96,7 +96,7 @@ The token then sits in the host's own configuration, so use a 30-day **aule-mcp*
 
 The Ollama Modelfiles in `src/models/` build Aulë variants: a forensic system prompt over different base models.
 
-Aulë was called Eru until 9 November 2026, and the models were `eru-*`. A model built then still works: when `ROWANHOLT_MODEL_NAME` names an `aule-*` model that isn't pulled but its `eru-*` namesake is (`aule-qwen` and `eru-qwen`), the backend uses the `eru-*` one. The other old names are still taken too: an `eru-mcp` token is an `aule-mcp` one (existing tokens are renamed when the backend starts), `X-Rowanholt-Agent: eru-mcp` still marks a call as Aulë's, `python3 -m eru_mcp.server` starts the MCP server, its `ask_eru` tool is `ask_aule`, and on a team server `ERU_MCP_ARGS` in `.env` still counts.
+Aulë was called Eru until 9 November 2026, and the models were `eru-*`. A model built then still works: when `ROWANHOLT_MODEL_NAME` names an `aule-*` model that isn't pulled but its `eru-*` namesake is (`aule-qwen` and `eru-qwen`), the backend uses the `eru-*` one. The other old names are still taken too: an `eru-mcp` token is an `aule-mcp` one (existing tokens are renamed when the backend starts), `X-Rowanholt-Agent: eru-mcp` still marks a call as Aulë's, `python3 -m eru_mcp.server` starts the MCP server, and on a team server `ERU_MCP_ARGS` in `.env` still counts.
 
 ## Available Models
 
