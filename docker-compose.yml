@@ -239,7 +239,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          # The dev server's webpack compile peaks above 512M (Rocky 9 on arm64 was OOM-killed)
+          memory: 1G
 
   # Splunk Enterprise
   splunk:

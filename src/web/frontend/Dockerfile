@@ -59,8 +59,9 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install all dependencies (including dev)
-RUN npm install
+# Install all dependencies (including dev). Offline, npm can exit 0 with empty packages:
+# fail instead, so that layer is never cached
+RUN npm install && test -x node_modules/.bin/react-scripts
 
 # Copy application code
 COPY . .
