@@ -3,25 +3,25 @@ import { Link } from 'react-router-dom';
 
 const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt.png`;
 const gandalfImage = `${process.env.PUBLIC_URL}/images/gandalf.png`;
-const elrondImage = `${process.env.PUBLIC_URL}/images/elrond.png`;
 const pippinImage = `${process.env.PUBLIC_URL}/images/pippin.png`;
 const aragornImage = `${process.env.PUBLIC_URL}/images/aragorn.png`;
-const eruImage = `${process.env.PUBLIC_URL}/images/eru.png`;
+const elrondImage = `${process.env.PUBLIC_URL}/images/elrond.png`;
+const auleImage = `${process.env.PUBLIC_URL}/images/aule.png`;
 const mordorClosedImage = `${process.env.PUBLIC_URL}/images/mordor_closed.jpg`;
 const mordorOpenImage = `${process.env.PUBLIC_URL}/images/mordor_open.jpg`;
 
-// The banners, left to right (the Aragorn page itself is for admins); drop lowers a figure in its
-// frame: Elrond's legs are long for his body, so he's cut lower, Pippin half as much
+// The banners, left to right (the Aragorn page itself is for admins). Insight is drawn as Aulë, the
+// smith, though the AI analyst is Eru. drop lowers a figure in its frame
 const JOURNEYS = [
   { to: '/gandalf', image: gandalfImage, name: 'Gandalf', role: 'Acquisition',
     text: 'Collect evidence from live or remote systems with encrypted packaging.' },
-  { to: '/elrond', image: elrondImage, name: 'Elrond', role: 'Analysis', drop: '24px',
+  { to: '/elrond', image: elrondImage, name: 'Elrond', role: 'Analysis',
     text: 'Process timelines, memory and artifacts to map incidents to MITRE ATT&CK.' },
   { to: '/pippin', image: pippinImage, name: 'Pippin', role: 'Threat Intelligence', drop: '12px',
     text: 'Import indicators, match cases against them and see whose tradecraft the evidence resembles.' },
   { to: '/aragorn', image: aragornImage, name: 'Aragorn', role: 'Administration',
     text: "Keep the realm: Rowanholt's containers, users, settings and the test lab." },
-  { to: '/ai', image: eruImage, name: 'Eru', role: 'Insight',
+  { to: '/ai', image: auleImage, name: 'Aulë', role: 'Insight',
     text: 'Ask about a case and get answers drawn from its own files, each citing the rows it came from.' },
 ];
 
