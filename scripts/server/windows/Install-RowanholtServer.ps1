@@ -128,8 +128,12 @@ if ($reboot) {
 }
 # Every wsl.exe below is this one, not System32's
 Set-Alias -Name wsl.exe -Value $wslExe -Scope Script
+# 'Continue' while stderr is captured: under 'Stop' its first line would be thrown instead
+$ErrorActionPreference = 'Continue'
 $status = & wsl.exe --status 2>&1 | Out-String
-if ($LASTEXITCODE -ne 0) {
+$code = $LASTEXITCODE
+$ErrorActionPreference = 'Stop'
+if ($code -ne 0) {
     # An unpatched Server 2022 (20348.587, the release media) is refused by the MSI's WSL
     if ($status -match 'WSL_E_OS_NOT_SUPPORTED') {
         throw "This Windows build ($([Environment]::OSVersion.Version)) is too old for WSL: install Windows Update's cumulative updates, reboot, then run this script again.`n$status"

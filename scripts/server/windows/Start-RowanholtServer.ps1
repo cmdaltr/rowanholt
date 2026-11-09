@@ -22,8 +22,13 @@ Write-Log 'Starting Rowanholt'
 # WSL's MSI (Install-RowanholtServer.ps1), not System32's wsl.exe, which on Server 2022 predates it
 $wslExe = Join-Path $env:ProgramFiles 'WSL\wsl.exe'
 if (Test-Path $wslExe) { Set-Alias -Name wsl.exe -Value $wslExe -Scope Script }
-& wsl.exe -d $Distro -u root -- "$($config.Root)/rowanholt" start *>> $Log
-if ($LASTEXITCODE -ne 0) { Write-Log "rowanholt start failed ($LASTEXITCODE)"; exit 1 }
+# Windows PowerShell turns a redirected stderr line into a terminating error under 'Stop', and
+# Compose writes its progress there; the log stays one encoding through Add-Content
+$ErrorActionPreference = 'Continue'
+& wsl.exe -d $Distro -u root -- "$($config.Root)/rowanholt" start 2>&1 | ForEach-Object { Add-Content -Path $Log -Value "$_" }
+$code = $LASTEXITCODE
+$ErrorActionPreference = 'Stop'
+if ($code -ne 0) { Write-Log "rowanholt start failed ($code)"; exit 1 }
 
 $address = ((& wsl.exe -d $Distro -u root -- hostname -I) -split '\s+' | Where-Object { $_ -match '^\d+\.\d+\.\d+\.\d+$' } | Select-Object -First 1)
 if (-not $address) { Write-Log 'No address for the distribution'; exit 1 }
