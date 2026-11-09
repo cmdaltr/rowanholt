@@ -121,8 +121,14 @@ if ($reboot) {
 }
 # Every wsl.exe below is this one, not System32's
 Set-Alias -Name wsl.exe -Value $wslExe -Scope Script
-& wsl.exe --status *> $null
-if ($LASTEXITCODE -ne 0) { throw "WSL is installed but doesn't start ($wslExe --status). Is nested virtualisation on in the VM?" }
+$status = & wsl.exe --status 2>&1 | Out-String
+if ($LASTEXITCODE -ne 0) {
+    # An unpatched Server 2022 (20348.587, the release media) is refused by the MSI's WSL
+    if ($status -match 'WSL_E_OS_NOT_SUPPORTED') {
+        throw "This Windows build ($([Environment]::OSVersion.Version)) is too old for WSL: install Windows Update's cumulative updates, reboot, then run this script again.`n$status"
+    }
+    throw "WSL is installed but doesn't start ($wslExe --status). Is nested virtualisation on in the VM?`n$status"
+}
 & wsl.exe --update | Out-Null
 
 # The proxy is reached through Windows' own addresses (portproxy, below), not WSL's localhost

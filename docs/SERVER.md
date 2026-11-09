@@ -103,7 +103,7 @@ git clone https://github.com/cmdaltr/rowanholt.git; cd rowanholt
     -CertificateThumbprint 3F2A... -EvidencePath D:\Evidence -WslPath E:\Rowanholt\wsl
 ```
 
-It turns WSL 2 on (the first run may stop and ask for a reboot: run it again afterwards), imports Ubuntu 24.04's WSL image (SHA-256 checked) as a distribution named `Rowanholt` with its disk under `-WslPath`, installs Docker Engine from Docker's repository under systemd, clones Rowanholt into `/opt/rowanholt` inside it, and runs the same `rowanholt server init` as on Linux. The first admin's password is printed then, as on Linux.
+Windows Server 2022 needs its cumulative updates first: WSL comes from Microsoft's MSI, which refuses the release build (20348.587, `WSL_E_OS_NOT_SUPPORTED`). It turns WSL 2 on (the first run may stop and ask for a reboot: run it again afterwards), imports Ubuntu 24.04's WSL image (SHA-256 checked) as a distribution named `Rowanholt` with its disk under `-WslPath`, installs Docker Engine from Docker's repository under systemd, clones Rowanholt into `/opt/rowanholt` inside it, and runs the same `rowanholt server init` as on Linux. The first admin's password is printed then, as on Linux.
 
 | Parameter | |
 |---|---|
