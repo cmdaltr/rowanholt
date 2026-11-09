@@ -36,15 +36,20 @@ function Navigation({ onGuide }) {
       <div className="nav-left">
         <Link to="/gandalf">Gandalf</Link>
         <Link to="/elrond">Elrond</Link>
-        <Link to="/mordor">Mordor</Link>
         <Link to="/pippin">Pippin</Link>
-        <Link to="/ai">Eru</Link>
         {user?.role === 'admin' && <Link to="/aragorn">Aragorn</Link>}
+        <Link to="/ai">Aulë</Link>
       </div>
+      {/* Mordor opens the right: the datasets sit beside the jobs they feed */}
       <div className="nav-right">
+        <Link to="/mordor">Mordor</Link>
         <Link to="/jobs">Jobs</Link>
-        <Link to="/help">About</Link>
-        <button type="button" className="nav-guide" onClick={onGuide} title="The guide and a tip">Guide</button>
+        <div className="nav-menu">
+          <Link to="/help">About</Link>
+          <div className="nav-menu__items">
+            <button type="button" className="nav-guide" onClick={onGuide} title="The guide and a tip">Guide</button>
+          </div>
+        </div>
         <Link to={isAuthenticated ? "/account" : "/login"}>Account</Link>
         <button
           onClick={isAuthenticated ? handleLogout : undefined}

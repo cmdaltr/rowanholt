@@ -4,6 +4,26 @@ import { useAuth } from '../context/AuthContext';
 import { markOffered, nextTip, offeredThisStart, setStartPref, startPrefs } from '../guide/prefs';
 import Guide from './Guide';
 import { randomQuote } from '../guide/quotes';
+import { GUIDE_PAGES } from '../guide/content';
+
+const SHOTS = `${process.env.PUBLIC_URL}/guide`;
+
+// The guide's photograph of the page a route leads to (the home page's when there's none)
+const shotFor = (route) => {
+  const path = (route || '/').split('#')[0];
+  const page = GUIDE_PAGES.find((p) => p.route === path)
+    || GUIDE_PAGES.find((p) => p.route !== '/' && path.startsWith(p.route.split('/:')[0]))
+    || GUIDE_PAGES[0];
+  return { src: `${SHOTS}/${page.id}.jpg`, title: page.title };
+};
+
+// A photograph that takes itself away if it was never taken
+const Shot = ({ shot, onClick, label }) => (
+  <button type="button" className="start-offer-shot" onClick={onClick} aria-label={label}>
+    <img src={shot.src} alt="" onError={(e) => { e.currentTarget.parentElement.style.display = 'none'; }} />
+    <span>{shot.title}</span>
+  </button>
+);
 
 // Pages where nobody's settled in yet: the offer waits until they're past them
 const NOT_YET = ['/login', '/register', '/forgot-password', '/reset-password'];
@@ -65,6 +85,7 @@ function StartOffer({ offerRequested, onOfferClosed }) {
         <section className="start-offer-part">
           <h3>The guide</h3>
           <p>Every page, section by section: what it's for, who uses it and when it helps most.</p>
+          <Shot shot={shotFor(pathname)} label="Take the guide" onClick={() => { setOffer(false); setGuide(true); }} />
           <button type="button" onClick={() => { setOffer(false); setGuide(true); }}>Take the guide</button>
           <label className="guide-check">
             <input type="checkbox" checked={prefs.guide} onChange={(e) => toggle('guide', e.target.checked)} />
@@ -77,6 +98,10 @@ function StartOffer({ offerRequested, onOfferClosed }) {
           {tip ? (
             <>
               <p className="start-offer-tip">{tip.text}</p>
+              {tip.to && (
+                <Shot shot={shotFor(tip.to)} label="Show me"
+                  onClick={() => { setOffer(false); if (tip.to !== pathname) navigate(tip.to); }} />
+              )}
               <div className="start-offer-actions">
                 <button type="button" className="guide-secondary" onClick={() => setTip(nextTip(user, tip.id))}>
                   Another tip

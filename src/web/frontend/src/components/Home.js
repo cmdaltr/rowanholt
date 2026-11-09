@@ -10,8 +10,8 @@ const auleImage = `${process.env.PUBLIC_URL}/images/aule.png`;
 const mordorClosedImage = `${process.env.PUBLIC_URL}/images/mordor_closed.jpg`;
 const mordorOpenImage = `${process.env.PUBLIC_URL}/images/mordor_open.jpg`;
 
-// The banners, left to right (the Aragorn page itself is for admins). Insight is drawn as Aulë, the
-// smith, though the AI analyst is Eru. drop lowers a figure in its frame; zoom closes in when it's open
+// The banners, left to right (the Aragorn page itself is for admins). Insight is Aulë, the smith.
+// drop lowers a figure in its frame; zoom closes in when it's open
 const JOURNEYS = [
   { to: '/gandalf', image: gandalfImage, name: 'Gandalf', role: 'Acquisition',
     text: 'Collect evidence from live or remote systems with encrypted packaging.' },

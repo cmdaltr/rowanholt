@@ -89,6 +89,25 @@ body {
 .nav-left { grid-column: 1; justify-content: flex-start; }
 .nav-right { grid-column: 3; justify-content: flex-end; }
 
+/* About, with the guide in a menu beneath it */
+.nav-menu { position: relative; display: flex; }
+.nav-menu__items {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding-top: 0.35rem;
+  display: none;
+  z-index: 30;
+}
+.nav-menu:hover .nav-menu__items,
+.nav-menu:focus-within .nav-menu__items { display: block; }
+.nav-menu__items .nav-guide {
+  background: #2b2f1c;
+  border: 1px solid #4c3a1b;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+}
+
 /* The logo on every other page goes home */
 .App:not(.App--home) img.hero-image { cursor: pointer; }
 
@@ -3222,7 +3241,30 @@ a.mt-pill-link:hover { border-color: #66d9ef; }
   overflow: auto;
 }
 .guide { width: min(1400px, 100%); padding: 1.25rem 1.5rem 1rem; }
-.start-offer { width: min(980px, 100%); padding: 1.5rem 1.75rem 1.25rem; }
+.start-offer { width: min(1240px, 100%); padding: 1.75rem 2.25rem 1.5rem; }
+/* A photograph of where the guide or the tip leads, from the guide's own (public/guide) */
+.start-offer-shot {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 240px;
+  margin: 0 0 1rem;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #3a3550;
+  border-radius: 8px;
+  background: #11101a;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.start-offer-shot img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+.start-offer-shot span {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 1.2rem 0.75rem 0.45rem;
+  background: linear-gradient(transparent, rgba(12, 11, 20, 0.92));
+  color: #f0dba5; font-family: 'Cinzel', serif; font-size: 0.85rem; letter-spacing: 0.06em; text-align: left;
+}
+.start-offer-shot:hover { border-color: #a7db6c; transform: translateY(-2px); }
 
 .guide h2, .start-offer h2 { color: #c3e88d; font-family: 'Cinzel', 'Times New Roman', serif; margin: 0; }
 .guide h3, .start-offer h3 { color: #f0dba5; font-family: 'Cinzel', 'Times New Roman', serif; margin: 0 0 0.5rem; }
