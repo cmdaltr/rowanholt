@@ -21,7 +21,7 @@ Server mode is the backend setting `ROWANHOLT_SERVER_MODE`, which `deploy/server
 
 ## Setting up
 
-Requirements: a Linux host with Docker Engine and Compose 2.24 or later, and a DNS name for it. Ubuntu 24.04 with Docker's own packages is the tested shape; Rocky, RHEL and Alma 9 need the steps in [Rocky, RHEL and Alma](#rocky-rhel-and-alma) first, and Windows Server runs it in WSL 2 ([Windows Server](#windows-server)).
+Requirements: a Linux host with Docker Engine and Compose 2.24 or later, and a DNS name for it. Ubuntu 24.04 and Rocky 9 with SELinux enforcing, each with Docker's own packages, are the tested shapes (both run end to end on 9 November 2026); Rocky, RHEL and Alma 9 need the steps in [Rocky, RHEL and Alma](#rocky-rhel-and-alma) first, and Windows Server runs it in WSL 2 ([Windows Server](#windows-server)).
 
 ```bash
 git clone https://github.com/cmdaltr/rowanholt.git && cd rowanholt
@@ -121,7 +121,7 @@ Inside, it's a Linux server: `wsl -d Rowanholt -u root -- /opt/rowanholt/rowanho
 
 ### Evidence
 
-Paths in Rowanholt are paths on the server. Mount your evidence storage on the host and make it visible to the containers with a `docker-compose.local.yml` beside `docker-compose.yml` (the launcher adds it when it exists; it's gitignored):
+Paths in Rowanholt are paths on the server. Mount your evidence storage on the host and make it visible to the containers with a `docker-compose.local.yml` beside `docker-compose.yml` (the launcher adds it when it exists, as `rowanholt start` begins, so a file added later needs another `rowanholt start`; it's gitignored):
 
 ```yaml
 services:

@@ -6,17 +6,8 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 
 | ID | Request | Area |
 |---|---|---|
-| FR-01 | Team servers on Linux beyond Ubuntu (RHEL, Rocky, Alma): built, not yet run on Rocky | Server |
 | FR-03 | Desktop app RPM for Rocky Linux 9 / RHEL 9: built, first run on a desktop untried | Desktop app |
 | FR-05 | Mobile device forensics (iOS, Android): built, needs test images | Gandalf, Elrond |
-
-## FR-01: Team servers on Linux beyond Ubuntu
-
-**Built 8 November 2026, not yet run on a Rocky host.** `docs/SERVER.md` (Rocky, RHEL and Alma): SELinux through `deploy/docker-compose.selinux.yml` (`label=disable` on the services that mount host folders, so no evidence is relabelled), firewalld ports opened by `server init`, and `rowanholt start` refusing a missing Docker or Podman's `docker` with Docker's RHEL install steps.
-
-**Done when** `rowanholt server init` and `rowanholt start` bring up a working, signed-in server on Rocky 9 with SELinux enforcing, an analysis job reads evidence from a configured folder, and the same passes on Ubuntu 24.04. Then this entry goes.
-
-**Depends on** a Rocky 9 VM in the lab; headless is enough.
 
 ## FR-03: Desktop app RPM for Rocky Linux 9 / RHEL 9
 
