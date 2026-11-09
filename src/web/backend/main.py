@@ -29,7 +29,7 @@ try:
     from .threat_intel_routes import router as threat_intel_router  # Threat intelligence indicators
     from . import threat_intel_store
     from . import case_routes  # The case browser, findings, notes and assignments
-    from . import eru_offline
+    from . import aule_offline
     from . import backup_secrets  # Phone backup passwords, job form to worker
     from .models.job import (
         Job,
@@ -54,7 +54,7 @@ except ImportError:
     from threat_intel_routes import router as threat_intel_router  # Threat intelligence indicators
     import threat_intel_store
     import case_routes  # The case browser, findings, notes and assignments
-    import eru_offline
+    import aule_offline
     import backup_secrets  # Phone backup passwords, job form to worker
     from models.job import (
         Job,
@@ -129,7 +129,7 @@ job_storage = JobStorage()
 access.configure(job_storage)
 threat_intel_store.configure(job_storage)
 case_routes.configure(job_storage)
-eru_offline.FINDINGS = case_routes.findings_for_case
+aule_offline.FINDINGS = case_routes.findings_for_case
 
 
 class SharingUpdate(BaseModel):

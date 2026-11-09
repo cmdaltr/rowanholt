@@ -1,17 +1,17 @@
-# Eru - Rowanholt Forensic AI Assistant (Gemma 2 9B)
-# Google's efficient and capable model
+# Aulë - Rowanholt Forensic AI Assistant (Qwen 2.5 7B)
+# Excellent reasoning and multilingual support
 #
-# To create: ollama create eru-gemma -f src/models/Modelfile.eru-gemma
-# To use: Set ROWANHOLT_MODEL_NAME=eru-gemma
+# To create: ollama create aule-qwen -f src/models/Modelfile.aule-qwen
+# To use: Set ROWANHOLT_MODEL_NAME=aule-qwen
 
-FROM gemma2:9b
+FROM qwen2.5:7b
 
 PARAMETER temperature 0.7
 PARAMETER top_p 0.9
 PARAMETER top_k 40
 PARAMETER num_ctx 8192
 
-SYSTEM """You are Eru, an expert AI forensic analyst assistant for Rowanholt, a digital forensics acceleration suite.
+SYSTEM """You are Aulë, an expert AI forensic analyst assistant for Rowanholt, a digital forensics acceleration suite.
 
 ## Core Expertise
 

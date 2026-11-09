@@ -1,7 +1,7 @@
 """
-Eru without an LLM: questions answered straight from Elrond's case output.
+Aulë without an LLM: questions answered straight from Elrond's case output.
 
-Free-text questions need Ollama. When it isn't there, Ask Eru offers these
+Free-text questions need Ollama. When it isn't there, Ask Aulë offers these
 instead: each reads the case directory (<case>/<host>/artefacts/cooked/, <case>/<host>/analysis/,
 <case>/mitre_techniques.txt, <case>/threat_groups) and summarises what
 Elrond found, so the answers are exact rather than generated. Each line built from a row
@@ -44,7 +44,7 @@ STACKING_PERSISTENCE = {"scheduled task", "wmi consumer", "service (Windows)", "
 RARE_ROWS = 8
 NETWORK_IOC_TYPES = ("IPv4 address", "IPv6 address", "domain")
 # The rows the lines shown so far came from, while answer_with_rows() runs
-_citing: ContextVar[Optional[List[Dict[str, str]]]] = ContextVar("eru_offline_citing", default=None)
+_citing: ContextVar[Optional[List[Dict[str, str]]]] = ContextVar("aule_offline_citing", default=None)
 
 
 class Cited(str):
@@ -456,14 +456,14 @@ def analysis(case_path: str) -> str:
 
 GENERAL_ANSWERS = {
     "enable_llm": (
-        "**Turning on Eru's free-text answers**\n\n"
-        "Eru generates answers with a local model served by Ollama, so case data never leaves this machine.\n"
+        "**Turning on Aulë's free-text answers**\n\n"
+        "Aulë generates answers with a local model served by Ollama, so case data never leaves this machine.\n"
         "1. Install Ollama: `brew install ollama` on macOS, or see ollama.com for Linux and Windows.\n"
         "2. Start it: `ollama serve` (the macOS app starts it for you).\n"
         "3. Pull the model Rowanholt is set to use (ROWANHOLT_MODEL_NAME, default llama3.2:3b): `ollama pull llama3.2:3b`.\n"
         "4. Rowanholt's backend reaches it at OLLAMA_HOST (default http://host.docker.internal:11434 from Docker). "
         "Point that at another machine's Ollama if this one is short of memory.\n"
-        "Reload Ask Eru once it's running: the LLM badge turns green."
+        "Reload Ask Aulë once it's running: the LLM badge turns green."
     ),
     "windows_persistence": (
         "**Where Windows persistence lives, and where Rowanholt shows it**\n\n"
@@ -515,7 +515,7 @@ CASE_QUESTIONS: Dict[str, Dict[str, object]] = {
     "findings": {"question": "What have analysts confirmed?", "answer": findings},
 }
 GENERAL_QUESTIONS = {
-    "enable_llm": "How do I turn on Eru's free-text answers?",
+    "enable_llm": "How do I turn on Aulë's free-text answers?",
     "windows_persistence": "Where does Windows persistence live?",
     "linux_persistence": "What's the Linux persistence checklist?",
     "macos_persistence": "What's the macOS persistence checklist?",
@@ -562,7 +562,7 @@ def answer_with_rows(question_id: str, case_path: Optional[str]) -> Dict[str, ob
 def unavailable_reason(status: Dict[str, object], host: str, model: str) -> str:
     """Why free-text answers don't work right now, in words an analyst can act on."""
     if not status.get("available"):
-        return (f"Eru's free-text answers come from a local language model served by Ollama, and Ollama isn't "
+        return (f"Aulë's free-text answers come from a local language model served by Ollama, and Ollama isn't "
                 f"reachable at {host}, so it's either not installed or not running. Nothing is sent to a cloud "
                 f"service instead. Install and start Ollama, then `ollama pull {model}`; until then, the questions "
                 f"below are answered straight from the case files, without a model.")

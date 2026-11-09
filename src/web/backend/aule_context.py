@@ -1,8 +1,8 @@
 """
-What Eru's model is given about a case, with every row numbered so its answer can cite them.
+What Aulë's model is given about a case, with every row numbered so its answer can cite them.
 
 The context is the analysts' confirmed findings, the hosts, the tagged ATT&CK techniques, the rows
-Eru's offline answers rest on (flagged persistence, suspicious commands, staging, detections,
+Aulë's offline answers rest on (flagged persistence, suspicious commands, staging, detections,
 Elrond's analysis, threat intelligence, what's rare), and the rows of the hosts' cooked and analysis
 tables that contain the question's words. Each row is tagged [R1], [R2]...; the model is asked to
 cite the tags, and only a tag that was in the context maps back to a row (cited()), so a model
@@ -16,10 +16,10 @@ from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Tuple
 
 try:
-    from . import case_files, eru_offline
+    from . import case_files, aule_offline
 except ImportError:  # main.py imports the routes as top-level modules too
     import case_files
-    import eru_offline
+    import aule_offline
 
 logger = logging.getLogger(__name__)
 
@@ -119,8 +119,8 @@ def build(case_path: str, question: str = "", findings: Optional[List[Dict]] = N
         context.parts.append("## Confirmed findings (analysts)\n" + "\n".join(
             f"- {f['title']} ({f.get('technique') or 'no technique'}): {f['host']} {f['artefact']} row {f['row_ref']}: "
             f"{(f.get('excerpt') or '')[:300]}" for f in confirmed[:30]))
-    context.parts.append(eru_offline.hosts(case_path))
-    context.parts.append(eru_offline.techniques(case_path))
+    context.parts.append(aule_offline.hosts(case_path))
+    context.parts.append(aule_offline.techniques(case_path))
 
     # The question's own rows first: they're what it's about
     words = terms(question)
@@ -130,11 +130,11 @@ def build(case_path: str, question: str = "", findings: Optional[List[Dict]] = N
             context.parts.append(f"## Rows containing {', '.join(words)}\n" + "\n".join(lines))
 
     for question_id in LEADS:
-        answer = eru_offline.answer_with_rows(question_id, case_path)
+        answer = aule_offline.answer_with_rows(question_id, case_path)
         lines = [f"[{context.tag(row)}] {row['host']} {row['file']} row {row['row_ref']}: {row['line']}"
                  for row in answer["rows"]]
         if lines:
-            title = eru_offline.CASE_QUESTIONS[question_id]["question"]
+            title = aule_offline.CASE_QUESTIONS[question_id]["question"]
             context.parts.append(f"## {title}\n" + "\n".join(lines))
     return context
 

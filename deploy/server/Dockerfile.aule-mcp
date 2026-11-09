@@ -1,4 +1,4 @@
-# Eru's MCP server over streamable HTTP, for a team server (docker-compose.server.yml, profile
+# Aulë's MCP server over streamable HTTP, for a team server (docker-compose.server.yml, profile
 # "mcp"): its own image, so the MCP SDK stays out of the worker and backend images. It holds no
 # token and no case data: each request brings its analyst's API token, and every call goes to
 # the backend's API.
@@ -8,11 +8,11 @@ COPY requirements/mcp.txt /tmp/mcp.txt
 RUN pip install --no-cache-dir -r /tmp/mcp.txt && rm /tmp/mcp.txt
 
 WORKDIR /app
-COPY src/eru_mcp /app/eru_mcp
+COPY src/aule_mcp /app/aule_mcp
 # Readable by nobody whatever the checkout's own permissions
 RUN chmod -R a+rX /app
 USER nobody
 
 EXPOSE 5690
-# ERU_MCP_ARGS (from .env, e.g. --allow-writes): read-only without it
-ENTRYPOINT ["sh", "-c", "exec python -m eru_mcp.server --http 0.0.0.0:5690 ${ERU_MCP_ARGS:-}"]
+# AULE_MCP_ARGS (from .env, e.g. --allow-writes): read-only without it
+ENTRYPOINT ["sh", "-c", "exec python -m aule_mcp.server --http 0.0.0.0:5690 ${AULE_MCP_ARGS:-}"]

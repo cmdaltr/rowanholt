@@ -2,7 +2,7 @@
 # layers this over docker-compose.server.yml when .env sets ROWANHOLT_SERVICE.
 #
 # The proxy's Service sites (Caddyfile.service) on the host's loopback only, where Tailscale hands
-# them the name's requests: 5680 the web app, API and Eru's MCP server, 5681 Splunk, 5682 Kibana,
+# them the name's requests: 5680 the web app, API and Aulë's MCP server, 5681 Splunk, 5682 Kibana,
 # 5683 the ATT&CK Navigator. The certificate and the ports the server already has don't change.
 
 services:

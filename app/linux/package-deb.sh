@@ -49,7 +49,7 @@ Depends: bash, curl, tar, gzip, xdg-utils
 Recommends: zenity, libnotify-bin
 Suggests: docker.io, docker-compose-v2
 Description: Rowanholt DFIR platform (desktop launcher)
- Gandalf acquires, Elrond analyses and Eru answers. This package adds Rowanholt to
+ Gandalf acquires, Elrond analyses and Aulë answers. This package adds Rowanholt to
  the application menu: on first launch it checks for Docker, puts Rowanholt's files
  in a folder you choose, and opens the web UI in its own window.
 EOF

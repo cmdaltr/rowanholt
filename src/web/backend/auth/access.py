@@ -118,13 +118,13 @@ def _user_from_api_token(token: str) -> Optional[dict]:
             _storage.touch_token(record["id"], now)
         except Exception as exc:  # a missed last-used time mustn't refuse the request
             logger.warning(f"Could not record token {record['prefix']}… as used: {exc}")
-    return {**public(user), "token": {"id": record["id"], "name": record["name"], "scope": record["scope"]}}
+    return {**public(user), "token": {"id": record["id"], "name": record["name"], "scope": tokens.scope_of(record["scope"])}}
 
 
 def token_scope(request: Request) -> Optional[str]:
     """The scope of the API token behind this request, or None for a sign-in or no token."""
     user = getattr(request.state, "user", None) or {}
-    return (user.get("token") or {}).get("scope")
+    return tokens.scope_of((user.get("token") or {}).get("scope"))
 
 
 def is_admin(user: dict) -> bool:

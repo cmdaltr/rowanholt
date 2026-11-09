@@ -11,7 +11,7 @@ const CASE_HOST = '(case)'; // the case's own summaries (stacking.csv): a findin
 const rowKey = (row) => `${row.host}|${row.file}|${row.row_ref}`;
 // One entry per job (two jobs can share a case number), or per case folder with no job behind it
 const caseKey = (c) => c.job_id || c.case_id;
-// Eru reads that job's output, not the first visible job with the same case number
+// Aulë reads that job's output, not the first visible job with the same case number
 const caseUrl = (c, action) =>
   `${API_BASE}/api/ai/cases/${encodeURIComponent(c.case_id)}/${action}${c.job_id ? `?job_id=${c.job_id}` : ''}`;
 // The rows an answer cited, which can be flagged on its job's case
@@ -91,7 +91,7 @@ function AIAssistant() {
       setLlmStatus({
         available: false,
         model: null,
-        reason: "Rowanholt's backend didn't answer, so Eru can't reach its language model or the case files. Check the backend container is running.",
+        reason: "Rowanholt's backend didn't answer, so Aulë can't reach its language model or the case files. Check the backend container is running.",
         checked: true
       });
     }
@@ -109,7 +109,7 @@ function AIAssistant() {
     }
   };
 
-  // Without an LLM, Eru answers these from the case files themselves
+  // Without an LLM, Aulë answers these from the case files themselves
   const askOffline = async (q) => {
     setMessages(prev => [...prev, { role: 'user', content: q.question }]);
     setLoading(true);
@@ -321,7 +321,7 @@ function AIAssistant() {
       </section>
 
       <header>
-        <h2>Eru (Rowanholt AI Agent)</h2>
+        <h2>Aulë (Rowanholt AI Agent)</h2>
         <p>
           Intelligent guidance for forensic analysis workflows, feature explanations, and guidance through investigations and case management.
         </p>
@@ -329,7 +329,7 @@ function AIAssistant() {
 
       <div className="card ai-chat-container">
         {/* Collapsible Help Section */}
-        <div data-guide="eru.help" style={{ marginBottom: '1rem' }}>
+        <div data-guide="aule.help" style={{ marginBottom: '1rem' }}>
           <button
             onClick={() => setShowHelp(!showHelp)}
             style={{
@@ -352,7 +352,7 @@ function AIAssistant() {
             }}>
               &#9654;
             </span>
-            What can Eru help you with?
+            What can Aulë help you with?
           </button>
 
           {showHelp && (
@@ -397,7 +397,7 @@ function AIAssistant() {
         </div>
 
         {/* Case Selection and Status */}
-        <div data-guide="eru.case" style={{
+        <div data-guide="aule.case" style={{
           display: 'flex',
           gap: '1rem',
           marginBottom: '1.5rem',
@@ -482,7 +482,7 @@ function AIAssistant() {
         </div>
 
         {/* Chat Messages */}
-        <div data-guide="eru.chat" className="chat-messages" style={{ minHeight: messages.length > 0 ? '200px' : '60px', maxHeight: '500px', overflowY: 'auto' }}>
+        <div data-guide="aule.chat" className="chat-messages" style={{ minHeight: messages.length > 0 ? '200px' : '60px', maxHeight: '500px', overflowY: 'auto' }}>
           {messages.length === 0 && (
             <div style={{
               textAlign: 'center',
@@ -526,7 +526,7 @@ function AIAssistant() {
                   marginBottom: '0.25rem',
                   fontWeight: 600
                 }}>
-                  {message.role === 'user' ? 'You' : 'Eru'}
+                  {message.role === 'user' ? 'You' : 'Aulë'}
                   {message.offline && (
                     <span style={{ marginLeft: '0.5rem', fontWeight: 'normal' }}>(from the case files, no model)</span>
                   )}
@@ -610,7 +610,7 @@ function AIAssistant() {
                 }}
               >
                 <div style={{ fontSize: '0.75rem', opacity: 0.7, marginBottom: '0.25rem', fontWeight: 600 }}>
-                  Eru
+                  Aulë
                 </div>
                 <div style={{ lineHeight: '1.5' }}>
                   Analyzing...
@@ -622,7 +622,7 @@ function AIAssistant() {
           <div ref={messagesEndRef} />
         </div>
 
-        <div data-guide="eru.quick" className="quick-actions" style={{
+        <div data-guide="aule.quick" className="quick-actions" style={{
           marginTop: '1rem',
           position: 'relative'
         }}>
@@ -641,7 +641,7 @@ function AIAssistant() {
               color: '#ffc107',
               lineHeight: '1.6'
             }}>
-              <strong>Eru can't answer free-text questions right now.</strong> {formatContent(llmStatus.reason)}
+              <strong>Aulë can't answer free-text questions right now.</strong> {formatContent(llmStatus.reason)}
             </div>
           )}
           <div style={{
@@ -715,7 +715,7 @@ function AIAssistant() {
           </div>
         </div>
 
-        <form data-guide="eru.ask" onSubmit={handleSubmit} style={{
+        <form data-guide="aule.ask" onSubmit={handleSubmit} style={{
           marginTop: '1.5rem',
           display: 'flex',
           gap: '0.75rem'

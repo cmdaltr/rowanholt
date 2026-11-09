@@ -203,7 +203,7 @@ def case_wide(indicator: Indicator, kind: str) -> bool:
 
 
 class ThreatIntelIndex:
-    """Indicators prepared for matching. Build once per case (or per process for Eru)."""
+    """Indicators prepared for matching. Build once per case (or per process for Aulë)."""
 
     def __init__(self, indicators: Iterable[Indicator], scope: str = "value"):
         good = known_good()
@@ -314,7 +314,7 @@ def enrich_artefact(value: str, index: ThreatIntelIndex) -> List[Dict[str, objec
     """What threat intelligence says about one process name, command line or file path (or any IP,
     domain, hash or URL in it): one entry per matching evidential element, the most specific first,
     each with the groups, techniques and sources behind it and the indicator rows themselves
-    (schema display names). This is the function Eru calls."""
+    (schema display names). This is the function Aulë calls."""
     out = []
     for entry in by_element(index.match(value)):
         rows = [i.row() for i in entry.pop("indicators")]

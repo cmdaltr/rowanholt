@@ -56,7 +56,7 @@ Recommends:     zenity, libnotify, docker-ce, docker-compose-plugin
 %global __brp_mangle_shebangs %{nil}
 
 %description
-Gandalf acquires, Elrond analyses and Eru answers. This package adds
+Gandalf acquires, Elrond analyses and Aulë answers. This package adds
 Rowanholt to the application menu: on first launch it checks for Docker,
 puts Rowanholt's files in a folder you choose, and opens the web UI in
 its own window.

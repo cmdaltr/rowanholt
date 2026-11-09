@@ -25,12 +25,12 @@ const AccountPage = () => {
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [showMfaSetup, setShowMfaSetup] = useState(false);
 
-  // Long-lived tokens for scripts and Eru's MCP server (auth/tokens.py)
+  // Long-lived tokens for scripts and Aulë's MCP server (auth/tokens.py)
   const [generatedToken, setGeneratedToken] = useState('');
   const [apiTokens, setApiTokens] = useState([]);
   const [tokensAvailable, setTokensAvailable] = useState(true);
   const [tokenName, setTokenName] = useState('');
-  const [tokenScope, setTokenScope] = useState('eru-mcp');
+  const [tokenScope, setTokenScope] = useState('aule-mcp');
   const [tokenDays, setTokenDays] = useState(90);
 
   // Messages
@@ -356,15 +356,15 @@ const AccountPage = () => {
                 </form>
               </div>
 
-              {/* Tokens for scripts and Eru's MCP server */}
+              {/* Tokens for scripts and Aulë's MCP server */}
               <div style={{ paddingTop: '2rem', borderTop: '1px solid #3f4b2a' }}>
-                <h3 style={{ marginBottom: '1.5rem' }}>Tokens for scripts and Eru's MCP server</h3>
+                <h3 style={{ marginBottom: '1.5rem' }}>Tokens for scripts and Aulë's MCP server</h3>
 
                 <p style={{ marginBottom: '1rem', color: '#a09580' }}>
                   A token lasts until it expires or you revoke it, and is shown once, when it's made. An{' '}
-                  <code>eru-mcp</code> token can only read, flag leads and add notes, recorded as Eru acting for you;
+                  <code>aule-mcp</code> token can only read, flag leads and add notes, recorded as Aulë acting for you;
                   a <code>full</code> token does what you can do, so keep it like a password. For{' '}
-                  <code>rowanholt mcp</code>, set it as <code>ROWANHOLT_TOKEN</code> (docs/ERU.md).
+                  <code>rowanholt mcp</code>, set it as <code>ROWANHOLT_TOKEN</code> (docs/AULE.md).
                 </p>
 
                 {tokenMessage.text && (
@@ -390,7 +390,7 @@ const AccountPage = () => {
                       <div style={{ flex: '1 1 8rem' }}>
                         <label>Scope</label>
                         <select value={tokenScope} onChange={(e) => setTokenScope(e.target.value)}>
-                          <option value="eru-mcp">eru-mcp</option>
+                          <option value="aule-mcp">aule-mcp</option>
                           <option value="full">full</option>
                         </select>
                       </div>
@@ -601,7 +601,7 @@ const AccountPage = () => {
                   <div>
                     <h4 style={{ color: '#f0dba5', marginBottom: '1rem' }}>OpenAI</h4>
                     <p style={{ marginBottom: '1rem', color: '#a09580', fontSize: '0.85rem' }}>
-                      Required for Ask Eru AI assistant functionality.
+                      Required for Ask Aulë AI assistant functionality.
                     </p>
                     <div className="form-group">
                       <label>API Key</label>

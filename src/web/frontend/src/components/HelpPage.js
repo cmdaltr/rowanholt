@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt.png`;
 const architectureMap = `${process.env.PUBLIC_URL}/architecture/rowanholt-architecture.html`;
 const architecturePages = [
-  { href: `${architectureMap}#realm`, preview: 'realm.jpg', title: 'The realm: Gandalf to Elrond to Eru' },
+  { href: `${architectureMap}#realm`, preview: 'realm.jpg', title: 'The realm: Gandalf to Elrond to Aulë' },
   { href: `${architectureMap}#elrond`, preview: 'elrond.jpg', title: "Elrond's roads: branching by evidence and OS" },
   {
     href: `${process.env.PUBLIC_URL}/architecture/gandalf-acquisition.html`,
@@ -69,7 +69,7 @@ const HelpPage = () => {
             <li><strong>Automated Analysis (Elrond):</strong> Process evidence with 30+ integrated forensic tools</li>
             <li><strong>MITRE ATT&CK Integration:</strong> Automatic technique mapping and coverage analysis</li>
             <li><strong>Cloud Forensics:</strong> AWS, Azure, and GCP investigation support</li>
-            <li><strong>AI-Powered Analysis (Eru):</strong> Natural language queries using local LLM</li>
+            <li><strong>AI-Powered Analysis (Aulë):</strong> Natural language queries using local LLM</li>
             <li><strong>Memory Forensics:</strong> Volatility 3 integration</li>
             <li><strong>Timeline Generation:</strong> Plaso/log2timeline support</li>
             <li><strong>SIEM Integration:</strong> Direct export to Splunk and Elasticsearch</li>
@@ -109,7 +109,7 @@ rowanholt start --testing        # the stack without Splunk and Elastic
           <br />
           <p><strong>Optional:</strong></p>
           <ul>
-            <li>Ollama, for Eru's free-text answers (Eru answers fixed questions without it)</li>
+            <li>Ollama, for Aulë's free-text answers (Aulë answers fixed questions without it)</li>
             <li>Splunk or Elasticsearch, for SIEM export (<code>rowanholt start</code> without <code>--testing</code>)</li>
           </ul>
 
@@ -338,7 +338,7 @@ sudo python3 python/gandalf.py Password Remote -O /evidence/CASE-001`}
         <>
           <h3>Threat Intelligence</h3>
           <p>
-            Pippin holds the indicators Elrond matches cases against and Eru checks single values with, in the
+            Pippin holds the indicators Elrond matches cases against and Aulë checks single values with, in the
             ten columns of the Iran APT workbook: evidential element, threat group, procedure, technique,
             tactic, context, references and source.
           </p>
@@ -424,14 +424,14 @@ sudo python3 python/gandalf.py Password Remote -O /evidence/CASE-001`}
         </>
       )
     },
-    eru: {
-      title: 'Eru',
+    aule: {
+      title: 'Aulë',
       content: (
         <>
-          <h3>Eru - AI-Powered Analysis</h3>
+          <h3>Aulë - AI-Powered Analysis</h3>
           <p>
             Query investigation data using natural language with a privacy-focused local LLM powered by Ollama.
-            Named after Eru Iluvatar, the supreme deity in Tolkien's legendarium.
+            Named after Aulë (OW-leh), the smith of the Valar in Tolkien's legendarium, maker of the Dwarves.
           </p>
 
           <h4>Features</h4>

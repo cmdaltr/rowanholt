@@ -2,14 +2,14 @@
 
 ## What this is
 
-Rowanholt is a unified DFIR platform — the merger of Elrond (analysis) and Gandalf (acquisition) into a single directed-graph execution model, with Eru as the AI analyst. It is Ben's primary professional tool, not a side project. Treat it accordingly.
+Rowanholt is a unified DFIR platform — the merger of Elrond (analysis) and Gandalf (acquisition) into a single directed-graph execution model, with Aulë as the AI analyst. It is Ben's primary professional tool, not a side project. Treat it accordingly.
 
 ## Architecture
 
 ```
-Gandalf (acquisition) → Elrond (analysis) → Eru (AI analyst)
+Gandalf (acquisition) → Elrond (analysis) → Aulë (AI analyst)
          ↓                      ↓                  ↓
-  bash, Python, PowerShell  30+ forensic tools   Ask Eru (web) + ai CLI
+  bash, Python, PowerShell  30+ forensic tools   Ask Aulë (web) + ai CLI
   local, SSH, PSRemoting    Volatility 3, Plaso  Ollama (local LLM)
   order of volatility,      Artemis, RegRipper,  fixed answers from the
   SHA-256 log.meta          YARA, Sleuth Kit     case files without one
@@ -26,7 +26,7 @@ Gandalf (acquisition) → Elrond (analysis) → Eru (AI analyst)
 - The platform: **Rowanholt** (rowan + Old English *holt*, a wood: the rowan wood; formerly Rivendell). Don't bring the old name back: what's left of it is deliberate (`scripts/migrate/from-rivendell.sh`, the old Eru header and template key it still accepts, `rivendell` data folders on disk)
 - Acquisition module: **Gandalf**
 - Analysis module: **Elrond**
-- AI analyst: **Eru**
+- AI analyst: **Aulë** (the Tolkien smith, OW-leh; `aule` in identifiers; formerly Eru, renamed 9 November 2026). What's left of Eru is deliberate, aliases so nothing breaks, like the Rivendell leftovers: the `eru-mcp` token scope (read as `aule-mcp`, `auth/tokens.py` `OLD_SCOPES`; stored scopes renamed by migration `f2b7c9d4e816`) and `X-Rowanholt-Agent: eru-mcp` (`case_routes.OLD_AULE_MCP`), the `ask_eru` MCP tool, the `eru_mcp` package shim (`python -m eru_mcp.server`), the `eru-mcp` network alias and `ERU_MCP_ARGS` in `deploy/server/docker-compose.server.yml`, `eru-*` Ollama models used when the `aule-*` one isn't pulled (`ai_routes.old_model_name`), and "Eru (for <user>)" in cases' recorded history
 - Administration: **Aragorn**; its Docker manager: **Andúril** (`anduril` in code)
 - Attack datasets and the lab's recordings: **Mordor**
 - Threat intelligence (the web app's page): **Pippin**, who looked into the palantír
@@ -38,16 +38,16 @@ Gandalf (acquisition) → Elrond (analysis) → Eru (AI analyst)
 |---|---|
 | `rowanholt` | Root launcher (bash): the Docker stack, Gandalf, Elrond, the lab, every script, `map` |
 | `src/acquisition/` | Gandalf: `bash/gandalf.sh`, `python/gandalf.py` + `collect_artefacts-py`, `windows/Invoke-Gandalf.ps1` + `Set-ArtefactCollection` |
-| `src/analysis/elrond.py`, `src/analysis/rowanholt/` | Elrond: `core/` (incl. Gandalf ingest and manifest check, `mobile.py` for phones), `collect/`, `process/` (incl. `network.py`: Zeek, NetFlow; `mobile.py`: iLEAPP, ALEAPP), `analysis/`, `memory/`, `post/` (Splunk, Elastic, OpenSearch/Wazuh, Timesketch, ATT&CK), `report/` (the case report, shared with the backend), `cloud/`, `ai/` (Eru's CLI) |
+| `src/analysis/elrond.py`, `src/analysis/rowanholt/` | Elrond: `core/` (incl. Gandalf ingest and manifest check, `mobile.py` for phones), `collect/`, `process/` (incl. `network.py`: Zeek, NetFlow; `mobile.py`: iLEAPP, ALEAPP), `analysis/`, `memory/`, `post/` (Splunk, Elastic, OpenSearch/Wazuh, Timesketch, ATT&CK), `report/` (the case report, shared with the backend), `cloud/`, `ai/` (Aulë's CLI) |
 | `src/analysis/tools/definitions.py` | Forensic tool definitions (executables, paths, platforms) |
-| `src/web/backend/` | FastAPI (:5688): jobs, auth, `ai_routes.py` + `eru_offline.py` (fixed answers) + `eru_context.py` (the model's numbered context) (Eru), Mordor, lab, Andúril proxy |
+| `src/web/backend/` | FastAPI (:5688): jobs, auth, `ai_routes.py` + `aule_offline.py` (fixed answers) + `aule_context.py` (the model's numbered context) (Aulë), Mordor, lab, Andúril proxy |
 | `src/web/frontend/` | React (:5687); About is `components/HelpPage.js` |
 | `deploy/server/`, `scripts/server/` | Team server profile: Compose override (Caddy in front, nothing else published, production frontend), Caddyfile, `server init/users/ca`; a Tailscale Service name (`server init --service`: `Caddyfile.service` and `docker-compose.service.yml`, loopback 5680–5683); Rocky/RHEL (`deploy/docker-compose.selinux.yml`), Windows Server through WSL 2 (`scripts/server/windows/`); guide in `docs/SERVER.md` |
-| `src/web/backend/auth/` | Sign-in: `users.py` (file store), `access.py` (the server-mode middleware: every route, job ownership and sharing via the `job_access` table), `tokens.py` (long-lived API tokens, `full` or `eru-mcp` scope), `oidc.py` (SSO), `manage_users.py` |
+| `src/web/backend/auth/` | Sign-in: `users.py` (file store), `access.py` (the server-mode middleware: every route, job ownership and sharing via the `job_access` table), `tokens.py` (long-lived API tokens, `full` or `aule-mcp` scope), `oidc.py` (SSO), `manage_users.py` |
 | `src/common/startup_progress.py` | `rowanholt start --progress`: phases, ETA from start history, the Shire-to-Rowanholt places the apps draw |
 | `src/mordor/` | Security datasets and recorded attack telemetry |
-| `src/eru_mcp/` | Eru's MCP server (`rowanholt mcp`), read-only over Rowanholt's API |
-| `src/models/` | Ollama Modelfiles for the eru-* models |
+| `src/aule_mcp/` | Aulë's MCP server (`rowanholt mcp`), read-only over Rowanholt's API |
+| `src/models/` | Ollama Modelfiles for the aule-* models |
 | `app/` | Desktop app: `macos/` (Swift WebKit app + first-run setup, `build.sh`/`package.sh` → DMG), `linux/` (launcher + zenity setup, `.deb`), `windows/` (launcher, Inno Setup installer); release builds in `.github/workflows/desktop-release.yml`; `rowanholt app install` for a checkout; see `app/README.md` |
 | `lab/` | Test lab: Linux targets, Tart/UTM VMs, Gandalf against seeded hosts; bugs in `tests/docs/BUGS.md` |
 | `src/analysis/web/`, `src/analysis/docker/` | Legacy standalone Elrond stack (ports 3000/8000), not used |
@@ -59,7 +59,7 @@ Gandalf (acquisition) → Elrond (analysis) → Eru (AI analyst)
 - argparse for CLIs (`src/cli/rowanholt.py`, `elrond.py`)
 - openpyxl for XLSX output
 - Volatility 3, Plaso (psteal), Artemis, RegRipper, YARA, The Sleuth Kit, ClamAV, ewfmount/qemu-nbd/apfs-fuse as subprocess calls
-- Eru's LLM backend is Ollama (`OLLAMA_HOST`, `ROWANHOLT_MODEL_NAME`, default `llama3.2:3b`); the CLI can also use llama.cpp through LangChain. No hosted-API backend exists
+- Aulë's LLM backend is Ollama (`OLLAMA_HOST`, `ROWANHOLT_MODEL_NAME`, default `llama3.2:3b`); the CLI can also use llama.cpp through LangChain. No hosted-API backend exists
 - React 18 front end; Docker Compose for everything (`docker-compose.yml`)
 
 ## Code conventions
@@ -73,28 +73,28 @@ Gandalf (acquisition) → Elrond (analysis) → Eru (AI analyst)
 - New forensic tool integrations: define the tool in `src/analysis/tools/definitions.py` and add its processing under `src/analysis/rowanholt/process/` following the existing modules
 - New artefact parsers (no external tool): a stdlib module in `process/extractions/` that returns rows, routed from `process/extra_artefacts.py` (or the OS router: `windows_artefacts.py`, `linux_artefacts.py`, `mac_artefacts.py`) into `cooked/<name>.csv`, techniques via `_record_techniques`; selection in `process/select.py` follows `is_extra_artefact`
 
-## What Eru touches
+## What Aulë touches
 
-Eru is the AI layer. It reads Elrond's case output and provides:
-- Natural-language answers, case summaries and investigation suggestions (with Ollama), from per-host rows tagged `[R1]`…; answers return only the cited rows they were given, which Ask Eru offers to flag
-- Fixed questions answered straight from the case files when Ollama or the model isn't available (`eru_offline.py`): hosts, ATT&CK techniques, persistence, logins, IOCs, suspicious commands
-- ATT&CK mapping itself is Elrond's (`post/mitre/`), not Eru's
+Aulë is the AI layer. It reads Elrond's case output and provides:
+- Natural-language answers, case summaries and investigation suggestions (with Ollama), from per-host rows tagged `[R1]`…; answers return only the cited rows they were given, which Ask Aulë offers to flag
+- Fixed questions answered straight from the case files when Ollama or the model isn't available (`aule_offline.py`): hosts, ATT&CK techniques, persistence, logins, IOCs, suspicious commands
+- ATT&CK mapping itself is Elrond's (`post/mitre/`), not Aulë's
 
 ## Threat intelligence, collaboration, stacking
 
-- Threat intelligence: `src/analysis/rowanholt/threat_intel/` (Iran APT loader `iran_apt_loader.py`, STIX/TAXII, MITRESaw, matching, `enrich_artefact()` as the Eru-facing function); fixed 10-column schema: Evidential Element, Threat Group, Procedure Example, Technique ID, Technique Name, Tactic, Contextual Evidence, Reference URL, Navigation Layer URL, Source Type; table `threat_intel_indicators` — don't rename or restructure without asking. Expiry and confidence live beside it in `threat_intel_validity` (`threat_intel/validity.py`; STIX's own, else 90 days for IPs and domains); expired indicators stay listed but are left out of the CSV export (Elrond's matching) and the value index (`/enrich`, Eru) Elrond `--threatIntel`, API `/api/threat-intel`, the Intel page. Online lookups (`threat_intel_lookup.py`, VirusTotal, off unless `.env` turns them on): any analyst from Pippin, refused to Eru; approved 4 November 2026 (`.claude/threat-model.md`)
+- Threat intelligence: `src/analysis/rowanholt/threat_intel/` (Iran APT loader `iran_apt_loader.py`, STIX/TAXII, MITRESaw, matching, `enrich_artefact()` as the Aulë-facing function); fixed 10-column schema: Evidential Element, Threat Group, Procedure Example, Technique ID, Technique Name, Tactic, Contextual Evidence, Reference URL, Navigation Layer URL, Source Type; table `threat_intel_indicators` — don't rename or restructure without asking. Expiry and confidence live beside it in `threat_intel_validity` (`threat_intel/validity.py`; STIX's own, else 90 days for IPs and domains); expired indicators stay listed but are left out of the CSV export (Elrond's matching) and the value index (`/enrich`, Aulë) Elrond `--threatIntel`, API `/api/threat-intel`, the Intel page. Online lookups (`threat_intel_lookup.py`, VirusTotal, off unless `.env` turns them on): any analyst from Pippin, refused to Aulë; approved 4 November 2026 (`.claude/threat-model.md`)
 - Case browser and collaboration: `src/web/backend/case_routes.py` + `case_files.py` (read-only over cooked/ and analysis/, never raw/), tables `case_findings`, `case_notes`, `case_hosts`, `case_activity`
 - Stacking across hosts: `src/analysis/rowanholt/analysis/stacking.py` (stdlib; run by `--Analysis` on 2+ hosts, rarity needs 3+ of an OS, Linux grouped by distro family, persistence ranked above programs at equal score); no learned model (scikit-learn was dropped)
 
-## Eru's MCP server
+## Aulë's MCP server
 
-- `src/eru_mcp/server.py` (`rowanholt mcp`, stdio; or `--http` on a team server, the `eru-mcp` service behind Caddy at `/mcp`, each request's own eru-mcp API token checked by `RowanholtTokens` (full tokens and JWTs refused), reviewed 4 November 2026; mcp 2's `MCPServer`, formerly FastMCP; `requirements/mcp.txt`, Python 3.10+, never in the worker or backend images). Register every Eru capability through this one server — no parallel registration system
-- A thin client of Rowanholt's API only (`RowanholtAPI` refuses anything but `/api/` paths), read-only by default; every phase 1 tool `readOnlyHint`. Never expose starting/restarting/deleting jobs, Gandalf, threat intelligence import/delete, host assignment, changing or removing findings, or `raw/`. Phase 2 (`flag_lead`, `add_note`) only with `--allow-writes`: leads only, every call sends `X-Rowanholt-Agent: eru-mcp` so the backend records "Eru (for <user>)" and refuses Eru anything else, capped by `--max-writes`. An `eru-mcp` API token (`auth/tokens.py`, table `api_tokens`) makes the backend treat the caller as Eru without the header and refuse anything but reads, leads and notes; on a team server `--allow-writes` won't start without one (`write_refusal`). Reviewed 3 November 2026 with conditions (`.claude/threat-model.md`): on a live case only in an MCP host with no other network-capable tools and no shell or file access to the case store; any new tool needs a fresh review
-- Tests: `tests/unit/test_eru_mcp.py` over `test_server_access.BackendCase` (the real backend in server mode)
+- `src/aule_mcp/server.py` (`rowanholt mcp`, stdio; or `--http` on a team server, the `aule-mcp` service behind Caddy at `/mcp`, each request's own aule-mcp API token checked by `RowanholtTokens` (full tokens and JWTs refused), reviewed 4 November 2026; mcp 2's `MCPServer`, formerly FastMCP; `requirements/mcp.txt`, Python 3.10+, never in the worker or backend images). Register every Aulë capability through this one server — no parallel registration system
+- A thin client of Rowanholt's API only (`RowanholtAPI` refuses anything but `/api/` paths), read-only by default; every phase 1 tool `readOnlyHint`. Never expose starting/restarting/deleting jobs, Gandalf, threat intelligence import/delete, host assignment, changing or removing findings, or `raw/`. Phase 2 (`flag_lead`, `add_note`) only with `--allow-writes`: leads only, every call sends `X-Rowanholt-Agent: aule-mcp` so the backend records "Aulë (for <user>)" and refuses Aulë anything else, capped by `--max-writes`. An `aule-mcp` API token (`auth/tokens.py`, table `api_tokens`) makes the backend treat the caller as Aulë without the header and refuse anything but reads, leads and notes; on a team server `--allow-writes` won't start without one (`write_refusal`). Reviewed 3 November 2026 with conditions (`.claude/threat-model.md`): on a live case only in an MCP host with no other network-capable tools and no shell or file access to the case store; any new tool needs a fresh review
+- Tests: `tests/unit/test_aule_mcp.py` over `test_server_access.BackendCase` (the real backend in server mode)
 
 ## What not to do
 
-- Do not rename Gandalf, Elrond, Eru, Aragorn, Andúril, Mordor or Pippin
+- Do not rename Gandalf, Elrond, Aulë, Aragorn, Andúril, Mordor or Pippin
 - Do not restructure the execution graph model without explicit instruction
 - Do not add new Python dependencies without checking `requirements/` (and `src/web/backend/requirements.txt`) first
 - Do not convert subprocess tool calls to library imports — the subprocess boundary is intentional (isolation)

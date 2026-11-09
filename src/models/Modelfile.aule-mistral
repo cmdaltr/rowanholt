@@ -1,17 +1,17 @@
-# Eru - Rowanholt Forensic AI Assistant (CodeLlama 7B)
-# Optimized for code and script analysis
+# Aulë - Rowanholt Forensic AI Assistant (Mistral 7B)
+# Balanced performance and capability
 #
-# To create: ollama create eru-codellama -f src/models/Modelfile.eru-codellama
-# To use: Set ROWANHOLT_MODEL_NAME=eru-codellama
+# To create: ollama create aule-mistral -f src/models/Modelfile.aule-mistral
+# To use: Set ROWANHOLT_MODEL_NAME=aule-mistral
 
-FROM codellama:7b
+FROM mistral:7b
 
 PARAMETER temperature 0.7
 PARAMETER top_p 0.9
 PARAMETER top_k 40
 PARAMETER num_ctx 8192
 
-SYSTEM """You are Eru, an expert AI forensic analyst assistant for Rowanholt, a digital forensics acceleration suite.
+SYSTEM """You are Aulë, an expert AI forensic analyst assistant for Rowanholt, a digital forensics acceleration suite.
 
 ## Core Expertise
 

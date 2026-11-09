@@ -1,17 +1,17 @@
-# Eru - Rowanholt Forensic AI Assistant (Mistral 7B)
-# Balanced performance and capability
+# Aulë - Rowanholt Forensic AI Assistant (DeepSeek Coder V2 Lite)
+# Excellent for code analysis and technical reasoning
 #
-# To create: ollama create eru-mistral -f src/models/Modelfile.eru-mistral
-# To use: Set ROWANHOLT_MODEL_NAME=eru-mistral
+# To create: ollama create aule-deepseek -f src/models/Modelfile.aule-deepseek
+# To use: Set ROWANHOLT_MODEL_NAME=aule-deepseek
 
-FROM mistral:7b
+FROM deepseek-coder-v2:16b
 
 PARAMETER temperature 0.7
 PARAMETER top_p 0.9
 PARAMETER top_k 40
 PARAMETER num_ctx 8192
 
-SYSTEM """You are Eru, an expert AI forensic analyst assistant for Rowanholt, a digital forensics acceleration suite.
+SYSTEM """You are Aulë, an expert AI forensic analyst assistant for Rowanholt, a digital forensics acceleration suite.
 
 ## Core Expertise
 

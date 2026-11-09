@@ -39,12 +39,14 @@ HOST_STATUSES = ("to do", "in progress", "done")
 TECHNIQUE = re.compile(r"^T\d{4}(?:\.\d{3})?$")
 EXCERPT = 600
 LIVE_EVERY = 2.0  # seconds between the live socket's checks
-# Eru's MCP server (src/eru_mcp) sends this on every call, so what it writes reads as Eru's, on the
+# Aulë's MCP server (src/aule_mcp) sends this on every call, so what it writes reads as Aulë's, on the
 # analyst's behalf, and never passes for the analyst's own work
 AGENT_HEADER = "X-Rowanholt-Agent"
-# What an MCP server from before the rename sends: still Eru, never the analyst
+# What an MCP server from before the rename sends: still Aulë, never the analyst
 OLD_AGENT_HEADER = "X-Rivendell-Agent"
-ERU_MCP = "eru-mcp"
+AULE_MCP = "aule-mcp"
+# The header's value from an MCP server from before Aulë was renamed from Eru: still Aulë
+OLD_AULE_MCP = "eru-mcp"
 
 
 class Conflict(Exception):
@@ -243,15 +245,16 @@ def restart_refusal(job_id: str, confirm: bool) -> Optional[Dict]:
                        "Restart with confirm=true to go ahead."}
 
 
-def _by_eru(request: Request) -> bool:
-    """Eru's MCP server says so in a header; an eru-mcp token is Eru whatever it says."""
-    return (any(request.headers.get(h, "").strip().lower() == ERU_MCP for h in (AGENT_HEADER, OLD_AGENT_HEADER))
-            or access.token_scope(request) == ERU_MCP)
+def _by_aule(request: Request) -> bool:
+    """Aulë's MCP server says so in a header; an aule-mcp token is Aulë whatever it says."""
+    return (any(request.headers.get(h, "").strip().lower() in (AULE_MCP, OLD_AULE_MCP)
+                for h in (AGENT_HEADER, OLD_AGENT_HEADER))
+            or access.token_scope(request) == AULE_MCP)
 
 
 def _actor(request: Request) -> str:
     user = access.current_user(request).get("username") or "local"
-    return f"Eru (for {user})" if _by_eru(request) else user
+    return f"Aulë (for {user})" if _by_aule(request) else user
 
 
 def _root(job_id: str) -> Path:
@@ -272,7 +275,7 @@ def _file(job_id: str, host: str, path: str) -> Path:
 
 
 def findings_for_case(case_path: str) -> List[Dict]:
-    """For Eru: the findings on every job whose output is this case directory."""
+    """For Aulë: the findings on every job whose output is this case directory."""
     if not _jobs or not _store:
         return []
     target = Path(case_path).resolve()
@@ -376,8 +379,8 @@ def _verify(root: Path, found: List[Dict]) -> None:
 async def flag(job_id: str, finding: FindingIn, request: Request):
     """Flag a row. The row is read here, so its hash and excerpt are what the case holds."""
     technique = _check(finding.status, finding.technique)
-    if _by_eru(request) and finding.status != "lead":
-        raise HTTPException(status_code=403, detail="Eru flags leads only: confirming or dismissing is an analyst's")
+    if _by_aule(request) and finding.status != "lead":
+        raise HTTPException(status_code=403, detail="Aulë flags leads only: confirming or dismissing is an analyst's")
     try:
         row = case_files.find_row(_file(job_id, finding.host, finding.artefact), finding.row_ref)
     except case_files.CaseFileError as exc:
@@ -403,8 +406,8 @@ def _flagged_already(already: Dict) -> HTTPException:
 
 @router.patch("/findings/{finding_id}")
 async def update_finding(job_id: str, finding_id: int, update: FindingUpdate, request: Request):
-    if _by_eru(request):
-        raise HTTPException(status_code=403, detail="Eru doesn't change findings: an analyst does")
+    if _by_aule(request):
+        raise HTTPException(status_code=403, detail="Aulë doesn't change findings: an analyst does")
     technique = _check(update.status, update.technique)
     try:
         changed = store().update_finding(job_id, finding_id, _actor(request), expected=update.updated_at,
@@ -421,8 +424,8 @@ async def update_finding(job_id: str, finding_id: int, update: FindingUpdate, re
 
 @router.delete("/findings/{finding_id}")
 async def delete_finding(job_id: str, finding_id: int, request: Request):
-    if _by_eru(request):
-        raise HTTPException(status_code=403, detail="Eru doesn't remove findings: an analyst does")
+    if _by_aule(request):
+        raise HTTPException(status_code=403, detail="Aulë doesn't remove findings: an analyst does")
     if not store().delete_finding(job_id, finding_id, _actor(request)):
         raise HTTPException(status_code=404, detail="Finding not found")
     return {"deleted": finding_id}
@@ -455,8 +458,8 @@ async def add_note(job_id: str, note: NoteIn, request: Request):
 
 @router.put("/hosts/{host}")
 async def assign_host(job_id: str, host: str, update: HostUpdate, request: Request):
-    if _by_eru(request):
-        raise HTTPException(status_code=403, detail="Eru doesn't assign hosts: an analyst does")
+    if _by_aule(request):
+        raise HTTPException(status_code=403, detail="Aulë doesn't assign hosts: an analyst does")
     if update.status is not None and update.status not in HOST_STATUSES:
         raise HTTPException(status_code=400, detail=f"status is one of {', '.join(HOST_STATUSES)}")
     if host not in {h.name for h in case_files.hosts(_root(job_id))}:
