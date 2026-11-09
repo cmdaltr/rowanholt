@@ -13,6 +13,7 @@ import {
 } from '../api';
 import { useAuth } from '../context/AuthContext';
 import PageHero from './PageHero';
+import './ThreatIntel.css';
 
 const PAGE = 50;
 const ACCEPT = '.xlsx,.xlsm,.csv,.json,.txt';
@@ -21,6 +22,25 @@ const detail = (err, fallback) => err.response?.data?.detail || err.message || f
 const EXTEND_DAYS = 90;
 const day = (iso) => (iso ? iso.slice(0, 10) : '');
 const inDays = (days) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
+const tactics = (text) => (text || '').split(/[,;]\s*/).map((t) => t.trim()).filter(Boolean);
+
+// The technique ID as a pill (a link when the row has a reference), its name beneath
+function Technique({ id, name, url }) {
+  if (!id && !name) return null;
+  return (
+    <>
+      {id && (url
+        ? <a className="pippin-tid" href={url} target="_blank" rel="noopener noreferrer">{id}</a>
+        : <span className="pippin-tid">{id}</span>)}
+      {name && <span className="pippin-tname">{name}</span>}
+    </>
+  );
+}
+
+function Tactics({ text }) {
+  const list = tactics(text);
+  return list.length ? <div className="pippin-tactics">{list.map((t) => <span key={t} className="pippin-tactic">{t}</span>)}</div> : null;
+}
 
 // The indicators Elrond matches a case against (Threat intelligence on Elrond's page, or
 // --threatIntel) and Aulë enriches single values with. On a team server only admins add or
@@ -144,81 +164,127 @@ function ThreatIntel() {
     }
   };
 
+  const sourcesCard = (
+    <section data-guide="intel.sources" className="card">
+      <div className="pippin-head">
+        <h3>Sources</h3>
+        {summary && summary.total > 0 && (
+          <span className="pippin-meta">
+            <strong>{summary.total.toLocaleString()}</strong> indicators · <strong>{summary.groups}</strong> groups
+          </span>
+        )}
+      </div>
+      {!summary ? <p className="pippin-muted">Loading…</p> : summary.total === 0 ? (
+        <p className="pippin-muted">No indicators yet.{canEdit ? ' Import a file or pull a TAXII collection.' : ' An administrator imports them.'}</p>
+      ) : (
+        <>
+          <ul className="pippin-sources">
+            {summary.sources.map((s) => (
+              <li key={s.source} className={source === s.source ? 'is-current' : undefined}>
+                <button type="button" className="pippin-source-name" title="Show only this source's indicators"
+                  onClick={() => { setSource(s.source); setOffset(0); }}>{s.source || '(none)'}</button>
+                <span className="pippin-count">{s.count.toLocaleString()}</span>
+                {canEdit && (
+                  <button type="button" className="pippin-small pippin-danger" disabled={busy}
+                    onClick={() => remove(s.source)}>Remove</button>
+                )}
+              </li>
+            ))}
+          </ul>
+          {summary.expired > 0 && (
+            <p className="pippin-muted pippin-expired-note">
+              {summary.expired.toLocaleString()} expired: still listed, but cases aren't matched against them and Aulë
+              doesn't check values with them until their source is imported again or an administrator extends them.
+            </p>
+          )}
+        </>
+      )}
+    </section>
+  );
+
+  const importCard = canEdit && (
+    <section data-guide="intel.import" className="card">
+      <div className="pippin-head">
+        <h3>Import</h3>
+        <span className="pippin-meta">up to 200 MB</span>
+      </div>
+      <dl className="pippin-formats">
+        <dt><code>.xlsx</code> <code>.xlsm</code></dt>
+        <dd>A sheet with the ten threat intelligence columns as headers (Evidential Element … Source Type).</dd>
+        <dt><code>.csv</code></dt>
+        <dd>The same ten columns, as Rowanholt exports them, or a MITRESaw procedures export (<code>group_sw_name</code> and <code>evidence</code> columns).</dd>
+        <dt><code>.json</code></dt>
+        <dd>A STIX 2.1 bundle; each indicator's own expiry and confidence are kept.</dd>
+        <dt><code>.txt</code></dt>
+        <dd>A watchlist: one value per line, <code>#</code> for comments.</dd>
+      </dl>
+      <p className="pippin-muted" style={{ margin: '0 0 1rem' }}>Indicators already stored are skipped and their expiry renewed.</p>
+      <div className="pippin-file">
+        {/* The browser's own file picker hidden behind a button in the app's style */}
+        <input ref={picker} type="file" accept={ACCEPT} style={{ display: 'none' }}
+          onChange={(e) => setFile(e.target.files[0] || null)} />
+        <button type="button" className="secondary" onClick={() => picker.current?.click()}>Choose file</button>
+        <span className={`pippin-file-name${file ? ' is-chosen' : ''}`}>{file ? file.name : 'No file chosen'}</span>
+        <button type="button" disabled={!file || busy} onClick={upload}>{busy ? 'Working…' : 'Import'}</button>
+      </div>
+
+      <div className="pippin-subsection">
+        <h4>TAXII 2.1 collection</h4>
+        <div className="pippin-taxii">
+          <div className="is-wide">
+            <label htmlFor="taxii-url">Collection URL</label>
+            <input id="taxii-url" type="text" placeholder="https://taxii.example/api/collections/<id>/" value={taxii.url}
+              onChange={(e) => setTaxii({ ...taxii, url: e.target.value })} />
+          </div>
+          <div>
+            <label htmlFor="taxii-user">Username <span>(optional)</span></label>
+            <input id="taxii-user" type="text" value={taxii.username} autoComplete="off"
+              onChange={(e) => setTaxii({ ...taxii, username: e.target.value })} />
+          </div>
+          <div>
+            <label htmlFor="taxii-password">Password <span>(optional)</span></label>
+            <input id="taxii-password" type="password" value={taxii.password} autoComplete="new-password"
+              onChange={(e) => setTaxii({ ...taxii, password: e.target.value })} />
+          </div>
+          <div>
+            <label htmlFor="taxii-after">Added after <span>(optional)</span></label>
+            <input id="taxii-after" type="text" placeholder="2026-01-01T00:00:00Z" value={taxii.added_after}
+              onChange={(e) => setTaxii({ ...taxii, added_after: e.target.value })} />
+          </div>
+        </div>
+        <div className="pippin-actions">
+          <button type="button" disabled={!taxii.url || busy} onClick={pull}>Pull collection</button>
+          <span className="pippin-muted">Up to 5,000 objects per pull.</span>
+        </div>
+      </div>
+    </section>
+  );
+
   return (
-    <div className="job-list journey-detail">
+    <div className="job-list journey-detail pippin">
       <PageHero title="Pippin">
-        Threat intelligence: the indicators that Elrond matches cases against and Aulë checks single values with: the Iran APT
-        workbook, STIX 2.1 bundles, TAXII 2.1 collections, MITRESaw procedures or a watchlist.
+        Threat intelligence: the indicators Elrond matches cases against and Aulë checks single values with,
+        from STIX 2.1 bundles, TAXII 2.1 collections, MITRESaw procedures or a watchlist.
       </PageHero>
 
       {error && <div className="error">{error}</div>}
-      {notice && <div className="card" style={{ color: '#a7db6c' }}>{notice}</div>}
+      {notice && <div className="card pippin-notice">{notice}</div>}
 
-      <div data-guide="intel.sources" className="card">
-        <h3>Sources</h3>
-        {!summary ? <p>Loading…</p> : summary.total === 0 ? (
-          <p>No indicators yet.{canEdit ? ' Import a file or pull a TAXII collection below.' : ' An administrator imports them.'}</p>
-        ) : (
-          <>
-            <p>
-              {summary.total.toLocaleString()} indicators about {summary.groups} groups.
-              {summary.expired > 0 && ` ${summary.expired.toLocaleString()} have expired: they stay listed but cases aren't matched against them, and Aulë doesn't check values with them, until a fresh import of their source or an administrator extends them.`}
-            </p>
-            <div className="table-container">
-              <table>
-                <thead><tr><th>Source</th><th>Indicators</th><th /></tr></thead>
-                <tbody>
-                  {summary.sources.map((s) => (
-                    <tr key={s.source}>
-                      <td><button type="button" style={{ background: 'none', border: 'none', padding: 0, color: '#f0dba5', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => { setSource(s.source); setOffset(0); }}>{s.source || '(none)'}</button></td>
-                      <td>{s.count.toLocaleString()}</td>
-                      <td>{canEdit && <button type="button" disabled={busy} onClick={() => remove(s.source)}>Remove</button>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </div>
+      {canEdit ? <div className="pippin-pair">{sourcesCard}{importCard}</div> : sourcesCard}
 
-      {canEdit && (
-        <div data-guide="intel.import" className="card">
-          <h3>Import</h3>
-          <p>
-            XLSX (the Iran APT workbook's ten columns), CSV (Rowanholt's columns or MITRESaw's procedures),
-            JSON (a STIX 2.1 bundle) or a .txt watchlist with one value per line.
-            Indicators already stored are skipped.
-          </p>
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            {/* The browser's own file picker hidden behind a button in the app's style */}
-            <input ref={picker} type="file" accept={ACCEPT} style={{ display: 'none' }}
-              onChange={(e) => setFile(e.target.files[0] || null)} />
-            <button type="button" className="secondary" onClick={() => picker.current?.click()}>Choose file</button>
-            <span style={{ color: file ? '#a7db6c' : '#999' }}>{file ? file.name : 'No file chosen'}</span>
-            <button type="button" disabled={!file || busy} onClick={upload}>{busy ? 'Working…' : 'Import'}</button>
-          </div>
-          <h4 style={{ marginTop: '1.5rem' }}>TAXII 2.1 collection</h4>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(14rem, 1fr))', gap: '0.5rem' }}>
-            <input type="text" placeholder="https://taxii.example/api/collections/<id>/" value={taxii.url}
-              onChange={(e) => setTaxii({ ...taxii, url: e.target.value })} />
-            <input type="text" placeholder="Username (optional)" value={taxii.username} autoComplete="off"
-              onChange={(e) => setTaxii({ ...taxii, username: e.target.value })} />
-            <input placeholder="Password (optional)" type="password" value={taxii.password} autoComplete="new-password"
-              onChange={(e) => setTaxii({ ...taxii, password: e.target.value })} />
-            <input type="text" placeholder="Added after (2026-01-01T00:00:00Z)" value={taxii.added_after}
-              onChange={(e) => setTaxii({ ...taxii, added_after: e.target.value })} />
-          </div>
-          <button type="button" style={{ marginTop: '0.5rem' }} disabled={!taxii.url || busy} onClick={pull}>Pull collection</button>
+      <section data-guide="intel.enrich" className="card">
+        <div className="pippin-head">
+          <h3>Check a value</h3>
+          <span className="pippin-meta">one value against every indicator</span>
         </div>
-      )}
-
-      <div data-guide="intel.enrich" className="card">
-        <h3>Check a value</h3>
-        <p>A process name, command line, path, IP, domain or hash: which indicators it matches, and how many groups share each one.</p>
-        <form onSubmit={enrich} style={{ display: 'flex', gap: '0.5rem' }}>
-          <input type="text" style={{ flex: 1 }} value={value} onChange={(e) => setValue(e.target.value)}
-            placeholder="powershell.exe -nop -w hidden -enc ..." />
+        <p className="pippin-lede">
+          Paste one value from a case: a command line, path, process name, IP, domain or hash. Pippin finds the
+          indicators that occur in it, matched as Elrond matches (IPs and hashes exactly, tools as whole words,
+          commands as phrases), and how many groups share each. Expired indicators are left out.
+        </p>
+        <form onSubmit={enrich} className="pippin-check">
+          <input type="text" className="pippin-value" value={value} onChange={(e) => setValue(e.target.value)}
+            placeholder="powershell.exe -nop -w hidden -enc ..." aria-label="Value to check" />
           <button type="submit" disabled={value.length < 3}>Check</button>
           {lookupOn?.enabled && (
             <button type="button" className="secondary" disabled={value.trim().length < 3 || looking} onClick={lookUp}
@@ -226,12 +292,12 @@ function ThreatIntel() {
           )}
         </form>
         {lookupOn?.enabled && (
-          <p style={{ fontSize: '0.85rem', color: '#888' }}>
+          <p className="pippin-muted" style={{ marginTop: '0.5rem' }}>
             Looking up sends the value to VirusTotal: an IP, domain or hash only, never a private address or internal name.
           </p>
         )}
         {looked && (
-          <div data-testid="lookup-result" style={{ marginTop: '1rem' }}>
+          <div data-testid="lookup-result" className="pippin-result">
             {!looked.found ? <p>VirusTotal has nothing on <code>{looked.value}</code>.</p> : (
               <p>
                 VirusTotal on <code>{looked.value}</code>: <strong style={{ color: looked.malicious ? '#e06c6c' : '#a7db6c' }}>
@@ -242,59 +308,96 @@ function ThreatIntel() {
               </p>
             )}
             <a href={looked.link} target="_blank" rel="noopener noreferrer">Open on VirusTotal</a>
-            {looked.cached && <span style={{ color: '#888' }}> · from the last hour's answer</span>}
+            {looked.cached && <span className="pippin-muted"> · from the last hour's answer</span>}
           </div>
         )}
-        {enriched && (enriched.matches.length === 0 ? <p>No indicators match.</p> : (
-          <div className="table-container" style={{ marginTop: '1rem' }}>
-            <table>
-              <thead><tr><th>Element</th><th>Kind</th><th>Groups</th><th>Techniques</th><th>Sources</th></tr></thead>
-              <tbody>
-                {enriched.matches.map((m) => (
-                  <tr key={m.element}>
-                    <td><code>{m.element}</code>{m.common && <div style={{ fontSize: '0.8rem', color: '#888' }}>common: {m.breadth} groups use it</div>}</td>
-                    <td>{m.kind}</td>
-                    <td>{m.groups.slice(0, 8).join(', ')}{m.groups.length > 8 ? ` +${m.groups.length - 8}` : ''}</td>
-                    <td>{m.techniques.join(', ')}</td>
-                    <td>{m.sources.join('; ')}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {enriched && (
+          <div className="pippin-result">
+            {enriched.matches.length === 0 ? <p className="pippin-muted">No indicators occur in that value.</p> : (
+              <div className="table-container">
+                <table className="pippin-table">
+                  <colgroup>
+                    <col style={{ width: '28%' }} /><col style={{ width: '8%' }} /><col style={{ width: '27%' }} />
+                    <col style={{ width: '25%' }} /><col style={{ width: '12%' }} />
+                  </colgroup>
+                  <thead><tr><th>Matched element</th><th>Kind</th><th>Threat groups</th><th>Technique IDs</th><th>Sources</th></tr></thead>
+                  <tbody>
+                    {enriched.matches.map((m) => (
+                      <tr key={m.element}>
+                        <td data-label="Matched element">
+                          <code className="pippin-element">{m.element}</code>
+                          {m.common && <div className="pippin-muted">common: {m.breadth} groups use it</div>}
+                        </td>
+                        <td data-label="Kind">{m.kind}</td>
+                        <td data-label="Threat groups">{m.groups.slice(0, 8).join(', ')}{m.groups.length > 8 ? ` +${m.groups.length - 8}` : ''}</td>
+                        <td data-label="Technique IDs">
+                          <div className="pippin-tids">{m.techniques.map((t) => <span key={t} className="pippin-tid">{t}</span>)}</div>
+                        </td>
+                        <td data-label="Sources">{m.sources.join('; ')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        ))}
-      </div>
+        )}
+      </section>
 
-      <div data-guide="intel.browse" className="card">
-        <h3>Indicators{source ? `: ${source}` : ''}</h3>
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-          <input type="text" style={{ flex: 1 }} placeholder="Search elements, groups or technique IDs" value={query}
-            onChange={(e) => { setQuery(e.target.value); setOffset(0); }} />
-          {source && <button type="button" onClick={() => { setSource(''); setOffset(0); }}>All sources</button>}
+      <section data-guide="intel.browse" className="card">
+        <div className="pippin-head">
+          <h3>Indicators</h3>
+          <span className="pippin-meta"><strong>{results.total.toLocaleString()}</strong> {query || source ? 'shown by the filter' : 'stored'}</span>
         </div>
+        <div className="pippin-filter">
+          <label htmlFor="pippin-filter">Filter</label>
+          <input id="pippin-filter" type="text" placeholder="Element, threat group or technique ID (e.g. mimikatz, APT29, T1105)" value={query}
+            onChange={(e) => { setQuery(e.target.value); setOffset(0); }} />
+          {source && (
+            <span className="pippin-chip">Source: {source}
+              <button type="button" aria-label="Show every source" title="Show every source"
+                onClick={() => { setSource(''); setOffset(0); }}>×</button>
+            </span>
+          )}
+        </div>
+        <p className="pippin-muted" style={{ margin: '0.35rem 0 0.75rem' }}>
+          Narrows this list to rows whose element, group or technique ID contains the text; expired rows included.
+          To test a value from a case against the indicators, use Check a value.
+        </p>
         <div className="table-container">
-          <table>
-            <thead><tr><th>Evidential Element</th><th>Threat Group</th><th>Technique</th><th>Tactic</th><th>Source</th><th>Expires</th></tr></thead>
+          <table className="pippin-table">
+            <colgroup>
+              <col style={{ width: '29%' }} /><col style={{ width: '13%' }} /><col style={{ width: '20%' }} />
+              <col style={{ width: '16%' }} /><col style={{ width: '10%' }} /><col style={{ width: '12%' }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Evidential element</th><th>Threat group</th><th>Technique (ID and name)</th>
+                <th>Tactic</th><th>Source</th><th>Expires</th>
+              </tr>
+            </thead>
             <tbody>
               {results.indicators.map((i) => (
                 <tr key={i.id}>
-                  <td title={i.procedure_example}><code>{i.evidential_element}</code></td>
-                  <td>{i.threat_group}</td>
-                  <td>{i.reference_url ? <a href={i.reference_url} target="_blank" rel="noopener noreferrer">{i.technique_id}</a> : i.technique_id} {i.technique_name}</td>
-                  <td>{i.tactic}</td>
-                  <td>{i.source_type}</td>
-                  <td style={{ whiteSpace: 'nowrap' }}>
+                  <td data-label="Evidential element" title={i.procedure_example || undefined}>
+                    <code className="pippin-element">{i.evidential_element}</code>
+                  </td>
+                  <td data-label="Threat group">{i.threat_group}</td>
+                  <td data-label="Technique"><Technique id={i.technique_id} name={i.technique_name} url={i.reference_url} /></td>
+                  <td data-label="Tactic"><Tactics text={i.tactic} /></td>
+                  <td data-label="Source">{i.source_type}</td>
+                  <td data-label="Expires" className="pippin-expiry">
                     {i.valid_until
-                      ? <span style={i.expired ? { color: '#ed5565' } : undefined} title={i.first_seen ? `first seen ${day(i.first_seen)}` : undefined}>
+                      ? <span className={i.expired ? 'is-expired' : undefined} title={i.first_seen ? `first seen ${day(i.first_seen)}` : undefined}>
                           {i.expired ? 'expired ' : ''}{day(i.valid_until)}
                         </span>
                       : 'never'}
-                    {i.confidence !== null && i.confidence !== undefined && <div style={{ fontSize: '0.8rem', color: '#888' }}>confidence {i.confidence}</div>}
+                    {i.confidence !== null && i.confidence !== undefined && <div className="pippin-muted">confidence {i.confidence}</div>}
                     {canEdit && (
-                      <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.25rem' }}>
-                        <button type="button" disabled={busy} style={{ padding: '0.1rem 0.4rem' }} title={`Hold until ${inDays(EXTEND_DAYS)}`}
+                      <div className="pippin-expiry-actions">
+                        <button type="button" className="pippin-small pippin-quiet" disabled={busy} title={`Hold until ${inDays(EXTEND_DAYS)}`}
                           onClick={() => extend(i)}>+{EXTEND_DAYS} days</button>
-                        {i.valid_until && <button type="button" className="secondary" disabled={busy} style={{ padding: '0.1rem 0.4rem' }}
+                        {i.valid_until && <button type="button" className="pippin-small pippin-quiet" disabled={busy}
                           onClick={() => clearExpiry(i)}>No expiry</button>}
                       </div>
                     )}
@@ -303,15 +406,16 @@ function ThreatIntel() {
               ))}
             </tbody>
           </table>
+          {results.indicators.length === 0 && <p className="pippin-empty">No indicators match the filter.</p>}
         </div>
         {results.total > PAGE && (
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.5rem' }}>
-            <button type="button" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE))}>Previous</button>
+          <div className="pippin-pager">
+            <button type="button" className="pippin-small pippin-quiet" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE))}>Previous</button>
             <span>{offset + 1}–{Math.min(offset + PAGE, results.total)} of {results.total.toLocaleString()}</span>
-            <button type="button" disabled={offset + PAGE >= results.total} onClick={() => setOffset(offset + PAGE)}>Next</button>
+            <button type="button" className="pippin-small pippin-quiet" disabled={offset + PAGE >= results.total} onClick={() => setOffset(offset + PAGE)}>Next</button>
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }
