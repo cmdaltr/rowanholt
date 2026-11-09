@@ -10,13 +10,14 @@ const eruImage = `${process.env.PUBLIC_URL}/images/eru.png`;
 const mordorClosedImage = `${process.env.PUBLIC_URL}/images/mordor_closed.jpg`;
 const mordorOpenImage = `${process.env.PUBLIC_URL}/images/mordor_open.jpg`;
 
-// The banners, left to right (the Aragorn page itself is for admins)
+// The banners, left to right (the Aragorn page itself is for admins); drop lowers a figure in its
+// frame: Elrond's legs are long for his body, so he's cut lower, Pippin half as much
 const JOURNEYS = [
   { to: '/gandalf', image: gandalfImage, name: 'Gandalf', role: 'Acquisition',
     text: 'Collect evidence from live or remote systems with encrypted packaging.' },
-  { to: '/elrond', image: elrondImage, name: 'Elrond', role: 'Analysis',
+  { to: '/elrond', image: elrondImage, name: 'Elrond', role: 'Analysis', drop: '24px',
     text: 'Process timelines, memory and artifacts to map incidents to MITRE ATT&CK.' },
-  { to: '/pippin', image: pippinImage, name: 'Pippin', role: 'Threat Intelligence',
+  { to: '/pippin', image: pippinImage, name: 'Pippin', role: 'Threat Intelligence', drop: '12px',
     text: 'Import indicators, match cases against them and see whose tradecraft the evidence resembles.' },
   { to: '/aragorn', image: aragornImage, name: 'Aragorn', role: 'Administration',
     text: "Keep the realm: Rowanholt's containers, users, settings and the test lab." },
@@ -38,8 +39,11 @@ const JourneyBanners = ({ offset }) => {
           className={`journey-banner${i === open ? ' is-open' : ''}`}
           onMouseEnter={() => setOpen(i)} onFocus={() => setOpen(i)}
           aria-label={`${j.name} ${j.role}`}>
-          <img src={j.image} alt="" />
-          <span className="journey-banner__name">{j.name}</span>
+          <img src={j.image} alt="" style={j.drop ? { '--drop': j.drop } : undefined} />
+          <span className="journey-banner__name">
+            <span>{j.name}</span>
+            <span className="journey-banner__role">{j.role}</span>
+          </span>
           <div className="journey-banner__content">
             <h2>{j.name} <span>{j.role}</span></h2>
             <p>{j.text}</p>

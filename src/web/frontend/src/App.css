@@ -1156,6 +1156,7 @@ table input[type="checkbox"] {
   object-fit: cover;
   object-position: center top;
   opacity: 0.55;
+  transform: translateY(var(--drop, 0px));
   transition: opacity 0.45s ease;
 }
 
@@ -1179,6 +1180,17 @@ table input[type="checkbox"] {
   letter-spacing: 0.12em;
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
   transition: opacity 0.3s ease;
+  white-space: nowrap;
+}
+
+/* Vertical, each span is a column: the name, then its role beside it */
+.journey-banner__name > span { display: block; }
+
+.journey-banner__role {
+  margin-block-start: 0.2rem;
+  color: #a7db6c;
+  font-size: 0.7em;
+  letter-spacing: 0.08em;
 }
 
 .journey-banner.is-open .journey-banner__name { opacity: 0; }
