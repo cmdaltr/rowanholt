@@ -464,3 +464,20 @@ export const countFindings = async (jobId) => {
     return 0;
   }
 };
+
+// Volatility symbol tables for memory images (Aragorn's Settings; admin-only)
+export const listSymbolTables = async () => (await api.get('/api/symbols')).data;
+
+export const addSymbolTable = async (kind, file, extra = {}) => {
+  const formData = new FormData();
+  formData.append('kind', kind);
+  formData.append('file', file);
+  Object.entries(extra).forEach(([key, value]) => value && formData.append(key, value));
+  return (await api.post('/api/symbols/add', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 0,
+  })).data;
+};
+
+export const getSymbolTask = async (taskId) =>
+  (await api.get(`/api/symbols/tasks/${encodeURIComponent(taskId)}`)).data;

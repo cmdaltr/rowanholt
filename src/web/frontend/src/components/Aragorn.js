@@ -18,6 +18,7 @@ import PageHero from './PageHero';
 import LabMachines from './LabMachines';
 import LabManage from './Lab';
 import LabBuilder from './LabBuilder';
+import SymbolTables from './SymbolTables';
 
 const formatBytes = (n) => {
   if (!n && n !== 0) return '—';
@@ -373,7 +374,8 @@ function AndurilPanel() {
 
 // Aragorn: everything Rowanholt runs on this host. Lab is the lab's targets and machines (the lab
 // agent); Deploy builds and runs a Gandalf, Elrond or Mordor run; Settings is Rowanholt's containers
-// and images (Anduril, the aragorn service) and the lab's host, settings and password.
+// and images (Anduril, the aragorn service), memory images' symbol tables, and the lab's host,
+// settings and password.
 const TABS = [['lab', 'Lab'], ['deploy', 'Deploy'], ['settings', 'Settings']];
 
 function Aragorn() {
@@ -415,6 +417,7 @@ function Aragorn() {
       {tab === 'settings' && (
         <>
           <AndurilPanel />
+          {admin && <SymbolTables />}
           {admin ? <LabManage section="settings" /> : adminOnly}
         </>
       )}

@@ -67,6 +67,8 @@ services:
       - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
       - ROWANHOLT_MODEL_NAME=${ROWANHOLT_MODEL_NAME:-llama3.2:3b}
       - ROWANHOLT_NUM_CTX=${ROWANHOLT_NUM_CTX:-8192}
+      # Shown on Aragorn's symbol tables (the worker's setting, which it acts on)
+      - ROWANHOLT_SYMBOL_DOWNLOADS=${ROWANHOLT_SYMBOL_DOWNLOADS:-on}
       # Online lookups (.env.example): Pippin's VirusTotal button needs "virustotal" and the key
       - ROWANHOLT_ONLINE_LOOKUPS=${ROWANHOLT_ONLINE_LOOKUPS:-}
       - VIRUSTOTAL_API_KEY=${VIRUSTOTAL_API_KEY:-}
@@ -77,6 +79,8 @@ services:
       - ./src/analysis/rowanholt/core:/opt/elrond-src/rowanholt/core:ro # reading case tables (rowanholt/core/records.py)
       - ./src/analysis/rowanholt/report:/opt/elrond-src/rowanholt/report:ro # the case report (/api/jobs/{id}/case/full-report)
       - ./src/analysis/rowanholt/post/mitre:/opt/elrond-src/rowanholt/post/mitre:ro # the pinned ATT&CK release: technique names in the report, Navigator layers
+      - ./src/analysis/rowanholt/memory/symbols:/opt/elrond-src/rowanholt/memory/symbols:ro # the symbol tables' index (/api/symbols)
+      - ./symbols:/opt/rowanholt/symbols # Volatility symbol tables: Aragorn lists them and takes uploads (incoming/, built by the worker)
       - anduril_token:/run/anduril:ro # Written by anduril
       # Platform-specific mounts - uncomment for your OS:
       # - /mnt:/mnt:ro              # Linux: Mount points (read-only)
@@ -178,6 +182,9 @@ services:
       - ROWANHOLT_EXCLUDE_PROFILE_CACHE=true
       # Elrond's DNS lookups of extracted IOCs: only when the list includes "dns" (.env.example)
       - ROWANHOLT_ONLINE_LOOKUPS=${ROWANHOLT_ONLINE_LOOKUPS:-}
+      # Volatility symbol tables fetched for a memory image's kernel (memory/symbols: hash-checked,
+      # audit-logged); off also runs Volatility --offline (no Windows PDBs). Team servers: off
+      - ROWANHOLT_SYMBOL_DOWNLOADS=${ROWANHOLT_SYMBOL_DOWNLOADS:-on}
     volumes:
       - ./src/web/backend:/app
       # NOTE: elrond source is now copied into the image during build (see Dockerfile.forensics)
@@ -191,9 +198,14 @@ services:
       - /tmp/rowanholt:/tmp/rowanholt # Mount for test images in /tmp/rowanholt
       - ./fixtures:/tmp/rowanholt/fixtures:ro # Keywords, YARA rules, IOC watchlists for analysis
       # Volatility 3 symbol tables (ISF) for Linux and macOS memory, which it can't fetch
-      # itself as it does Windows PDBs (E14); kept here so worker rebuilds don't lose them
-      - ./symbols/linux:/usr/local/lib/python3.10/dist-packages/volatility3/symbols/linux:ro
-      - ./symbols/mac:/usr/local/lib/python3.10/dist-packages/volatility3/symbols/mac:ro
+      # itself as it does Windows PDBs (E14): fetched or built into these (memory/symbols, each
+      # folder's rowanholt.index and rowanholt-symbols.log), kept here so rebuilds don't lose them
+      - ./symbols/linux:/usr/local/lib/python3.10/dist-packages/volatility3/symbols/linux
+      - ./symbols/mac:/usr/local/lib/python3.10/dist-packages/volatility3/symbols/mac
+      # The Windows tables Volatility converts from Microsoft's PDBs, and its banner cache
+      - volatility_windows:/usr/local/lib/python3.10/dist-packages/volatility3/symbols/windows
+      - volatility_cache:/root/.cache/volatility3
+      - ./symbols:/opt/rowanholt/symbols # Aragorn's uploads (incoming/), at the backend's path
       - rowanholt_uploads:/tmp/elrond/uploads # For uploaded forensic images
       - splunk_etc:/opt/splunk/etc
       - splunk_var:/opt/splunk/var
@@ -495,6 +507,8 @@ volumes:
   elastic_data:
   navigator_data:
   anduril_token:
+  volatility_windows:
+  volatility_cache:
 
 networks:
   rowanholt-network:

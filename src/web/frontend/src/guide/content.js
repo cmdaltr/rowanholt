@@ -408,6 +408,13 @@ export const GUIDE_PAGES = [
         who: 'Rowanholt administrators.',
         when: 'A service is misbehaving and you\'d rather not open a terminal. Andúril holds the Docker socket, so it\'s off until enabled.',
       },
+      {
+        id: 'aragorn.symbols',
+        title: 'Memory symbol tables',
+        what: 'The Volatility symbol tables Rowanholt has for Linux and macOS kernels, where each came from, and an upload for one it can\'t fetch: a table, a vmlinux, or a macOS Kernel Debug Kit\'s kernel.',
+        who: 'Rowanholt administrators.',
+        when: 'A memory job said it had no symbol table for its kernel: downloads are off, or the kernel\'s debug package isn\'t published anywhere Rowanholt fetches from.',
+      },
     ],
   },
   {

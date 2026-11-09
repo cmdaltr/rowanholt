@@ -59,7 +59,7 @@ PUBLIC_PATHS = {
 }
 # An online lookup is a POST (it sends the value out) that every analyst may make
 LOOKUP_PATH = "/api/threat-intel/lookup"
-ADMIN_PREFIXES = ("/api/lab", "/api/anduril", "/api/aragorn", "/api/auth/users")
+ADMIN_PREFIXES = ("/api/lab", "/api/anduril", "/api/aragorn", "/api/auth/users", "/api/symbols")
 JOB_PATH = re.compile(r"^/api/jobs/([0-9a-fA-F-]{36})(?:/|$)")
 CASE_PATH = re.compile(r"^/api/ai/cases/([^/]+)/")
 

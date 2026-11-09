@@ -30,7 +30,7 @@ rowanholt server init rowanholt.dfir.example.org
 rowanholt start
 ```
 
-`server init` writes the server settings into `.env` (mode 600): the hostname, the certificate choice, a random `SECRET_KEY`, the first admin's password (printed once), and random Postgres, Elastic and Splunk passwords for stores that don't exist yet. Run it again to change the hostname or certificate; secrets already set are kept. From then on, `rowanholt start`, `stop` and `status` use the server profile without being asked (`--server` forces it).
+`server init` writes the server settings into `.env` (mode 600): the hostname, the certificate choice, a random `SECRET_KEY`, the first admin's password (printed once), and random Postgres, Elastic and Splunk passwords for stores that don't exist yet. It also writes `ROWANHOLT_SYMBOL_DOWNLOADS=off`: the worker doesn't fetch Volatility symbol tables or Windows PDBs for memory images. A job that needs one names the `rowanholt symbols fetch` command an administrator runs, or set it `on` (`symbols/README.md`). Run it again to change the hostname or certificate; secrets already set are kept. From then on, `rowanholt start`, `stop` and `status` use the server profile without being asked (`--server` forces it).
 
 With Splunk, Elastic and the Navigator:
 

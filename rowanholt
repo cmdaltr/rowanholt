@@ -30,6 +30,8 @@ Forensics (run from the directory you're working in; relative paths stay relativ
   acquire <args>                    Gandalf through the Python CLI (rowanholt acquire --help)
   analyse <args>                    Elrond (rowanholt analyse --help); 'analyze' works too
   mordor <command>                  Security datasets: list, download, info, local, verify, ...
+  symbols fetch|add|list            Volatility symbol tables for memory images, in the worker
+                                    (fetch <image> or --banner '<banner>'; symbols/README.md)
   web                               The web UI and API without Docker
   mcp                               Aulë's MCP server over stdio, for Claude Desktop, Claude Code and the like
                                     (ROWANHOLT_API, ROWANHOLT_TOKEN; needs requirements/mcp.txt; docs/AULE.md)
@@ -502,6 +504,16 @@ case "$COMMAND" in
     analyse|analyze) exec "$PYTHON" "$ROOT/src/cli/rowanholt.py" analyze "$@" ;;
     anduril|aragorn) exec "$PYTHON" "$ROOT/src/cli/rowanholt.py" anduril "$@" ;;
     mordor) exec "$PYTHON" "$ROOT/src/cli/mordor.py" "$@" ;;
+    # In the worker, which has Volatility, dwarf2json and the symbols folders; an image or file
+    # must be at a path the worker mounts (/Volumes, /tmp/rowanholt, an evidence folder)
+    symbols)
+        ensure_docker
+        docker ps --format '{{.Names}}' | grep -qx rowanholt-celery-worker \
+            || { echo "The worker isn't running: rowanholt start" >&2; exit 1; }
+        TTY=-i; [ -t 0 ] && [ -t 1 ] && TTY=-it
+        exec docker exec "$TTY" -e ROWANHOLT_SYMBOL_DOWNLOADS=on rowanholt-celery-worker \
+            /usr/bin/python3 -m rowanholt.memory.symbols "$@"
+        ;;
     # stdout is the MCP protocol: nothing else may print to it
     mcp) PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}" exec "${ROWANHOLT_MCP_PYTHON:-$PYTHON}" -m aule_mcp.server "$@" ;;
     scripts) list_scripts ;;

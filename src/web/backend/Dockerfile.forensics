@@ -3,6 +3,15 @@
 # Build steps: 5 total
 
 # =============================================================================
+# dwarf2json, which turns a kernel's debug info into a Volatility 3 symbol table
+# (memory/symbols). Built from its tagged source: its releases have no arm64 binary and
+# publish no digest
+# =============================================================================
+FROM golang:1.22-bookworm AS dwarf2json
+RUN git clone --depth 1 --branch v0.9.0 https://github.com/volatilityfoundation/dwarf2json.git /src \
+    && cd /src && CGO_ENABLED=0 go build -trimpath -o /dwarf2json .
+
+# =============================================================================
 # Step 1/5: Initialize base image
 # =============================================================================
 FROM ubuntu:22.04
@@ -215,11 +224,19 @@ RUN pip3 install --no-cache-dir volatility3 && \
         'if "PYTHONPATH" in os.environ:' \
         '    del os.environ["PYTHONPATH"]' \
         '' \
+        '# Symbol downloads off (ROWANHOLT_SYMBOL_DOWNLOADS): no PDB or ISF fetches either' \
+        'if os.environ.get("ROWANHOLT_SYMBOL_DOWNLOADS", "on").strip().lower() in ("off", "0", "false", "no") and "--offline" not in sys.argv:' \
+        '    sys.argv.insert(1, "--offline")' \
+        '' \
         'from volatility3 import cli' \
         'cli.main()' \
         > /usr/local/bin/vol.py && \
     chmod +x /usr/local/bin/vol.py && \
     echo "Volatility3 installed successfully"
+# Symbol tables for Linux and macOS kernels (memory/symbols): dwarf2json, and rpm2cpio and cpio
+# for unpacking RPM debug packages (dpkg-deb is already here)
+COPY --from=dwarf2json /dwarf2json /usr/local/bin/dwarf2json
+RUN apt-get update && apt-get install -y --no-install-recommends rpm2cpio cpio && rm -rf /var/lib/apt/lists/*
 
 # 4g: ClamAV's signatures, fetched once here: analysis never goes online for them unless
 # ROWANHOLT_ONLINE_LOOKUPS lists freshclam. ClamAV's mirrors rate-limit, so a failed fetch

@@ -38,7 +38,7 @@ Gandalf (acquisition) → Elrond (analysis) → Aulë (AI analyst)
 |---|---|
 | `rowanholt` | Root launcher (bash): the Docker stack, Gandalf, Elrond, the lab, every script, `map` |
 | `src/acquisition/` | Gandalf: `bash/gandalf.sh`, `python/gandalf.py` + `collect_artefacts-py`, `windows/Invoke-Gandalf.ps1` + `Set-ArtefactCollection` |
-| `src/analysis/elrond.py`, `src/analysis/rowanholt/` | Elrond: `core/` (incl. Gandalf ingest and manifest check, `mobile.py` for phones), `collect/`, `process/` (incl. `network.py`: Zeek, NetFlow; `mobile.py`: iLEAPP, ALEAPP), `analysis/`, `memory/`, `post/` (Splunk, Elastic, OpenSearch/Wazuh, Timesketch, ATT&CK), `report/` (the case report, shared with the backend), `cloud/`, `ai/` (Aulë's CLI) |
+| `src/analysis/elrond.py`, `src/analysis/rowanholt/` | Elrond: `core/` (incl. Gandalf ingest and manifest check, `mobile.py` for phones), `memory/` (incl. `symbols/`: Volatility symbol tables found or fetched by kernel banner, `rowanholt symbols`), `collect/`, `process/` (incl. `network.py`: Zeek, NetFlow; `mobile.py`: iLEAPP, ALEAPP), `analysis/`, `post/` (Splunk, Elastic, OpenSearch/Wazuh, Timesketch, ATT&CK), `report/` (the case report, shared with the backend), `cloud/`, `ai/` (Aulë's CLI) |
 | `src/analysis/tools/definitions.py` | Forensic tool definitions (executables, paths, platforms) |
 | `src/web/backend/` | FastAPI (:5688): jobs, auth, `ai_routes.py` + `aule_offline.py` (fixed answers) + `aule_context.py` (the model's numbered context) (Aulë), Mordor, lab, Andúril proxy |
 | `src/web/frontend/` | React (:5687); About is `components/HelpPage.js` |

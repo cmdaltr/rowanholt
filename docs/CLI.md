@@ -46,6 +46,7 @@ It follows its own link back to the repository, so moving the clone means runnin
 | `rowanholt analyse <args>` | Elrond (`analyze` works too) |
 | `rowanholt mordor <command>` | Security datasets: `list`, `download`, `info`, `local`, `verify`, `refresh`, `stats` |
 | `rowanholt anduril <command>` | Container administration (also `aragorn`) |
+| `rowanholt symbols fetch\|add\|list` | Volatility symbol tables for Linux and macOS memory, in the worker (`symbols/README.md`) |
 | `rowanholt web` | The web UI and API without Docker |
 | `rowanholt lab <command>` | The test lab, `lab/lab.sh` |
 | `rowanholt scripts` | Lists every script under `scripts/` |
@@ -560,6 +561,18 @@ Taken from the October 2026 test runs:
 ```
 
 Shadow copies (`--vss`) get their own `<image> (volume shadow copy #N)` entries in the audit log.
+
+### Memory symbol tables
+
+Volatility 3 reads a Linux or macOS memory image only with a symbol table for its exact kernel. Elrond finds one from the image's kernel banner before the memory plugins run. It looks first at the tables it already has, then the prebuilt collection, then the distribution's debug package, built with dwarf2json (Ubuntu, Debian, Rocky, Alma). Each download is checked against its publisher's hash and audit-logged. An image with no table is skipped, and the audit log says why. With `ROWANHOLT_SYMBOL_DOWNLOADS=off` (team servers), nothing is fetched, Windows PDBs included, and the reason names the command that fetches the table:
+
+```bash
+rowanholt symbols fetch --banner '<the banner from the audit log>'
+rowanholt symbols add --vmlinux vmlinux-<release>       # a kernel no source publishes
+rowanholt symbols list
+```
+
+Sources, coverage and the macOS Kernel Debug Kit route: `symbols/README.md`. Aragorn's Settings tab lists the tables and takes the same uploads.
 
 ---
 

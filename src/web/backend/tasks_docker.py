@@ -5,6 +5,7 @@ Background tasks for running Elrond analysis in Docker containers.
 This version runs Elrond directly in the same container environment.
 """
 
+import shutil
 import subprocess
 import sys
 import os
@@ -564,6 +565,27 @@ def _stop_process_group(process, grace=30):
     except Exception as e:
         logger.warning(f"Could not stop Elrond (pid {process.pid}): {e}")
         process.kill()
+
+
+SYMBOLS_INCOMING = Path("/opt/rowanholt/symbols/incoming")
+
+
+@celery_app.task(bind=True)
+def add_symbol_table(self, args: list, folder: str) -> dict:
+    """An administrator's upload from Aragorn made a symbol table: `rowanholt symbols add` with
+    the uploaded files (symbol_routes.py), which are removed afterwards."""
+    work = Path(folder).resolve()
+    if work.parent != SYMBOLS_INCOMING:
+        return {"ok": False, "output": f"Not an upload folder: {folder}"}
+    env = {**os.environ, "PYTHONPATH": "/opt/elrond-src"}
+    try:
+        proc = subprocess.run([sys.executable, "-m", "rowanholt.memory.symbols", "add", *args],
+                              capture_output=True, text=True, env=env, timeout=3600)
+        return {"ok": proc.returncode == 0, "output": (proc.stdout + proc.stderr).strip()[-4000:]}
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "output": "Building the table took over an hour"}
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
 
 
 @celery_app.task(bind=True)

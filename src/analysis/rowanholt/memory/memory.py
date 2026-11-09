@@ -6,6 +6,7 @@ import time
 from datetime import datetime
 
 from rowanholt.audit import write_audit_log_entry
+from rowanholt.memory.symbols import resolve as symbols
 from rowanholt.memory.volcore import (
     assess_volatility_choice,
     dump_vol3_ziphex,
@@ -117,12 +118,43 @@ def five_level_paging(path):
         return False
 
 
+# banners.Banners output per image, kept for ensure_symbols so the image isn't scanned twice
+KERNEL_BANNERS = {}
+
+
+def ensure_symbols(output_directory, verbosity, artefact):
+    """Find or fetch the symbol table for a Linux or macOS image's kernel (memory/symbols),
+    auditing each download and build. False, with the reason (and the command that fetches the
+    table when downloads are off) in the audit log, when there is none."""
+    name = artefact.split("/")[-1]
+
+    def audit(line):
+        entry = "{},symbols,{},{}\n".format(datetime.now().isoformat(), name, line.replace(",", ";"))
+        write_audit_log_entry(verbosity, output_directory, entry, "")
+
+    banners = symbols.banners_from(KERNEL_BANNERS.get(artefact, ""))
+    if not banners:
+        return True
+    try:
+        result = symbols.resolve(banners[0], audit)
+    except Exception as e:  # a fault here mustn't end the case: Volatility then runs without a table
+        print(f"     WARNING: couldn't resolve symbols for '{name}': {e}")
+        return True
+    if result.status in ("fetched", "built"):
+        print(f"     {result.message}")
+    elif not result.ok:
+        audit(result.message)
+        print(f"     No symbol table for '{name}', so its memory isn't analysed: {result.message}")
+    return result.ok
+
+
 def kernel_banner_os(d, artefact, memext):
     """ "Linux" or "macOS" from the kernel banner in the image (writing that OS's bundled
     symbols as the other checks do), or "" when there's neither. The process-based checks need
     something that happens to be running (sudo for Linux): a Linux image without it was called
     Windows."""
     banners = vol3_check_os(artefact, memext, "banners.Banners")
+    KERNEL_BANNERS[artefact] = banners
     if "Linux version" in banners:
         if Linux is not None:
             dump_vol3_ziphex(d, "Linux", Linux())
@@ -237,6 +269,8 @@ def process_memory(
         profile, profileplatform = "Windows", "Windows"
     elif banner_os:
         profile, profileplatform = banner_os, banner_os
+        if not ensure_symbols(output_directory, verbosity, artefact):
+            profile, profileplatform = "", ""
     else:
         # Check if macOS profile helpers are available
         if macOS1 is not None and macOS2 is not None:

@@ -177,3 +177,8 @@ deploy/server/certs/*
 # The YouTube walkthrough: kept locally, not committed, except its README
 scripts/docs/video/*
 !scripts/docs/video/README.md
+symbols/linux/rowanholt.index
+symbols/mac/*.json*
+symbols/mac/rowanholt.index
+symbols/*/rowanholt-symbols.log
+symbols/incoming/

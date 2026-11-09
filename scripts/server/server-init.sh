@@ -167,6 +167,10 @@ else
     set_value ROWANHOLT_OTHER_URLS ""
 fi
 set_value ROWANHOLT_PUBLIC_URL "$PUBLIC_URL"
+# A server's worker doesn't fetch symbol tables (or Windows PDBs) for memory images unless an
+# administrator turns it on: a job that needs one names the rowanholt symbols command instead.
+# Only when unset, so a re-run keeps the administrator's choice
+[ -n "$(current ROWANHOLT_SYMBOL_DOWNLOADS)" ] || set_value ROWANHOLT_SYMBOL_DOWNLOADS off
 
 key="$(current SECRET_KEY)"
 case "$key" in ""|change-this-to-a-random-secret-key|your-secret-key-change-in-production) set_value SECRET_KEY "$(secret)$(secret)" ;; esac
