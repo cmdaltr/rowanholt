@@ -97,8 +97,9 @@ arrow(f"M 1150 300 C 1080 330, 960 360, {GX + 110} {GY - 70}")
 # ---- Gandalf ----
 svg.append(f'<circle cx="{GX}" cy="{GY}" r="92" fill="#e9f2ea" stroke="#2f6b3a" stroke-width="3"/>')
 svg.append(f'<clipPath id="gclip"><circle cx="{GX}" cy="{GY}" r="89"/></clipPath>')
-svg.append(f'<image href="{png("flow-gandalf.png")}" x="{GX - 72}" y="{GY - 92}" width="144" height="216" '
-           f'clip-path="url(#gclip)" preserveAspectRatio="xMidYMin meet"/>')
+# head and shoulders from the project's own Gandalf (public/images/gandalf.png), filling the circle
+svg.append(f'<image href="{png("flow-gandalf.png")}" x="{GX - 92}" y="{GY - 92}" width="184" height="184" '
+           f'clip-path="url(#gclip)" preserveAspectRatio="xMidYMid slice"/>')
 text(GX, GY + 122, ["Gandalf", "live acquisition"], size=19)
 
 # ---- targets ----
@@ -163,7 +164,8 @@ arrow(f"M {bx + bw + 4} 830 C 1400 828, 1440 820, 1472 812")
 lock_icon(1530, 480)
 text(1530, 568, ["Encrypted archive", "None · Password · Key", "key: &lt;host&gt;.shadowfax.key"])
 arrow("M 1530 752 L 1530 640", "archived", 1530, 700)
-image(png("flow-elrond.png"), 1530, 150, 104, 150)
+# the ledger-keeper (public/images/elrond.png), trimmed to the figure
+image(png("flow-elrond.png"), 1530, 150, 110, 166)
 text(1530, 254, ["Elrond", "decrypts, re-hashes every file", "gandalf_integrity.jsonl"])
 arrow("M 1530 416 L 1530 322", "scp · PSRemoting · copy", 1530, 372)
 

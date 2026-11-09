@@ -1,7 +1,7 @@
 """
 Builds Rowanholt's architecture map: a self-contained HTML page (fonts and images
 embedded) in the style of a map of Middle-earth. Page 1 is the realm (Gandalf, the
-web UI, the worker, Elrond, Eru, Aragorn, Mordor); page 2 is Elrond's directed graph,
+web UI, the worker, Elrond, Aulë, Aragorn, Mordor); page 2 is Elrond's directed graph,
 branching by evidence type and operating system.
 
     python3 scripts/docs/architecture/build_map.py [out.html]
@@ -33,20 +33,23 @@ GOLD, RUST, CRIMSON, VIOLET = "#ffce54", "#d57a54", "#ed5565", "#b39ddb"
 INK, INK_SOFT = "#4c3a1b", "rgba(76,58,27,0.55)"
 
 W, H = 2560, 1440
-# map panel and the image's 1024-px coordinates -> page coordinates
+# map panel and the image's 1024-px coordinates -> page coordinates. The map is square, so it fills
+# the panel's width and CROP trims (1024 * SCALE - MH) page pixels, 55% of them off the top.
 MX, MY, MW, MH = 430, 160, 1700, 1222
 SCALE = MW / 1024
-CROP = (1024 * SCALE - MH) * 0.38
+CROP = (1024 * SCALE - MH) * 0.55
 
 
 def P(ix, iy):
     return round(MX + ix * SCALE), round(MY + iy * SCALE - CROP)
 
 
+# places on the map's own features: the rowan and the keep on the hill above the lake, the village by
+# the lake, the ring of standing stones, the gorge under the snow-peaks, the coast's coves and headlands
 PLACES = {
-    "shire": P(300, 330), "bree": P(372, 322), "rowanholt": P(468, 326), "moria": P(492, 442),
-    "isengard": P(446, 560), "minas": P(612, 640), "mordor": P(850, 612), "erebor": P(690, 112),
-    "havens": P(98, 335),
+    "havens": P(325, 415), "shire": P(440, 520), "bree": P(724, 521), "rowanholt": P(812, 418),
+    "moria": P(600, 352), "isengard": P(907, 460), "erebor": P(757, 186), "minas": P(285, 790),
+    "mordor": P(930, 700),
 }
 
 parts = []
@@ -112,21 +115,21 @@ parts.append(f'<img src="data:image/png;base64,{b64(ASSETS / "rowanholt.png")}" 
              f'style="position:absolute;left:52px;top:26px;height:108px;border-radius:8px;border:1px solid {PARCH_DIM}">')
 parts.append(f'<div style="position:absolute;left:{52 + 180}px;top:30px;width:720px">'
              f'<div class="h1">Rowanholt</div>'
-             f'<div class="h2">A map of the realm: how a case travels from Gandalf to Elrond to Eru</div></div>')
+             f'<div class="h2">A map of the realm: how a case travels from Gandalf to Elrond to Aulë</div></div>')
 
-# Eru: beyond the circles of the world (top centre, above the map)
-box(1020, 18, 640, 134, "Eru <span class='sub'>AI analyst · Ask Eru</span>",
+# Aulë: the smith in the Uttermost West (top centre, above the map)
+box(1020, 18, 640, 134, "Aulë <span class='sub'>AI analyst · Ask Aulë</span>",
     "Reads Elrond's cooked artefacts, IOCs and ATT&amp;CK tags; answers in plain language with a local model "
     "(<b>Ollama</b>, nothing leaves the host). Without Ollama it says why and answers a fixed set of questions "
     "straight from the case files.",
-    VIOLET, kicker="Beyond the circles of the world")
+    VIOLET, kicker="The smith in the Uttermost West")
 
 # legend
 lx, ly = 1700, 24
 parts.append(f'<div class="legend" style="left:{lx}px;top:{ly}px;width:800px;height:116px"></div>')
 legend = [(GREEN, "", "live acquisition (hosts, cloud)"), (GOLD, "10 7", "the Great East Road: Gandalf archives"),
           (TEAL, "", "web UI, jobs and queues"), (CRIMSON, "", "Mordor: attack datasets"),
-          (VIOLET, "6 6", "Eru: AI, read-only"), ("#9aa3b5", "", "administration and the lab")]
+          (VIOLET, "6 6", "Aulë: AI, read-only"), ("#9aa3b5", "", "administration and the lab")]
 for i, (col, dash, text) in enumerate(legend):
     x = lx + 24 + (i % 2) * 390
     y = ly + 20 + (i // 2) * 30
@@ -138,22 +141,20 @@ for i, (col, dash, text) in enumerate(legend):
 parts.append(f'<div class="map" style="left:{MX}px;top:{MY}px;width:{MW}px;height:{MH}px;'
              f'background-size:{MW}px {round(1024 * SCALE)}px;background-position:0 -{round(CROP)}px"></div>')
 
-region(MX + 400, MY + 770, "E R I A D O R", 40)
-region(MX + 760, MY + 236, "R H O V A N I O N", 30, -2)
-region(MX + 830, MY + 940, "G O N D O R", 40)
-region(MX + 1400, MY + 925, "M O R D O R", 40)
-region(MX + 30, MY + 1010, "B E L E G A E R", 30, -8)
-region(MX + 60, MY + 1050, "<i style='font-size:18px;letter-spacing:0.12em'>the Great Sea</i>", 18, -8)
+region(MX + 30, MY + 212, "B E L E G A E R", 26)
+region(MX + 40, MY + 248, "<i style='font-size:18px;letter-spacing:0.12em'>the Great Sea</i>", 18)
+region(MX + 700, MY + 96, "R H O V A N I O N", 28, -2)
+region(MX + 1352, MY + 822, "M O R D O R", 30)
 
-for key, label, dx, dy in (("shire", "The Shire", -40, 14), ("bree", "Bree", -20, 14),
-                           ("rowanholt", "Rowanholt", -120, -30), ("moria", "Moria", -78, -10),
-                           ("isengard", "Isengard", 14, -10), ("minas", "Minas Tirith", -70, 14),
-                           ("mordor", "Barad-dûr", 14, -30), ("erebor", "Erebor", 14, -10),
-                           ("havens", "Grey Havens", -60, -34)):
+for key, label, dx, dy in (("havens", "Grey Havens", -60, -36), ("shire", "The Shire", -46, 14),
+                           ("bree", "Bree", -64, -34), ("rowanholt", "Rowanholt", -126, -6),
+                           ("moria", "Moria", 14, -10), ("isengard", "Isengard", 14, -10),
+                           ("minas", "Minas Tirith", -80, -38), ("mordor", "Barad-dûr", 14, -30),
+                           ("erebor", "Erebor", -82, -10)):
     place(key, label, dx, dy)
 
-# compass rose (sea, bottom left)
-cx, cy = MX + 120, MY + 1130
+# compass rose (the sea, top left)
+cx, cy = MX + 300, MY + 350
 pts = []
 for a in range(0, 360, 45):
     r = 64 if a % 90 == 0 else 36
@@ -168,53 +169,55 @@ svg.append(f'<g transform="translate({cx},{cy})" opacity="0.8"><circle r="46" fi
            f'<text x="0" y="-74" text-anchor="middle" font-family="Cinzel" font-size="20" fill="{INK}">N</text></g>')
 
 # ================= realms (cards on the map) =================
+# The cards keep off the map's heart (the rowan, the keep, the lake, the village, the standing stones)
+# and its snow-peaks: they sit on the sea, the north coast and the rugged south.
 S, B, R, M, I, T, MO, E, GH = (PLACES[k] for k in ("shire", "bree", "rowanholt", "moria", "isengard", "minas",
                                                    "mordor", "erebor", "havens"))
 
-box(MX + 20, MY + 440, 330, 286, "Gandalf <span class='sub'>acquisition</span>",
+box(MX + 20, MY + 420, 330, 286, "Gandalf <span class='sub'>acquisition</span>",
     "<b>gandalf.sh</b> and <b>gandalf.py</b> (Linux, macOS; local or over SSH) and <b>Invoke-Gandalf.ps1</b> "
     "(Windows, as admin). Live state first, then files in order of volatility; locked ones straight off the "
     "NTFS volume. Once all is copied, every file is SHA-256 hashed into <code>log.meta</code>, which Elrond checks "
     "on arrival. The archive is encrypted; in Key mode the key rides home as <code>&lt;host&gt;.shadowfax.key</code>.",
     GREEN, kicker="Sets out from the Shire")
 
-box(MX + 250, MY + 70, 360, 168, "Web UI and API <span class='sub'>:5687 · :5688</span>",
+box(MX + 240, MY + 24, 360, 168, "Web UI and API <span class='sub'>:5687 · :5688</span>",
     "React front end and FastAPI back end: start jobs, upload or pick images, watch progress, read results, "
-    "Ask Eru, Pippin (threat intelligence), shared findings. Admins also see Aragorn.",
+    "Ask Aulë, Pippin (threat intelligence), shared findings. Admins also see Aragorn.",
     TEAL, kicker="The Prancing Pony, Bree")
 
-box(MX + 400, MY + 530, 330, 196, "Elrond worker <span class='sub'>Celery</span>",
+box(MX + 600, MY + 230, 330, 196, "Elrond worker <span class='sub'>Celery</span>",
     "Jobs arrive through <b>Redis</b>. The worker runs Elrond, and Elrond runs its tools as separate processes: "
     "Volatility 3, Plaso, Artemis, RegRipper, YARA, The Sleuth Kit.",
     TEAL, kicker="Delving in Moria")
 
-box(MX + 40, MY + 790, 330, 190, "SIEM <span class='sub'>Splunk · Elastic · Kibana</span>",
+box(MX + 1442, MY + 236, 240, 250, "SIEM <span class='sub'>Splunk · Elastic</span>",
     "<code>--Splunk</code> and <code>--Elastic</code> index the cooked artefacts, with Rowanholt's own Splunk app "
     "and Kibana dashboards. Local containers or remote servers.",
-    RUST, kicker="The palantír of Orthanc")
+    RUST, kicker="Orthanc's palantír")
 
-box(MX + 760, MY + 1000, 420, 206, "Aragorn <span class='sub'>administration</span>",
+box(MX + 20, MY + 960, 340, 226, "Aragorn <span class='sub'>administration</span>",
     "<b>Andúril</b>: Rowanholt's own containers (status, logs, restart; won't stop the worker mid-job). "
     "<b>The lab</b>: Linux targets, Tart and UTM VMs, test runs from the browser, Gandalf against seeded hosts, "
     "Mordor recordings.",
     "#c9cfdc", kicker="The King in Minas Tirith")
 
-box(MX + 1250, MY + 990, 430, 206, "Mordor <span class='sub'>attack datasets</span>",
+box(MX + 1350, MY + 960, 332, 246, "Mordor <span class='sub'>attack datasets</span>",
     "OTRF Security-Datasets (APT29 day 1 and 2, Atomic sets) and the lab's own recordings of Atomic Red Team "
     "tests. <code>--Mordor</code> ingests them as event logs, so detections and ATT&amp;CK tagging can be checked "
     "against known attacks.",
     CRIMSON, kicker="Where the shadows lie")
 
-box(MX + 1270, MY + 70, 410, 170, "Case store <span class='sub'>the hoard</span>",
+box(MX + 1290, MY + 50, 392, 176, "Case store <span class='sub'>the hoard</span>",
     "<b>Postgres</b>: users, jobs, history. Case directories on disk: <code>raw/</code>, <code>cooked/</code>, "
     "<code>analysis/</code>, <code>mitre_techniques.txt</code>, timelines, archives.",
     GOLD, kicker="Under the Lonely Mountain")
 
-# Rowanholt: Elrond's road, an inset
-rx, ry, rw, rh = MX + 870, MY + 300, 812, 560
+# Rowanholt: Elrond's road, an inset below the hall on the hill
+rx, ry, rw, rh = MX + 520, MY + 640, 812, 560
 parts.append(f'<div class="inset" style="left:{rx}px;top:{ry}px;width:{rw}px;height:{rh}px"></div>')
 parts.append(f'<div class="inset-title" style="left:{rx + 24}px;top:{ry + 14}px">'
-             f'<span class="kicker" style="color:{PARCH}">The Last Homely House</span><br>'
+             f'<span class="kicker" style="color:{PARCH}">The Hall under the Rowan</span><br>'
              f'<span style="color:{PARCH};font-size:30px">Elrond</span> <span class="sub">analysis · a directed graph, '
              f'not a pipeline: it branches by OS, evidence type and cloud provider</span></div>')
 steps = [
@@ -272,7 +275,7 @@ outputs = [
     ("ATT&amp;CK Navigator", "A layer of every technique tagged in the case, served by the bundled Navigator", GOLD),
     ("Timeline", "One Plaso super-timeline of every source, also indexed into Splunk or Kibana", GOLD),
     ("Dashboards", "Splunk app and Kibana dashboards over the same cooked data", RUST),
-    ("Answers and findings", "Eru: case summaries and suggestions with a model; exact answers from the files "
+    ("Answers and findings", "Aulë: case summaries and suggestions with a model; exact answers from the files "
      "without one. Findings the team confirmed in the case browser, as a report and a layer",
      VIOLET),
 ]
@@ -283,53 +286,55 @@ for i, (t, body, col) in enumerate(outputs):
     box(2160, y, 360, 206, t, body, col)
 
 # ================= roads =================
-gx, gy = MX + 20 + 330, MY + 440 + 140
+gx, gy = MX + 20 + 330, MY + 420 + 140
 for i in range(3):
     route(c((400, ys[i] + 103), (415, ys[i] + 103), (MX + 6, gy - 30 + i * 30), (MX + 20, gy - 30 + i * 30)),
           GREEN, 3)
 # cloud: Rowanholt's cloud commands pull disks and logs for Elrond
-route(c((400, ys[3] + 103), (MX - 10, ys[3] + 103), (MX + 360, MY + 700), (MX + 400, MY + 680)), GREEN, 3,
-      dash="2 7", label="cloud: snapshots and logs", lx=MX + 210, ly=MY + 754, lw=170)
-# disk images: straight to the web UI / Elrond
-route(c((400, ys[4] + 103), (MX + 420, ys[4] + 90), (MX + 560, MY + 860), (MX + 580, MY + 726)),
-      TEAL, 3, label="images go straight to Elrond", lx=MX + 400, ly=MY + 1004, lw=200)
+route(c((400, ys[3] + 103), (418, ys[3] + 103), (418, MY + 780), (rx, MY + 780)), GREEN, 3,
+      dash="2 7", label="cloud: snapshots and logs", lx=MX + 40, ly=MY + 738, lw=230)
+# disk images: straight to Elrond
+route(c((400, ys[4] + 103), (426, ys[4] + 103), (426, MY + 860), (rx, MY + 860)),
+      TEAL, 3, label="images go straight to Elrond", lx=MX + 40, ly=MY + 874, lw=230)
 
 # the Great East Road: Gandalf -> Shire -> Bree -> Rowanholt
-route(c((MX + 200, MY + 440), S, B, (R[0] - 40, R[1] + 10), R), GOLD, 5, dash="14 9", arrow=False)
-route(c(R, (rx - 30, ry + 60), (rx, ry + 70)), GOLD, 5, dash="14 9",
-      label="<b>The Great East Road</b>: encrypted per-host archives, <code>acquisitions/</code>, "
-            "decrypted and checked on arrival", lx=MX + 390, ly=MY + 448, lw=300)
+route(c((MX + 350, MY + 560), S, (MX + 960, MY + 628), B, (MX + 1250, MY + 500), R), GOLD, 5, dash="14 9",
+      arrow=False, label="<b>The Great East Road</b>: encrypted per-host archives, <code>acquisitions/</code>, "
+                         "decrypted and checked on arrival", lx=MX + 372, ly=MY + 450, lw=250)
+route(c(R, (MX + 1384, MY + 560), (MX + 1316, ry)), GOLD, 5, dash="14 9")
 
 # Bree (web UI) -> Moria (worker) via Redis; Moria -> Rowanholt
-route(c((MX + 430, MY + 238), (MX + 520, MY + 400), (MX + 560, MY + 530)), TEAL, 3.5,
-      label="jobs queued in Redis", lx=MX + 600, ly=MY + 300, lw=150)
-route(c((MX + 730, MY + 620), (MX + 820, MY + 620), (rx, ry + 330)), TEAL, 3.5, label="runs Elrond", lx=MX + 740,
-      ly=MY + 650, lw=110)
+route(c((MX + 520, MY + 192), (MX + 560, MY + 214), (MX + 640, MY + 230)), TEAL, 3.5,
+      label="jobs queued in Redis", lx=MX + 612, ly=MY + 160, lw=160)
+route(c((MX + 765, MY + 426), (MX + 780, MY + 540), (MX + 800, ry)), TEAL, 3.5, label="runs Elrond",
+      lx=MX + 812, ly=MY + 500, lw=110)
 
 # Rowanholt -> Isengard (SIEM)
-route(c((rx + 300, ry + rh), (rx + 200, MY + 930), (MX + 380, MY + 900), (MX + 370, MY + 890)), RUST, 3.5,
-      label="<code>--Splunk</code> · <code>--Elastic</code>", lx=MX + 520, ly=MY + 920, lw=200)
-# Rowanholt -> Erebor (case store)
-route(c((rx + 560, ry), (rx + 600, MY + 250), (MX + 1400, MY + 240)), GOLD, 3.5,
-      label="case output, job state", lx=rx + 610, ly=MY + 250, lw=180)
-# Erebor -> Eru (read-only)
-route(c((MX + 1500, MY + 70), (MX + 1450, MY + 20), (1500, 140)), VIOLET, 3, dash="6 6",
-      label="Eru reads the case", lx=1660, ly=MY + 8, lw=170)
+route(c((rx + rw, ry + 60), (MX + 1600, MY + 690), (MX + 1600, MY + 472)), RUST, 3.5,
+      label="<code>--Splunk</code> · <code>--Elastic</code>", lx=MX + 1400, ly=MY + 560, lw=186)
+# Rowanholt -> Erebor (case store), past the keep
+route(c((rx + rw, ry + 30), (MX + 1426, MY + 640), (MX + 1426, MY + 400), (MX + 1426, MY + 226)), GOLD, 3.5,
+      label="case output, job state", lx=MX + 1240, ly=MY + 296, lw=176)
+# Erebor -> Aulë (read-only)
+route(c((MX + 1480, MY + 50), (MX + 1440, MY + 16), (1500, 140)), VIOLET, 3, dash="6 6",
+      label="Aulë reads the case", lx=1250, ly=MY + 10, lw=180)
 # Mordor -> Rowanholt
-route(c((MX + 1460, MY + 990), (MX + 1440, MY + 930), (rx + 560, ry + rh)), CRIMSON, 4,
-      label="<code>--Mordor</code>: datasets as event logs", lx=MX + 1050, ly=MY + 900, lw=290)
-# Aragorn's lab -> Mordor (recordings) and -> Gandalf (seeded targets)
-route(c((MX + 1180, MY + 1100), (MX + 1215, MY + 1095), (MX + 1250, MY + 1090)), "#9aa3b5", 3,
-      label="lab recordings", lx=MX + 1185, ly=MY + 1160, lw=130)
-route(c((MX + 760, MY + 1150), (MX + 430, MY + 1150), (MX + 300, MY + 1040), (MX + 200, MY + 726)), "#9aa3b5", 3,
-      dash="5 7", label="seeded lab targets test every collector", lx=MX + 470, ly=MY + 1160, lw=270)
-# Rowanholt -> outputs
+route(c((MX + 1400, MY + 960), (MX + 1400, MY + 920), (rx + rw, MY + 920)), CRIMSON, 4,
+      label="<code>--Mordor</code>: datasets as event logs", lx=MX + 1420, ly=MY + 914, lw=262)
+# Aragorn's lab -> Mordor (recordings, along the south coast) and -> Gandalf (seeded targets)
+route(c((MX + 380, MY + 1150), (MX + 450, MY + 1212), (MX + 1300, MY + 1212), (MX + 1350, MY + 1180)), "#9aa3b5", 3,
+      label="lab recordings", lx=MX + 386, ly=MY + 1112, lw=126)
+route(c((MX + 320, MY + 960), (MX + 330, MY + 830), (MX + 300, MY + 706)), "#9aa3b5", 3,
+      dash="5 7", label="seeded lab targets test every collector", lx=MX + 338, ly=MY + 900, lw=170)
+# Rowanholt -> outputs: east along the south, then up or down the margin
 for i, y in enumerate(oys):
-    route(c((rx + rw, ry + 200 + i * 40), (rx + rw + 60, ry + 200 + i * 40), (2140, y + 103), (2160, y + 103)),
+    y0 = ry + 100 + i * 16
+    gxo = MX + MW + 6 + i * 4
+    route(c((rx + rw, y0), (gxo, y0), (gxo, y + 103), (2160, y + 103)),
           GOLD if i < 3 else (RUST if i == 3 else VIOLET), 3, dash="6 6" if i == 4 else "")
 
-parts.append(f'<div class="footer">Rowanholt · Gandalf collects · Elrond analyses · Eru answers · '
-             f'Aragorn keeps the realm · page 1 of 2 · generated from the codebase, October 2026</div>')
+parts.append(f'<div class="footer">Rowanholt · Gandalf collects · Elrond analyses · Aulë answers · '
+             f'Aragorn keeps the realm · page 1 of 2 · generated from the codebase, November 2026</div>')
 
 
 def page(anchor, label):
@@ -392,7 +397,7 @@ box(fx, fy, fw, fh, "Identify and mount",
     "and VHD(X), <b>losetup</b> and <b>kpartx</b> for raw, <b>ntfs-3g</b>, HFS+ and APFS drivers for the file "
     "systems. The OS is read from what's on the volume. <b>vshadowmount</b> turns every shadow copy into a "
     "branch of its own. Memory images get their Volatility profile here and wait for processing.",
-    PARCH, kicker="The Ford of Bruinen")
+    PARCH, kicker="The Rowan-ford")
 
 # the lanes on parchment
 px, py, pw, ph = 770, 170, 1150, 1050
@@ -495,7 +500,7 @@ route(c((400, ay[3] + 98), (412, ay[3] + 98), (412, py + ph + 120), (sx - 40, py
       ly=py + ph + 104, lw=440)
 
 parts.append(f'<div class="footer">Rowanholt · Elrond · the same stages for every host, whatever road it took · '
-             f'page 2 of 2 · generated from the codebase, October 2026</div>')
+             f'page 2 of 2 · generated from the codebase, November 2026</div>')
 pages.append(page("elrond", "Elrond's directed graph, branching by evidence type and operating system"))
 
 font_css = "".join(
@@ -523,7 +528,7 @@ html,body{{margin:0;background:{NAVY}}}
 .map{{position:absolute;border:3px double {PARCH_DIM};border-radius:4px;
   box-shadow:0 0 0 8px rgba(15,15,35,0.6), inset 0 0 120px rgba(76,58,27,0.45)}}
 .region{{position:absolute;font-family:Cinzel,serif;font-weight:600;color:{INK_SOFT};letter-spacing:0.3em;
-  white-space:nowrap;transform-origin:left top}}
+  white-space:nowrap;transform-origin:left top;text-shadow:0 0 6px rgba(233,220,188,0.85),0 0 12px rgba(233,220,188,0.6)}}
 .place{{position:absolute;font-family:Cinzel,serif;font-weight:700;font-size:17px;color:{INK};
   text-shadow:0 0 4px #e9dcbc,0 0 8px #e9dcbc;white-space:nowrap}}
 .card{{position:absolute;box-sizing:border-box;padding:14px 16px;background:rgba(15,15,35,0.93);
