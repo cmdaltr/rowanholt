@@ -85,6 +85,13 @@ if (-not $Credential) {
 if ($Credential.UserName -notmatch "(^|\\)$([regex]::Escape($env:USERNAME))$") {
     throw 'The task must run as the account running this script: the Rowanholt distribution is registered to it.'
 }
+# Checked now, not at Register-ScheduledTask after everything else has been done
+Add-Type -AssemblyName System.DirectoryServices.AccountManagement
+$context = if ((Get-CimInstance Win32_ComputerSystem).PartOfDomain -and $env:USERDOMAIN -ne $env:COMPUTERNAME) { 'Domain' } else { 'Machine' }
+$principal = New-Object System.DirectoryServices.AccountManagement.PrincipalContext $context, $env:USERDOMAIN
+if (-not $principal.ValidateCredentials($env:USERNAME, $Credential.GetNetworkCredential().Password)) {
+    throw "That isn't $env:USERDOMAIN\$env:USERNAME's password: run the script again."
+}
 New-Item -ItemType Directory -Force -Path $State, $WslPath | Out-Null
 
 # 1. WSL 2. Windows Server 2022's own wsl.exe predates --install --no-distribution and --status
@@ -254,10 +261,10 @@ $trigger = New-ScheduledTaskTrigger -AtStartup
 $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 `
     -RestartInterval (New-TimeSpan -Minutes 1) -StartWhenAvailable -AllowStartIfOnBatteries
 Register-ScheduledTask -TaskName Rowanholt -Action $action -Trigger $trigger -Settings $settings -RunLevel Highest `
-    -User $Credential.UserName -Password $Credential.GetNetworkCredential().Password -Force | Out-Null
+    -User $Credential.UserName -Password $Credential.GetNetworkCredential().Password -Force -ErrorAction Stop | Out-Null
 
 Write-Host 'Starting Rowanholt (the first start builds the images, which takes a while)...'
-Start-ScheduledTask -TaskName Rowanholt
+Start-ScheduledTask -TaskName Rowanholt -ErrorAction Stop
 Write-Host ''
 Write-Host "Rowanholt runs at boot as $($Credential.UserName), forwarding $($ports -join ', ') into WSL."
 Write-Host "Follow the first start with: wsl -d $Distro -u root -- $Root/rowanholt status"
