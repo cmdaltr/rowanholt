@@ -186,17 +186,11 @@ function NewAcquisition() {
 
   return (
     <div className="new-analysis">
-      <div className="card">
-        <h2>New Forensic Acquisition</h2>
-
-        <div className="validation-message info">
-          Gandalf runs on the target, or on a host that reaches it over SSH or PowerShell Remoting:
-          choose what to collect, then copy the command and run it there.
-        </div>
-
+      {/* Section headings take the page's card-heading style (acq-heading) */}
+      <div className="card acq-form">
         <div data-guide="gandalf.case" className="form-row">
           <div className="form-group">
-            <label htmlFor="caseNumber">
+            <label className="acq-heading" htmlFor="caseNumber">
               Case Number / Investigation ID *
             </label>
             <div className="input-with-icon">
@@ -221,7 +215,7 @@ function NewAcquisition() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="destinationPath">
+            <label className="acq-heading" htmlFor="destinationPath">
               Destination Directory
             </label>
             <input
@@ -236,7 +230,7 @@ function NewAcquisition() {
         </div>
 
         <div data-guide="gandalf.config" className="form-group">
-          <label>Acquisition Configuration *</label>
+          <label className="acq-heading">Acquisition Configuration *</label>
           <div className="dropdown-row">
             <select
               id="locationMode"
@@ -298,7 +292,7 @@ function NewAcquisition() {
         {remote && (
           <div data-guide="gandalf.hosts" className="form-row">
             <div className="form-group">
-              <label htmlFor="hostnames">
+              <label className="acq-heading" htmlFor="hostnames">
                 Target host(s): names or IP addresses, comma-separated
               </label>
               <input
@@ -312,7 +306,7 @@ function NewAcquisition() {
             </div>
             {scriptLanguage === 'bash' && (
               <div className="form-group">
-                <label htmlFor="sshUser">SSH user</label>
+                <label className="acq-heading" htmlFor="sshUser">SSH user</label>
                 <input
                   type="text"
                   id="sshUser"
@@ -327,7 +321,7 @@ function NewAcquisition() {
         )}
 
         <div data-guide="gandalf.options" className="form-group">
-          <label>Collection Options</label>
+          <label className="acq-heading">Collection Options</label>
           {!spec && (
             <div className="validation-message info">
               Choose the target platform and collector to see its options. Every collector takes its artefacts
@@ -371,7 +365,7 @@ function NewAcquisition() {
         <div data-guide="gandalf.command" className="acquisition-actions">
           <div className="command-block-container">
             <div className="command-block-header">
-              <label>Generated Command</label>
+              <label className="acq-heading">Generated Command</label>
               <div className="command-header-actions">
                 <button
                   type="button"
@@ -391,7 +385,7 @@ function NewAcquisition() {
           {!missing && hostsList && (
             <div className="command-block-container">
               <div className="command-block-header">
-                <label>Save as {hostsList}</label>
+                <label className="acq-heading">Save as {hostsList}</label>
                 <div className="command-header-actions">
                   <button type="button" className="copy-button" onClick={() => copy(hosts.join('\n') + '\n', 'hosts')}>
                     {copied === 'hosts' ? 'Copied' : 'Copy'}

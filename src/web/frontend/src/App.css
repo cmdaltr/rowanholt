@@ -201,6 +201,18 @@ code, pre, kbd, samp { font-family: var(--font-mono); letter-spacing: 0; }
   letter-spacing: 0.04em;
 }
 
+/* Gandalf's form: each section's heading in the card-heading style */
+.acq-form label.acq-heading {
+  color: #c3e88d;
+  font-size: 1.5rem;
+  margin-bottom: 0.75rem;
+  letter-spacing: 0.04em;
+}
+.acq-form > .form-group + .form-group,
+.acq-form > .form-row + .form-group { margin-top: 1.25rem; }
+.journey-detail header .validation-message { margin-top: 0.9rem; }
+.acq-form .form-row { align-items: start; }
+
 .card h3 {
   color: #f0dba5;
   margin-bottom: 0.75rem;
@@ -2524,9 +2536,10 @@ table input[type="checkbox"] {
   margin-top: 0.5rem;
   padding: 0.5rem 0.75rem;
   border-radius: 4px;
-  font-size: 0.875rem;
-  font-family: 'Cinzel', 'Times New Roman', serif;
-  letter-spacing: 0.03em;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  font-family: var(--font-body);
+  letter-spacing: 0;
   transition: all 0.3s ease;
 }
 

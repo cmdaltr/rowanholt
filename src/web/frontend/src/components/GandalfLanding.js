@@ -23,6 +23,10 @@ const GandalfLanding = () => {
         <p>
           Securely acquire artifacts from local or remote hosts using PowerShell, Python or Bash.
         </p>
+        <div className="validation-message info">
+          Gandalf runs on the target, or on a host that reaches it over SSH or PowerShell Remoting:
+          choose what to collect, then copy the command and run it there.
+        </div>
       </header>
 
       <NewAcquisition />
