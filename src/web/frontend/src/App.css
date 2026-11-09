@@ -1159,10 +1159,10 @@ table input[type="checkbox"] {
   transition: opacity 0.45s ease;
 }
 
+/* Open, the same cover fit fills a wider frame, so the figure zooms in to head and shoulders
+   as the banner widens */
 .journey-banner.is-open img {
-  object-fit: contain;
-  object-position: center 0.5rem;
-  height: calc(100% - 3.5rem);
+  object-position: center 6%;
   opacity: 1;
 }
 
@@ -1222,7 +1222,7 @@ table input[type="checkbox"] {
 @media (max-width: 640px) {
   .journey-banners { flex-direction: column; height: auto; }
   .journey-banner, .journey-banner.is-open { flex: none; height: 220px; }
-  .journey-banner img, .journey-banner.is-open img { height: 100%; object-fit: cover; opacity: 0.45; }
+  .journey-banner img, .journey-banner.is-open img { opacity: 0.45; }
   .journey-banner__name { display: none; }
   .journey-banner__content { opacity: 1; }
 }
