@@ -19,6 +19,7 @@
   .label .lg{display:flex;gap:4px;justify-content:center;margin-top:3px}
   .label .lg svg{width:calc(11px*var(--ui));height:calc(11px*var(--ui));fill:var(--parch2);filter:drop-shadow(0 1px 2px #000)}
   .label.off{opacity:.38}
+  .label .sh{display:none} body.far .label .fu,body.far .label .s,body.far .label .lg{display:none} body.far .label .sh{display:inline}
   header{position:fixed;top:0;left:0;right:0;padding:12px 18px 0;z-index:5;display:flex;align-items:center;gap:14px;flex-wrap:wrap;pointer-events:none}
   h1{font-size:18px;margin:0;display:flex;align-items:center;gap:12px;font-weight:600}
   h1 img{height:46px;width:auto;display:block;filter:drop-shadow(0 2px 6px rgba(0,0,0,.6))}
@@ -27,8 +28,7 @@
   .hint{font-size:calc(10.5px*var(--ui));color:var(--muted);margin-left:auto;text-shadow:0 1px 3px #000}
   #jrow{position:fixed;top:68px;left:18px;right:18px;z-index:6;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
   .tm{position:fixed;right:12px;bottom:6px;z-index:5;font-size:9px;color:var(--muted);pointer-events:none;opacity:.8}
-  #track{position:fixed;left:50%;bottom:calc(58px + 26px*var(--ui));transform:translateX(-50%);z-index:6;
-    width:min(1040px,calc(100vw - 24px));display:flex;flex-wrap:wrap;gap:4px 5px;justify-content:center;pointer-events:none}
+  #track{position:fixed;left:calc(40px + min(calc(360px*var(--ui)),calc(100vw - 32px)));right:16px;bottom:calc(58px + 26px*var(--ui));z-index:6;display:flex;flex-wrap:wrap;gap:4px 5px;justify-content:center;pointer-events:none}
   .tk{font-size:calc(10px*var(--ui));color:var(--muted);border:1px solid rgba(240,219,165,.18);border-radius:11px;
     padding:2px 8px;background:rgba(10,14,24,.6);transition:all .3s}
   .tk.done{color:var(--green);border-color:rgba(167,219,108,.55)}
@@ -38,11 +38,12 @@
   .tk.opt.cur{background:var(--amber);border-color:var(--amber);color:var(--navy)}
   .tkar{color:var(--muted);font-size:calc(10px*var(--ui));opacity:.45;align-self:center}
   #log{position:fixed;left:16px;bottom:calc(46px + 36px*var(--ui));z-index:6;width:min(calc(360px*var(--ui)),calc(100vw - 32px));
-    max-height:calc(100vh - 230px);overflow:hidden;display:flex;flex-direction:column;
+    max-height:min(54vh,calc(100vh - 230px));overflow:hidden;display:flex;flex-direction:column;
     background:rgba(9,12,22,.74);border:1px solid rgba(240,219,165,.3);border-radius:8px;padding:calc(10px*var(--ui)) calc(12px*var(--ui));
     backdrop-filter:blur(8px);pointer-events:none;box-shadow:0 14px 34px rgba(0,0,0,.45)}
   #log .camp{font-family:var(--serif);font-size:calc(11px*var(--ui));letter-spacing:2px;text-transform:uppercase;color:var(--parch);margin-bottom:6px}
-  #log ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;justify-content:flex-end;gap:calc(5px*var(--ui));overflow:hidden;min-height:0}
+  #log ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;justify-content:flex-end;gap:calc(5px*var(--ui));overflow:hidden;min-height:0;
+    -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 48px);mask-image:linear-gradient(to bottom,transparent 0,#000 48px)}
   #log li{font-size:calc(10.5px*var(--ui));line-height:1.45;color:var(--muted);padding-left:calc(10px*var(--ui));border-left:2px solid rgba(167,219,108,.45);
     animation:logIn .35s ease-out;transition:color .3s,border-color .3s;flex-shrink:0}
   #log li b{display:block;font-size:calc(9.5px*var(--ui));letter-spacing:1.2px;text-transform:uppercase;color:var(--green);font-weight:700}
@@ -79,7 +80,7 @@
   #info .x:hover{color:var(--ink)}
   .fallback{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:40px;color:var(--muted);text-align:center}
   @media (max-width:760px){
-    #jrow{top:62px} .hint{display:none} #log{max-height:30vh} #info{top:auto;bottom:120px;max-height:45vh}
+    #jrow{top:62px} #track{left:16px} .hint{display:none} #log{max-height:30vh} #info{top:auto;bottom:120px;max-height:45vh}
     h1 img{height:36px} .fig{display:none}
   }
 </style>
@@ -144,13 +145,13 @@ const NODES = [
   desc:'The React front end on :5687 and the FastAPI back end on :5688: start jobs, upload archives and images or pick them from disk, watch progress, read results, Ask Aulë, Pippin, shared findings and notes. Admins also see Aragorn. Each job goes into Redis, the dovecote, and a bird carries it to the Celery worker that runs Elrond.'},
  {id:'weathertop', name:'Identify · mount · verify', port:'Amon Sûl · Elrond step 01', pos:[-42,-26], r:6, icon:'check',
   desc:'Elrond recognises E01, VMDK, VHD(X), raw and dd images, memory, Gandalf archives, Mordor datasets and cloud logs, and mounts what needs mounting (ewfmount, qemu-nbd, apfs-fuse). A Gandalf archive is decrypted and every file re-hashed against <code>log.meta</code> into <code>gandalf_integrity.jsonl</code> (verified, MISMATCH, missing), then laid out as <code>raw/</code>. The ring of stones turns green when every hash matches.'},
- {id:'imladris', name:'Elrond · collect, process, analyse', port:'the Last Homely House, in the rowan wood', pos:[-10,2], r:13, char:'elrond', logos:['celery','python','docker'],
+ {id:'rowanhall', name:'Elrond · collect, process, analyse', port:'the Hall under the Rowan, in the rowan wood', pos:[-10,2], r:13, char:'elrond', logos:['celery','python','docker'],
   desc:'Elrond keeps the ledger. The Celery worker (the mill wheel) takes each job from Redis and runs Elrond, and Elrond runs every tool as its own process: Artemis, RegRipper, Volatility 3, Plaso, YARA, The Sleuth Kit, iLEAPP and ALEAPP for phones, Zeek for network captures. Step 02 collects per OS from the mounted image (hives, event logs, $MFT and journals; launchd, BTM and unified logs; cron, systemd, PAM and logins; shadow copies too); step 03 writes every artefact to <code>cooked/</code> as JSON Lines, each record with its host, source, UTC time and techniques; step 04 (<code>--Analysis</code>, <code>--Keywords</code>, <code>--Yara</code>) searches keywords and YARA, extracts IOCs, stacks across hosts, and finds timestomping, alternate data streams and masquerading. Memory images are read by Volatility 3, by profile.'},
  {id:'pippin', name:'Pippin · threat intelligence', port:'Dol Baran · the palantír', pos:[20,-30], r:7, char:'pippin', opt:true,
   desc:'Pippin looked into the palantír. The Intel page imports STIX/TAXII bundles, MITRESaw and the Iran APT loader into one table of indicators, each with its group, procedure, technique and source; expiry and confidence sit beside it (STIX\'s own, else 90 days for IPs and domains). With <code>--threatIntel</code> Elrond matches the case against every unexpired indicator, and Aulë sees the same context for an artefact. Online lookups (VirusTotal) are off unless turned on, and are for analysts, never for Aulë.'},
  {id:'beacons', name:'ATT&CK tagging', port:'the Beacons of Gondor · step 05', pos:[45,6], r:7, icon:'flame',
   desc:'Fourteen beacons, one per Enterprise tactic, lit as techniques are tagged from artefacts, event-log rules and Mordor datasets into <code>mitre_techniques.txt</code>; <code>--Navigator</code> writes an ATT&amp;CK Navigator layer too. The mapping is Elrond\'s, not Aulë\'s.'},
- {id:'fangorn', name:'Timeline · Plaso', port:'Fangorn · step 06 · --Timeline', pos:[70,38], r:8, icon:'clock', opt:true,
+ {id:'fangorn', name:'Timeline · Plaso', port:'Fangorn · step 06 · --Timeline', pos:[70,38], r:10, icon:'clock', opt:true,
   desc:'psteal builds one super-timeline across every source of a host: Treebeard\'s rings, read in order. It is indexed into Splunk or Kibana with the rest when the case is exported.'},
  {id:'orthanc', name:'Export · Splunk, Elastic, Kibana', port:'Orthanc · step 07 · --Splunk / --Elastic', pos:[100,8], r:10, icon:'export', opt:true, logos:['splunk','elastic','kibana'],
   desc:'<code>--Splunk</code> and <code>--Elastic</code> index the cooked artefacts, with Rowanholt\'s own Splunk app and Kibana dashboards, to local containers or remote servers. The light on the tower goes up as the case is sent.'},
@@ -164,7 +165,7 @@ const NODES = [
   desc:'OTRF Security-Datasets (APT29 day 1 and 2, Atomic sets) and the lab\'s own recordings of Atomic Red Team tests. <code>--Mordor</code> ingests them as event logs, so detections and ATT&amp;CK tagging can be checked against a known attack.'},
 ];
 const NODE = Object.fromEntries(NODES.map(n => [n.id, n]));
-const SHORT = {shire:'The Shire', havens:'Grey Havens', bree:'Bree', weathertop:'Amon Sûl', imladris:'Elrond', pippin:'Pippin',
+const SHORT = {shire:'The Shire', havens:'Grey Havens', bree:'Bree', weathertop:'Amon Sûl', rowanhall:'Elrond', pippin:'Pippin',
   beacons:'Beacons', fangorn:'Fangorn', orthanc:'Orthanc', erebor:'Erebor', aule:'Aulë', minas:'Minas Tirith', mordor:'Mordor'};
 const CHAR = {gandalf:'Gandalf', elrond:'Elrond', pippin:'Pippin', aragorn:'Aragorn', aule:'Aulë'};
 const TACTICS = ['Reconnaissance','Resource Development','Initial Access','Execution','Persistence','Privilege Escalation',
@@ -187,35 +188,35 @@ const JOURNEYS = {
   ['shire','Gandalf calls on a live host with <code>Invoke-Gandalf.ps1</code>, <code>gandalf.sh</code> or <code>gandalf.py</code>: live state first, then the seven lanterns, in order of volatility. Every file is hashed into <code>log.meta</code> and the archive sealed (Password or Key optional).'],
   ['bree','At the Prancing Pony the archive is uploaded and the job queued in Redis; a bird carries it to the worker.'],
   ['weathertop','Amon Sûl: decrypted, every file re-hashed against <code>log.meta</code> into <code>gandalf_integrity.jsonl</code>. The stones turn green.'],
-  ['imladris','Elrond enters it in the ledger: collect per OS, process every artefact into <code>cooked/</code> JSON Lines, and with <code>--Analysis</code> search keywords, YARA and IOCs.'],
+  ['rowanhall','Elrond enters it in the ledger: collect per OS, process every artefact into <code>cooked/</code> JSON Lines, and with <code>--Analysis</code> search keywords, YARA and IOCs.'],
   ...TAIL]},
  disk:{label:'Disk image', hits:[2,3,4,6,7,8,10], steps:[
   ['bree','A disk image (E01, VMDK, VHD(X), raw or dd) is uploaded or picked from disk. No Gandalf needed: the eagle carries it.'],
   ['weathertop','Amon Sûl: identified and mounted (ewfmount, qemu-nbd, apfs-fuse).'],
-  ['imladris','Elrond collects per OS from the mounted image (shadow copies too), processes every artefact into <code>cooked/</code>, and analyses with <code>--Analysis</code>.'],
+  ['rowanhall','Elrond collects per OS from the mounted image (shadow copies too), processes every artefact into <code>cooked/</code>, and analyses with <code>--Analysis</code>.'],
   ...TAIL]},
  memory:{label:'Memory image', hits:[3,4,6,8,11], steps:[
   ['bree','A memory image (raw, AFF4, hiberfil.sys, pagefile.sys, MEMORY.DMP, .vmem) is uploaded or picked from disk.'],
   ['weathertop','Amon Sûl: recognised as memory, and its profile found.'],
-  ['imladris','Elrond runs Volatility 3 by profile: pslist, psscan, cmdline, netscan, malfind, svcscan, and the linux.* and mac.* equivalents.'],
+  ['rowanhall','Elrond runs Volatility 3 by profile: pslist, psscan, cmdline, netscan, malfind, svcscan, and the linux.* and mac.* equivalents.'],
   TAIL[0], TAIL[1], TAIL[3], TAIL[4], TAIL[5]]},
  cloud:{label:'Cloud', hits:[2,3,4,5,7,8,12], steps:[
   ['havens','From the Grey Havens: an AWS, Azure or GCP disk snapshot, CloudTrail or activity logs, Kubernetes audit logs.'],
   ['bree','At Bree the snapshot becomes a disk image job, queued in Redis.'],
   ['weathertop','Amon Sûl: identified and mounted.'],
-  ['imladris','Elrond collects, processes and analyses it like any disk image; the cloud logs are processed as logs.'],
+  ['rowanhall','Elrond collects, processes and analyses it like any disk image; the cloud logs are processed as logs.'],
   ...TAIL]},
  mordor:{label:'Mordor dataset', hits:[2,3,4,5,6,7,8,9,10,11,12,13], steps:[
   ['mordor','An OTRF Security-Dataset (APT29 day 1 and 2, Atomic sets) or the lab\'s own Atomic Red Team recording leaves the Black Gate.'],
   ['bree','Picked at Bree: <code>--Mordor</code>.'],
   ['weathertop','Amon Sûl: read as event logs.'],
-  ['imladris','Elrond processes the event logs as if they came from a host.'],
+  ['rowanhall','Elrond processes the event logs as if they came from a host.'],
   ['beacons','The beacons are lit by the event-log rules: did the right tactics light for a known attack?'],
   TAIL[2], TAIL[3], TAIL[4]]},
  intel:{label:'Threat intel', hits:[], steps:[
   ['bree','On Pippin\'s page in the web app, import a STIX/TAXII bundle, MITRESaw output or the Iran APT loader.'],
   ['pippin','Into the palantír: one table of indicators (group, procedure, technique, source), with expiry and confidence beside it. Expired ones stay listed but are left out of matching.'],
-  ['imladris','Elrond\'s <code>--threatIntel</code> matches a case against every unexpired indicator.'],
+  ['rowanhall','Elrond\'s <code>--threatIntel</code> matches a case against every unexpired indicator.'],
   ['aule','Aulë sees the same context when he looks at an artefact. Online lookups (VirusTotal, off unless enabled) are for analysts only, never for Aulë.', true]]},
  ask:{label:'Ask Aulë', hits:[], steps:[
   ['bree','You ask a question in Ask Aulë, or from an MCP host through Aulë\'s read-only MCP server.'],
@@ -247,7 +248,7 @@ const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.5, 24
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.dampingFactor = 0.08; controls.minDistance = 14; controls.maxDistance = 420;
 controls.maxPolarAngle = Math.PI * 0.47;
-const FOLLOW_OFF = new THREE.Vector3(-16, 44, 60);
+const FOLLOW_OFF = new THREE.Vector3(-16, 47, 95);
 const OVERVIEW = {target:new THREE.Vector3(-4, 0, 10), pos:new THREE.Vector3(-14, 230, 250)};
 
 // ---------- light: a low evening sun over the sea ----------
@@ -415,15 +416,17 @@ const RIVER = [[2, -120], [1, -72], [-2, -42], [4, -16], [5, 8], [-6, 26], [-34,
 const BEACON_LINE = [[22, 10], [68, 2]];
 function hRaw(x, z) {
   let h = (fbm(x * 0.016 + 3, z * 0.016, 4) - 0.5) * 7 + (fbm(x * 0.07, z * 0.07, 3) - 0.5) * 1.5 + 1.8;
-  h += smooth(-48, -110, z) * (5 + fbm(x * 0.03, z * 0.03, 3) * 14);                    // highlands to the north
-  h += smooth(140, 185, x) * (6 + fbm(x * 0.03 + 5, z * 0.03, 3) * 12);                 // and the east
+  h += smooth(-48, -110, z) * (4 + fbm(x * 0.03, z * 0.03, 3) * 10);                    // highlands to the north
+  h += smooth(150, 200, x) * (2 + fbm(x * 0.05 + 5, z * 0.05, 3) * 9);                  // and the east
   h += 9 * ridge(segDist(x, z, -40, 76, 26, 70), 8) * (0.7 + 0.5 * fbm(x * 0.08, z * 0.08, 2)); // the White Mountains, ending at Minas Tirith
   h += 3.6 * ridge(segDist(x, z, ...BEACON_LINE[0], ...BEACON_LINE[1]), 5);             // the beacon hills
   const wall = Math.max(ridge(segDist(x, z, 92, 42, 170, 42), 4.2), ridge(segDist(x, z, 92, 42, 92, 56), 4.2), ridge(segDist(x, z, 92, 68, 92, 110), 4.2));
-  const inside = smooth(92, 99, x) * smooth(42, 49, z);
+  const mx = (fbm(z * 0.06, 3.3, 3) - 0.5) * 10, mz = (fbm(x * 0.06, 7.7, 3) - 0.5) * 10;
+  const inside = smooth(92, 99, x + mx) * smooth(42, 49, z + mz);
   h += (1.2 + 0.6 * fbm(x * 0.1, z * 0.1, 2) - h) * inside;                            // the ash plain of Mordor
-  h += 12 * wall * (0.8 + 0.4 * fbm(x * 0.2, z * 0.2, 2));
+  h += 10 * wall * (0.5 + 0.9 * fbm(x * 0.25, z * 0.25, 3)) + wall * Math.max(0, Math.sin(x * 0.9 + z * 1.3)) * 3;
   h += 8.5 * Math.max(0, 1 - Math.hypot(x + 42, z + 26) / 15) ** 1.3;                    // Weathertop
+  h = Math.min(h, WATER - 0.3 + (96 + (fbm(x * 0.045, 9.1, 4) - 0.5) * 40 + Math.sin(x * 0.07) * 4 - z) * 0.2);    // the southern shore
   const d = x - coastX(z), cliff = smooth(14, -40, z);
   h = Math.min(h, WATER - 0.3 + d * (0.14 + cliff * 0.75));                              // the sea, cliffs to the north
   const dr = polyDist(x, z, RIVER); if (dr < 7) h = Math.min(h, WATER - 0.7 + Math.max(0, dr - 1.4) * 0.5);
@@ -436,7 +439,7 @@ function hgt(x, z) {
   for (const n of NODES) { const d = Math.hypot(x - n.pos[0], z - n.pos[1]); if (d < n.r * 1.5) h += (n.h0 - h) * smooth(n.r * 1.5, n.r * 0.75, d); }
   return h;
 }
-const MORDOR = (x, z) => smooth(92, 99, x) * smooth(42, 49, z);
+const MORDOR = (x, z) => smooth(92, 99, x + (fbm(z * 0.06, 3.3, 3) - 0.5) * 10) * smooth(42, 49, z + (fbm(x * 0.06, 7.7, 3) - 0.5) * 10);
 (function terrain() {
   const W = 900, D = 720, g = new THREE.PlaneGeometry(W, D, 460, 368); g.rotateX(-Math.PI / 2); g.translate(-10, 0, 0);
   const p = g.attributes.position;
@@ -494,24 +497,24 @@ function treeGeos() {
   out.rowan = [0, 1, 2].map(s => { const parts = [{geo:taperTube([[0, 0, 0], [0.05, 0.7, 0], [-0.08, 1.4, 0.04]], [0.09, 0.05], {rs:7, ts:6, color:() => col(0x6a6258)})}];
     parts.push({geo:taperTube([[0, 0.8, 0], [0.4, 1.3, 0.1], [0.6, 1.7, 0.1]], [0.04, 0.02], {rs:5, ts:4, color:() => col(0x6a6258)})});
     const autumn = s === 2;
-    for (let i = 0; i < 5; i++) { const a = i * 1.3 + s; parts.push({geo:blobGeo(0.5 + rnd() * 0.2, i * 3 + s, 0.75, autumn ? 0x6a5a22 : 0x3f5a28, autumn ? 0xb98a35 : 0x86a24a, 0.28),
+    for (let i = 0; i < 5; i++) { const a = i * 1.3 + s; parts.push({geo:blobGeo(0.5 + rnd() * 0.2, i * 3 + s, 0.75, autumn ? 0x5a4a22 : 0x2f4a24, autumn ? 0x9a7a3a : 0x5f7f3a, 0.28),
       m:M4(Math.cos(a) * 0.45, 1.75 + (i % 3) * 0.25, Math.sin(a) * 0.45)}); }
     for (let i = 0; i < 14; i++) { const a = rnd() * 6.28, y = 1.45 + rnd() * 0.75, rr = 0.62 + rnd() * 0.25;    // the berries
       for (let k = 0; k < 3; k++) parts.push({geo:new THREE.IcosahedronGeometry(0.075, 0), color:k ? 0xc72a1c : 0xe0452a, m:M4(Math.cos(a) * rr + (k - 1) * 0.07, y - k * 0.05, Math.sin(a) * rr)}); }
     return merge(parts); });
   out.birch = [0, 1].map(s => { const parts = [{geo:taperTube([[0, 0, 0], [0.08, 1.3, 0], [0.02, 2.6, 0.06]], [0.08, 0.04], {rs:7, ts:10, color:t => fbm(t * 30 + s, 1, 2) > 0.55 ? col(0x2c2a26) : col(0xddd8cb)})}];
-    for (let i = 0; i < 4; i++) parts.push({geo:blobGeo(0.42 + rnd() * 0.15, i + 20 + s, 1.3, 0x5a6a2a, s ? 0xc2a843 : 0x9fb153, 0.3), m:M4((rnd() - 0.5) * 0.5, 2.1 + i * 0.3, (rnd() - 0.5) * 0.5)});
+    for (let i = 0; i < 4; i++) parts.push({geo:blobGeo(0.42 + rnd() * 0.15, i + 20 + s, 1.3, 0x4a5a28, s ? 0x9a8a3e : 0x7a9145, 0.3), m:M4((rnd() - 0.5) * 0.5, 2.1 + i * 0.3, (rnd() - 0.5) * 0.5)});
     return merge(parts); });
   return out;
 }
 (function forests() {
   const G = treeGeos(), lists = {}; Object.entries(G).forEach(([k, arr]) => arr.forEach((g, i) => lists[k + i] = []));
-  const pick = (k) => k + Math.floor(rnd() * G[k].length);
+  const pick = (k) => k + (k === 'rowan' ? (rnd() < 0.12 ? 2 : Math.floor(rnd() * 2)) : Math.floor(rnd() * G[k].length));
   const Q = new THREE.Quaternion(), E = new THREE.Euler();
   let placed = 0;
   for (let tries = 0; tries < 26000 && placed < 1900; tries++) {
     const x = -150 + rnd() * 320, z = -95 + rnd() * 185;
-    const rowanWood = Math.max(0, 1 - Math.hypot(x + 10, z - 2) / 30), fang = Math.max(0, 1 - Math.hypot(x - 70, z - 40) / 22);
+    const rowanWood = Math.max(0, 1 - Math.hypot(x + 10, z - 2) / 30), fang = Math.max(0, 1 - Math.hypot(x - 74, z - 28) / 22);
     const dens = smooth(0.48, 0.66, fbm(x * 0.035 + 11, z * 0.035, 3)) * 0.55 + rowanWood * 1.1 + fang * 1.4;
     if (rnd() > dens) continue;
     if (NODE_CLEAR(x, z) || MORDOR(x, z) > 0.1 || segDist(x, z, ...BEACON_LINE[0], ...BEACON_LINE[1]) < 2.5) continue;
@@ -533,17 +536,18 @@ function treeGeos() {
 const rockMat = tmat('rock', 2, 2, {bump:0.08});
 (function stones() {
   const geos = [0, 1, 2].map(i => rockGeo(0.6, 2, 0.32, 1.25, 0.6, 1, i * 5));
-  const ms = [[], [], []], Q = new THREE.Quaternion(), E = new THREE.Euler();
-  for (let i = 0; i < 1800 && ms.flat().length < 700; i++) { const x = -145 + rnd() * 315, z = -90 + rnd() * 180;
+  const ms = [[], [], [], []], Q = new THREE.Quaternion(), E = new THREE.Euler();
+  for (let i = 0; i < 2600 && ms.flat().length < 900; i++) { const x = -145 + rnd() * 315, z = -90 + rnd() * 180;
     if (NODE_CLEAR(x, z, 1.0)) continue; const h = hgt(x, z); if (h < WATER + 0.2) continue;
-    if (rnd() > 0.25 + smooth(3, 10, h) * 0.6 + MORDOR(x, z) * 0.5) continue;
-    const s = 0.5 + rnd() * rnd() * 3.2; E.set(0, rnd() * 6, 0); Q.setFromEuler(E);
-    ms[i % 3].push(new THREE.Matrix4().compose(V3(x, h + s * 0.08, z), Q, V3(s, s, s))); }
-  ms.forEach((arr, i) => { const im = new THREE.InstancedMesh(geos[i], rockMat, arr.length); arr.forEach((m, j) => im.setMatrixAt(j, m));
+    if (rnd() > 0.25 + smooth(3, 10, h) * 0.6 + MORDOR(x, z) * 0.75) continue;
+    const s = 0.4 + rnd() * rnd() * 2.4; E.set(0, rnd() * 6, 0); Q.setFromEuler(E);
+    ms[MORDOR(x, z) > 0.3 ? 3 : i % 3].push(new THREE.Matrix4().compose(V3(x, h + s * 0.08, z), Q, V3(s, s * (MORDOR(x, z) > 0.3 ? 1.8 : 1), s))); }
+  const ashRock = tmat('rock', 2, 2, {bump:0.1, c:0x4a3a34});
+  ms.forEach((arr, i) => { const im = new THREE.InstancedMesh(geos[i % 3], i === 3 ? ashRock : rockMat, arr.length); arr.forEach((m, j) => im.setMatrixAt(j, m));
     im.castShadow = true; im.receiveShadow = true; im.frustumCulled = false; scene.add(im); });
 })();
 (function grass() {
-  const blade = merge([0, 1, 2].map(i => ({geo:CONE(0.03, 0.42, 3), color:0xffffff, m:M4((i - 1) * 0.06, 0.21, (i % 2) * 0.05, (i - 1) * 0.25, i, 0)})));
+  const blade = merge([0, 1, 2].map(i => ({geo:CONE(0.025, 0.3, 3), color:0xffffff, m:M4((i - 1) * 0.06, 0.21, (i % 2) * 0.05, (i - 1) * 0.25, i, 0)})));
   const N = 60000, im = new THREE.InstancedMesh(blade, new THREE.MeshStandardMaterial({roughness:1, vertexColors:true}), N), m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), c = new THREE.Color();
   let k = 0; for (let i = 0; i < N * 2 && k < N; i++) { const x = -140 + rnd() * 300, z = -85 + rnd() * 170; if (NODE_CLEAR(x, z, 0.7)) continue;
     const h = hgt(x, z); if (h < WATER + 0.6 || h > 13 || MORDOR(x, z) > 0.2) continue;
@@ -604,7 +608,7 @@ function figure(o) {
     const hand = new THREE.Mesh(SPH(0.045, 10), skinM); hand.position.copy(new THREE.Vector3(...pts[pts.length - 1])); pv.add(hand); pv.userData.hand = hand.position.clone(); return pv; };
   const armL = arm(1, o.armL ?? [[0, 0, 0], [0.05, -0.3, 0.02], [0.06, -0.58, 0.05]]);
   const armR = arm(-1, o.armR ?? [[0, 0, 0], [-0.05, -0.3, 0.02], [-0.06, -0.58, 0.05]]);
-  g.scale.setScalar(o.scale ?? 1);
+  g.scale.setScalar((o.scale ?? 1) * 1.35);
   return {g, head, armL, armR};
 }
 
@@ -631,10 +635,10 @@ const barkMat = tmat('bark', 1, 2, {bump:0.06});
 // The Shire: Gandalf at a smial, the seven lanterns, the sealed archive on its cart
 const fx = {}; // per-place effects, driven by the journey
 function shire(g) {
-  const hill = new THREE.Mesh(blobGeo(3.6, 3, 0.5, 0x3d5a2c, 0x6b8a40, 0.08), vcMat()); hill.position.set(0, -0.2, -1.2); g.add(hill);
+  const hill = new THREE.Mesh(blobGeo(3.6, 3, 0.5, 0x34502a, 0x5a7838, 0.08), vcMat()); hill.position.set(0, -0.2, -2.3); g.add(hill);
   const front = new THREE.Shape(); front.moveTo(-2.3, 0); front.lineTo(2.3, 0); front.lineTo(2.3, 1.15); front.quadraticCurveTo(0, 2.0, -2.3, 1.15); front.lineTo(-2.3, 0);
   const fw = new THREE.Mesh(new THREE.ExtrudeGeometry(front, {depth:0.4, bevelEnabled:false}), tmat('stone', 0.5, 0.5, {bump:0.06})); fw.position.set(0, 0, 1.55); g.add(fw);
-  const turf = new THREE.Mesh(blobGeo(2.6, 8, 0.28, 0x3d5a2c, 0x6b8a40, 0.06), vcMat()); turf.position.set(0, 1.35, 1.2); g.add(turf);
+  const turf = new THREE.Mesh(blobGeo(2.6, 8, 0.28, 0x34502a, 0x5a7838, 0.06), vcMat()); turf.position.set(0, 1.3, 0.6); g.add(turf);
   const door = new THREE.Mesh(CYL(0.55, 0.55, 0.08, 32), mat(0x2f5a2c, {r:0.6})); door.rotation.x = Math.PI / 2; door.position.set(0, 0.62, 1.98); g.add(door);
   const frame = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.06, 8, 32), tmat('planks', 0.3, 0.3)); frame.position.set(0, 0.62, 1.99); g.add(frame);
   const knob = new THREE.Mesh(SPH(0.06, 10), mat(0xd9b04a, {m:0.8, r:0.3})); knob.position.set(0, 0.62, 2.04); g.add(knob);
@@ -667,21 +671,22 @@ function shire(g) {
   fx.lanterns = [];
   for (let i = 0; i < 7; i++) { const a = -2.4 + i * 0.36, x = Math.cos(a) * 5.0, z = Math.sin(a) * -5.0 + 0.4;
     const post = new THREE.Mesh(CYL(0.04, 0.05, 1.3, 8), mat(0x2a2016)); post.position.set(x, 0.65, z); g.add(post);
-    const cage = new THREE.Mesh(BOX(0.18, 0.24, 0.18), mat(0x2a2a2a, {m:0.6, r:0.4})); cage.position.set(x, 1.38, z); g.add(cage);
-    const fl = new THREE.Mesh(SPH(0.08, 10), mat(0x5b5040, {e:0xffb040, ei:0})); fl.position.set(x, 1.38, z); g.add(fl); fx.lanterns.push(fl); }
+    const cap = new THREE.Mesh(CONE(0.17, 0.16, 6), mat(0x2a2a2a, {m:0.6, r:0.4})); cap.position.set(x, 1.6, z); g.add(cap);
+    const base = new THREE.Mesh(CYL(0.1, 0.08, 0.05, 6), mat(0x2a2a2a, {m:0.6, r:0.4})); base.position.set(x, 1.31, z); g.add(base);
+    const fl = new THREE.Mesh(SPH(0.11, 12), mat(0x8a7a60, {e:0xffb040, ei:0, r:0.3})); fl.position.set(x, 1.44, z); g.add(fl); fx.lanterns.push(fl); }
   g.add(plight(0xffa850, 1.8, 14, 0, 2.2, 3.4));
 }
 function havens(g, n) {
   // a stone quay, a white tower with a lamp, and three swan-ships riding the swell
   const wy = (WATER - n._gy) / LOC_SCALE;
-  const quay = new THREE.Mesh(BOX(7, 0.6 - wy + 0.3, 1.6), tmat('white', 3, 0.5, {bump:0.05})); quay.position.set(-3.8, (0.3 + wy) / 2 - 0.1, 0.2); g.add(quay);
+  const quay = new THREE.Mesh(BOX(9, 0.6 - wy + 0.3, 1.4), tmat('white', 4, 0.5, {bump:0.05})); quay.position.set(-4.8, (0.3 + wy) / 2 - 0.1, 0.2); g.add(quay);
   const tower = new THREE.Mesh(new THREE.LatheGeometry([[0.9, 0], [0.75, 1.5], [0.6, 4.5], [0.75, 4.7], [0.75, 5.0], [0, 5.0]].map(([r, y]) => V2(r, y)), 24), tmat('white', 2, 3, {bump:0.03})); tower.position.set(1.2, 0, -1.0); g.add(tower);
   const lamp = new THREE.Mesh(SPH(0.32, 16), glowMat(0xfff0c8, 2.2)); lamp.position.set(1.2, 5.35, -1.0); g.add(lamp);
   const cap = new THREE.Mesh(CONE(0.75, 1.0, 24), tmat('slate', 1, 1)); cap.position.set(1.2, 6.1, -1.0); g.add(cap);
   for (let k = 0; k < 5; k++) { const p = new THREE.Mesh(CYL(0.05, 0.05, 0.5, 6), mat(0xe8e4da)); const a = k / 5 * 6.28; p.position.set(1.2 + Math.cos(a) * 0.6, 5.25, -1.0 + Math.sin(a) * 0.6); g.add(p); }
   g.add(plight(0xffe6b0, 2.4, 22, 1.2, 5.6, -1.0));
   fx.ships = [];
-  [[-6.5, -2.6, 0.2], [-8.6, 1.4, -0.3], [-5.8, 3.8, 0.4]].forEach(([x, z, ry]) => {
+  [[-10.5, -3.4, 0.2], [-12.8, 1.0, -0.3], [-10.0, 4.4, 0.4]].forEach(([x, z, ry]) => {
     const s = new THREE.Group(); s.position.set(x, wy, z); s.rotation.y = ry + Math.PI / 2; g.add(s);
     const hull = new THREE.Mesh(sculpt({len:2.4, depth:0.42, width:0.55, seg:[28, 14], shape:x => ({d:x > 0 ? 1 : 1, w:1 - Math.abs(x) * 0.35, dy:Math.abs(x) ** 3 * 0.25}), color:(x, y) => y > 0.6 ? col(0xc9a24a) : col(0xf1eee6)}),
       new THREE.MeshStandardMaterial({vertexColors:true, roughness:0.5})); hull.position.y = 0.1; hull.scale.y = 0.8; s.add(hull);
@@ -722,15 +727,16 @@ function weathertop(g) {
   // Amon Sûl: a broken tower and a ring of standing stones, which turn green when every hash matches
   fx.stones = [];
   for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, h = 0.9 + ((i * 7) % 5) * 0.18;
-    const m = mat(0x8a8478, {e:0x000000, ei:0, r:0.9}); const s = new THREE.Mesh(rockGeo(0.32, 2, 0.22, 0.75, h * 1.6, 0.6, i * 3), m);
-    s.position.set(Math.cos(a) * 3.0, h * 0.42, Math.sin(a) * 3.0); s.rotation.y = -a; g.add(s); fx.stones.push(m); }
+    const m = new THREE.MeshStandardMaterial({map:texture('rock', 0.4, 1), color:0xa09a8c, roughness:0.95, emissive:0x000000, flatShading:true});
+    const geo = new THREE.BoxGeometry(0.42, h * 1.15, 0.26, 2, 4, 2), gp = geo.attributes.position; for (let k = 0; k < gp.count; k++) { const y = gp.getY(k), f = 1 - smooth(-0.1, 0.6, y / h) * 0.25; gp.setXYZ(k, gp.getX(k) * f + n3(k, i, 1) * 0.04, y + (y > 0 ? n3(i, k, 2) * 0.12 : 0), gp.getZ(k) * f); } geo.computeVertexNormals();
+    const s = new THREE.Mesh(geo, m); s.position.set(Math.cos(a) * 3.0, h * 0.5, Math.sin(a) * 3.0); s.rotation.set((rnd() - 0.5) * 0.12, -a + Math.PI / 2, (rnd() - 0.5) * 0.12); g.add(s); fx.stones.push(m); }
   const ruin = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.15, 1.6, 20, 1, true, 0.4, 4.2), tmat('stone', 2, 0.6, {bump:0.08, side:THREE.DoubleSide})); ruin.position.set(0, 0.8, -0.3); g.add(ruin);
   const stub = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.9, 20, 1, true, 4.8, 1.0), tmat('stone', 0.6, 0.4, {side:THREE.DoubleSide})); stub.position.set(0, 2.05, -0.3); g.add(stub);
   for (let i = 0; i < 7; i++) { const b = new THREE.Mesh(rockGeo(0.2, 1, 0.3, 1.4, 0.6, 1, i), rockMat); b.position.set(-1.4 + rnd() * 2.8, 0.08, 1.3 + rnd() * 0.8); g.add(b); }
   const ring = new THREE.Mesh(new THREE.TorusGeometry(3.0, 0.05, 6, 64), mat(0xa7db6c, {e:0xa7db6c, ei:0, t:true, o:0})); ring.rotation.x = Math.PI / 2; ring.position.y = 0.06; g.add(ring); fx.wtRing = ring;
 }
-function imladris(g) {
-  // the Last Homely House: pale stone, slate roofs, a waterfall turning the mill (the worker); Elrond keeps the ledger on the terrace
+function rowanhall(g) {
+  // the Hall under the Rowan: pale stone, slate roofs, a waterfall turning the mill (the worker); Elrond keeps the ledger on the terrace
   const wall = tmat('white', 2, 1, {bump:0.03}), slate = tmat('slate', 3, 3, {bump:0.05});
   const terr = new THREE.Mesh(BOX(7.2, 0.4, 3.2), tmat('white', 3, 1)); terr.position.set(0, 0.2, 1.4); g.add(terr);
   const hall = gable({w:4.4, d:2.6, h:2.0, roofH:1.9, wall, roof:slate, gableMat:wall, overhang:0.3}); hall.position.set(0, 0.4, -0.8); g.add(hall);
@@ -744,10 +750,10 @@ function imladris(g) {
   for (let i = 0; i < 6; i++) { const c = new THREE.Mesh(CYL(0.08, 0.1, 1.4, 12), tmat('white', 0.3, 1)); c.position.set(-3.2 + i * 1.28, 1.1, 2.85); g.add(c); }
   const lintel = new THREE.Mesh(BOX(7.0, 0.14, 0.3), tmat('white', 2, 0.1)); lintel.position.set(0, 1.85, 2.85); g.add(lintel);
   // the cliff, the falls and the pool
-  const cliff = new THREE.Mesh(rockGeo(3.0, 3, 0.25, 1.6, 1.5, 0.8, 9), rockMat); cliff.position.set(5.6, 2.2, -3.0); g.add(cliff);
+  const cliff = new THREE.Mesh(rockGeo(2.0, 3, 0.25, 1.4, 1.6, 0.8, 9), rockMat); cliff.position.set(5.6, 1.6, -3.2); g.add(cliff);
   const fallsTex = texture('falls', 1, 2); fx.fallsTex = fallsTex;
-  const falls = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 4.8), new THREE.MeshStandardMaterial({map:fallsTex, emissive:0x8fb8cc, emissiveIntensity:0.35, transparent:true, opacity:0.85, side:THREE.DoubleSide}));
-  falls.position.set(5.3, 2.6, -1.25); falls.rotation.y = -0.3; g.add(falls);
+  const falls = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.3, 4.8, 16, 1, true, -0.45, 0.9), new THREE.MeshStandardMaterial({map:fallsTex, color:0xdfeef4, emissive:0x9fc4d4, emissiveIntensity:0.3, transparent:true, opacity:0.78, side:THREE.DoubleSide, depthWrite:false}));
+  falls.position.set(5.4, 1.9, -2.7); falls.rotation.y = -0.3; falls.scale.y = 0.75; g.add(falls);
   const pool = new THREE.Mesh(new THREE.CircleGeometry(1.4, 32), waterMat); pool.rotation.x = -Math.PI / 2; pool.position.set(5.2, 0.12, -0.3); g.add(pool);
   smoke(g, 5.2, 0.2, -0.6, 0.8, 0xeaf2f5, 8);
   // the mill and its wheel: the Celery worker
@@ -789,7 +795,7 @@ function pippin(g) {
   const core = new THREE.Mesh(SPH(0.06, 12), new THREE.MeshBasicMaterial({color:0xffa060, transparent:true, opacity:0.7})); core.position.copy(orb.position); g.add(core); fx.palCore = core;
   const pl = plight(0xff7a3a, 0.4, 14, orb.position.x, orb.position.y + 0.2, orb.position.z + 0.3); g.add(pl); fx.palLight = pl;
   // the satchel of scrolls: STIX bundles, MITRESaw, the loaders
-  for (let i = 0; i < 5; i++) { const s = new THREE.Mesh(CYL(0.06, 0.06, 0.5, 10), tmat('canvas', 0.3, 0.3)); s.rotation.z = Math.PI / 2; s.rotation.y = i * 0.4; s.position.set(1.0 + (i % 2) * 0.12, 0.08 + (i >> 1) * 0.11, 1.0); g.add(s); }
+  for (let i = 0; i < 5; i++) { const s = new THREE.Mesh(CYL(0.06, 0.06, 0.5, 10), mat(0xe2cf9e, {r:0.8})); s.rotation.z = Math.PI / 2; s.rotation.y = i * 0.4; s.position.set(1.0 + (i % 2) * 0.12, 0.08 + (i >> 1) * 0.11, 1.0); g.add(s); }
 }
 function beacons(g, n) {
   // fourteen beacons along the hills, one per tactic; the place itself is the middle one
@@ -797,18 +803,19 @@ function beacons(g, n) {
   const [[ax, az], [bx, bz]] = BEACON_LINE;
   for (let i = 0; i < 14; i++) { const t = i / 13, x = ax + (bx - ax) * t, z = az + (bz - az) * t + Math.sin(i * 1.4) * 1.2, y = hgt(x, z);
     const b = new THREE.Group(); b.position.set((x - n.pos[0]) / LOC_SCALE, (y - n._gy) / LOC_SCALE, (z - n.pos[1]) / LOC_SCALE); g.add(b);
-    const cairn = new THREE.Mesh(CYL(0.45, 0.65, 0.5, 10), tmat('stone', 1, 0.3)); cairn.position.y = 0.25; b.add(cairn);
-    for (let k = 0; k < 4; k++) { const l = new THREE.Mesh(CYL(0.05, 0.05, 0.8, 6), barkMat); l.rotation.set(0, k * Math.PI / 4, Math.PI / 2 - 0.35); l.position.y = 0.72; b.add(l); }
-    const f = fire(b, 0, 0.6, 0, 1.25, false); f.visible = false;
+    const cairn = new THREE.Mesh(CYL(0.3, 0.45, 0.4, 10), tmat('stone', 1, 0.3)); cairn.position.y = 0.2; b.add(cairn);
+    for (let k = 0; k < 4; k++) { const l = new THREE.Mesh(CYL(0.05, 0.05, 0.8, 6), barkMat); l.rotation.set(0, k * Math.PI / 4, Math.PI / 2 - 0.35); l.position.y = 0.55; l.scale.setScalar(0.75); b.add(l); }
+    const f = fire(b, 0, 0.5, 0, 1.2, false); f.visible = false;
     fx.beacons.push(f); }
   fx.beaconLight = plight(0xff8a30, 0, 60, 0, 6, 0); g.add(fx.beaconLight);
 }
 function fangorn(g) {
   // an Ent among the trees, and a cut stump whose rings are the timeline
-  const ent = new THREE.Group(); ent.position.set(-0.6, 0, -0.6); g.add(ent); fx.ent = ent;
-  ent.add(new THREE.Mesh(taperTube([[0, 0, 0], [0.15, 1.4, 0.05], [-0.1, 2.8, 0], [0.05, 3.9, -0.1]], t => 0.62 - t * 0.32, {rs:14, ts:20}), barkMat));
-  for (const [s, k] of [[-1, 0], [1, 1]]) ent.add(new THREE.Mesh(taperTube([[s * 0.3, 2.9, 0], [s * 0.9, 2.6, 0.2], [s * 1.4, 2.9, 0.3], [s * 1.7, 3.5, 0.2]], [0.16, 0.05], {rs:8, ts:12}), barkMat));
-  for (const s of [-1, 1]) ent.add(new THREE.Mesh(taperTube([[s * 0.25, 0.4, 0], [s * 0.7, 0.1, 0.25], [s * 1.0, 0.0, 0.4]], [0.18, 0.06], {rs:8, ts:8}), barkMat));
+  const ent = new THREE.Group(); ent.position.set(-0.6, 0, -0.6); ent.scale.setScalar(1.3); g.add(ent); fx.ent = ent;
+  const entBark = tmat('bark', 1, 2, {bump:0.08, c:0xb8a890});
+  ent.add(new THREE.Mesh(taperTube([[0, 0, 0], [0.15, 1.4, 0.05], [-0.1, 2.8, 0], [0.05, 3.9, -0.1]], t => 0.62 - t * 0.32, {rs:14, ts:20}), entBark));
+  for (const [s, k] of [[-1, 0], [1, 1]]) ent.add(new THREE.Mesh(taperTube([[s * 0.3, 2.9, 0], [s * 0.9, 2.6, 0.2], [s * 1.4, 2.9, 0.3], [s * 1.7, 3.5, 0.2]], [0.16, 0.05], {rs:8, ts:12}), entBark));
+  for (const s of [-1, 1]) ent.add(new THREE.Mesh(taperTube([[s * 0.25, 0.4, 0], [s * 0.7, 0.1, 0.25], [s * 1.0, 0.0, 0.4]], [0.18, 0.06], {rs:8, ts:8}), entBark));
   for (let i = 0; i < 6; i++) { const a = i * 1.1; const c = new THREE.Mesh(blobGeo(0.9, i + 40, 0.75, 0x1f3424, 0x3c5a34), vcMat()); c.position.set(Math.cos(a) * 0.8, 4.0 + (i % 3) * 0.4, Math.sin(a) * 0.7); ent.add(c); }
   fx.entEyes = [];
   for (const s of [-1, 1]) { const e = new THREE.Mesh(SPH(0.07, 10), mat(0xa7db6c, {e:0xa7db6c, ei:0.4})); e.position.set(s * 0.17, 2.75, 0.44); ent.add(e); fx.entEyes.push(e.material); }
@@ -819,14 +826,14 @@ function fangorn(g) {
 }
 function orthanc(g) {
   // the black tower in its ring wall; a light goes up as the case goes out
-  const dark = new THREE.MeshStandardMaterial({color:0x17191d, metalness:0.55, roughness:0.32});
+  const dark = new THREE.MeshStandardMaterial({color:0x2a2d33, metalness:0.5, roughness:0.35, flatShading:true});
   const sh = new THREE.Shape(); for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + Math.PI / 8, r = i % 2 ? 0.9 : 1.15; const p = [Math.cos(a) * r, Math.sin(a) * r]; i ? sh.lineTo(...p) : sh.moveTo(...p); }
-  const tw = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, {depth:7.5, bevelEnabled:false}), dark); tw.rotation.x = -Math.PI / 2; g.add(tw);
-  for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + Math.PI / 4; g.add(new THREE.Mesh(taperTube([[Math.cos(a) * 0.7, 7.4, Math.sin(a) * 0.7], [Math.cos(a) * 1.0, 8.4, Math.sin(a) * 1.0], [Math.cos(a) * 0.85, 9.2, Math.sin(a) * 0.85]], [0.26, 0.02], {rs:8, ts:10}), dark)); }
-  const lamp = new THREE.Mesh(SPH(0.35, 16), glowMat(0xffd08a, 0.3)); lamp.position.y = 7.9; g.add(lamp); fx.orLamp = lamp;
+  const tw = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, {depth:6.2, bevelEnabled:false}), dark); tw.rotation.x = -Math.PI / 2; g.add(tw);
+  for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + Math.PI / 4; g.add(new THREE.Mesh(taperTube([[Math.cos(a) * 0.7, 6.1, Math.sin(a) * 0.7], [Math.cos(a) * 1.0, 7.1, Math.sin(a) * 1.0], [Math.cos(a) * 0.85, 7.9, Math.sin(a) * 0.85]], [0.26, 0.02], {rs:8, ts:10}), dark)); }
+  const lamp = new THREE.Mesh(SPH(0.35, 16), glowMat(0xffd08a, 0.3)); lamp.position.y = 6.6; g.add(lamp); fx.orLamp = lamp;
   const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 1.1, 30, 20, 1, true), new THREE.MeshBasicMaterial({color:0xffd9a0, transparent:true, opacity:0, side:THREE.DoubleSide, depthWrite:false, blending:THREE.AdditiveBlending}));
-  beam.position.y = 7.9 + 15; g.add(beam); fx.orBeam = beam;
-  fx.orLight = plight(0xffc070, 0, 30, 0, 8.2, 0); g.add(fx.orLight);
+  beam.position.y = 6.6 + 15; g.add(beam); fx.orBeam = beam;
+  fx.orLight = plight(0xffc070, 0, 30, 0, 6.9, 0); g.add(fx.orLight);
   const wallM = tmat('stone', 8, 0.5, {bump:0.07, c:0x6a6660});
   const ringW = new THREE.Mesh(new THREE.CylinderGeometry(4.6, 4.8, 0.9, 48, 1, true, 0.3, Math.PI * 2 - 0.6), new THREE.MeshStandardMaterial({map:wallM.map, color:0x6a6660, roughness:0.9, side:THREE.DoubleSide}));
   ringW.position.y = 0.45; ringW.rotation.y = 0; g.add(ringW);
@@ -834,7 +841,7 @@ function orthanc(g) {
 }
 function erebor(g) {
   // the Front Gate of the Lonely Mountain, the hoard glinting inside
-  const st = tmat('stone', 2, 2, {bump:0.08, c:0x9a948a});
+  const st = tmat('rock', 2, 2, {bump:0.1, c:0xb0a898});
   const face = new THREE.Mesh(BOX(6, 5.5, 1.4), st); face.position.set(0, 2.75, -1.6); g.add(face);
   const arch = new THREE.Shape(); arch.moveTo(-1.0, 0); arch.lineTo(1.0, 0); arch.lineTo(1.0, 2.2); arch.absarc(0, 2.2, 1.0, 0, Math.PI, false); arch.lineTo(-1.0, 0);
   const gateM = mat(0xffc85a, {e:0xffa62a, ei:0.5, r:0.5}); fx.gate = gateM;
@@ -857,8 +864,8 @@ function aule(g) {
   const top = new THREE.Mesh(CYL(0.45, 0.9, 0.7, 20), stone); top.position.set(-1.2, 2.55, -1.0); g.add(top);
   const flue = new THREE.Mesh(CYL(0.22, 0.28, 1.6, 14), tmat('stone', 0.6, 1)); flue.position.set(-1.2, 3.6, -1.0); g.add(flue);
   fx.forgeSmoke = smoke(g, -1.2, 4.4, -1.0, 1.2, 0x8c8c8c);
-  const mouthM = mat(0xff7a1a, {e:0xff6a10, ei:3}); fx.mouth = mouthM;
-  const mouth = new THREE.Mesh(new THREE.CircleGeometry(0.4, 20), mouthM); mouth.position.set(-1.2, 0.8, 0.22); mouth.rotation.x = -0.2; g.add(mouth);
+  const mouthM = mat(0xc04a10, {e:0xff5a10, ei:2}); fx.mouth = mouthM;
+  const mouth = new THREE.Mesh(new THREE.CircleGeometry(0.3, 20, 0, Math.PI), mouthM); mouth.position.set(-1.2, 0.55, 0.2); mouth.rotation.x = -0.2; g.add(mouth);
   fx.forgeLight = plight(0xff7a20, 3.0, 14, -1.2, 1.2, 0.9); g.add(fx.forgeLight);
   const bel = new THREE.Mesh(sculpt({len:0.9, depth:0.2, width:0.32, seg:[16, 10], shape:x => ({d:0.6 + 0.4 * (1 - (x + 1) / 2), w:1}), color:() => col(0x6b4024)}), new THREE.MeshStandardMaterial({vertexColors:true, roughness:0.8}));
   bel.position.set(-2.6, 0.6, -0.6); bel.rotation.y = -0.4; g.add(bel);
@@ -870,8 +877,8 @@ function aule(g) {
   const blade = new THREE.Mesh(BOX(0.7, 0.02, 0.07), mat(0xff8a3a, {e:0xff5a10, ei:1.6, m:0.6, r:0.3})); blade.position.set(-0.05, 0.18, 0); anvil.add(blade); fx.blade = blade.material;
   const trough = new THREE.Mesh(BOX(0.9, 0.35, 0.4), tmat('planks', 1, 0.4)); trough.position.set(2.2, 0.17, -0.2); g.add(trough);
   const tw = new THREE.Mesh(new THREE.PlaneGeometry(0.82, 0.32), waterMat); tw.rotation.x = -Math.PI / 2; tw.position.set(2.2, 0.33, -0.2); g.add(tw);
-  for (const [x, z] of [[-3.0, -2.4], [3.0, -2.4], [-3.0, 2.0], [3.0, 2.0]]) { const p = new THREE.Mesh(CYL(0.1, 0.12, 3.2, 8), barkMat); p.position.set(x, 1.6, z); g.add(p); }
-  const rf = new THREE.Mesh(BOX(6.8, 0.12, 5.2), tmat('shingle', 3, 3, {bump:0.06})); rf.position.set(0, 3.3, -0.2); rf.rotation.x = 0.12; g.add(rf);
+  for (const [x, z, h] of [[-3.0, -2.6, 3.0], [3.0, -2.6, 3.0], [-3.0, -0.4, 3.6], [3.0, -0.4, 3.6]]) { const p = new THREE.Mesh(CYL(0.1, 0.12, h, 8), barkMat); p.position.set(x, h / 2, z); g.add(p); }
+  const rf = new THREE.Mesh(BOX(6.8, 0.12, 2.6), tmat('shingle', 3, 1.5, {bump:0.06})); rf.position.set(0, 3.45, -1.6); rf.rotation.x = 0.28; g.add(rf);
   // the ledger he reads from: the case files, and nothing else
   const desk = new THREE.Mesh(BOX(0.9, 0.08, 0.55), tmat('planks', 0.5, 0.3)); desk.position.set(2.3, 0.95, 1.4); g.add(desk);
   for (const x of [1.95, 2.65]) { const l = new THREE.Mesh(BOX(0.06, 0.92, 0.06), mat(0x3a2a1a)); l.position.set(x, 0.46, 1.4); g.add(l); }
@@ -891,18 +898,19 @@ function aule(g) {
 function minas(g) {
   // Minas Tirith: seven white tiers and the tower; Aragorn with Andúril at the gate, the containers and the lab beside him
   const white = tmat('white', 6, 1, {bump:0.03});
+  const city = new THREE.Group(); city.scale.setScalar(0.78); city.position.z = -1.0; g.add(city);
   for (let t = 0; t < 7; t++) { const r = 5.6 - t * 0.68, y = t * 0.75;
-    const tier = new THREE.Mesh(CYL(r, r + 0.12, 0.75, 40), white); tier.position.set(0, y + 0.375, -1.5); g.add(tier);
-    const bat = new THREE.Mesh(new THREE.TorusGeometry(r + 0.02, 0.06, 4, 40), tmat('white', 6, 0.1)); bat.rotation.x = Math.PI / 2; bat.position.set(0, y + 0.76, -1.5); g.add(bat); }
-  const tower = new THREE.Mesh(CYL(0.42, 0.52, 4.2, 20), tmat('white', 1, 2)); tower.position.set(0, 5.25 + 2.1, -1.5); g.add(tower);
-  const tcap = new THREE.Mesh(CONE(0.55, 0.9, 20), tmat('white', 1, 0.5)); tcap.position.set(0, 9.8, -1.5); g.add(tcap);
-  const pole = new THREE.Mesh(CYL(0.02, 0.02, 1.0, 6), mat(0x3a3a3a)); pole.position.set(0, 10.6, -1.5); g.add(pole);
-  const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.45), mat(0x15181e, {side:THREE.DoubleSide})); flag.position.set(0.4, 10.85, -1.5); g.add(flag); fx.minasFlag = flag;
-  const tree = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.3), mat(0xf2efe6, {side:THREE.DoubleSide})); tree.position.set(0.4, 10.85, -1.49); g.add(tree);
-  const gate = new THREE.Mesh(BOX(1.0, 0.65, 0.1), mat(0x2a2a2e, {m:0.6, r:0.4})); gate.position.set(0, 0.33, 4.2); g.add(gate);
+    const tier = new THREE.Mesh(CYL(r, r + 0.12, 0.75, 40), white); tier.position.set(0, y + 0.375, -1.5); city.add(tier);
+    const bat = new THREE.Mesh(new THREE.TorusGeometry(r + 0.02, 0.06, 4, 40), tmat('white', 6, 0.1)); bat.rotation.x = Math.PI / 2; bat.position.set(0, y + 0.76, -1.5); city.add(bat); }
+  const tower = new THREE.Mesh(CYL(0.42, 0.52, 4.2, 20), tmat('white', 1, 2)); tower.position.set(0, 5.25 + 2.1, -1.5); city.add(tower);
+  const tcap = new THREE.Mesh(CONE(0.55, 0.9, 20), tmat('white', 1, 0.5)); tcap.position.set(0, 9.8, -1.5); city.add(tcap);
+  const pole = new THREE.Mesh(CYL(0.02, 0.02, 1.0, 6), mat(0x3a3a3a)); pole.position.set(0, 10.6, -1.5); city.add(pole);
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.45), mat(0x15181e, {side:THREE.DoubleSide})); flag.position.set(0.4, 10.85, -1.5); city.add(flag); fx.minasFlag = flag;
+  const tree = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.3), mat(0xf2efe6, {side:THREE.DoubleSide})); tree.position.set(0.4, 10.85, -1.49); city.add(tree);
+  const gate = new THREE.Mesh(BOX(1.0, 0.65, 0.1), mat(0x2a2a2e, {m:0.6, r:0.4})); gate.position.set(0, 0.33, 4.2); city.add(gate);
   fx.tierWin = [];
   for (let t = 0; t < 6; t++) for (let k = 0; k < 7; k++) { const r = 5.6 - t * 0.68, a = -0.9 + k * 0.3 + t * 0.05;
-    const wm = mat(0xffd890, {e:0xffb050, ei:0.6}); const w = new THREE.Mesh(BOX(0.12, 0.16, 0.05), wm); w.position.set(Math.sin(a) * (r + 0.13), t * 0.75 + 0.42, -1.5 + Math.cos(a) * (r + 0.13)); w.rotation.y = a; g.add(w); fx.tierWin.push(wm); }
+    const wm = mat(0xffd890, {e:0xffb050, ei:0.6}); const w = new THREE.Mesh(BOX(0.12, 0.16, 0.05), wm); w.position.set(Math.sin(a) * (r + 0.13), t * 0.75 + 0.42, -1.5 + Math.cos(a) * (r + 0.13)); w.rotation.y = a; city.add(w); fx.tierWin.push(wm); }
   // Aragorn, Andúril raised
   const Ar = figure({robe:0x5a3c26, cloak:0x3e4a30, hood:true, hair:0x4a3322, long:0.6, beard:0x3a2a1c, beardLen:0.08, belt:true, bareArms:true,
     armR:[[0, 0, 0], [-0.1, 0.18, 0.08], [-0.12, 0.42, 0.12]]});
@@ -915,7 +923,7 @@ function minas(g) {
   // Andúril's charge: Rowanholt's own containers
   fx.containers = [];
   [[2.4, 4.4, 0], [3.5, 4.0, 0], [2.9, 4.3, 1], [4.4, 3.4, 0], [4.0, 3.6, 1]].forEach(([x, z, lvl], i) => {
-    const c = new THREE.Mesh(BOX(0.95, 0.55, 0.5), tmat('planks', 0.6, 0.3, {c:0x9aa4b0})); c.position.set(x, 0.28 + lvl * 0.56, z); c.rotation.y = -0.4; g.add(c);
+    const c = new THREE.Mesh(BOX(0.95, 0.55, 0.5), mat(0x5d7590, {r:0.6, m:0.3})); c.position.set(x, 0.28 + lvl * 0.56, z); c.rotation.y = -0.4; g.add(c);
     const lm = mat(0x103010, {e:0xa7db6c, ei:1}); const l = new THREE.Mesh(SPH(0.05, 8), lm); l.position.set(x + Math.cos(0.4) * 0.0, 0.42 + lvl * 0.56, z + 0.27); g.add(l); fx.containers.push(lm); });
   // the lab: a row of huts, test hosts with lit windows
   for (let i = 0; i < 3; i++) { const h = gable({w:1.0, d:0.9, h:0.7, roofH:0.45, wall:tmat('white', 1, 0.5), roof:tmat('slate', 1, 1)}); h.position.set(-4.6 + i * 1.3, 0, 3.0 - i * 0.2); g.add(h);
@@ -938,7 +946,7 @@ function mordor(g, n) {
   const pupil = new THREE.Mesh(BOX(0.25, 1.4, 0.1), mat(0x000000)); pupil.position.set(0, 0, 0.98); eye.add(pupil);
   B.add(plight(0xff5a1a, 4, 70, 0, 24, 3));
   shadowed(B); B.traverse(o => { if (o.isMesh) o.userData.node = n; });
-  const lava = new THREE.Mesh(CYL(1.6, 2.6, 0.6, 16), mat(0xff5a10, {e:0xff3a00, ei:2.4})); lava.position.set(DOOM.x, doom.position.y + 8.2, DOOM.z); scene.add(lava); fx.lava = lava.material;
+  const lava = new THREE.Mesh(CONE(1.5, 1.4, 16), mat(0xff5a10, {e:0xff3a00, ei:2.4})); lava.position.set(DOOM.x, doom.position.y + 7.6, DOOM.z); scene.add(lava); fx.lava = lava.material;
   smoke(scene, DOOM.x, doom.position.y + 8.6, DOOM.z, 5, 0x4a3a34);
   fx.doomLight = plight(0xff4a10, 4, 90, DOOM.x, doom.position.y + 12, DOOM.z); scene.add(fx.doomLight);
 }
@@ -1008,10 +1016,10 @@ function addFlag(n) {
 // ---------- build the places ----------
 const LOC_SCALE = 2.2;
 const pickMeshes = [];
-const BUILD = {shire, havens, bree, weathertop, imladris, pippin, beacons, fangorn, orthanc, erebor, aule, minas, mordor};
+const BUILD = {shire, havens, bree, weathertop, rowanhall, pippin, beacons, fangorn, orthanc, erebor, aule, minas, mordor};
 // where each banner stands (world offset) and how tall; where the label sits above the ground
-const FLAGS = {shire:[-9, -4, 9, 9], havens:[6, -9, 9, 15], bree:[-10, -2, 9, 12], weathertop:[5, 8, 7, 8], imladris:[-12, -6, 10, 16], pippin:[-7, -3, 8, 7],
-  beacons:[0, -6, 8, 6], fangorn:[-6, 6, 9, 13], orthanc:[8, 6, 9, 22], erebor:[9, 3, 9, 15], aule:[-9, 4, 9, 10], minas:[-11, 2, 10, 25], mordor:[-7, -9, 9, 14]};
+const FLAGS = {shire:[-9, -4, 9, 9], havens:[6, -9, 9, 15], bree:[-10, -2, 9, 12], weathertop:[5, 8, 7, 8], rowanhall:[-12, -6, 10, 16], pippin:[-7, -3, 8, 7],
+  beacons:[0, -6, 8, 6], fangorn:[-6, 6, 9, 13], orthanc:[8, 6, 9, 19], erebor:[9, 3, 9, 15], aule:[-9, 4, 9, 10], minas:[-11, 2, 10, 25], mordor:[-7, -9, 9, 14]};
 NODES.forEach(n => {
   const gy = hgt(n.pos[0], n.pos[1]); n._gy = gy;
   const g = new THREE.Group(); g.position.set(n.pos[0], gy, n.pos[1]); g.scale.setScalar(LOC_SCALE); scene.add(g);
@@ -1021,7 +1029,7 @@ NODES.forEach(n => {
   const ring = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.07, 10, 48), new THREE.MeshBasicMaterial({color:0xa7db6c, transparent:true, opacity:0, depthWrite:false}));
   ring.rotation.x = -Math.PI / 2; ring.position.set(n.pos[0], gy + 0.15, n.pos[1]); scene.add(ring); n._ring = ring;
   const el = document.createElement('div'); el.className = 'label';
-  el.innerHTML = `${n.name}<span class="s${n.opt ? ' opt' : ''}">${n.port}</span><span class="lg"></span>`;
+  el.innerHTML = `<span class="fu">${n.name}</span><span class="sh">${SHORT[n.id]}</span><span class="s${n.opt ? ' opt' : ''}">${n.port}</span><span class="lg"></span>`;
   const lbl = new CSS2DObject(el); lbl.position.set(n.pos[0], Math.max(gy + ly, n._flagTop.y + 1.6), n.pos[1]); scene.add(lbl); n._el = el;
   n._pulse = 0; n._fx = -99;
 });
@@ -1110,7 +1118,7 @@ function buildPath() {
     let L = 0; for (let k = 1; k < seg.length; k++) L += seg[k].distanceTo(seg[k - 1]); segLen.push(L);
     const opt = !!s[i + 1][2];
     const ground = seg.map(v => V3(v.x, Math.max(hgt(v.x, v.z), WATER) + 0.45, v.z));
-    const line = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(ground), 160, 0.38, 6, false),
+    const line = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(ground), 160, 0.3, 6, false),
       new THREE.MeshBasicMaterial({color:opt ? 0xe3a857 : 0xa7db6c, transparent:true, opacity:0.4, depthWrite:false}));
     scene.add(line); pathLines.push({line, opt});
   }
@@ -1133,7 +1141,7 @@ function arriveAt(idx) {
   const s = steps(), n = NODE[s[idx][0]];
   n._pulse = 1; n._visited = true; n._fx = simT; if (idx > 0) pathLines[idx - 1].line.material.opacity = 0.95;
   ping(n, s[idx][2]); story(idx); updateTracker(idx); atNode = idx;
-  if (n.id === 'bree' && s.slice(idx + 1).some(st => st[0] === 'imladris')) msg.t = 0;
+  if (n.id === 'bree' && s.slice(idx + 1).some(st => st[0] === 'rowanhall')) msg.t = 0;
 }
 function startJourney(k, glide = true) {
   ji = jkeys.indexOf(k); atNode = 0; segT = 0; endWait = 0;
@@ -1262,6 +1270,7 @@ function update(dt, ts) {
   sun.target.position.copy(tgt); sun.position.copy(tgt).addScaledVector(SUN_DIR, 200);
   const ext = THREE.MathUtils.clamp(dist * 0.95, 60, 220); const sc = sun.shadow.camera; if (Math.abs(sc.right - ext) > 1) { sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext; sc.updateProjectionMatrix(); }
   scene.fog.near = dist * 1.3; scene.fog.far = dist * 5 + 120;
+  const far = dist > 190; if (far !== document.body.classList.contains('far')) document.body.classList.toggle('far', far);
   banners.forEach(b => { b.getWorldPosition(tmp); b.rotation.y = Math.atan2(camera.position.x - tmp.x, camera.position.z - tmp.z) - 0.25; });
 }
 // what each place does when the evidence arrives (times are seconds since arrival)
@@ -1284,11 +1293,11 @@ function effects(dt, ts) {
     messenger.lookAt(tmp); messenger._w.forEach((w, i) => w.rotation.z = (i ? -1 : 1) * Math.sin(ts * 16) * 0.7); messenger.visible = true; } else messenger.visible = false;
   // Amon Sûl: the stones light in turn: green for verified hashes, parchment for a mount
   const wt = since('weathertop'), wtOn = NODE.weathertop._visited;
-  glowColour.setHex(J === 'gandalf' ? 0xa7db6c : 0xf0dba5);
-  fx.stones.forEach((m, i) => { const on = wtOn && wt > i * 0.18; m.emissive.copy(on ? glowColour : glowColour.clone().setHex(0)); m.emissiveIntensity = on ? 0.55 + 0.15 * Math.sin(ts * 3 + i) : 0; });
+  glowColour.setHex(J === 'gandalf' ? 0x5fae3a : 0xc9a860);
+  fx.stones.forEach((m, i) => { const on = wtOn && wt > i * 0.18; m.emissive.copy(on ? glowColour : glowColour.clone().setHex(0)); m.emissiveIntensity = on ? 0.32 + 0.1 * Math.sin(ts * 3 + i) : 0; });
   fx.wtRing.material.opacity = wtOn && wt > 2.2 && J === 'gandalf' ? 0.6 + 0.2 * Math.sin(ts * 3) : 0; fx.wtRing.material.emissiveIntensity = 1;
-  // Imladris: the mill turns faster while a job runs; the ledger glows as it fills
-  const im = since('imladris'), working = NODE.imladris._visited && im < 8;
+  // The Hall under the Rowan: the mill turns faster while a job runs; the ledger glows as it fills
+  const im = since('rowanhall'), working = NODE.rowanhall._visited && im < 8;
   fx.wheel.rotation.x -= dt * (working ? 2.6 : 0.5);
   fx.pages.emissiveIntensity = working ? 0.5 + 0.3 * Math.sin(ts * 4) : 0.08;
   fx.imlWin.forEach(m => m.emissiveIntensity = working ? 1.8 : 1.0);
@@ -1314,7 +1323,7 @@ function effects(dt, ts) {
   fx.gate.emissiveIntensity = 0.4 + eOn * 1.6 + Math.sin(ts * 1.7) * 0.05; fx.gateLight.intensity = 1 + eOn * 4;
   // Aulë: the forge burns with Ollama and is banked without; he strikes, the sparks fly
   const lit2 = state.ollama, au = since('aule'), busy = NODE.aule._visited && au < 10;
-  fx.mouth.emissiveIntensity += ((lit2 ? 3 + Math.sin(ts * 7) * 0.3 : 0.5) - fx.mouth.emissiveIntensity) * Math.min(1, dt * 2);
+  fx.mouth.emissiveIntensity += ((lit2 ? 1.8 + Math.sin(ts * 7) * 0.3 : 0.35) - fx.mouth.emissiveIntensity) * Math.min(1, dt * 2);
   fx.forgeLight.intensity = lit2 ? 3 + Math.sin(ts * 9) * 0.4 + (busy ? 2 : 0) : 0.5;
   fx.blade.emissiveIntensity = lit2 ? 1.6 : 0.1; fx.forgeSmoke.k = lit2 ? 1 : 0.25;
   fx.auleBook.emissiveIntensity = (!lit2 && NODE.aule._visited) ? 0.6 + 0.2 * Math.sin(ts * 3) : 0.1;
@@ -1349,7 +1358,9 @@ startJourney(first, false);
 const ff = Math.min(+hashArgs.get('t') || 0, 300);
 for (let i = 0; i < ff * 30; i++) update(1 / 30, i / 30);
 if (hashArgs.get('view') === 'map') { follow = false; document.getElementById('followBtn').classList.remove('on'); document.getElementById('overBtn').classList.add('on'); controls.target.copy(OVERVIEW.target); camera.position.copy(OVERVIEW.pos); }
-if (ff) { const f = focusPoint(); if (follow) { controls.target.copy(f); camera.position.copy(f).add(FOLLOW_OFF); } }
+const fid = hashArgs.get('focus'); if (NODE[fid]) { follow = false; const n = NODE[fid], k = +(hashArgs.get('dist') || 0.45);
+  controls.target.set(n.pos[0], n._gy + 2, n.pos[1]); camera.position.copy(controls.target).add(FOLLOW_OFF.clone().multiplyScalar(k)); if (hashArgs.get('open')) openInfo(n); }
+else if (ff) { const f = focusPoint(); if (follow) { controls.target.copy(f); camera.position.copy(f).add(FOLLOW_OFF); } }
 setPlay();
 const clock = new THREE.Clock(); let ts0 = ff;
 function animate() { requestAnimationFrame(animate); const dt = Math.min(clock.getDelta(), 0.05);
