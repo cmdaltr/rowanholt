@@ -2,119 +2,113 @@
  "home": {
   "image": "home.jpg",
   "width": 1440,
-  "height": 2209,
+  "height": 1460,
   "boxes": {
    "home.hero": [
     30,
     0,
     1379,
-    552
+    397
    ],
    "home.journeys": [
     30,
-    536,
+    385,
     1379,
-    1050
+    437
    ],
    "home.mordor": [
     30,
-    1639,
+    875,
     1379,
-    547
+    561
    ]
   }
  },
  "gandalf": {
   "image": "gandalf.jpg",
   "width": 1440,
-  "height": 597,
+  "height": 592,
   "boxes": {
    "gandalf.case": [
     54,
     24,
     1332,
-    97
+    115
    ],
    "gandalf.config": [
     54,
-    121,
+    158,
     1332,
-    79
-   ],
-   "gandalf.hosts": [
-    54,
-    223,
-    1332,
-    97
+    98
    ],
    "gandalf.options": [
     54,
-    321,
+    279,
     1332,
-    64
+    86
    ],
    "gandalf.command": [
     54,
-    415,
+    395,
     1332,
-    159
+    173
    ]
   }
  },
  "elrond": {
   "image": "elrond.jpg",
   "width": 1440,
-  "height": 1139,
+  "height": 1171,
   "boxes": {
    "elrond.case": [
     54,
     24,
-    654,
-    74
+    433,
+    78
    ],
    "elrond.source": [
-    731,
+    510,
     24,
-    654,
-    74
+    876,
+    78
    ],
    "elrond.browse": [
     54,
-    121,
+    125,
     1332,
-    365
+    375
    ],
    "elrond.options": [
     54,
-    509,
+    523,
     1332,
-    605
+    624
    ]
   }
  },
  "jobs": {
   "image": "jobs.jpg",
   "width": 1440,
-  "height": 314,
+  "height": 772,
   "boxes": {
    "jobs.filters": [
     54,
     24,
-    285,
+    293,
     46
    ],
    "jobs.table": [
     54,
     85,
     1332,
-    205
+    663
    ]
   }
  },
  "job": {
   "image": "job.jpg",
   "width": 1440,
-  "height": 1146,
+  "height": 1137,
   "boxes": {
    "job.actions": [
     772,
@@ -124,74 +118,111 @@
    ],
    "job.info": [
     54,
-    99,
+    110,
     1332,
-    47
+    53
    ],
    "job.progress": [
     54,
-    162,
+    178,
     1332,
     52
    ],
    "job.sources": [
     54,
-    469,
+    494,
     654,
-    130
+    95
    ],
    "job.options": [
     731,
-    469,
+    494,
     654,
-    130
+    95
    ],
    "job.sharing": [
     54,
-    222,
+    238,
     1332,
-    194
+    203
    ],
    "job.log": [
     54,
-    630,
+    620,
     1332,
-    492
+    493
+   ]
+  }
+ },
+ "case": {
+  "image": "case.jpg",
+  "width": 1440,
+  "height": 908,
+  "boxes": {
+   "case.hosts": [
+    30,
+    24,
+    341,
+    184
+   ],
+   "case.table": [
+    387,
+    24,
+    1023,
+    73
+   ],
+   "case.findings": [
+    30,
+    253,
+    1379,
+    342
+   ],
+   "case.notes": [
+    30,
+    641,
+    682,
+    243
+   ],
+   "case.activity": [
+    728,
+    641,
+    682,
+    243
    ]
   }
  },
  "aule": {
   "image": "aule.jpg",
   "width": 1440,
-  "height": 823,
+  "height": 880,
   "boxes": {
    "aule.help": [
     54,
     24,
     1332,
-    202
+    205
    ],
    "aule.case": [
     54,
-    241,
+    244,
     1332,
-    71
+    73
    ],
    "aule.chat": [
     54,
-    335,
+    340,
     1332,
     57
    ],
    "aule.quick": [
     54,
-    407,
+    413,
     1332,
-    323
+    374
    ],
    "aule.ask": [
     54,
-    753,
+    810,
     1332,
     46
    ]
@@ -206,19 +237,50 @@
     30,
     24,
     1379,
-    91
+    101
    ],
    "mordor.generate": [
     30,
-    150,
+    159,
     1379,
-    1051
+    1024
    ],
    "mordor.recorded": [
     30,
-    1246,
+    1228,
     1379,
-    2992
+    2837
+   ]
+  }
+ },
+ "intel": {
+  "image": "intel.jpg",
+  "width": 1440,
+  "height": 1500,
+  "boxes": {
+   "intel.sources": [
+    30,
+    24,
+    451,
+    142
+   ],
+   "intel.import": [
+    508,
+    24,
+    902,
+    574
+   ],
+   "intel.enrich": [
+    30,
+    621,
+    1379,
+    224
+   ],
+   "intel.browse": [
+    30,
+    867,
+    1379,
+    3769
    ]
   }
  },
@@ -238,45 +300,39 @@
  "account": {
   "image": "account.jpg",
   "width": 1440,
-  "height": 543,
+  "height": 532,
   "boxes": {
    "account.settings": [
     30,
     24,
     1379,
-    495
+    484
    ]
   }
  },
  "aragorn": {
   "image": "aragorn.jpg",
   "width": 1440,
-  "height": 1347,
+  "height": 98,
   "boxes": {
    "aragorn.tabs": [
     30,
     24,
     1379,
     50
-   ],
-   "aragorn.lab": [
-    30,
-    600,
-    1379,
-    722
    ]
   }
  },
  "aragorn-settings": {
   "image": "aragorn-settings.jpg",
   "width": 1440,
-  "height": 297,
+  "height": 285,
   "boxes": {
    "aragorn.anduril": [
     30,
     24,
     1379,
-    249
+    237
    ]
   }
  },
@@ -289,75 +345,7 @@
     30,
     24,
     1379,
-    1589
-   ]
-  }
- },
- "case": {
-  "image": "case.jpg",
-  "width": 1440,
-  "height": 1500,
-  "boxes": {
-   "case.hosts": [
-    30,
-    24,
-    341,
-    494
-   ],
-   "case.table": [
-    387,
-    24,
-    1023,
-    321
-   ],
-   "case.findings": [
-    30,
-    564,
-    1379,
-    561
-   ],
-   "case.notes": [
-    30,
-    1171,
-    682,
-    582
-   ],
-   "case.activity": [
-    728,
-    1171,
-    682,
-    456
-   ]
-  }
- },
- "intel": {
-  "image": "intel.jpg",
-  "width": 1440,
-  "height": 1500,
-  "boxes": {
-   "intel.sources": [
-    30,
-    24,
-    1379,
-    217
-   ],
-   "intel.import": [
-    30,
-    286,
-    1379,
-    314
-   ],
-   "intel.enrich": [
-    30,
-    646,
-    1379,
-    150
-   ],
-   "intel.browse": [
-    30,
-    841,
-    1379,
-    3043
+    1852
    ]
   }
  }
