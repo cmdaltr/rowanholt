@@ -1157,7 +1157,8 @@ table input[type="checkbox"] {
   object-position: center top;
   opacity: 0.55;
   transform: translateY(var(--drop, 0px));
-  transition: opacity 0.45s ease;
+  transform-origin: center 15%;
+  transition: opacity 0.45s ease, transform 0.45s ease;
 }
 
 /* Open, the same cover fit fills a wider frame, so the figure zooms in to head and shoulders
@@ -1165,6 +1166,7 @@ table input[type="checkbox"] {
 .journey-banner.is-open img {
   object-position: center 6%;
   opacity: 1;
+  transform: translateY(var(--drop, 0px)) scale(var(--zoom, 1));
 }
 
 .journey-banner__name {
