@@ -136,7 +136,7 @@ function AppContent() {
 
         <footer className="App-footer">
           <p>
-            Rowanholt v1.0.0 - Digital Forensics Acceleration Suite
+            Rowanholt v2.1.0 - Digital Forensics Acceleration Suite
           </p>
           <p className="attribution">
             This project contains references to "The Lord of the Rings" by J.R.R. Tolkien. This code is not affiliated with or endorsed by the Tolkien Estate or Peter Jackson.<br />

