@@ -20,14 +20,6 @@ The v2.3 features that are being built are planned in `docs/ROADMAP.md`.
 
 **Depends on** a Rocky 9 VM in the lab; headless is enough.
 
-## FR-02: Team servers on Windows Server
-
-**Built 8 November 2026, not yet run on Windows Server.** `scripts/server/windows/Install-RowanholtServer.ps1` and `Start-RowanholtServer.ps1`, `docs/SERVER.md` (Windows Server): its own WSL 2 distribution with Docker Engine, the same `server init`, the certificate from the Windows store, evidence through `/mnt/<drive>`, portproxy and a firewall rule, and a boot task that needs nobody signed in. Parsed by PowerShell 7 only; Windows PowerShell 5.1, WSL and the task are untried.
-
-**Done when** a Windows Server 2022 host runs the server profile through WSL 2, survives a reboot without anyone signing in, and analyses evidence from a Windows volume. Then this entry goes.
-
-**Depends on** a Windows Server 2022 VM: an x86 host, since WSL 2 needs nested virtualisation, which Apple silicon's VMs don't have.
-
 ## FR-03: Desktop app RPM for Rocky Linux 9 / RHEL 9
 
 **Built 8 November 2026.** `app/linux/package-rpm.sh` and the `linux-rpm` job in `desktop-release.yml` (built, linted, installed and removed in `rockylinux:9`); `app/README.md`.
