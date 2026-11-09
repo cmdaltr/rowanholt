@@ -140,9 +140,10 @@ def _header(cells: List[str]) -> List[str]:
 
 def tsv_rows(path: Path) -> Tuple[List[str], Iterator[Dict[str, str]]]:
     """(header, rows) of a LEAPP TSV export. LEAPP appends to a TSV each time an artefact writes,
-    header and all, so a repeat of the header is skipped."""
+    header and all, so a repeat of the header is skipped. NUL bytes (a cache entry's raw bytes, say)
+    are dropped: csv refuses a line with one."""
     fh = open(path, encoding="utf-8-sig", errors="replace", newline="")
-    reader = csv.reader(fh, delimiter="\t")
+    reader = csv.reader((line.replace("\0", "") for line in fh), delimiter="\t")
     try:
         first = next(reader)
     except StopIteration:
@@ -211,27 +212,39 @@ def cook_report(report: Path, cooked: Path, host_dir: Path, host: str, tool: str
     for tsv in sorted(report.glob("_TSV Exports/*.tsv")):
         if tsv.name.startswith("_"):
             continue
-        header, rows = tsv_rows(tsv)
-        if not header:
+        # One unreadable table is reported and left out: the rest of the phone is still cooked
+        try:
+            written, table = _cook_tsv(tsv, cooked, host_dir, host, tool)
+        except (csv.Error, OSError) as e:
+            print(f"    Couldn't read {tool}'s '{tsv.name}' for '{host}': {e}; left out")
+            logger.warning("couldn't cook %s: %s", tsv, e)
             continue
-        sample: List[Dict[str, str]] = []
-        for row in rows:
-            sample.append(row)
-            if len(sample) >= SAMPLE:
-                break
-        when = time_field(header, sample)
-        name = slug(tsv.stem)
-        table = f"{tool}/{name}"
-
-        def chained(first=sample, rest=rows) -> Iterator[Dict[str, str]]:
-            yield from first
-            yield from rest
-
-        written, _ = write_parts(cooked / tool / name, chained(), host=host, artefact=table,
-                                 source_path=str(tsv.relative_to(host_dir)), time=when)
         if written:
             counts[table] = counts.get(table, 0) + written
     return counts
+
+
+def _cook_tsv(tsv: Path, cooked: Path, host_dir: Path, host: str, tool: str) -> Tuple[int, str]:
+    """One TSV export as cooked/<tool>/<artefact>.jsonl; (rows written, table)."""
+    name = slug(tsv.stem)
+    table = f"{tool}/{name}"
+    header, rows = tsv_rows(tsv)
+    if not header:
+        return 0, table
+    sample: List[Dict[str, str]] = []
+    for row in rows:
+        sample.append(row)
+        if len(sample) >= SAMPLE:
+            break
+    when = time_field(header, sample)
+
+    def chained() -> Iterator[Dict[str, str]]:
+        yield from sample
+        yield from rows
+
+    written, _ = write_parts(cooked / tool / name, chained(), host=host, artefact=table,
+                             source_path=str(tsv.relative_to(host_dir)), time=when)
+    return written, table
 
 
 # ---- device management (configuration profiles, MDM, device administrators) --------------

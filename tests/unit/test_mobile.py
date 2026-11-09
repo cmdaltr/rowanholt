@@ -526,6 +526,32 @@ class CookingTest(Tmp):
         self.assertIsNone(mobile.time_field(["Sender", "Body"], [{"Sender": "bob", "Body": "x"}]))
         self.assertEqual(mobile.slug("Safari - History (iOS 17+)"), "safari_history_ios_17")
 
+    def test_nul_bytes_and_unreadable_tables_dont_stop_the_cook(self):
+        # ALEAPP's Firefox cache export carried a NUL, and csv's refusal of it ended the whole cook
+        host = self.tmp / "phone"
+        report = host / "mobile" / "ALEAPP"
+        exports = report / "_TSV Exports"
+        exports.mkdir(parents=True)
+        (exports / "Firefox Browser Cache.tsv").write_text("Key\tData\nhttps://a.example/\tab\x00cd\n",
+                                                           encoding="utf-8-sig")
+        write_tsv(exports / "SMS and MMS Messages.tsv", SMS_HEADER, SMS_ROWS)
+        (exports / "Broken.tsv").write_text("A\tB\n1\t2\n")
+        real = mobile.tsv_rows
+
+        def refuse(path):
+            if path.name == "Broken.tsv":
+                raise mobile.csv.Error("line contains NUL")
+            return real(path)
+
+        cooked = host / "artefacts" / "cooked"
+        with mock.patch.object(mobile, "tsv_rows", side_effect=refuse):
+            counts = mobile.cook_report(report, cooked, host, "phone", "aleapp")
+        self.assertEqual(counts["aleapp/firefox_browser_cache"], 1)
+        cache = [r for _, r in read_records(cooked / "aleapp/firefox_browser_cache.jsonl")]
+        self.assertEqual(cache[0]["Data"], "abcd")
+        self.assertEqual(counts["aleapp/sms_and_mms_messages"], 2)
+        self.assertNotIn("aleapp/broken", counts)
+
     def test_password_found_in_the_report_is_named(self):
         report = self.tmp / "iLEAPP"
         (report / "_HTML").mkdir(parents=True)
