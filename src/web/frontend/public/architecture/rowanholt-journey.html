@@ -150,7 +150,7 @@ const NODES = [
  {id:'pippin', name:'Pippin · threat intelligence', port:'Dol Baran · the palantír', pos:[20,-30], r:7, char:'pippin', opt:true,
   desc:'Pippin looked into the palantír. The Intel page imports STIX/TAXII bundles, MITRESaw and the Iran APT loader into one table of indicators, each with its group, procedure, technique and source; expiry and confidence sit beside it (STIX\'s own, else 90 days for IPs and domains). With <code>--threatIntel</code> Elrond matches the case against every unexpired indicator, and Aulë sees the same context for an artefact. Online lookups (VirusTotal) are off unless turned on, and are for analysts, never for Aulë.'},
  {id:'beacons', name:'ATT&CK tagging', port:'the Beacons of Gondor · step 05', pos:[45,6], r:7, icon:'flame',
-  desc:'Fourteen beacons, one per Enterprise tactic, lit as techniques are tagged from artefacts, event-log rules and Mordor datasets into <code>mitre_techniques.txt</code>; <code>--Navigator</code> writes an ATT&amp;CK Navigator layer too. The mapping is Elrond\'s, not Aulë\'s.'},
+  desc:'Fifteen beacons, one per Enterprise tactic (ATT&amp;CK v20.1), lit as techniques are tagged from artefacts, event-log rules and Mordor datasets into <code>mitre_techniques.txt</code>; <code>--Navigator</code> writes an ATT&amp;CK Navigator layer too. The mapping is Elrond\'s, not Aulë\'s.'},
  {id:'fangorn', name:'Timeline · Plaso', port:'Fangorn · step 06 · --Timeline', pos:[70,38], r:10, icon:'clock', opt:true,
   desc:'psteal builds one super-timeline across every source of a host: Treebeard\'s rings, read in order. It is indexed into Splunk or Kibana with the rest when the case is exported.'},
  {id:'orthanc', name:'Export · Splunk, Elastic, Kibana', port:'Orthanc · step 07 · --Splunk / --Elastic', pos:[100,8], r:10, icon:'export', opt:true, logos:['splunk','elastic','kibana'],
@@ -169,7 +169,7 @@ const SHORT = {shire:'The Shire', havens:'Grey Havens', bree:'Bree', weathertop:
   beacons:'Beacons', fangorn:'Fangorn', orthanc:'Orthanc', erebor:'Erebor', aule:'Aulë', minas:'Minas Tirith', mordor:'Mordor'};
 const CHAR = {gandalf:'Gandalf', elrond:'Elrond', pippin:'Pippin', aragorn:'Aragorn', aule:'Aulë'};
 const TACTICS = ['Reconnaissance','Resource Development','Initial Access','Execution','Persistence','Privilege Escalation',
-  'Defense Evasion','Credential Access','Discovery','Lateral Movement','Collection','Command and Control','Exfiltration','Impact'];
+  'Stealth','Defense Impairment','Credential Access','Discovery','Lateral Movement','Collection','Command and Control','Exfiltration','Impact'];
 
 // ---------- the journeys: each step is [place, what happens, optional?] ----------
 const ASK_AULE = () => state.ollama
@@ -184,29 +184,29 @@ const TAIL = [
   ['aule', ASK_AULE, true],
 ];
 const JOURNEYS = {
- gandalf:{label:'Gandalf archive', hits:[2,3,4,5,6,7,10,11], steps:[
+ gandalf:{label:'Gandalf archive', hits:[2,3,4,5,6,7,8,11,12], steps:[
   ['shire','Gandalf calls on a live host with <code>Invoke-Gandalf.ps1</code>, <code>gandalf.sh</code> or <code>gandalf.py</code>: live state first, then the seven lanterns, in order of volatility. Every file is hashed into <code>log.meta</code> and the archive sealed (Password or Key optional).'],
   ['bree','At the Prancing Pony the archive is uploaded and the job queued in Redis; a bird carries it to the worker.'],
   ['weathertop','Amon Sûl: decrypted, every file re-hashed against <code>log.meta</code> into <code>gandalf_integrity.jsonl</code>. The stones turn green.'],
   ['rowanhall','Elrond enters it in the ledger: collect per OS, process every artefact into <code>cooked/</code> JSON Lines, and with <code>--Analysis</code> search keywords, YARA and IOCs.'],
   ...TAIL]},
- disk:{label:'Disk image', hits:[2,3,4,6,7,8,10], steps:[
+ disk:{label:'Disk image', hits:[2,3,4,6,7,8,9,11], steps:[
   ['bree','A disk image (E01, VMDK, VHD(X), raw or dd) is uploaded or picked from disk. No Gandalf needed: the eagle carries it.'],
   ['weathertop','Amon Sûl: identified and mounted (ewfmount, qemu-nbd, apfs-fuse).'],
   ['rowanhall','Elrond collects per OS from the mounted image (shadow copies too), processes every artefact into <code>cooked/</code>, and analyses with <code>--Analysis</code>.'],
   ...TAIL]},
- memory:{label:'Memory image', hits:[3,4,6,8,11], steps:[
+ memory:{label:'Memory image', hits:[3,4,6,7,9,12], steps:[
   ['bree','A memory image (raw, AFF4, hiberfil.sys, pagefile.sys, MEMORY.DMP, .vmem) is uploaded or picked from disk.'],
   ['weathertop','Amon Sûl: recognised as memory, and its profile found.'],
   ['rowanhall','Elrond runs Volatility 3 by profile: pslist, psscan, cmdline, netscan, malfind, svcscan, and the linux.* and mac.* equivalents.'],
   TAIL[0], TAIL[1], TAIL[3], TAIL[4], TAIL[5]]},
- cloud:{label:'Cloud', hits:[2,3,4,5,7,8,12], steps:[
+ cloud:{label:'Cloud', hits:[2,3,4,5,8,9,13], steps:[
   ['havens','From the Grey Havens: an AWS, Azure or GCP disk snapshot, CloudTrail or activity logs, Kubernetes audit logs.'],
   ['bree','At Bree the snapshot becomes a disk image job, queued in Redis.'],
   ['weathertop','Amon Sûl: identified and mounted.'],
   ['rowanhall','Elrond collects, processes and analyses it like any disk image; the cloud logs are processed as logs.'],
   ...TAIL]},
- mordor:{label:'Mordor dataset', hits:[2,3,4,5,6,7,8,9,10,11,12,13], steps:[
+ mordor:{label:'Mordor dataset', hits:[2,3,4,5,6,7,8,9,10,11,12,13,14], steps:[
   ['mordor','An OTRF Security-Dataset (APT29 day 1 and 2, Atomic sets) or the lab\'s own Atomic Red Team recording leaves the Black Gate.'],
   ['bree','Picked at Bree: <code>--Mordor</code>.'],
   ['weathertop','Amon Sûl: read as event logs.'],
@@ -798,10 +798,10 @@ function pippin(g) {
   for (let i = 0; i < 5; i++) { const s = new THREE.Mesh(CYL(0.06, 0.06, 0.5, 10), mat(0xe2cf9e, {r:0.8})); s.rotation.z = Math.PI / 2; s.rotation.y = i * 0.4; s.position.set(1.0 + (i % 2) * 0.12, 0.08 + (i >> 1) * 0.11, 1.0); g.add(s); }
 }
 function beacons(g, n) {
-  // fourteen beacons along the hills, one per tactic; the place itself is the middle one
+  // a beacon per tactic along the hills (fifteen since v20 split Defense Evasion); the place itself is the middle one
   fx.beacons = [];
   const [[ax, az], [bx, bz]] = BEACON_LINE;
-  for (let i = 0; i < 14; i++) { const t = i / 13, x = ax + (bx - ax) * t, z = az + (bz - az) * t + Math.sin(i * 1.4) * 1.2, y = hgt(x, z);
+  for (let i = 0; i < TACTICS.length; i++) { const t = i / (TACTICS.length - 1), x = ax + (bx - ax) * t, z = az + (bz - az) * t + Math.sin(i * 1.4) * 1.2, y = hgt(x, z);
     const b = new THREE.Group(); b.position.set((x - n.pos[0]) / LOC_SCALE, (y - n._gy) / LOC_SCALE, (z - n.pos[1]) / LOC_SCALE); g.add(b);
     const cairn = new THREE.Mesh(CYL(0.3, 0.45, 0.4, 10), tmat('stone', 1, 0.3)); cairn.position.y = 0.2; b.add(cairn);
     for (let k = 0; k < 4; k++) { const l = new THREE.Mesh(CYL(0.05, 0.05, 0.8, 6), barkMat); l.rotation.set(0, k * Math.PI / 4, Math.PI / 2 - 0.35); l.position.y = 0.55; l.scale.setScalar(0.75); b.add(l); }
@@ -1178,7 +1178,7 @@ async function openInfo(n) {
   const port = document.getElementById('iPort'); port.textContent = n.port; port.classList.toggle('opt', !!n.opt);
   let extra = '';
   if (n.id === 'aule') extra = `<p>Now: <b>${state.ollama ? 'Ollama running: the model answers, citing its rows' : 'no Ollama: fixed questions, exact answers from the case files'}</b>. Toggle it below.</p>`;
-  if (n.id === 'beacons') { const hits = JOURNEYS[jkeys[ji]].hits; extra = `<p>Lit on this journey: <b>${hits.length}</b> of 14${hits.length ? ': ' + hits.map(c => TACTICS[c]).join(', ') : ''} (an example).</p>`; }
+  if (n.id === 'beacons') { const hits = JOURNEYS[jkeys[ji]].hits; extra = `<p>Lit on this journey: <b>${hits.length}</b> of ${TACTICS.length}${hits.length ? ': ' + hits.map(c => TACTICS[c]).join(', ') : ''} (an example).</p>`; }
   document.getElementById('iDesc').innerHTML = `<p>${n.desc}</p>${extra}`;
   document.getElementById('iLg').innerHTML = (n.logos || []).map(k => `<span>${LOGO_SVG[k] || ''}${LOGO_NAME[k]}</span>`).join('');
   const pt = document.getElementById('iPt'); pt.style.display = 'none';
