@@ -171,7 +171,7 @@ start_vm() {
     -netdev "user,id=net0,hostfwd=tcp:127.0.0.1:$PORT-:22" -device e1000e,netdev=net0 \
     -device qemu-xhci -device usb-tablet -vga std -display none -vnc 127.0.0.1:59 \
     -rtc base=utc -qmp "unix:$QMP_SOCK,server=on,wait=off" -pidfile "$PIDFILE" -daemonize \
-    ${WINDOWS_QEMU_ARGS:-}  # e.g. "-action reboot=shutdown,shutdown=pause" to stop on a crash and keep its screen
+    ${WINDOWS_QEMU_ARGS:-}  # e.g. "-action reboot=shutdown,shutdown=pause" to stop on a crash and keep its screen; resuming then needs qmp.py set-action '{"reboot":"reset"}' before system_reset and cont, since that action turns system_reset into another shutdown
   for i in $(seq 1 20); do [ -S "$QMP_SOCK" ] && return 0; sleep 1; done
   die "QEMU started but its control socket ($QMP_SOCK) didn't appear"
 }
