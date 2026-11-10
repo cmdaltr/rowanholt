@@ -85,7 +85,7 @@ class TechniqueMapper:
         "token_manipulation": [
             ("T1134", 0.9),  # Access Token Manipulation
         ],
-        # Defense Evasion
+        # Stealth and Defense Impairment (v20's split of Defense Evasion)
         "timestomp": [
             ("T1070.006", 0.95),  # Timestomp
             ("T1070", 0.9),  # Indicator Removal

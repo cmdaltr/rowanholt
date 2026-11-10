@@ -334,7 +334,7 @@ T1105: Ingress Tool Transfer
 
 T1027: Obfuscated Files or Information
   Confidence: 0.85
-  Tactics: Defense Evasion
+  Tactics: Stealth
 ```
 
 ### Example 2: Generate Coverage Report

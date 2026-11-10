@@ -6,6 +6,36 @@ import requests
 import sys
 
 
+# The tactics that have a Splunk page, in ATT&CK v20.1's kill-chain order (v20 split Defense
+# Evasion into Stealth and Defense Impairment). A technique's page is its earliest tactic here.
+PAGE_TACTICS = (
+    "Initial Access",
+    "Execution",
+    "Persistence",
+    "Privilege Escalation",
+    "Stealth",
+    "Defense Impairment",
+    "Credential Access",
+    "Discovery",
+    "Lateral Movement",
+    "Collection",
+    "Command and Control",
+    "Exfiltration",
+    "Impact",
+)
+
+
+def tactic_page(tactics: str) -> str:
+    """The page (initial_access, stealth, ...) a technique's tactics put it on: its earliest
+    tactic in PAGE_TACTICS, or "" for a Reconnaissance or Resource Development technique."""
+    if "Reconnaissance" in tactics or "Resource Development" in tactics:
+        return ""
+    for tactic in PAGE_TACTICS:
+        if tactic in tactics:
+            return tactic.lower().replace(" ", "_")
+    return ""
+
+
 # ensure transforms.py is updated with the correct pairings - this will dicate how the html and xml pages are created
 
 def append_threat_actors(related_threat_actors, csv_row):
@@ -704,7 +734,7 @@ def main():
     related_threat_actors = []
     for row in techniques_contents[2:-7].split("\n")[1:]:
         row_elements = re.findall(
-            r"^([^,]+),[^,]+,([^,]+),(.*),(https:\/\/attack\.mitre\.org\/techniques\/T[^,]+),[^,]+,[^,]+,enterprise-attack,\d+\.\d+,\"?((?:Reconnaissance|Resource Development|Initial Access|Execution|Persistence|Privilege Escalation|Defense Evasion|Credential Access|Discovery|Lateral Movement|Collection|Command and Control|Exfiltration|Impact)(?:, (?:Reconnaissance|Resource Development|Initial Access|Execution|Persistence|Privilege Escalation|Defense Evasion|Credential Access|Discovery|Lateral Movement|Collection|Command and Control|Exfiltration|Impact)){0,6})\"?,(.*),(\"?(?:Azure AD|Containers|Google Workspace|IaaS|Linux|Network|Office 365|PRE|SaaS|Windows|macOS)(?:(?:, (?:Azure AD|Containers|Google Workspace|IaaS|Linux|Network|Office 365|PRE|SaaS|Windows|macOS))?){0,10}\"?),",
+            r"^([^,]+),[^,]+,([^,]+),(.*),(https:\/\/attack\.mitre\.org\/techniques\/T[^,]+),[^,]+,[^,]+,enterprise-attack,\d+\.\d+,\"?((?:Reconnaissance|Resource Development|Initial Access|Execution|Persistence|Privilege Escalation|Stealth|Defense Impairment|Credential Access|Discovery|Lateral Movement|Collection|Command and Control|Exfiltration|Impact)(?:, (?:Reconnaissance|Resource Development|Initial Access|Execution|Persistence|Privilege Escalation|Stealth|Defense Impairment|Credential Access|Discovery|Lateral Movement|Collection|Command and Control|Exfiltration|Impact)){0,6})\"?,(.*),(\"?(?:Azure AD|Containers|Google Workspace|IaaS|Linux|Network|Office 365|PRE|SaaS|Windows|macOS)(?:(?:, (?:Azure AD|Containers|Google Workspace|IaaS|Linux|Network|Office 365|PRE|SaaS|Windows|macOS))?){0,10}\"?),",
             row,
         )
         tid = row_elements[0][0]
@@ -849,20 +879,8 @@ def main():
         technique_link = technique_info.split("||")[3]
         technique_tactics = technique_info.split("||")[4]
         if ";" in technique_tactics:
-            technique_tactics = (
-                technique_tactics.replace("Initial Access", "01Initial Access")
-                .replace("Execution", "02Execution")
-                .replace("Persistence", "03Persistence")
-                .replace("Privilege Escalation", "04Privilege Escalation")
-                .replace("Defense Evasion", "05Defense Evasion")
-                .replace("Credential Access", "06Credential Access")
-                .replace("Discovery", "07Discovery")
-                .replace("Lateral Movement", "08Lateral Movement")
-                .replace("Collection", "09Collection")
-                .replace("Command and Control", "10Command and Control")
-                .replace("Exfiltration", "11Exfiltration")
-                .replace("Impact", "12Impact")
-            )
+            for position, tactic in enumerate(PAGE_TACTICS, start=1):
+                technique_tactics = technique_tactics.replace(tactic, f"{position:02d}{tactic}")
             technique_tactic = re.sub(
                 r"(; )\d{2}",
                 r"\1",
@@ -905,13 +923,10 @@ def main():
             port_dict, evt_dict, reg_dict, cmd_dict, cve_dict, software_dict = (
                 {} for _ in range(6)
             )
-        if (
-            "Initial Access" in html_page_content.split("||")[4]
-            and "Resource Development" not in html_page_content.split("||")[4]
-            and "Reconnaissance" not in html_page_content.split("||")[4]
-        ):
+        page = tactic_page(tactics)
+        if page:
             build_tactic_html_and_xml_py(
-                "initial_access",
+                page,
                 tid,
                 name,
                 desc,
@@ -926,304 +941,6 @@ def main():
                 cve_dict,
                 software_dict,
             )
-        elif (
-            "Execution" in tactics
-            and "Initial Access" not in tactics
-            and "Resource Development" not in tactics
-            and "Reconnaissance" not in tactics
-        ):
-            build_tactic_html_and_xml_py(
-                "execution",
-                tid,
-                name,
-                desc,
-                link,
-                tactics,
-                platform,
-                evidence,
-                port_dict,
-                evt_dict,
-                reg_dict,
-                cmd_dict,
-                cve_dict,
-                software_dict,
-            )
-        elif (
-            "Persistence" in tactics
-            and "Execution" not in tactics
-            and "Initial Access" not in tactics
-            and "Resource Development" not in tactics
-            and "Reconnaissance" not in tactics
-        ):
-            build_tactic_html_and_xml_py(
-                "persistence",
-                tid,
-                name,
-                desc,
-                link,
-                tactics,
-                platform,
-                evidence,
-                port_dict,
-                evt_dict,
-                reg_dict,
-                cmd_dict,
-                cve_dict,
-                software_dict,
-            )
-        elif (
-            "Privilege Escalation" in tactics
-            and "Persistence" not in tactics
-            and "Execution" not in tactics
-            and "Initial Access" not in tactics
-            and "Resource Development" not in tactics
-            and "Reconnaissance" not in tactics
-        ):
-            build_tactic_html_and_xml_py(
-                "privilege_escalation",
-                tid,
-                name,
-                desc,
-                link,
-                tactics,
-                platform,
-                evidence,
-                port_dict,
-                evt_dict,
-                reg_dict,
-                cmd_dict,
-                cve_dict,
-                software_dict,
-            )
-        elif (
-            "Defense Evasion" in tactics
-            and "Privilege Escalation" not in tactics
-            and "Persistence" not in tactics
-            and "Execution" not in tactics
-            and "Initial Access" not in tactics
-            and "Resource Development" not in tactics
-            and "Reconnaissance" not in tactics
-        ):
-            build_tactic_html_and_xml_py(
-                "defense_evasion",
-                tid,
-                name,
-                desc,
-                link,
-                tactics,
-                platform,
-                evidence,
-                port_dict,
-                evt_dict,
-                reg_dict,
-                cmd_dict,
-                cve_dict,
-                software_dict,
-            )
-        elif (
-            "Credential Access" in tactics
-            and "Defense Evasion" not in tactics
-            and "Privilege Escalation" not in tactics
-            and "Persistence" not in tactics
-            and "Execution" not in tactics
-            and "Initial Access" not in tactics
-            and "Resource Development" not in tactics
-            and "Reconnaissance" not in tactics
-        ):
-            build_tactic_html_and_xml_py(
-                "credential_access",
-                tid,
-                name,
-                desc,
-                link,
-                tactics,
-                platform,
-                evidence,
-                port_dict,
-                evt_dict,
-                reg_dict,
-                cmd_dict,
-                cve_dict,
-                software_dict,
-            )
-        elif (
-            "Discovery" in tactics
-            and "Credential Access" not in tactics
-            and "Defense Evasion" not in tactics
-            and "Privilege Escalation" not in tactics
-            and "Persistence" not in tactics
-            and "Execution" not in tactics
-            and "Initial Access" not in tactics
-            and "Resource Development" not in tactics
-            and "Reconnaissance" not in tactics
-        ):
-            build_tactic_html_and_xml_py(
-                "discovery",
-                tid,
-                name,
-                desc,
-                link,
-                tactics,
-                platform,
-                evidence,
-                port_dict,
-                evt_dict,
-                reg_dict,
-                cmd_dict,
-                cve_dict,
-                software_dict,
-            )
-        elif (
-            "Lateral Movement" in tactics
-            and "Discovery" not in tactics
-            and "Credential Access" not in tactics
-            and "Defense Evasion" not in tactics
-            and "Privilege Escalation" not in tactics
-            and "Persistence" not in tactics
-            and "Execution" not in tactics
-            and "Initial Access" not in tactics
-            and "Resource Development" not in tactics
-            and "Reconnaissance" not in tactics
-        ):
-            build_tactic_html_and_xml_py(
-                "lateral_movement",
-                tid,
-                name,
-                desc,
-                link,
-                tactics,
-                platform,
-                evidence,
-                port_dict,
-                evt_dict,
-                reg_dict,
-                cmd_dict,
-                cve_dict,
-                software_dict,
-            )
-        elif (
-            "Collection" in tactics
-            and "Lateral Movement" not in tactics
-            and "Discovery" not in tactics
-            and "Credential Access" not in tactics
-            and "Defense Evasion" not in tactics
-            and "Privilege Escalation" not in tactics
-            and "Persistence" not in tactics
-            and "Execution" not in tactics
-            and "Initial Access" not in tactics
-            and "Resource Development" not in tactics
-            and "Reconnaissance" not in tactics
-        ):
-            build_tactic_html_and_xml_py(
-                "collection",
-                tid,
-                name,
-                desc,
-                link,
-                tactics,
-                platform,
-                evidence,
-                port_dict,
-                evt_dict,
-                reg_dict,
-                cmd_dict,
-                cve_dict,
-                software_dict,
-            )
-        elif (
-            "Command and Control" in tactics
-            and "Collection" not in tactics
-            and "Lateral Movement" not in tactics
-            and "Discovery" not in tactics
-            and "Credential Access" not in tactics
-            and "Defense Evasion" not in tactics
-            and "Privilege Escalation" not in tactics
-            and "Persistence" not in tactics
-            and "Execution" not in tactics
-            and "Initial Access" not in tactics
-            and "Resource Development" not in tactics
-            and "Reconnaissance" not in tactics
-        ):
-            build_tactic_html_and_xml_py(
-                "command_and_control",
-                tid,
-                name,
-                desc,
-                link,
-                tactics,
-                platform,
-                evidence,
-                port_dict,
-                evt_dict,
-                reg_dict,
-                cmd_dict,
-                cve_dict,
-                software_dict,
-            )
-        elif (
-            "Exfiltration" in tactics
-            and "Command and Control" not in tactics
-            and "Collection" not in tactics
-            and "Lateral Movement" not in tactics
-            and "Discovery" not in tactics
-            and "Credential Access" not in tactics
-            and "Defense Evasion" not in tactics
-            and "Privilege Escalation" not in tactics
-            and "Persistence" not in tactics
-            and "Execution" not in tactics
-            and "Initial Access" not in tactics
-            and "Resource Development" not in tactics
-            and "Reconnaissance" not in tactics
-        ):
-            build_tactic_html_and_xml_py(
-                "exfiltration",
-                tid,
-                name,
-                desc,
-                link,
-                tactics,
-                platform,
-                evidence,
-                port_dict,
-                evt_dict,
-                reg_dict,
-                cmd_dict,
-                cve_dict,
-                software_dict,
-            )
-        elif (
-            "Impact" in tactics
-            and "Exfiltration" not in tactics
-            and "Command and Control" not in tactics
-            and "Collection" not in tactics
-            and "Lateral Movement" not in tactics
-            and "Discovery" not in tactics
-            and "Credential Access" not in tactics
-            and "Defense Evasion" not in tactics
-            and "Privilege Escalation" not in tactics
-            and "Persistence" not in tactics
-            and "Execution" not in tactics
-            and "Initial Access" not in tactics
-            and "Resource Development" not in tactics
-            and "Reconnaissance" not in tactics
-        ):
-            build_tactic_html_and_xml_py(
-                "impact",
-                tid,
-                name,
-                desc,
-                link,
-                tactics,
-                platform,
-                evidence,
-                port_dict,
-                evt_dict,
-                reg_dict,
-                cmd_dict,
-                cve_dict,
-                software_dict,
-            )
-
 
 if __name__ == "__main__":
     main()

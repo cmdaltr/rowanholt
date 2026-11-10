@@ -30,7 +30,7 @@ class CloudTrailAnalyzer:
     Analyze CloudTrail logs for suspicious activity.
 
     Detects:
-    - Defense evasion (log tampering)
+    - Stealth and defence impairment (log tampering)
     - Privilege escalation
     - Credential access
     - Discovery activities
@@ -39,12 +39,12 @@ class CloudTrailAnalyzer:
 
     # Suspicious event names mapped to MITRE ATT&CK
     SUSPICIOUS_EVENTS = {
-        # Defense Evasion - Log Tampering
+        # Stealth (T1070.003) - Log Tampering
         "DeleteTrail": ["T1070.003"],  # Clear Cloud Logs
         "StopLogging": ["T1070.003"],
         "UpdateTrail": ["T1070.003"],
         "PutEventSelectors": ["T1070.003"],
-        # Defense Evasion - Policy Modification
+        # Impact, Stealth and Defense Impairment - Policy Modification
         "DeleteBucket": ["T1485"],  # Data Destruction
         "PutBucketLogging": ["T1070.003"],
         "DeleteFlowLogs": ["T1070.003"],
