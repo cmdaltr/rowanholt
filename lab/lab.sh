@@ -473,7 +473,7 @@ preset_techniques() {
   case "$1" in
     persistence) echo "T1547.001,T1053.005,T1543.003" ;;
     credential_access) echo "T1003.001,T1552.001" ;;
-    defense_evasion) echo "T1070.001,T1562.001,T1218.011" ;;
+    defense_evasion) echo "T1685.005,T1685,T1218.011" ;;
     discovery) echo "T1082,T1087.001,T1016" ;;
   esac
 }
@@ -493,13 +493,13 @@ cmd_mordor_capture() {
   menu "Generate a Mordor-style dataset (Atomic Red Team in the Windows VM)" \
     "Persistence: T1547.001 Run key, T1053.005 scheduled task, T1543.003 service" \
     "Credential access: T1003.001 LSASS dump, T1552.001 credentials in files" \
-    "Defence evasion: T1070.001 clear logs, T1562.001 disable tools, T1218.011 rundll32" \
+    "Defence evasion: T1685.005 clear logs, T1685 disable tools, T1218.011 rundll32" \
     "Discovery: T1082, T1087.001, T1016" \
     "Custom technique list"
   case "$MENU_CHOICE" in
     1) name=lab_persistence; techniques="T1547.001,T1053.005,T1543.003" ;;
     2) name=lab_credential_access; techniques="T1003.001,T1552.001" ;;
-    3) name=lab_defense_evasion; techniques="T1070.001,T1562.001,T1218.011" ;;
+    3) name=lab_defense_evasion; techniques="T1685.005,T1685,T1218.011" ;;
     4) name=lab_discovery; techniques="T1082,T1087.001,T1016" ;;
     5) ask name "Dataset name" "lab_custom"; ask techniques "Techniques (comma-separated)" "T1059.001" ;;
     *) return ;;
@@ -529,7 +529,7 @@ cmd_mordor_record() {
     menu "Record telemetry: Atomic Red Team in the Windows VM, each test's logs kept apart" \
       "Persistence: T1547.001, T1053.005, T1543.003" \
       "Credential access: T1003.001, T1552.001" \
-      "Defence evasion: T1070.001, T1562.001, T1218.011" \
+      "Defence evasion: T1685.005, T1685, T1218.011" \
       "Discovery: T1082, T1087.001, T1016" \
       "Custom technique list"
     case "$MENU_CHOICE" in

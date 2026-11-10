@@ -31,7 +31,7 @@ const TOOLS = [
 const PRESETS = {
   persistence: 'T1547.001,T1053.005,T1543.003',
   credential_access: 'T1003.001,T1552.001',
-  defense_evasion: 'T1070.001,T1562.001,T1218.011',
+  defense_evasion: 'T1685.005,T1685,T1218.011',
   discovery: 'T1082,T1087.001,T1016',
 };
 const OTRF_GROUPS = {

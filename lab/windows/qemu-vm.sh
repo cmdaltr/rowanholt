@@ -42,7 +42,7 @@ STUCK="Watch its screen on vnc://127.0.0.1:5959 to see where it stopped"
 DISK_GB="${WINDOWS_QEMU_DISK_GB:-48}"
 # The Atomic Red Team tests a sample runs, in this order: discovery first, the log clearing last
 # so it wipes only what came before it (as an intruder's would)
-SAMPLE_TECHNIQUES="${SAMPLE_TECHNIQUES:-T1082,T1087.001,T1016,T1547.001,T1053.005,T1543.003,T1552.001,T1003.001,T1218.011,T1562.001,T1070.001}"
+SAMPLE_TECHNIQUES="${SAMPLE_TECHNIQUES:-T1082,T1087.001,T1016,T1547.001,T1053.005,T1543.003,T1552.001,T1003.001,T1218.011,T1685,T1685.005}"
 
 # The pidfile, else the process by name: a second QEMU refused the disk's lock removes the
 # first one's pidfile and socket as it exits, and a VM that looked stopped then got started twice
