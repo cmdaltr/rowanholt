@@ -92,6 +92,9 @@ def identify_disk_image(verbosity, output_directory, disk_image, mount_location)
         ):
             if "MSOCache" in str(os.listdir(mount_location)):
                 windows_os = "Windows7"
+            elif not os.path.isdir(mount_location + "Windows"):
+                # NTFS but no Windows folder (a recovery or data volume; $Boot shows on every one)
+                return disk_image
             elif "Windows" in str(os.listdir(mount_location)) or "Boot" in str(
                 os.listdir(mount_location)
             ):

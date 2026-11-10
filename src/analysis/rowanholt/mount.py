@@ -444,7 +444,6 @@ def _mount_with_kpartx(path, destination_mount, disk_file, allimgs, partitions, 
         return False
 
     # Mount each partition found by kpartx
-    mounted_any = False
     for idx, loop_dev in enumerate(loop_devices):
         dev_path = f"/dev/mapper/{loop_dev}"
 
@@ -469,12 +468,16 @@ def _mount_with_kpartx(path, destination_mount, disk_file, allimgs, partitions, 
             if mount_result.returncode == 0:
                 print(f"  -> Partition {idx} mounted as {fs_type}")
                 disk_image = identify_disk_image(verbosity, output_directory, disk_file, destination_mount)
+                if "::" not in disk_image:
+                    # Not an OS volume: off again, so the next partition isn't mounted over it
+                    subprocess.run(["umount", destination_mount], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    break
                 partition = mounted_image(allimgs, disk_image, destination_mount, disk_file, str(idx))
                 partitions.append(f"{partition}||{disk_image}")
-                mounted_any = True
-                break
+                # Every partition shares the one mount point: stop at the OS volume, or the next hides it
+                return True
 
-    return mounted_any
+    return False
 
 
 def mount_vmdk_image(
