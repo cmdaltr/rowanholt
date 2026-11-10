@@ -46,10 +46,11 @@ record() {
   # MORDOR_NO_CLEANUP=1: leave what each test made (a sample image is analysed for it afterwards)
   local keep=""; [ "${MORDOR_NO_CLEANUP:-0}" = 1 ] && keep=" -NoCleanup"
   info "Recording $techniques in $VM (each test, then a ${MORDOR_SETTLE:-20}s settle${keep:+, no cleanup})"
-  # -Command, not -File: -File passes "T1,T2" as one string, not a list. A technique can have a
-  # dozen tests, so allow two hours rather than ssh.exp's 15 minutes
-  LAB_SSH_TIMEOUT="${LAB_SSH_TIMEOUT:-7200}" ssh_vm "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& C:\\lab\\scripts\\Invoke-MordorRecord.ps1 -Techniques $techniques -Run $run -Out C:\\lab\\mordor\\telemetry -Settle ${MORDOR_SETTLE:-20}$keep\"" \
-    | grep -v -i password || true
+  # -Command, not -File: -File passes "T1,T2" as one string, not a list. Each test takes about two
+  # minutes with its settle and log export, and a sample's 11 techniques are ~150 tests, so allow
+  # eight hours rather than ssh.exp's 15 minutes: when it runs out, Windows ends the run mid-list
+  LAB_SSH_TIMEOUT="${LAB_SSH_TIMEOUT:-28800}" ssh_vm "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& C:\\lab\\scripts\\Invoke-MordorRecord.ps1 -Techniques $techniques -Run $run -Out C:\\lab\\mordor\\telemetry -Settle ${MORDOR_SETTLE:-20}$keep\"" \
+    | grep --line-buffered -v -i password || true
   pull_recording "$run" "$dest"
 }
 
