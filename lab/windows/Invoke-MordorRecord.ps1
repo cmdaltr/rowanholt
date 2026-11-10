@@ -54,6 +54,15 @@ $hostName = ([Environment]::MachineName).ToLower()
 $runDir = Join-Path $Out $Run
 New-Item -ItemType Directory -Force -Path $runDir | Out-Null
 $manifest = [ordered]@{ run = $Run; host = $hostName; platform = $platform; started = (Get-Date).ToUniversalTime().ToString('o'); tests = @() }
+# The same run again carries on where it stopped (the VM went down part-way, say): its recorded tests are kept and skipped
+$manifestPath = Join-Path $runDir 'manifest.json'
+if (Test-Path $manifestPath) {
+    $previous = Get-Content $manifestPath -Raw | ConvertFrom-Json
+    $manifest.started = $previous.started
+    $manifest.tests = @($previous.tests)
+    Write-Host "Carrying on $Run after its $($manifest.tests.Count) recorded tests"
+}
+$done = @($manifest.tests | ForEach-Object { $_.folder })
 # A file of IDs, or a list
 if ($Techniques.Count -eq 1 -and (Test-Path $Techniques[0])) { $Techniques = Get-Content $Techniques[0] | Where-Object { $_ -match '^T\d{4}' } }
 
@@ -139,6 +148,7 @@ foreach ($t in $Techniques) {
         $test = $tests[$i - 1]
         if ($test.supported_platforms -notcontains $platform -or $test.executor.name -eq 'manual') { continue }
         $folder = "$t-$i"
+        if ($done -contains $folder) { continue }
         $dir = Join-Path $runDir $folder
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
         Write-Host "==> $t test ${i}: $($test.name)"
@@ -183,7 +193,7 @@ foreach ($t in $Techniques) {
         $manifest.tests += [ordered]@{ technique = $t; test = $i; name = $test.name; folder = $folder
                                        start = $start.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'); end = $end.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') }
         # Saved after every test, so a run that stops part-way is still usable
-        $manifest | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $runDir 'manifest.json')
+        $manifest | ConvertTo-Json -Depth 5 | Set-Content $manifestPath
     }
 }
 Write-Host "Recorded $($manifest.tests.Count) tests in $runDir"
