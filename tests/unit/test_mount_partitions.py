@@ -1,5 +1,6 @@
 """kpartx mounts every partition of a disk at the one mount point: it stops at the OS volume
 rather than mounting the next partition over it, and a volume without Windows/ isn't Windows."""
+import shutil
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -41,3 +42,35 @@ def test_ntfs_without_a_windows_folder_is_not_identified(tmp_path, monkeypatch):
     assert identify.identify_disk_image(0, "/out/", "disk.dd", str(tmp_path)) == "disk.dd"
     (tmp_path / "Windows" / "BrowserCore").mkdir(parents=True)
     assert identify.identify_disk_image(0, "/out/", "disk.dd", str(tmp_path)).startswith("disk.dd::Windows")
+
+
+
+def test_a_raw_apfs_disk_mounts_its_data_volume(tmp_path, monkeypatch):
+    # Volume 0 the sealed System volume, 1 Preboot, 2 the Data volume; then no more
+    volumes = {0: ["Shared"], 1: [], 2: ["Shared", "admin"]}
+    dest, mounted = tmp_path / "mnt", []
+
+    def run(cmd, **_):
+        if cmd[0] == "umount":
+            shutil.rmtree(dest / "root")
+            mounted.pop()
+            return SimpleNamespace(returncode=0)
+        volume = int(cmd[2])
+        if volume not in volumes:
+            return SimpleNamespace(returncode=1)
+        (dest / "root").mkdir(parents=True)
+        for user in volumes[volume]:
+            (dest / "root" / "Users" / user).mkdir(parents=True)
+        if volume == 2:
+            (dest / "root" / "private" / "var" / "db").mkdir(parents=True)
+        mounted.append(volume)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(mount.subprocess, "run", run)
+    assert mount._mount_apfs_data_volume("/x/disk.img", str(dest))
+    assert mounted == [2]
+    volumes[2] = ["Shared"]  # no Data volume found: volume 0, as before
+    shutil.rmtree(dest / "root")
+    mounted.clear()
+    assert mount._mount_apfs_data_volume("/x/disk.img", str(dest))
+    assert mounted == [0]

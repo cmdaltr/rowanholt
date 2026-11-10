@@ -480,6 +480,33 @@ def _mount_with_kpartx(path, destination_mount, disk_file, allimgs, partitions, 
     return False
 
 
+def _mount_apfs_data_volume(path, destination_mount):
+    """Mount a raw APFS disk's Data volume with apfs-fuse; True once one is mounted.
+
+    apfs-fuse takes volume 0 unless told otherwise, which since macOS 10.15 is the sealed System
+    volume: no Users, no logs. The Data volume is the one with a user's home and private/var/db;
+    without one, volume 0 as before.
+    """
+    def mount(volume):
+        try:
+            return subprocess.run(["/usr/local/bin/apfs-fuse", "-v", str(volume), "-o", "allow_other",
+                                   path, destination_mount], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                  timeout=120).returncode == 0
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            return False
+
+    root = os.path.join(destination_mount, "root")
+    for volume in range(16):
+        if not mount(volume):
+            break  # no such volume: past the last
+        users = os.path.join(root, "Users")
+        homes = [u for u in os.listdir(users) if u != "Shared" and not u.startswith(".")] if os.path.isdir(users) else []
+        if homes and os.path.isdir(os.path.join(root, "private", "var", "db")):
+            return True
+        subprocess.run(["umount", destination_mount], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return volume > 0 and mount(0)
+
+
 def mount_vmdk_image(
     verbosity,
     output_directory,
@@ -500,6 +527,12 @@ def mount_vmdk_image(
             return partitions
         else:
             print(f"  -> kpartx mounting failed for {disk_file}")
+            if _mount_apfs_data_volume(path, destination_mount):
+                print(f"  -> Mounted {disk_file}'s APFS data volume (via apfs-fuse)")
+                disk_image = identify_disk_image(verbosity, output_directory, disk_file, destination_mount)
+                partition = mounted_image(allimgs, disk_image, destination_mount, disk_file, "0")
+                partitions.append(f"{partition}||{disk_image}")
+                return partitions
             # Try guestmount as final fallback
             if _try_guestmount(path, destination_mount, disk_file, allimgs, partitions, verbosity, output_directory):
                 return partitions

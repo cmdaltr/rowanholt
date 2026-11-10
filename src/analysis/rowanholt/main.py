@@ -27,7 +27,7 @@ def is_memory_image(filename, imgformat, filepath=None):
     1. File extensions: .mem, .vmem, .dmp, .lime, .aff4 (definite memory)
     2. Filename patterns like -raw.001, -memory.001 (memory dump with split extension)
     3. File type output containing 'crash dump', 'Windows memory', 'MS Windows hibernation'
-    4. For ambiguous extensions (.raw, .001, .bin under 32GB): return False to try mounting first
+    4. For ambiguous extensions (.raw, .dd, .img, .001, .bin under 32GB): return False to try mounting first
        - If mounting fails, the caller can fall back to memory processing
 
     Returns True if the file appears to be a memory image.
@@ -38,7 +38,9 @@ def is_memory_image(filename, imgformat, filepath=None):
 
     # Memory-specific extensions (definitive indicators)
     # Note: .raw is NOT included here as it's ambiguous (could be VMDK converted to raw, etc.)
-    memory_extensions = ['.mem', '.vmem', '.dmp', '.lime', '.aff4', '.img', '.001']
+    # Not .img or .001: as often a raw disk (a Tart or dd image, a split raw), which as memory
+    # would never be mounted, after a banners scan of the whole thing
+    memory_extensions = ['.mem', '.vmem', '.dmp', '.lime', '.aff4']
     has_definite_memory_ext = any(filename_lower.endswith(ext) for ext in memory_extensions)
 
     # Check for patterns like -raw.001, -memory.001, -memdump.001, etc.
@@ -654,8 +656,8 @@ def main(
                         )
                         write_audit_log_entry(verbosity, output_directory, entry, prnt)
 
-                        # For ambiguous extensions (.raw, .dd) under 32GB, fallback to memory processing
-                        ambiguous_extensions = ['.raw', '.dd']
+                        # For ambiguous extensions under 32GB, fallback to memory processing
+                        ambiguous_extensions = ['.raw', '.dd', '.img', '.001']
                         is_ambiguous = any(f.lower().endswith(ext) for ext in ambiguous_extensions)
                         max_memory_size = 32 * 1024 * 1024 * 1024  # 32GB
                         try:
