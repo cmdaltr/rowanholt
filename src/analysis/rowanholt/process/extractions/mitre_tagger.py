@@ -41,7 +41,7 @@ ARTEFACT_MITRE_MAPPING = {
         "tactics": ["Persistence", "Privilege Escalation"],
     },
     "unified_log": {
-        "technique_ids": ["T1070.002"],
+        "technique_ids": ["T1685.006"],
         "technique_names": ["Clear Linux or Mac System Logs"],
         "tactics": ["Defense Evasion"],
     },
@@ -78,12 +78,12 @@ ARTEFACT_MITRE_MAPPING = {
 
     # Linux artifacts
     "journal": {
-        "technique_ids": ["T1070.002"],
+        "technique_ids": ["T1685.006"],
         "technique_names": ["Clear Linux or Mac System Logs"],
         "tactics": ["Defense Evasion"],
     },
     "journalctl": {
-        "technique_ids": ["T1070.002"],
+        "technique_ids": ["T1685.006"],
         "technique_names": ["Clear Linux or Mac System Logs"],
         "tactics": ["Defense Evasion"],
     },
@@ -93,7 +93,7 @@ ARTEFACT_MITRE_MAPPING = {
         "tactics": ["Execution", "Persistence", "Discovery", "Initial Access", "Credential Access"],
     },
     "syslog": {
-        "technique_ids": ["T1070.002"],
+        "technique_ids": ["T1685.006"],
         "technique_names": ["Clear Linux or Mac System Logs"],
         "tactics": ["Defense Evasion"],
     },
@@ -194,12 +194,12 @@ ARTEFACT_MITRE_MAPPING = {
 
     # Generic log types
     "log": {
-        "technique_ids": ["T1070.002"],
+        "technique_ids": ["T1685.006"],
         "technique_names": ["Clear Linux or Mac System Logs"],
         "tactics": ["Defense Evasion"],
     },
     "logs": {
-        "technique_ids": ["T1070.002"],
+        "technique_ids": ["T1685.006"],
         "technique_names": ["Clear Linux or Mac System Logs"],
         "tactics": ["Defense Evasion"],
     },
@@ -365,13 +365,13 @@ def tag_mitre_for_platform(
             "T1547.015",  # Login Items
             "T1059.002",  # AppleScript
             "T1059.004",  # Unix Shell
-            "T1070.002",  # Clear macOS Logs
+            "T1685.006",  # Clear Linux or Mac System Logs
         ],
         "Linux": [
             "T1543.002",  # Systemd Service
             "T1053.003",  # Cron
             "T1059.004",  # Unix Shell
-            "T1070.002",  # Clear Linux Logs
+            "T1685.006",  # Clear Linux or Mac System Logs
         ],
         "Windows": [],  # Windows is handled by artemis.py
     }

@@ -500,7 +500,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
         "software": [],
         "procedure_examples": ["APT28 has deleted logs to cover tracks."]
     },
-    "T1070.001": {
+    "T1685.005": {
         "name": "Clear Windows Event Logs",
         "tactics": ["Defense Evasion"],
         "description": "Adversaries may clear Windows Event Logs to hide activity.",
@@ -508,7 +508,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
         "software": [],
         "procedure_examples": ["APT28 has cleared event logs.", "Lazarus Group clears logs after operations."]
     },
-    "T1070.002": {
+    "T1685.006": {
         "name": "Clear Linux or Mac System Logs",
         "tactics": ["Defense Evasion"],
         "description": "Adversaries may clear system logs to hide activity.",
@@ -1513,7 +1513,9 @@ def get_technique_data(technique_id: str) -> Optional[Dict]:
     """
     technique_id = attack_lookup.normalise(technique_id)
     published = attack_lookup.technique(technique_id)
-    curated = ATTACK_TECHNIQUES.get(technique_id)
+    # Curated entries are keyed by the pinned release's IDs; an older case's revoked ID finds
+    # its replacement's
+    curated = ATTACK_TECHNIQUES.get(technique_id) or ATTACK_TECHNIQUES.get(attack_lookup.current_id(technique_id))
     if published is None:
         return curated
     # Name, tactics and domain from the pinned release (Enterprise or Mobile); groups,

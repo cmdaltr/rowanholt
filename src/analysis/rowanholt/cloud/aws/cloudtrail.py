@@ -48,7 +48,7 @@ class CloudTrailAnalyzer:
         "DeleteBucket": ["T1485"],  # Data Destruction
         "PutBucketLogging": ["T1070.003"],
         "DeleteFlowLogs": ["T1070.003"],
-        "DeleteDetector": ["T1562.001"],  # Disable or Modify Tools (GuardDuty)
+        "DeleteDetector": ["T1685"],  # Disable or Modify Tools (GuardDuty)
         # Privilege Escalation
         "CreateAccessKey": ["T1098"],  # Account Manipulation
         "CreateUser": ["T1136.003"],  # Create Cloud Account

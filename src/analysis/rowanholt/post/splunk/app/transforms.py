@@ -14,7 +14,7 @@ def create_transforms(
         "Artefact_|_/print processors/|/print_processors/": "T1547.012 - Print Processors",  # usb, timeline
         "Artefact_|_/security/policy/secrets": "T1003.004 - LSA Secrets",  # usb, timeline
         "Artefact_|_/special/perf": "T1137.002 - Office Test",  # usb, timeline
-        "Artefact_|_/var/log": "T1070.002 - Clear Linux or Mac System Logs",  # usb, timeline
+        "Artefact_|_/var/log": "T1685.006 - Clear Linux or Mac System Logs",  # usb, timeline
         "Artefact_|_\\.7z|\\.arj|\\.tar|\\.tgz|\\.zip|makecab|tar|xcopy|diantz": "T1560.001 - Archive via Utility",  # usb, timeline
         "Artefact_|_\\.asc|\\.cer|\\.gpg|\\.key|\\.p12|\\.p7b|\\.pem|\\.pfx|\\.pgp|\\.ppk": "T1552.004 - Private Keys",  # usb, timeline
         "Artefact_|_\\.chm|\\.hh": "T1218.001 - Compiled HTML File",  # usb, timeline
@@ -45,10 +45,10 @@ def create_transforms(
         "Artefact_|_autoruns|reg |reg\\.exe": "T1112 - Modify Registry",  # usb, timeline
         "Artefact_|_backgrounditems\\.btm": "T1547.015 - Login Items",  # usb, timeline
         "Artefact_|_bash_history": "T1552.003 - Bash History",  # usb, timeline
-        "Artefact_|_bcdedit": "T1553.006 - Code Signing Policy Modification|T1562.009 - Safe Mode Boot",  # usb, timeline
+        "Artefact_|_bcdedit": "T1553.006 - Code Signing Policy Modification|T1688 - Safe Mode Boot",  # usb, timeline
         "Artefact_|_bcdedit|csrutil": "T1553.006 - Code Signing Policy Modification",  # usb, timeline
         "Artefact_|_bluetooth": "T1011.001 - Exfiltration over Bluetooth",  # usb, timeline
-        "Artefact_|_bootcfg": "T1562.009 - Safe Mode Boot",  # usb, timeline
+        "Artefact_|_bootcfg": "T1688 - Safe Mode Boot",  # usb, timeline
         "Artefact_|_certutil": "T1036.003 - Rename System Utilities|T1140 - Deobfuscate/Decode Files or Information|T1553.004 - Install Root Certificate",  # usb, timeline
         "Artefact_|_chage|common-password|pwpolicy|getaccountpolicies": "T1201 - Password Policy Discovery",  # usb, timeline
         "Artefact_|_chmod": "T1222.002 - Linux and Mac File and Directory Permissions Modification|T1548.001 - Setuid and Setgid",  # usb, timeline
@@ -65,7 +65,7 @@ def create_transforms(
         "Artefact_|_currentcontrolset/control/lsa": "T1003.001 - LSASS Memory|T1547.002 - Authentication Package|T1547.005 - Security Support Provider|T1556.002 - Password Filter DLL",  # usb, timeline
         "Artefact_|_currentcontrolset/control/nls/language": "T1614.001 - System Language Discovery",  # usb, timeline
         "Artefact_|_currentcontrolset/control/print/monitors": "T1547.010 - Port Monitors",  # usb, timeline
-        "Artefact_|_currentcontrolset/control/safeboot/minimal": "T1562.009 - Safe Mode Boot",  # usb, timeline
+        "Artefact_|_currentcontrolset/control/safeboot/minimal": "T1688 - Safe Mode Boot",  # usb, timeline
         "Artefact_|_currentcontrolset/control/session manager|currentcontrolset/control/session_manager": "T1546.009 - AppCert DLLs|T1547.001 - Registry Run Keys / Startup Folder",  # usb, timeline
         "Artefact_|_currentcontrolset/services/": "T1574.011 - Services Registry Permissions Weakness",  # usb, timeline
         "Artefact_|_currentcontrolset/services/termservice/parameters": "T1505.005 - Terminal Services DLL",  # usb, timeline
@@ -99,12 +99,12 @@ def create_transforms(
         "Artefact_|_gsecdump|minidump|mimikatz|pwdumpx|secretsdump|reg save|reg save|net user|net user|net\\.exe user|net\\.exe user|net1 user|net1 user|net1\\.exe user|net1\\.exe user|reg_save|reg_save|net user|net user|net\\.exe user|net\\.exe user|net1 user|net1 user|net1\\.exe user|net1\\.exe user|reg_save|reg__save|net_user|net__user|net\\.exe_user|net\\.exe__user|net1_user|net1__user|net1\\.exe_user|net1\\.exe__user": "T1003.002 - Security Account Manager",  # usb, timeline
         "Artefact_|_halt": "T1529 - System Shutdown/Reboot",  # usb, timeline
         "Artefact_|_hidden|uielement": "T1564.003 - Hidden Window",  # usb, timeline
-        "Artefact_|_histcontrol": "T1562.003 - Impair Command History Logging",  # usb, timeline
-        "Artefact_|_history|histfile": "T1070.003 - Clear Command History|T1552.003 - Bash History|T1562.003 - Impair Command History Logging",  # usb, timeline
+        "Artefact_|_histcontrol": "T1690 - Prevent Command History Logging",  # usb, timeline
+        "Artefact_|_history|histfile": "T1070.003 - Clear Command History|T1552.003 - Bash History|T1690 - Prevent Command History Logging",  # usb, timeline
         "Artefact_|_hostname |systeminfo|whoami": "T1033 - System Owner/User Discovery",  # usb, timeline
         "Artefact_|_is_debugging|sysctl|ptrace": "T1497.001 - System Checks|T1622 - Debugger Evasion",  # usb, timeline
         "Artefact_|_keychain": "T1555.001 - Keychain",  # usb, timeline
-        "Artefact_|_kill ": "T1489 - Service Stop|T1548.003 - Sudo and Sudo Caching|T1562.001 - Disable or Modify Tools",  # usb, timeline
+        "Artefact_|_kill ": "T1489 - Service Stop|T1548.003 - Sudo and Sudo Caching|T1685 - Disable or Modify Tools",  # usb, timeline
         "Artefact_|_launchagents|systemctl": "T1543.001 - Launch Agent",  # usb, timeline
         "Artefact_|_launchctl": "T1569.001 - Launchctl",  # usb, timeline
         "Artefact_|_launchdaemons": "T1543.004 - Launch Daemon",  # usb, timeline
@@ -135,7 +135,7 @@ def create_transforms(
         "Artefact_|_pam_unix\\.so": "T1556.003 - Pluggable Authentication Modules",  # usb, timeline
         "Artefact_|_panel/cpls": "T1218.002 - Control Panel",  # usb, timeline
         "Artefact_|_password|pwd|login|secure|credentials": "T1552.001 - Credentials in Files|T1555.005 - Password Managers",  # usb, timeline
-        "Artefact_|_payment|request|urgent": "T1656 - Impersonation",
+        "Artefact_|_payment|request|urgent": "T1684.001 - Impersonation",
         "Artefact_|_ping\\.|ping |traceroute|ifconfig|ipconfig|dig |etc/host|etc/hosts|bonjour": "T1016.001 - Internet Connection Discovery|T1018 - Remote System Discovery",  # usb, timeline
         "Artefact_|_policy\\.vpol|vaultcmd|vcrd": "T1555.004 - Windows Credential Manager",  # usb, timeline
         "Artefact_|_portopening": "T1090.001 - Internal Proxy",  # usb, timeline
@@ -186,7 +186,7 @@ def create_transforms(
         "Command_|_/delete": "T1070.005 - Network Share Connection Removal",  # memory, evt (Windows)
         "Command_|_/domain": "T1087.002 - Domain Account|T1136.002 - Domain Account",  # memory, evt (Windows)
         "Command_|_/etc/networkmanager/system-connections|show  ?ip  ?interface|show  ?ip  ?route": "T1016.001 - Internet Connection Discovery",  # memory, unix-logs (*nix)
-        "Command_|_/var/log": "T1070.002 - Clear Linux or Mac System Logs",  # memory, unix-logs (*nix)
+        "Command_|_/var/log": "T1685.006 - Clear Linux or Mac System Logs",  # memory, unix-logs (*nix)
         "Command_|_\\.7z|\\.arj|\\.tar|\\.tgz|\\.zip|winzip|winrar|makecab|xcopy|diantz": "T1560.001 - Archive via Utility",  # memory (*nix)
         "Command_|_\\.cpl": "T1218.002 - Control Panel",  # memory, evt (Windows)
         "Command_|_\\.lnk": "T1547.009 - Shortcut Modification",  # memory (*nix)
@@ -209,8 +209,8 @@ def create_transforms(
         "Command_|_at\\.(?:exe|allow|deny)|cron": "T1053.002 - At",  # memory (*nix)
         "Command_|_atbroker|displayswitch|magnify|narrator|osk\\.|sethc|utilman": "T1546.008 - Accessibility Features",  # memory, evt (Windows)
         "Command_|_attrib": "T1564.001 - Hidden Files and Directories",  # memory, evt (Windows)
-        "Command_|_audit\\.d|audit\\.conf|audit\\.rules|auditctl|systemctl": "T1562.012 - Disable or Modify Linux Audit System",  # memory (*nix)
-        "Command_|_auditpol": "T1562.002 - Disable Windows Event Logging",  # memory, evt (Windows)
+        "Command_|_audit\\.d|audit\\.conf|audit\\.rules|auditctl|systemctl": "T1685.004 - Disable or Modify Linux Audit System Log",  # memory (*nix)
+        "Command_|_auditpol": "T1685.001 - Disable or Modify Windows Event Log",  # memory, evt (Windows)
         "Command_|_authentication packages|authentication_packages": "T1547.002 - Authentication Package",  # memory, evt (Windows)
         "Command_|_authorizationexecutewithprivileges|security_authtrampoline": "T1548.004 - Elevated Execution with Prompt",  # memory, unix-logs (*nix)
         "Command_|_authorized_keys|sshd_config|ssh-keygen": "T1098.004 - SSH Authorized Keys",  # memory, unix-logs (*nix)
@@ -218,10 +218,10 @@ def create_transforms(
         "Command_|_az ad user get-member-groups|get-msolrole|getbucketacl|listattachedrolepolicies|listrolepolicies": "T1069.003 - Cloud Groups",  # memory, evt (Windows)
         "Command_|_az vm list|describedbinstances|describeinstances|gcloud compute instances list|getpublicaccessblock|headbucket|listbuckets": "T1580 - Cloud Infrastructure Discovery",
         "Command_|_bash_history": "T1552.003 - Bash History",  # memory, unix-logs (*nix)
-        "Command_|_bcdedit": "T1490 - Inhibit System Recovery|T1553.006 - Code Signing Policy Modification|T1562.009 - Safe Mode Boot",  # journal (Windows)
+        "Command_|_bcdedit": "T1490 - Inhibit System Recovery|T1553.006 - Code Signing Policy Modification|T1688 - Safe Mode Boot",  # journal (Windows)
         "Command_|_beingdebugged": "T1622 - Debugger Evasion",  # memory, evt (Windows)
         "Command_|_bluetooth": "T1011.001 - Exfiltration over Bluetooth",  # memory (*nix)
-        "Command_|_bootcfg": "T1562.009 - Safe Mode Boot",  # journal (Windows)
+        "Command_|_bootcfg": "T1688 - Safe Mode Boot",  # journal (Windows)
         "Command_|_bootexecute|autocheck|autochk": "T1547.001 - Registry Run Keys / Startup Folder",  # memory, evt (Windows)
         "Command_|_certmgr": "T1553.004 - Install Root Certificate",  # memory, evt (Windows)
         "Command_|_certutil": "T1036.003 - Rename System Utilities|T1140 - Deobfuscate/Decode Files or Information|T1553.004 - Install Root Certificate",  # memory, evt (Windows)
@@ -235,7 +235,7 @@ def create_transforms(
         "Command_|_cmsadcs|ntds": "T1003.003 - NTDS",  # memory, evt (Windows)
         "Command_|_com\\.apple\\.quarantine": "T1553.001 - Gatekeeper Bypass",  # memory, unix-logs (*nix)
         "Command_|_connect-azaccount|connect-mggraph|gcloud  ?auth  ?login": "T1021.007 - Cloud Services",  # memory, evt (Windows)
-        "Command_|_consolehost|clear-history|historysavestyle|savenothing": "T1562.003 - Impair Command History Logging",  # memory, evt (Windows)
+        "Command_|_consolehost|clear-history|historysavestyle|savenothing": "T1690 - Prevent Command History Logging",  # memory, evt (Windows)
         "Command_|_contentsofdirectoryatpath|pathextension": "T1106 - Native API",  # memory, unix-logs (*nix)
         "Command_|_copyfromscreen": "T1113 - Screen Capture_",  # memory, evt (Windows)
         "Command_|_cor_profiler": "T1547.012 - COR_PROFILER",  # memory, evt (Windows)
@@ -271,11 +271,11 @@ def create_transforms(
         "Command_|_emond": "T1546.014 - Emond|T1547.015 - Login Items",  # memory, unix-logs (*nix)
         "Command_|_enablemulticast": "T1557.001 - LLMNR/NBT-NS Poisoning and SMB Relay",  # memory, evt (Windows)
         "Command_|_encrypt": "T1573.001 - Symmetric Cryptography|T1573.002 - Asymmetric Cryptography",  # memory (*nix)
-        "Command_|_engineversion": "T1562.010 - Downgrade Attack",  # memory, evt (Windows)
+        "Command_|_engineversion": "T1689 - Downgrade Attack",  # memory, evt (Windows)
         "Command_|_etc/passwd|etc/shadow": "T1003.008 - /etc/passwd and /etc/shadow|T1087.001 - Local Account|T1556.003 - Pluggable Authentication Modules",  # memory, unix-logs (*nix)
         "Command_|_eventvwr|sdclt": "T1548.002 - Bypass User Account Control",  # memory, evt (Windows)
         "Command_|_execute-assembly|nscreateobjectfileimagefrommemory|memfd_create|execve": "T1620 - Reflective Code Loading",  # memory, evt (Windows)
-        "Command_|_failure": "T1547.011 - Services Registry Permissions Weakness",  # memory (*nix)
+        "Command_|_failure": "T1574.011 - Services Registry Permissions Weakness",  # memory (*nix)
         "Command_|_filerecvwriterand": "T1027.001 - Binary Padding",  # memory, evt (Windows)
         "Command_|_find-avsignature": "T1027.005 - Indicator Removal from Tools",  # memory, evt (Windows)
         "Command_|_fork |fork_": "T1106 - Native API|T1036.009 - Break Process Tree",  # memory (Windows & *nix)
@@ -303,8 +303,8 @@ def create_transforms(
         "Command_|_gsecdump|mimikatz|pwdumpx|secretsdump|reg save|reg  save|net user|net  user|net\\.exe user|net\\.exe  user|net1 user|net1  user|net1\\.exe user|net1\\.exe  user|reg_save|reg__save|net_user|net__user|net\\.exe_user|net\\.exe__user|net1_user|net1__user|net1\\.exe_user|net1\\.exe__user": "T1003.002 - Security Account Manager",  # memory, evt (Windows)
         "Command_|_halt": "T1529 - System Shutdown/Reboot",  # memory, unix-logs (*nix)
         "Command_|_hidden": "T1564.003 - Hidden Window",  # memory (*nix)
-        "Command_|_histcontrol": "T1562.003 - Impair Command History Logging",  # memory, unix-logs (*nix)
-        "Command_|_history|histfile": "T1070.003 - Clear Command History|T1552.003 - Bash History|T1562.003 - Impair Command History Logging",  # memory, unix-logs (*nix)
+        "Command_|_histcontrol": "T1690 - Prevent Command History Logging",  # memory, unix-logs (*nix)
+        "Command_|_history|histfile": "T1070.003 - Clear Command History|T1552.003 - Bash History|T1690 - Prevent Command History Logging",  # memory, unix-logs (*nix)
         "Command_|_hklm/sam|hklm/system": "T1003.002 - Security Account Manager",  # memory, evt (Windows)
         "Command_|_hostname |net config|net  config|net\\.exe config|net\\.exe  config|net1 config|net1  config|net1\\.exe config|net1\\.exe  config|netuser-getinfo|query user|query  user|net_config|net__config|net\\.exe_config|net\\.exe__config|net1_config|net1__config|net1\\.exe_config|net1\\.exe__config|query_user|query__user|quser|systeminfo|whoami": "T1033 - System Owner/User Discovery",  # memory (*nix)
         "Command_|_iam\\.serviceaccounts\\.actas|iam:passrole": "T1648 - Serverless Execution",
@@ -320,7 +320,7 @@ def create_transforms(
         "Command_|_itaskservice|itaskdefinition|itasksettings": "T1559.001 - Component Object Model Hijacking",  # memory, evt (Windows)
         "Command_|_kernelcallbacktable|fncopydata|fndword": "T1574.013 - KernelCallbackTable",  # memory, evt (Windows)
         "Command_|_keychain": "T1555.001 - Keychain",  # memory, unix-logs (*nix)
-        "Command_|_kill": "T1489 - Service Stop|T1548.003 - Sudo and Sudo Caching|T1562.001 - Disable or Modify Tools",  # memory, unix-logs (*nix)
+        "Command_|_kill": "T1489 - Service Stop|T1548.003 - Sudo and Sudo Caching|T1685 - Disable or Modify Tools",  # memory, unix-logs (*nix)
         "Command_|_launchagents": "T1543.001 - Launch Agent",  # memory, unix-logs (*nix)
         "Command_|_launchctl": "T1569.001 - Launchctl",  # memory, unix-logs (*nix)
         "Command_|_launchdaemons": "T1543.004 - Launch Daemon",  # memory, unix-logs (*nix)
@@ -375,7 +375,7 @@ def create_transforms(
         "Command_|_openthread": "T1055.004 - Asynchronous Procedure Call|T1055.003 - Thread Execution Hijacking",  # memory, evt (Windows)
         "Command_|_pam_unix\\.so": "T1556.003 - Pluggable Authentication Modules",  # memory, unix-logs (*nix)
         "Command_|_password|secure|credentials|security": "T1552.001 - Credentials in Files|T1555.004 - Windows Credential Manager|T1555.005 - Password Managers",  # memory, evt (Windows)
-        "Command_|_payment|request|urgent": "T1656 - Impersonation",
+        "Command_|_payment|request|urgent": "T1684.001 - Impersonation",
         "Command_|_performancecache|_vba_project": "T1564.007 - VBA Stomping",  # memory, evt (Windows)
         "Command_|_ping\\.|ping |tracert|traceroute|ifconfig|dig |etc/host|etc/hosts|bonjour": "T1016.001 - Internet Connection Discovery|T1018 - Remote System Discovery",  # memory, unix-logs (*nix)
         "Command_|_plutil|lsuielement|lsenvironment|dfbundledisplayname|cfbundleidentifier": "T1647 - Plist File Modification",  # memory, unix-logs (*nix)
@@ -388,7 +388,7 @@ def create_transforms(
         "Command_|_ps -|ps  -|ps_-": "T1057 - Process Discovery",  # memory, unix-logs (*nix)
         "Command_|_psexec": "T1003.001 - LSASS Memory|T1569.002 - Service Execution|T1570 - Lateral Tool Transfer",  # memory, evt (Windows)
         "Command_|_psinject|peinject|ntqueueapcthread|queueuserapc": "T1055.004 - Asynchronous Procedure Call",  # memory, evt (Windows)
-        "Command_|_psreadline|set-psreadlineoption": "T1070.003 - Clear Command History|T1562.003 - Impair Command History Logging",  # memory, evt (Windows)
+        "Command_|_psreadline|set-psreadlineoption": "T1070.003 - Clear Command History|T1690 - Prevent Command History Logging",  # memory, evt (Windows)
         "Command_|_pubprn": "T1216.001 - PubPrn",  # memory, evt (Windows)
         "Command_|_python|\\.py": "T1059.006 - Python",  # memory, evt (Windows)
         "Command_|_queueuserapc": "T1055.004 - Asynchronous Procedure Call",  # memory, evt (Windows)
@@ -410,7 +410,7 @@ def create_transforms(
         "Command_|_services": "T1489 - Service Stop",  # memory, unix-logs (*nix)
         "Command_|_set-adaccountpassword": "T1531 - Account Access Removal",
         "Command_|_set-casmailbox": "T1098.005 - Device Registration",  # memory, evt (Windows)
-        "Command_|_set-etwtraceprovider|zwopenprocess|getextendedtcptable": "T1562.006 - Indicator Blocking",  # memory, evt (Windows)
+        "Command_|_set-etwtraceprovider|zwopenprocess|getextendedtcptable": "T1685 - Disable or Modify Tools",  # memory, evt (Windows)
         "Command_|_setthreadcontext": "T1055.003 - Thread Execution Hijacking|T1055.004 - Asynchronous Procedure Call|T1055.005 - Thread Local Storage|T1055.012 - Process Hollowing|T1055.013 - Process Doppelganging|T1106 - Native API",  # memory, evt (Windows)
         "Command_|_setwindowshook|setwineventhook": "T1056.004 - Credential API Hooking",  # memory, evt (Windows)
         "Command_|_shellexecute|setlasterror|httpopenrequesta|createpipe|getusernamew|callwindowproc|enumresourcetypesa|connectnamedpipe|wnetaddconnection2|zwwritevirtualmemory|zwprotectvirtualmemory|zwqueueapcthread|ntresumethread|terminateprocess|getmodulefilename|lstrcat|createfile|readfile|getprocessbyid|writefile|closehandle|getcurrenthwprofile|getprocaddress|dwritecreatefactory|findnexturlcacheentrya|findfirsturlcacheentrya|getwindowsdirectoryw|movefileex|regenumkeyw": "T1106 - Native API",  # memory, evt (Windows)
@@ -442,7 +442,7 @@ def create_transforms(
         "Command_|_virtualalloc": "T1055.001 - Dynamic-link Library Injection|T1055.002 - Portable Executable Injection|T1055.003 - Thread Execution Hijacking|T1055.004 - Asynchronous Procedure Call|T1055.005 - Thread Local Storage|T1055.012 - Process Hollowing|T1106 - Native API",  # memory, evt (Windows)
         "Command_|_vpcext|vmtoolsd|msacpi_thermalzonetemperature": "T1497.001 - System Checks",  # memory, evt (Windows)
         "Command_|_vssadmin|wbadmin|shadows|shadowcopy|erase|format": "T1006 - Direct Volume Access|T1490 - Inhibit System Recovery|T1553.006 - Code Signing Policy Modification",  # memory, evt (Windows)
-        "Command_|_wevtutil|openeventlog|cleareventlog": "T1070.001 - Clear Windows Event Logs|T1654 - Log Enumeration",  # memory, evt (Windows)
+        "Command_|_wevtutil|openeventlog|cleareventlog": "T1685.005 - Clear Windows Event Logs|T1654 - Log Enumeration",  # memory, evt (Windows)
         "Command_|_windowstyle|hidden": "T1564.003 - Hidden Window",  # memory, evt (Windows)
         "Command_|_winexec": "T1106 - Native API|T1543.003 - Windows Service|T1546.009 - AppCert DLLs",  # memory, evt (Windows)
         "Command_|_winrm": "T1021.006 - Windows Remote Management",  # memory, evt (Windows)
@@ -460,13 +460,13 @@ def create_transforms(
         "EventID_|_^106|140|141|4698|4700|4701$": "T1053.002 - At|T1053.005 - Scheduled Task",
         "EventID_|_^1063$": "T1557.003 - DHCP Spoofing",  # evt
         "EventID_|_^1074|6006$": "T1529 - System Shutdown/Reboot",  # evt
-        "EventID_|_^1102$": "T1070.001 - Clear Windows Event Logs",  # evt
+        "EventID_|_^1102$": "T1685.005 - Clear Windows Event Logs",  # evt
         "EventID_|_^1341$": "T1557.003 - DHCP Spoofing",  # evt
         "EventID_|_^1342$": "T1557.003 - DHCP Spoofing",  # evt
         "EventID_|_^17|18$": "T1055.002 - Portable Execution Injection",  # evt
         "EventID_|_^3033|3063$": "T1547.008 - LSASS Driver|T1553.003 - SIP and Trust Provider Hijacking",  # evt
         "EventID_|_^307|510$": "T1484.002 - Domain Trust Modification",  # evt
-        "EventID_|_^400$": "T1562.010 - Downgrade Attack",  # evt
+        "EventID_|_^400$": "T1689 - Downgrade Attack",  # evt
         "EventID_|_^4624|4634$": "T1558.001 - Golden Ticket|T1558.002 - Silver Ticket",  # evt
         "EventID_|_^4625|4648|4771$": "T1110.003 - Password Spraying",  # evt
         "EventID_|_^4657$": "T1112 - Modify Registry|T1557.001 - LLMNR/NBT-NS Poisoning and SMB Relay",  # evt
@@ -504,14 +504,14 @@ def create_transforms(
         "Filename_|_appcmd\\.exe|inetsrv/config/applicationhost\\.config": "T1505.004 - IIS Components",  # journal, LastAccessTime, metadata & iocs
         "Filename_|_at\\.(?:exe|allow|deny)": "T1053.002 - At",  # journal, LastAccessTime, metadata & iocs
         "Filename_|_atbroker|displayswitch|magnify|narrator|osk\\.|sethc|utilman": "T1546.008 - Accessibility Features",  # journal, LastAccessTime, metadata & iocs
-        "Filename_|_audit\\.d|audit\\.conf|audit\\.rules|auditctl|systemctl": "T1562.012 - Disable or Modify Linux Audit System",  # journal, LastAccessTime, metadata & iocs
+        "Filename_|_audit\\.d|audit\\.conf|audit\\.rules|auditctl|systemctl": "T1685.004 - Disable or Modify Linux Audit System Log",  # journal, LastAccessTime, metadata & iocs
         "Filename_|_autoruns": "T1112 - Modify Registry",  # journal, LastAccessTime, metadata & iocs
         "Filename_|_backgrounditems\\.btm": "T1547.015 - Login Items",  # journal, LastAccessTime, metadata & iocs
         "Filename_|_bash_history": "T1552.003 - Bash History",  # journal, LastAccessTime, metadata & iocs
-        "Filename_|_bcdedit": "T1553.006 - Code Signing Policy Modification|T1562.009 - Safe Mode Boot",  # journal, LastAccessTime, metadata & iocs
+        "Filename_|_bcdedit": "T1553.006 - Code Signing Policy Modification|T1688 - Safe Mode Boot",  # journal, LastAccessTime, metadata & iocs
         "Filename_|_bcdedit|csrutil": "T1553.006 - Code Signing Policy Modification",  # journal, LastAccessTime, metadata & iocs
         "Filename_|_bluetooth": "T1011.001 - Exfiltration over Bluetooth",  # journal, LastAccessTime, metadata & iocs
-        "Filename_|_bootcfg": "T1562.009 - Safe Mode Boot",  # journal, LastAccessTime, metadata & iocs
+        "Filename_|_bootcfg": "T1688 - Safe Mode Boot",  # journal, LastAccessTime, metadata & iocs
         "Filename_|_certmgr": "T1553.004 - Install Root Certificate",  # journal, LastAccessTime, metadata & iocs
         "Filename_|_certutil": "T1036.003 - Rename System Utilities|T1140 - Deobfuscate/Decode Files or Information|T1553.004 - Install Root Certificate",  # journal, LastAccessTime, metadata & iocs
         "Filename_|_cmd |cmd_|cmd\\.": "T1059.003 - Windows Command Shell|T1106 - Native API",  # journal, LastAccessTime, metadata & iocs
@@ -591,7 +591,7 @@ def create_transforms(
         "Message_|_/print processors/|/print_processors/": "T1547.012 - Print Processors",  # unix-logs, timeline
         "Message_|_/security/policy/secrets": "T1003.004 - LSA Secrets",  # unix-logs, timeline
         "Message_|_/special/perf": "T1137.002 - Office Test",  # unix-logs, timeline
-        "Message_|_/var/log": "T1070.002 - Clear Linux or Mac System Logs",  # unix-logs, timeline
+        "Message_|_/var/log": "T1685.006 - Clear Linux or Mac System Logs",  # unix-logs, timeline
         "Message_|_\\.7z|\\.arj|\\.tar|\\.tgz|\\.zip|tar|diantz": "T1560.001 - Archive via Utility",  # unix-logs, timeline
         "Message_|_\\.asc|\\.cer|\\.gpg|\\.key|\\.p12|\\.p7b|\\.pem|\\.pfx|\\.pgp|\\.ppk": "T1552.004 - Private Keys",  # unix-logs, timeline
         "Message_|_\\.chm|\\.hh": "T1218.001 - Compiled HTML File",  # unix-logs, timeline
@@ -617,16 +617,16 @@ def create_transforms(
         "Message_|_ascii|unicode|hex|base64|mime": "T1132.001 - Standard Encoding",  # unix-logs, timeline
         "Message_|_at\\.(?:exe|allow|deny)": "T1053.002 - At",  # unix-logs, timeline
         "Message_|_atbroker|displayswitch|magnify|narrator|osk\\.|sethc|utilman": "T1546.008 - Accessibility Features",  # unix-logs, timeline
-        "Message_|_audit\\.d|audit\\.conf|audit\\.rules|auditctl|systemctl": "T1562.012 - Disable or Modify Linux Audit System",  # unix-logs, timeline
+        "Message_|_audit\\.d|audit\\.conf|audit\\.rules|auditctl|systemctl": "T1685.004 - Disable or Modify Linux Audit System Log",  # unix-logs, timeline
         "Message_|_authorizationexecutewithprivileges|security_authtrampoline": "T1548.004 - Elevated Execution with Prompt",  # unix-logs, timeline
         "Message_|_authorized_keys|sshd_config|ssh-keygen": "T1098.004 - SSH Authorized Keys",  # unix-logs, timeline
         "Message_|_autoruns|reg |reg\\.exe": "T1112 - Modify Registry",  # unix-logs, timeline
         "Message_|_backgrounditems\\.btm": "T1547.015 - Login Items",  # unix-logs, timeline
         "Message_|_bash_history": "T1552.003 - Bash History",  # unix-logs, timeline
-        "Message_|_bcdedit": "T1553.006 - Code Signing Policy Modification|T1562.009 - Safe Mode Boot",  # unix-logs, timeline
+        "Message_|_bcdedit": "T1553.006 - Code Signing Policy Modification|T1688 - Safe Mode Boot",  # unix-logs, timeline
         "Message_|_bcdedit|csrutil": "T1553.006 - Code Signing Policy Modification",  # unix-logs, timeline
         "Message_|_bluetooth": "T1011.001 - Exfiltration over Bluetooth",  # unix-logs, timeline
-        "Message_|_bootcfg": "T1562.009 - Safe Mode Boot",  # unix-logs, timeline
+        "Message_|_bootcfg": "T1688 - Safe Mode Boot",  # unix-logs, timeline
         "Message_|_certutil": "T1036.003 - Rename System Utilities|T1140 - Deobfuscate/Decode Files or Information|T1553.004 - Install Root Certificate",  # unix-logs, timeline
         "Message_|_chage|common-password|pwpolicy|getaccountpolicies": "T1201 - Password Policy Discovery",  # unix-logs, timeline
         "Message_|_chmod": "T1222.002 - Linux and Mac File and Directory Permissions Modification|T1548.001 - Setuid and Setgid",  # unix-logs, timeline
@@ -643,7 +643,7 @@ def create_transforms(
         "Message_|_currentcontrolset/control/lsa": "T1003.001 - LSASS Memory|T1547.002 - Authentication Package|T1547.005 - Security Support Provider|T1556.002 - Password Filter DLL",  # unix-logs, timeline
         "Message_|_currentcontrolset/control/nls/language": "T1614.001 - System Language Discovery",  # unix-logs, timeline
         "Message_|_currentcontrolset/control/print/monitors": "T1547.010 - Port Monitors",  # unix-logs, timeline
-        "Message_|_currentcontrolset/control/safeboot/minimal": "T1562.009 - Safe Mode Boot",  # unix-logs, timeline
+        "Message_|_currentcontrolset/control/safeboot/minimal": "T1688 - Safe Mode Boot",  # unix-logs, timeline
         "Message_|_currentcontrolset/control/session manager|currentcontrolset/control/session_manager": "T1546.009 - AppCert DLLs|T1547.001 - Registry Run Keys / Startup Folder",  # unix-logs, timeline
         "Message_|_currentcontrolset/services/": "T1574.011 - Services Registry Permissions Weakness",  # unix-logs, timeline
         "Message_|_currentcontrolset/services/termservice/parameters": "T1505.005 - Terminal Services DLL",  # unix-logs, timeline
@@ -677,13 +677,13 @@ def create_transforms(
         "Message_|_gsecdump|mimikatz|pwdumpx|secretsdump|reg save|reg save|net user|net user|net\\.exe user|net\\.exe user|net1 user|net1 user|net1\\.exe user|net1\\.exe user|reg_save|reg_save|net user|net user|net\\.exe user|net\\.exe user|net1 user|net1 user|net1\\.exe user|net1\\.exe user|reg_save|reg__save|net_user|net__user|net\\.exe_user|net\\.exe__user|net1_user|net1__user|net1\\.exe_user|net1\\.exe__user": "T1003.002 - Security Account Manager",  # unix-logs, timeline
         "Message_|_halt": "T1529 - System Shutdown/Reboot",  # unix-logs, timeline
         "Message_|_hidden|uielement": "T1564.003 - Hidden Window",  # unix-logs, timeline
-        "Message_|_histcontrol": "T1562.003 - Impair Command History Logging",  # unix-logs, timeline
-        "Message_|_history|histfile": "T1070.003 - Clear Command History|T1552.003 - Bash History|T1562.003 - Impair Command History Logging",  # unix-logs, timeline
+        "Message_|_histcontrol": "T1690 - Prevent Command History Logging",  # unix-logs, timeline
+        "Message_|_history|histfile": "T1070.003 - Clear Command History|T1552.003 - Bash History|T1690 - Prevent Command History Logging",  # unix-logs, timeline
         "Message_|_hostname |systeminfo|whoami": "T1033 - System Owner/User Discovery",  # unix-logs, timeline
         "Message_|_init |init_": "T1036.009 - Break Process Tree",  # unix-logs, timeline
         "Message_|_is_debugging|sysctl|ptrace": "T1497.001 - System Checks|T1622 - Debugger Evasion",  # unix-logs, timeline
         "Message_|_keychain": "T1555.001 - Keychain",  # unix-logs, timeline
-        "Message_|_kill ": "T1489 - Service Stop|T1548.003 - Sudo and Sudo Caching|T1562.001 - Disable or Modify Tools",  # unix-logs, timeline
+        "Message_|_kill ": "T1489 - Service Stop|T1548.003 - Sudo and Sudo Caching|T1685 - Disable or Modify Tools",  # unix-logs, timeline
         "Message_|_launchagents": "T1543.001 - Launch Agent",  # unix-logs, timeline
         "Message_|_launchctl": "T1569.001 - Launchctl",  # unix-logs, timeline
         "Message_|_launchdaemons": "T1543.004 - Launch Daemon",  # unix-logs, timeline
@@ -714,7 +714,7 @@ def create_transforms(
         "Message_|_pam_unix\\.so": "T1556.003 - Pluggable Authentication Modules",  # unix-logs, timeline
         "Message_|_panel/cpls": "T1218.002 - Control Panel",  # unix-logs, timeline
         "Message_|_password|pwd|login|secure|credentials": "T1552.001 - Credentials in Files|T1555.005 - Password Managers",  # unix-logs, timeline
-        "Message_|_payment|request|urgent": "T1656 - Impersonation",
+        "Message_|_payment|request|urgent": "T1684.001 - Impersonation",
         "Message_|_ping\\.|ping |traceroute|ifconfig|dig |etc/host|etc/hosts|bonjour": "T1016.001 - Internet Connection Discovery|T1018 - Remote System Discovery",  # unix-logs, timeline
         "Message_|_policy\\.vpol|vaultcmd|vcrd": "T1555.004 - Windows Credential Manager",  # unix-logs, timeline
         "Message_|_portopening": "T1090.001 - Internal Proxy",  # unix-logs, timeline
@@ -767,9 +767,9 @@ def create_transforms(
         "Process_|_at\\.(exe|allow|deny)|cron": "T1053.002 - At",  # memory, evt (Windows)
         "Process_|_atbroker|displayswitch|magnify|narrator|osk\\.|sethc|utilman": "T1546.008 - Accessibility Features",  # memory, evt (Windows)
         "Process_|_attrib": "T1564.001 - Hidden Files and Directories",  # memory, evt (Windows)
-        "Process_|_audit\\.d|audit\\.conf|audit\\.rules|auditctl|systemctl": "T1562.012 - Disable or Modify Linux Audit System",  # memory, evt (*nix)
+        "Process_|_audit\\.d|audit\\.conf|audit\\.rules|auditctl|systemctl": "T1685.004 - Disable or Modify Linux Audit System Log",  # memory, evt (*nix)
         "Process_|_az ad user get-member-groups|get-msolrole|getbucketacl|listattachedrolepolicies|listrolepolicies": "T1069.003 - Cloud Groups",  # memory, evt (Windows)
-        "Process_|_bcdedit": "T1490 - Inhibit System Recovery|T1553.006 - Code Signing Policy Modification|T1562.009 - Safe Mode Boot",  # journal (Windows)
+        "Process_|_bcdedit": "T1490 - Inhibit System Recovery|T1553.006 - Code Signing Policy Modification|T1688 - Safe Mode Boot",  # journal (Windows)
         "Process_|_bluetooth": "T1011.001 - Exfiltration over Bluetooth",  # memory, evt (Windows)
         "Process_|_certutil": "T1036.003 - Rename System Utilities|T1140 - Deobfuscate/Decode Files or Information|T1553.004 - Install Root Certificate",  # memory, evt (Windows)
         "Process_|_cmd |cmd_|cmd\\.": "T1059.003 - Windows Command Shell|T1106 - Native API",  # memory, evt (Windows)
@@ -852,7 +852,7 @@ def create_transforms(
         "Process_|_verclsid": "T1218.012 - Verclsid",  # memory, evt (Windows)
         "Process_|_virtualalloc": "T1055.001 - Dynamic-link Library Injection|T1055.002 - Portable Executable Injection|T1055.003 - Thread Execution Hijacking|T1055.004 - Asynchronous Procedure Call|T1055.005 - Thread Local Storage|T1055.012 - Process Hollowing|T1106 - Native API",  # memory, evt (Windows)
         "Process_|_vssadmin|wbadmin|shadows|shadowcopy|erase|format": "T1490 - Inhibit System Recovery|T1553.006 - Code Signing Policy Modification",  # memory, evt (Windows)
-        "Process_|_wevtutil|openeventlog|cleareventlog": "T1070.001 - Clear Windows Event Logs|T1654 - Log Enumeration",  # memory, evt (Windows)
+        "Process_|_wevtutil|openeventlog|cleareventlog": "T1685.005 - Clear Windows Event Logs|T1654 - Log Enumeration",  # memory, evt (Windows)
         "Process_|_winexec": "T1106 - Native API|T1543.003 - Windows Service|T1546.009 - AppCert DLLs",  # memory, evt (Windows)
         "Process_|_winrm": "T1021.006 - Windows Remote Management",  # memory, evt (Windows)
         "Process_|_winzip|winrar|makecab|xcopy|diantz": "T1560.001 - Archive via Utility",  # memory, evt (Windows)
@@ -868,7 +868,7 @@ def create_transforms(
         "Registry_|_currentcontrolset/control/lsa": "T1003.001 - LSASS Memory|T1547.002 - Authentication Package|T1547.005 - Security Support Provider|T1556.002 - Password Filter DLL",  # registry
         "Registry_|_currentcontrolset/control/nls/language": "T1614.001 - System Language Discovery",  # registry
         "Registry_|_currentcontrolset/control/print/monitors": "T1547.010 - Port Monitors",  # registry
-        "Registry_|_currentcontrolset/control/safeboot/minimal": "T1562.009 - Safe Mode Boot",  # registry
+        "Registry_|_currentcontrolset/control/safeboot/minimal": "T1688 - Safe Mode Boot",  # registry
         "Registry_|_currentcontrolset/control/session manager|currentcontrolset/control/session_manager": "T1547.001 - Registry Run Keys / Startup Folder|T1546.009 - AppCert DLLs",  # registry
         "Registry_|_currentcontrolset/services/": "T1574.011 - Services Registry Permissions Weakness",  # registry
         "Registry_|_currentcontrolset/services/termservice/parameters": "T1505.005 - Terminal Services DLL",  # registry

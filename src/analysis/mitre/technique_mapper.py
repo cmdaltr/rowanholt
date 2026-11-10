@@ -95,7 +95,7 @@ class TechniqueMapper:
             ("T1070", 0.75),  # Indicator Removal
         ],
         "clear_logs": [
-            ("T1070.001", 0.95),  # Clear Windows Event Logs
+            ("T1685.005", 0.95),  # Clear Windows Event Logs
             ("T1070", 0.9),  # Indicator Removal
         ],
         # Credential Access
@@ -152,7 +152,7 @@ class TechniqueMapper:
         ],
         # Linux Enhanced Artifacts (Feature 3)
         "systemd_journal": [
-            ("T1070.002", 0.7),  # Clear Linux or Mac System Logs
+            ("T1685.006", 0.7),  # Clear Linux or Mac System Logs
         ],
         "audit_execve": [
             ("T1059", 0.9),  # Command and Scripting Interpreter
@@ -214,7 +214,7 @@ class TechniqueMapper:
         ],
         # macOS Enhanced Artifacts (Feature 3)
         "unified_log": [
-            ("T1070.002", 0.7),  # Clear Linux or Mac System Logs
+            ("T1685.006", 0.7),  # Clear Linux or Mac System Logs
         ],
         "coreduet_app_usage": [
             ("T1083", 0.75),  # File and Directory Discovery
@@ -272,7 +272,7 @@ class TechniqueMapper:
         },
         "powershell_execution_policy_bypass": {
             "patterns": [r"-executionpolicy bypass", r"-ep bypass"],
-            "techniques": [("T1562.001", 0.2)],  # Disable or Modify Tools
+            "techniques": [("T1685", 0.2)],  # Disable or Modify Tools
         },
         "mimikatz": {
             "patterns": [r"mimikatz", r"sekurlsa", r"lsadump"],

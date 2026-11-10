@@ -30,6 +30,7 @@ from pathlib import Path
 TEXT_SUFFIXES = (".jsonl", ".csv", ".json", ".txt", ".log", ".tsv", ".audit")
 MAX_TEXT_BYTES = 64 << 20
 RECORDS = Path(__file__).resolve().parents[1] / "src" / "analysis" / "rowanholt" / "core" / "records.py"
+RELEASE = Path(__file__).resolve().parents[1] / "src" / "analysis" / "rowanholt" / "post" / "mitre" / "attack_release.json"
 
 
 def load_records():
@@ -41,6 +42,15 @@ def load_records():
 
 
 records = load_records()
+REVOKED = json.loads(RELEASE.read_text(encoding="utf-8")).get("revoked", {})
+
+
+def current_id(technique_id: str) -> str:
+    """The pinned release's ID (attack_lookup.current_id): a revoked technique's replacement, so an
+    expected.json naming the Atomic test's T1070.001 matches Elrond's T1685.005, and an older
+    case's mitre_techniques.txt matches an expected.json that names the v20.1 ID."""
+    tid = technique_id.strip().upper()
+    return REVOKED.get(tid, tid)
 
 
 def values(value) -> list:
@@ -133,8 +143,9 @@ def verify(host: Path, target: Path, techniques: set) -> list:
         row = {"item": label}
         row["collected"] = collected(item["path"], names) if "path" in item else None
         row["cooked"] = table(cooked, item["cooked"]) if "cooked" in item else None
-        row["attack"] = (item["attack"] in techniques or item["attack"].split(".")[0] in techniques) if "attack" in item else None
-        if "attack" in item and row["attack"] and item["attack"] not in techniques:
+        attack = current_id(item["attack"]) if "attack" in item else None
+        row["attack"] = (attack in techniques or attack.split(".")[0] in techniques) if attack else None
+        if attack and row["attack"] and attack not in techniques:
             row["attack"] = "parent"
         # A technique only YARA gives (the web shell marker in a web root) can't be there without it
         if item.get("attack_by") == "yara" and not yara_ran and row["attack"] is False:
@@ -175,7 +186,7 @@ def main() -> int:
     parser.add_argument("--json", action="store_true", help="print the results as JSON")
     args = parser.parse_args()
     out_dir, acq_dir = Path(args.output), Path(args.acquisitions)
-    techniques = set(read_text(out_dir / "mitre_techniques.txt").split())
+    techniques = {current_id(t) for t in read_text(out_dir / "mitre_techniques.txt").split()}
     results, bad = {}, 0
     for host, target in pair_hosts(out_dir, acq_dir):
         rows = verify(host, target, techniques)

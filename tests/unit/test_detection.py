@@ -87,7 +87,7 @@ class EventlogTechniquesTest(unittest.TestCase):
 
     def test_ids_are_scoped_to_their_channel(self) -> None:
         self.assertEqual(eventlog_techniques([_event("Microsoft-Windows-Foo/Operational", 1102)]), set())
-        self.assertEqual(eventlog_techniques([_event("Security", 1102)]), {"T1070.001"})
+        self.assertEqual(eventlog_techniques([_event("Security", 1102)]), {"T1685.005"})
 
     def test_a_few_failed_logons_are_not_brute_force(self) -> None:
         self.assertEqual(eventlog_techniques([_event("Security", 4625)] * 4), set())

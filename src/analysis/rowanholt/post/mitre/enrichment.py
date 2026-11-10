@@ -107,6 +107,11 @@ except ImportError:
         enrich_technique = None
         ATTACK_TECHNIQUES = {}
 
+try:
+    from rowanholt.post.mitre import attack_lookup
+except ImportError:
+    from . import attack_lookup
+
 # Try to import the MITRE modules (legacy)
 try:
     from analysis.mitre import MitreAttackUpdater, TechniqueMapper
@@ -183,7 +188,7 @@ class MitreEnrichment:
         ],
         # Event logs
         "eventlogs": [
-            {"technique_id": "T1070.001", "technique_name": "Clear Windows Event Logs", "tactics": ["Defense Evasion"]},
+            {"technique_id": "T1685.005", "technique_name": "Clear Windows Event Logs", "tactics": ["Defense Evasion"]},
         ],
         # SRUM
         "srum": [
@@ -306,7 +311,7 @@ class MitreEnrichment:
         "T1047": ["APT29", "Lazarus Group", "FIN7", "Wizard Spider"],
         "T1546.003": ["APT29", "Turla", "Leviathan"],
         "T1197": ["APT41", "Leviathan", "Turla"],
-        "T1070.001": ["APT28", "APT29", "APT41", "Lazarus Group"],
+        "T1685.005": ["APT28", "APT29", "APT41", "Lazarus Group"],
         "T1070.004": ["APT28", "APT29", "Turla", "Lazarus Group"],
         "T1070.006": ["APT28", "APT29", "APT41", "Lazarus Group"],
         "T1083": ["APT28", "APT29", "Turla", "Lazarus Group", "OilRig"],
@@ -388,8 +393,9 @@ class MitreEnrichment:
         if technique_id in self.groups_by_technique:
             return self.groups_by_technique[technique_id]
 
-        # Fall back to static mapping
-        return self.TECHNIQUE_GROUPS.get(technique_id, [])
+        # Fall back to static mapping, keyed by the pinned release's IDs (a revoked one's replacement)
+        return self.TECHNIQUE_GROUPS.get(technique_id) or self.TECHNIQUE_GROUPS.get(
+            attack_lookup.current_id(technique_id), [])
 
     def get_techniques_for_artefact(self, artefact_type: str) -> List[Dict]:
         """Get MITRE techniques associated with an artefact type."""
