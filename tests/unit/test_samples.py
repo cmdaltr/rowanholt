@@ -60,15 +60,85 @@ class TheCatalogue(unittest.TestCase):
         for slot in ("windows-disk", "windows-memory", "linux-disk", "linux-memory", "macos-disk", "android", "ios"):
             self.assertIn(slot, covers)
         for s in listed:
-            for entry in s["files"]:
+            for entry in s.get("files", []):
                 self.assertTrue(entry["url"].startswith("https://"), entry["url"])
             self.assertTrue(s["images"])
             self.assertTrue(s["folder"] and not s["folder"].startswith("/"))
 
     def test_only_13cubed_has_no_published_hash(self):
-        unhashed = [e["name"] for s in samples.catalogue() for e in s["files"]
+        unhashed = [e["name"] for s in samples.catalogue() for e in s.get("files", [])
                     if not (e.get("sha256") or e.get("md5") or e.get("sha256_from"))]
         self.assertEqual(unhashed, ["linux_challenge.zip"])
+
+    def test_the_lab_builds_windows_11_and_macos_15(self):
+        win, mac = samples.sample("lab-win11-atomics"), samples.sample("lab-macos15-atomics")
+        self.assertEqual(win["build"]["command"], "./lab/lab.sh windows-vm sample {dest}")
+        self.assertEqual(mac["build"]["command"], "./lab/lab.sh macos-vm sample {dest}")
+        self.assertEqual((win["images"], mac["images"]), (["memory.mem", "disk.dd"], ["disk.img"]))
+        for s in (win, mac):
+            self.assertEqual((s["publisher"], s["answers"]), ("Rowanholt lab", "expected.json"))
+            self.assertNotIn("files", s)
+
+
+class BuiltLocally(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.s = {"id": "lab", "folder": "samples/lab", "images": ["memory.mem", "disk.dd"], "answers": "expected.json",
+                  "build": {"command": "./lab/lab.sh windows-vm sample {dest}", "host": "an x86-64 host",
+                            "produces": ["memory.mem", "disk.dd", "expected.json"], "takes": "hours"},
+                  "options": {"memory": True}}
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def put(self, *names):
+        folder = self.root / "samples/lab"
+        folder.mkdir(parents=True, exist_ok=True)
+        for name in names:
+            (folder / name).write_bytes(b"x")
+        return folder
+
+    def test_validation(self):
+        samples.check(self.s)
+        bad = [{**self.s, "files": [{"name": "x.zip", "url": "https://x"}]},
+               {k: v for k, v in self.s.items() if k != "build"},
+               {**self.s, "build": {**self.s["build"], "host": ""}},
+               {**self.s, "build": {**self.s["build"], "command": "./lab/lab.sh windows-vm sample"}},
+               {**self.s, "answers": "https://example.org/answers"},
+               {**self.s, "answers": "../expected.json"}]
+        for entry in bad:
+            with self.assertRaises(samples.SampleError, msg=entry):
+                samples.check(entry)
+
+    def test_fetching_one_is_refused_with_its_build_command(self):
+        with mock.patch.object(samples.urllib.request, "urlopen") as urlopen:
+            with self.assertRaisesRegex(samples.SampleError, "can't be downloaded.*windows-vm sample .*samples/lab"):
+                samples.fetch(self.s, self.root)
+            with self.assertRaisesRegex(samples.SampleError, "not built yet"):
+                samples.unpack(self.s, self.root)
+        urlopen.assert_not_called()
+
+    def test_status_once_every_image_and_the_answer_key_are_there(self):
+        self.assertEqual(samples.status(self.s, self.root), {"id": "lab", "files": [], "images": [], "ready": False})
+        self.put("memory.mem", "disk.dd")
+        self.assertFalse(samples.status(self.s, self.root)["ready"])  # still building: no expected.json
+        folder = self.put("expected.json")
+        (folder / "disk.dd").unlink()
+        self.assertFalse(samples.status(self.s, self.root)["ready"])  # the disk is missing
+        self.put("disk.dd")
+        state = samples.status(self.s, self.root)
+        self.assertTrue(state["ready"])
+        self.assertEqual(state["images"], [str(folder / "memory.mem"), str(folder / "disk.dd")])
+        self.assertEqual(samples.answers_file(self.s, self.root), folder / "expected.json")
+        body = samples.job_request(self.s, samples.unpack(self.s, self.root))
+        self.assertEqual(body["source_paths"], state["images"])
+        self.assertEqual(body["options"], {"memory": True})
+
+    def test_the_build_command_writes_into_its_folder(self):
+        root = Path(self.tmp.name, "with space")
+        self.assertEqual(samples.build_command(self.s, root),
+                         f"./lab/lab.sh windows-vm sample '{root}/samples/lab'")
 
 
 class Fetching(unittest.TestCase):
@@ -198,6 +268,27 @@ class SampleRoutes(BackendCase):
             self.assertEqual(job["backup_password"], "MyPassword123")
             self.assertEqual(self.client.post("/api/samples/szechuan-desktop/import", headers=self.admin).status_code, 409)
             self.assertEqual(self.client.post("/api/samples/nope/import", headers=self.admin).status_code, 404)
+
+    def test_a_built_sample_lists_its_build_and_is_never_fetched(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict("os.environ", {"ROWANHOLT_SAMPLES_DIR": tmp}):
+            folder = Path(tmp, "samples", "macos15-atomics")
+            listed = {s["id"]: s for s in self.client.get("/api/samples", headers=self.admin).json()["samples"]}
+            mac = listed["lab-macos15-atomics"]
+            self.assertEqual(mac["build"]["command"], f"./lab/lab.sh macos-vm sample {folder}")
+            self.assertEqual((mac["images"], mac["job"], mac["answers"]), ([], None, ""))
+            self.assertIsNone(listed["szechuan-desktop"]["build"])
+            fetch = self.client.post("/api/samples/lab-macos15-atomics/fetch", headers=self.admin)
+            self.assertEqual(fetch.status_code, 409)
+            self.assertIn("macos-vm sample", fetch.json()["detail"])
+            self.assertEqual(self.client.post("/api/samples/lab-macos15-atomics/import", headers=self.admin).status_code, 409)
+            folder.mkdir(parents=True)
+            (folder / "disk.img").write_bytes(b"x")
+            (folder / "expected.json").write_text("{}")
+            mac = {s["id"]: s for s in self.client.get("/api/samples", headers=self.admin).json()["samples"]}["lab-macos15-atomics"]
+            self.assertEqual(mac["answers"], str(folder / "expected.json"))
+            self.assertEqual(mac["job"]["source_paths"], [str(folder / "disk.img")])
+            job = self.client.post("/api/samples/lab-macos15-atomics/import", headers=self.admin).json()
+            self.assertEqual(job["case_number"], "SAMPLE-LAB-MACOS15-ATOMICS")
 
 
 if __name__ == "__main__":

@@ -4,7 +4,8 @@ downloaded, and fetching one. Admin-only: a fetch downloads gigabytes from the i
 
 The catalogue and the downloads are Elrond's rowanholt/samples (also `rowanholt samples`), in
 ROWANHOLT_SAMPLES_DIR. A fetch runs in the worker; importing one is an ordinary job, which the
-web app starts through /api/jobs with the sources and options listed here.
+web app starts through /api/jobs with the sources and options listed here. The lab's own samples
+are built, not fetched: listed with their build command, imported the same way once built.
 """
 
 import importlib.util
@@ -55,10 +56,16 @@ async def list_samples(_: dict = Depends(require_admin)) -> dict:
         job = samples.job_request(s, found) if found else None
         if job:
             job.pop("backup_password", None)  # sent by the import itself, not listed
-        listed.append({**{k: s.get(k, "") for k in ("id", "title", "covers", "os", "publisher", "page",
-                                                       "answers", "terms", "catches")},
-                       "files": state["files"], "images": state["images"], "job": job,
-                       "has_backup_password": bool(s.get("backup_password"))})
+        entry = {**{k: s.get(k, "") for k in ("id", "title", "covers", "os", "publisher", "page",
+                                                 "answers", "terms", "catches")},
+                 "files": state["files"], "images": state["images"], "job": job,
+                 "has_backup_password": bool(s.get("backup_password")), "build": None}
+        if samples.built(s):
+            # A built sample's answer key is a file beside its images, listed once it's there
+            answers = samples.answers_file(s, root)
+            entry["answers"] = str(answers) if answers else ""
+            entry["build"] = {**s["build"], "command": samples.build_command(s, root)}
+        listed.append(entry)
     return {"dir": str(root), "samples": listed}
 
 
@@ -73,7 +80,7 @@ async def import_body(sample_id: str, _: dict = Depends(require_admin)) -> dict:
         raise HTTPException(status_code=404, detail=str(exc))
     found = samples.images(s, samples.samples_dir())
     if not found:
-        raise HTTPException(status_code=409, detail=f"{sample_id} isn't fetched yet")
+        raise HTTPException(status_code=409, detail=f"{sample_id} isn't {'built' if samples.built(s) else 'fetched'} yet")
     return samples.job_request(s, found)
 
 
@@ -82,9 +89,12 @@ async def fetch_sample(sample_id: str, user: dict = Depends(require_admin)) -> d
     """Download, check and unpack a sample in the worker."""
     samples = samples_module()
     try:
-        samples.sample(sample_id)
+        s = samples.sample(sample_id)
     except samples.SampleError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+    if samples.built(s):
+        raise HTTPException(status_code=409, detail=f"{sample_id} can't be downloaded: it's built locally "
+                                                    f"({s['build']['host']}): {samples.build_command(s, samples.samples_dir())}")
     try:
         from tasks_docker import fetch_sample as task
     except ImportError:

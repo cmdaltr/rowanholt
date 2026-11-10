@@ -1,5 +1,5 @@
 {
-  "about": "Public forensic images Rowanholt imports as ready cases (rowanholt samples; samples.py). Folders are relative to ROWANHOLT_SAMPLES_DIR. Hashes are the publisher's; sha256_from fetches one from its publisher's API at download time; none published means the SHA-256 is recorded on first download (SHA256SUMS) and checked from then on.",
+  "about": "Public forensic images Rowanholt imports as ready cases (rowanholt samples; samples.py). Folders are relative to ROWANHOLT_SAMPLES_DIR. Hashes are the publisher's; sha256_from fetches one from its publisher's API at download time; none published means the SHA-256 is recorded on first download (SHA256SUMS) and checked from then on. A build in place of files is a sample Rowanholt's lab builds on a host of its own (never fetched): command, run from the repo, writes into {dest}, its folder; answers is a file there.",
   "samples": [
     {
       "id": "szechuan-desktop",
@@ -122,6 +122,46 @@
       "images": ["00008030-001259123E50802E"],
       "backup_password": "MyPassword123",
       "options": {"local": false, "mobile": true, "navigator": true}
+    },
+    {
+      "id": "lab-win11-atomics",
+      "title": "Rowanholt lab: Windows 11 after Atomic Red Team, disk and memory",
+      "covers": ["windows-disk", "windows-memory"],
+      "os": "Windows 11 x64",
+      "publisher": "Rowanholt lab",
+      "page": "https://github.com/cmdaltr/rowanholt/blob/main/lab/README.md",
+      "answers": "expected.json",
+      "terms": "Built from your own Windows 11 ISO under Microsoft's licence; keep it in your lab",
+      "catches": "Built, not downloaded: a fresh install, then T1082, T1087.001, T1016, T1547.001, T1053.005, T1543.003, T1552.001, T1003.001, T1218.011, T1562.001 and T1070.001 with nothing cleaned up, memory and disk captured at one moment. Tamper Protection may have to be turned off by hand partway",
+      "folder": "samples/win11-atomics",
+      "build": {
+        "command": "./lab/lab.sh windows-vm sample {dest}",
+        "host": "an x86-64 host with QEMU (the Intel Mac Mini) and the Windows 11 x64 ISO in the lab's isos folder",
+        "produces": ["memory.mem", "disk.dd", "SHA256SUMS", "expected.json", "recording/"],
+        "takes": "a few hours: the unattended install, the tests, then a 48 GB disk written out raw"
+      },
+      "images": ["memory.mem", "disk.dd"],
+      "options": {"analysis": true, "extract_iocs": true, "memory": true, "navigator": true}
+    },
+    {
+      "id": "lab-macos15-atomics",
+      "title": "Rowanholt lab: macOS 15 Sequoia after Atomic Red Team, disk",
+      "covers": ["macos-disk"],
+      "os": "macOS 15 Sequoia",
+      "publisher": "Rowanholt lab",
+      "page": "https://github.com/cmdaltr/rowanholt/blob/main/lab/README.md",
+      "answers": "expected.json",
+      "terms": "Apple's licence: macOS runs virtualised only on Apple hardware and can't be redistributed, so each lab builds its own",
+      "catches": "Built, not downloaded; disk only, no memory",
+      "folder": "samples/macos15-atomics",
+      "build": {
+        "command": "./lab/lab.sh macos-vm sample {dest}",
+        "host": "a Mac with Apple silicon and Tart",
+        "produces": ["disk.img", "expected.json", "recording/"],
+        "takes": "an hour or two: the VM, the tests, then its disk written out raw"
+      },
+      "images": ["disk.img"],
+      "options": {"analysis": true, "extract_iocs": true, "navigator": true}
     }
   ]
 }

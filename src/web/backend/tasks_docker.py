@@ -602,10 +602,7 @@ def fetch_sample(self, sample_id: str) -> dict:
     def progress(name, done, total):
         self.update_state(state="PROGRESS", meta={"file": name, "bytes": done, "total": total})
     try:
-        s = samples.sample(sample_id)
-        for entry in s["files"]:
-            samples.fetch_file(s, entry, root, progress)
-        found = samples.unpack(s, root)
+        found = samples.fetch(samples.sample(sample_id), root, progress)
         return {"ok": True, "output": "Ready: " + ", ".join(p.name for p in found)}
     except (samples.SampleError, OSError) as exc:
         return {"ok": False, "output": str(exc)}

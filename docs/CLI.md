@@ -574,6 +574,8 @@ Shadow copies (`--vss`) get their own `<image> (volume shadow copy #N)` entries 
 | `magnet-2022-linux` | Linux disk | Magnet 2022 CTF via Digital Corpora (SHA-256 from its API) |
 | `mvs2026-mac` | macOS 15 disk | Magnet Virtual Summit 2026 CTF |
 | `android14`, `ios17`, `ios17-backup` | Android 14, iOS 17 (file system extraction, and the encrypted backup with its published password) | Josh Hickman via Digital Corpora |
+| `lab-win11-atomics` | Windows 11 disk and memory after Atomic Red Team | Built by the lab: `./lab/lab.sh windows-vm sample <dir>` on an x86-64 host with QEMU |
+| `lab-macos15-atomics` | macOS 15 disk after Atomic Red Team | Built by the lab: `./lab/lab.sh macos-vm sample <dir>` on Apple silicon with Tart (Apple's licence rules out sharing one) |
 
 ```bash
 export ROWANHOLT_SAMPLES_DIR=/Volumes/Data/samples    # a folder the worker reads; tens of GB per sample
@@ -583,6 +585,8 @@ rowanholt samples import szechuan-desktop                       # case SAMPLE-SZ
 ```
 
 A fetch resumes a part-downloaded file, and keeps a file under its own name only once it matches its publisher's hash. A file that doesn't match is left as `<name>.bad`. The fetch then unpacks each archive beside it. An import starts the case through the API, as the web app's form does: `ROWANHOLT_API` (default `http://localhost:5688`), and `ROWANHOLT_TOKEN` on a team server. `--force` replaces a case folder that's already there. Aragorn's Settings tab lists the same samples, with Fetch (run in the worker) and Import.
+
+The two lab samples can't be downloaded, so `fetch` refuses them (and `--all` passes over them). `list` shows each one's build command, writing into its folder under the samples folder (`samples/win11-atomics`, `samples/macos15-atomics`). Built on another machine, the folder is copied there. A lab sample counts as built once its images (`memory.mem` and `disk.dd`, or `disk.img`) and `expected.json`, the answer key the build writes last, are all in that folder. `import` then starts it like any other.
 
 ### Memory symbol tables
 
