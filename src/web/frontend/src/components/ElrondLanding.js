@@ -1,7 +1,7 @@
 import React from 'react';
 import NewAnalysis from './NewAnalysis';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
 
 const ElrondLanding = () => {
   return (

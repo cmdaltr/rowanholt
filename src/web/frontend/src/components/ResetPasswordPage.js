@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { resetPassword } from '../api';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
 
 const ResetPasswordPage = () => {
   const navigate = useNavigate();

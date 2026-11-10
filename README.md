@@ -1,7 +1,7 @@
-# Rowanholt DF Acceleration Suite
+# Rowanholt™ DF Acceleration Suite
 
 <div align="center">
-  <img src="./docs/images/rowanholt.png" alt="Rowanholt" width="800"/>
+  <img src="./docs/images/rowanholt-tm.png" alt="Rowanholt™" width="800"/>
 
   **Digital Forensics Suite v2.1.0**
 </div>
@@ -560,6 +560,8 @@ We welcome contributions! Open an issue or pull request at https://github.com/cm
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+**Rowanholt™** and the Rowanholt logo are trademarks of cmdaltr. The MIT License covers the software; it does not grant any right to use the Rowanholt name or logo, whether to brand a fork or otherwise.
 
 ---
 

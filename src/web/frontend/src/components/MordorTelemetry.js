@@ -325,7 +325,7 @@ function MordorTelemetry() {
   return (
     <div className="journey-detail mt-page">
       <section className="hero-section">
-        <img src={`${process.env.PUBLIC_URL}/images/rowanholt.png`} alt="Mordor Recordings" className="hero-image"
+        <img src={`${process.env.PUBLIC_URL}/images/rowanholt-tm.png`} alt="Mordor Recordings" className="hero-image"
              style={{ transform: 'scale(0.2)', transformOrigin: 'center top' }} />
       </section>
       <header>

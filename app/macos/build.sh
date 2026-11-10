@@ -78,7 +78,7 @@ else
 fi
 
 cp "$ROOT/app/icons/rowanholt.icns" "$BUNDLE/Contents/Resources/Rowanholt.icns"
-cp "$ROOT/docs/images/rowanholt.png" "$BUNDLE/Contents/Resources/rowanholt.png"
+cp "$ROOT/docs/images/rowanholt-tm.png" "$BUNDLE/Contents/Resources/rowanholt.png"  # the logo, with its ™ (the icon stays plain)
 cp "$HERE/setup.html" "$HERE/journey.html" "$BUNDLE/Contents/Resources/"
 # The journey's map: the Shire to the Misty Mountains, cut from the Middle-earth map
 sips -c 300 520 --cropOffset 150 120 "$ROOT/docs/images/middle_earth.png" --out "$BUNDLE/Contents/Resources/journey.png" >/dev/null

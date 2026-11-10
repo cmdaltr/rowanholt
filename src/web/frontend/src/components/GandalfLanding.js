@@ -1,7 +1,7 @@
 import React from 'react';
 import NewAcquisition from './NewAcquisition';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
 
 const GandalfLanding = () => {
   return (

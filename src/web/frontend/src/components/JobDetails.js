@@ -4,7 +4,7 @@ import { getJob, cancelJob, pauseJob, resumeJob, deleteJob, restartJob, exportSi
 import { serviceUrl } from '../apiBase';
 import JobSharing from './JobSharing';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
 
 function JobDetails() {
   const { jobId } = useParams();

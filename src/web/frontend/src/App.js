@@ -140,7 +140,8 @@ function AppContent() {
           </p>
           <p className="attribution">
             This project contains references to "The Lord of the Rings" by J.R.R. Tolkien. This code is not affiliated with or endorsed by the Tolkien Estate or Peter Jackson.<br />
-            All trademarks and copyrights for that work belong to their respective owners.
+            All trademarks and copyrights for that work belong to their respective owners.<br />
+            Rowanholt™ and the Rowanholt logo are trademarks of cmdaltr. The MIT License covers the software; it does not grant any right to use the Rowanholt name or logo.
           </p>
           <p style={{
             marginTop: '1rem',

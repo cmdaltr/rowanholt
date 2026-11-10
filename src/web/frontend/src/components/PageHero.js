@@ -1,6 +1,6 @@
 import React from 'react';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
 
 // The logo and title banner every Rowanholt page opens with (as ElrondLanding and GandalfLanding)
 function PageHero({ title, children }) {

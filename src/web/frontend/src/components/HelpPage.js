@@ -6,7 +6,7 @@ const VERSION = '2.1.0';
 const REPO = 'https://github.com/cmdaltr/rowanholt';
 const doc = (name) => `${REPO}/blob/main/docs/${name}`;
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
 const architectureMap = `${process.env.PUBLIC_URL}/architecture/rowanholt-architecture.html`;
 const architecturePages = [
   { href: `${architectureMap}#realm`, preview: 'realm.jpg', title: 'The realm: Gandalf to Elrond to Aulë' },

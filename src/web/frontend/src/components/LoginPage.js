@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { login as apiLogin, loginAsGuest as apiLoginAsGuest, getAuthConfig } from '../api';
 import { API_BASE_URL } from '../apiBase';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
 
 const LoginPage = () => {
   const navigate = useNavigate();
