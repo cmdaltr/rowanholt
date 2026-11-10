@@ -246,14 +246,21 @@ def _stem(archive: Path) -> str:
     return name
 
 
+def case_number(sample_: Dict) -> str:
+    """The case a sample is imported as, which Elrond writes into the sample's folder."""
+    return "SAMPLE-" + sample_["id"].upper()
+
+
 def images(sample_: Dict, root: Path) -> List[Path]:
     """The sample's evidence in its folder: what each of its image patterns finds, once. A built
     sample's only once the build is done: every pattern found, and its answer key (written last)."""
     folder = root / sample_["folder"]
+    case = case_number(sample_)
     found: List[Path] = []
     for pattern in sample_["images"]:
+        # Not inside the case an import writes beside the images: it has a folder per image, of the same name
         matched = [p for p in (sorted(folder.rglob(pattern)) if folder.is_dir() else [])
-                   if not p.name.endswith((".part", ".bad"))]
+                   if not p.name.endswith((".part", ".bad")) and case not in p.relative_to(folder).parts]
         if built(sample_) and not matched:
             return []
         found.extend(p for p in matched if p not in found)
@@ -322,7 +329,7 @@ def job_request(sample_: Dict, sources: List[Path], force: bool = False) -> Dict
     options = dict(sample_.get("options", {}))
     if force:
         options["force_overwrite"] = True
-    body = {"case_number": "SAMPLE-" + sample_["id"].upper(), "source_paths": [str(p) for p in sources],
+    body = {"case_number": case_number(sample_), "source_paths": [str(p) for p in sources],
             "options": options}
     if sample_.get("backup_password"):
         body["backup_password"] = sample_["backup_password"]

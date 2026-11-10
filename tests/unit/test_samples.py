@@ -135,6 +135,13 @@ class BuiltLocally(unittest.TestCase):
         self.assertEqual(body["source_paths"], state["images"])
         self.assertEqual(body["options"], {"memory": True})
 
+    def test_an_imported_case_beside_the_images_isnt_evidence(self):
+        folder = self.put("memory.mem", "disk.dd", "expected.json")
+        for name in ("memory.mem", "disk.dd"):
+            (folder / "SAMPLE-LAB" / name / "SAMPLE-LAB").mkdir(parents=True)  # Elrond's output, a folder per image
+            (folder / "SAMPLE-LAB" / name / "extracted.raw").write_bytes(b"x")
+        self.assertEqual(samples.images(self.s, self.root), [folder / "memory.mem", folder / "disk.dd"])
+
     def test_the_build_command_writes_into_its_folder(self):
         root = Path(self.tmp.name, "with space")
         self.assertEqual(samples.build_command(self.s, root),
