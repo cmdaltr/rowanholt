@@ -80,7 +80,7 @@ def test_registry_names_are_not_dumping_or_modification(tmp_path) -> None:
 def test_presence_keeps_persistence_and_interpreters_only() -> None:
     for technique in ("T1053.005", "T1543.002", "T1546.003", "T1547.015", "T1059.004"):
         assert presence_technique(technique), technique
-    for technique in ("T1070.002", "T1070.003", "T1070.006", "T1083", "T1112", "T1003.008", "T1087.001", "T1114"):
+    for technique in ("T1685.006", "T1070.003", "T1070.006", "T1083", "T1112", "T1003.008", "T1087.001", "T1114"):
         assert not presence_technique(technique), technique
 
 

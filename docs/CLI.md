@@ -210,7 +210,7 @@ On Windows, beyond the event logs, registry, prefetch, `$MFT` and browsers, Gand
 | `notepad` | Windows 11 Notepad TabState | Elrond |
 | `registry\original` | hive files, transaction logs, RegBack | collected for the analyst |
 | `thumbcache` | Explorer thumbnail and icon caches | Elrond: `thumbcache.jsonl`, each image saved to `cooked/thumbcache/<database>/` |
-| `powershell` | PSReadLine `ConsoleHost_history.txt` per user | Elrond: `powershell_history.jsonl`, download, encoded-command, Defender-tampering and other lines tagged (**T1059.001**, **T1105**, **T1027**, **T1562.001** and so on) |
+| `powershell` | PSReadLine `ConsoleHost_history.txt` per user | Elrond: `powershell_history.jsonl`, download, encoded-command, Defender-tampering and other lines tagged (**T1059.001**, **T1105**, **T1027**, **T1685** and so on) |
 | `rdpcache` | RDP bitmap cache | collected for the analyst |
 
 The USN journal is parsed with the `$MFT` beside it, so journal entries carry full paths. `$LogFile` is decoded into `ntfs_logfile.jsonl`: names added to and removed from directories, MFT records initialised and freed, and renames (a removal and an add of the same file in one transaction), each with its `$FILE_NAME` times. It covers the last minutes to hours before collection, even where `$MFT` entries have been reused. `pagefile.sys`, `swapfile.sys` and `hiberfil.sys` are searched for URLs, command lines, Run-key paths, executable paths, e-mail and IPv4 addresses (`paged_strings.jsonl`, one row per distinct string with its first offset and count) whether or not `--Memory` is set; with it, the paging files also go to Volatility. `Amcache.hve` goes to Artemis.

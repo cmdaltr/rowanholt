@@ -8,6 +8,7 @@ from typing import Dict, List
 
 from rowanholt.audit import write_audit_log_entry
 from rowanholt.core.records import SUFFIX, write_records
+from rowanholt.post.mitre.attack_lookup import current_id
 from rowanholt.process.extractions.artemis import _record_techniques
 from rowanholt.process.linux_artefacts import WEB_ROOTS, WEB_SCRIPTS
 from rowanholt.utils import safe_input
@@ -20,7 +21,8 @@ RULE = re.compile(r"^\s*(?:(?:private|global)\s+)*rule\s+(\w+)", re.M)
 
 
 def rule_techniques(yara_file):
-    """{rule name: [technique IDs]} from each rule's meta section."""
+    """{rule name: [technique IDs]} from each rule's meta section, a revoked ID given as the pinned
+    release's replacement (rules written before ATT&CK v20 still name T1562.001)."""
     try:
         with open(yara_file, encoding="utf-8", errors="replace") as fh:
             source = fh.read()
@@ -29,7 +31,8 @@ def rule_techniques(yara_file):
     starts = [(m.start(), m.group(1)) for m in RULE.finditer(source)] + [(len(source), None)]
     techniques = {}
     for (start, name), (end, _) in zip(starts, starts[1:]):
-        found = [t for value in TECHNIQUE_META.findall(source[start:end]) for t in TECHNIQUE_ID.findall(value)]
+        found = list(dict.fromkeys(current_id(t) for value in TECHNIQUE_META.findall(source[start:end])
+                                   for t in TECHNIQUE_ID.findall(value)))
         if found:
             techniques[name] = found
     return techniques

@@ -35,7 +35,7 @@ ARTEFACT_MITRE_MAPPING = {
         "groups": ["APT28", "APT29", "Lazarus Group", "FIN7", "Wizard Spider"]
     },
     "eventlogs": {
-        "technique_id": "T1070.001",
+        "technique_id": "T1685.005",
         "technique_name": "Clear Windows Event Logs",
         "tactics": ["Defense Evasion"],
         "groups": ["APT28", "APT29", "APT41", "Lazarus Group"]
@@ -182,7 +182,7 @@ def _record_techniques(techniques_file_path: str, techniques) -> None:
 # a log clear).
 EVENTLOG_TECHNIQUES = {
     "security": {
-        1102: ["T1070.001"],
+        1102: ["T1685.005"],
         4697: ["T1543.003", "T1569.002"],
         4698: ["T1053.005"],
         4702: ["T1053.005"],
@@ -192,7 +192,7 @@ EVENTLOG_TECHNIQUES = {
         4756: ["T1098"],
     },
     "system": {
-        104: ["T1070.001"],
+        104: ["T1685.005"],
         7045: ["T1543.003", "T1569.002"],
     },
     "microsoft-windows-powershell/operational": {4104: ["T1059.001"]},
@@ -583,7 +583,7 @@ def _get_patterns_for_artifact(artifact_type: str):
             # Registry-specific
             # Every hive has Run keys, Classes, Policies and Defender's settings: those are
             # recorded from the values in them (registry/system.py, profile.py), not the key names
-            "T1562.001": ["disableantispyware", "disablerealtimemonitoring"],  # Disable security
+            "T1685": ["disableantispyware", "disablerealtimemonitoring"],  # Disable security
             # Command lines in registry values. Windows' own associations open .vbs with wscript,
             # .hta with mshta and MSIs with msiexec, and its uninstall strings run rundll32
             "T1059.001": ["-encodedcommand", " -enc ", " -nop ", "-w hidden", "-windowstyle hidden"],
@@ -654,7 +654,7 @@ def _get_patterns_for_artifact(artifact_type: str):
             "T1059.006": ["python", "/usr/bin/python"],  # Python
             "T1053.003": ["cron", "crontab"],  # Cron
             "T1543.002": ["systemctl"],  # Systemd
-            "T1070.002": ["shred"],  # Log deletion
+            "T1685.006": ["shred"],  # Log deletion
             "T1105": ["netcat"],
         }
         field_pattern = r'"(?:message|msg|command|unit|exe)"\s*:\s*"([^"]+)"'

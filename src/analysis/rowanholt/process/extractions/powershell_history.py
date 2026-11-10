@@ -17,12 +17,12 @@ PATTERNS: Tuple[Tuple[str, str, "re.Pattern"], ...] = (
     ("execution policy bypass", "T1059.001", re.compile(r"-ep\s+bypass|-executionpolicy\s+(bypass|unrestricted)|"
                                                       r"set-executionpolicy\s+(bypass|unrestricted)", re.I)),
     ("hidden window", "T1564.003", re.compile(r"-w(indowstyle)?\s+h(idden)?\b", re.I)),
-    ("defender tampering", "T1562.001", re.compile(r"set-mppreference|add-mppreference|disablerealtimemonitoring|"
+    ("defender tampering", "T1685", re.compile(r"set-mppreference|add-mppreference|disablerealtimemonitoring|"
                                                   r"exclusionpath|tamperprotection", re.I)),
-    ("amsi bypass", "T1562.001", re.compile(r"amsiutils|amsiinitfailed|amsi\.dll", re.I)),
+    ("amsi bypass", "T1685", re.compile(r"amsiutils|amsiinitfailed|amsi\.dll", re.I)),
     ("credential access", "T1003", re.compile(r"mimikatz|sekurlsa|lsadump|procdump.*lsass|comsvcs.*minidump|"
                                              r"get-credential|convertto-securestring.*-asplaintext", re.I)),
-    ("log clearing", "T1070.001", re.compile(r"clear-eventlog|wevtutil\s+cl|remove-eventlog", re.I)),
+    ("log clearing", "T1685.005", re.compile(r"clear-eventlog|wevtutil\s+cl|remove-eventlog", re.I)),
     ("persistence", "T1053.005", re.compile(r"register-scheduledtask|new-scheduledtask|schtasks\s+/create", re.I)),
     ("persistence", "T1547.001", re.compile(r"(reg(\.exe)?\s+add|set-itemproperty|new-itemproperty)\b.*currentversion\\run",
                                            re.I)),
