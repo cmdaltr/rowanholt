@@ -2,22 +2,27 @@
 # Apple silicon only: Linux and macOS target VMs with Tart.
 #   tart-vm.sh create|start|stop|delete|status <linux|macos>
 #   tart-vm.sh move <linux|macos> <dir>   move the VM to another TART_HOME (e.g. local disk while testing)
+#   tart-vm.sh sample macos-sample <dir>  a Rowanholt sample case: a macOS 15 VM of its own,
+#                                         Atomic Red Team with nothing cleaned up, then its disk
+#                                         (sample.sh); stop|delete|status macos-sample manage that VM
 # Images are Cirrus Labs' public Tart images (default login admin/admin, which
 # this script changes to the lab password once provisioned).
 set -euo pipefail
 . "$(dirname "$0")/../lib/common.sh"
 load_config
 
-action="${1:?create|start|stop|delete|status|move}"; kind="${2:?linux|macos}"
+action="${1:?create|start|stop|delete|status|move|sample}"; kind="${2:?linux|macos|macos-sample}"
 TART="$(tart_bin)"; [ -n "$TART" ] || die "Tart is not installed. Run: ./lab.sh install"
 is_arm || die "Tart VMs need Apple silicon. On an Intel Mac the lab uses Vagrant + VirtualBox."
 
 case "$kind" in
   linux) IMAGE="${TART_LINUX_IMAGE:-ghcr.io/cirruslabs/ubuntu:latest}"; PORT=2230; MEM=2048; CPU=2 ;;
   macos) IMAGE="${TART_MACOS_IMAGE:-ghcr.io/cirruslabs/macos-sequoia-base:latest}"; PORT=2231; MEM=4096; CPU=4 ;;
-  *) die "kind must be linux or macos" ;;
+  # The sample case's own VM and port, so building one never touches rowan-lab-macos or its forward
+  macos-sample) IMAGE="${TART_MACOS_IMAGE:-ghcr.io/cirruslabs/macos-sequoia-base:latest}"; PORT=2234; MEM=4096; CPU=4 ;;
+  *) die "kind must be linux, macos or macos-sample" ;;
 esac
-VM="rowan-lab-$kind"
+case "$kind" in macos-sample) VM="rowan-lab-macos15-sample" ;; *) VM="rowan-lab-$kind" ;; esac
 mkdir -p "$TART_HOME"
 RUN_DIR="$LAB_CONFIG_DIR/run"; mkdir -p "$RUN_DIR"
 SSH="$LAB_ROOT/lib/ssh.exp"
@@ -119,8 +124,11 @@ provision() {
   ok "$VM provisioned: user 'gandalf', lab password; admin password changed to the lab password"
 }
 
+. "$LAB_ROOT/macos/sample.sh"
+
 case "$action" in
   create)
+    [ "$kind" = macos-sample ] && die "The sample VM is built by: ./macos/tart-vm.sh sample macos-sample <dir>"
     if ! vm_exists; then
       [ "$kind" = "macos" ] && warn "The macOS image is about 25 GB; the first pull takes a while."
       info "Pulling $IMAGE"
@@ -172,5 +180,8 @@ case "$action" in
     elif ! vm_running; then echo "$VM: stopped"
     elif [ -n "$(vm_ip)" ]; then echo "$VM: running at $(vm_ip), SSH 127.0.0.1:$PORT"
     else echo "$VM: booting (no IP yet)"; fi ;;
+  sample)
+    [ "$kind" = macos-sample ] || die "A sample is built on its own VM: ./macos/tart-vm.sh sample macos-sample <dir>"
+    sample "${3:?sample needs a directory, e.g. $LAB_DATA_DIR/samples/macos15-atomics-$(date +%Y%m%d)}" ;;
   *) die "unknown action $action" ;;
 esac
