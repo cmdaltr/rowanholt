@@ -255,13 +255,20 @@ create() {
 sample() {
   local dest="${1:?destination folder}" run
   [ -e "$dest/disk.dd" ] && die "$dest already holds a sample"
-  [ -f "$DISK" ] && die "$VM already exists, and a sample starts from a fresh install: delete it first (./windows/$SELF delete)"
   run="win11-atomics-$(date +%Y%m%d)"
-  WINDOWS_QEMU_CLEAN=1 create
+  if [ "${WINDOWS_SAMPLE_RESUME:-}" = 1 ]; then
+    # After the Tamper Protection stop: the same fresh install, nothing run on it since
+    [ -f "$DISK" ] || die "$VM doesn't exist; run sample without WINDOWS_SAMPLE_RESUME"
+    running || start_vm
+    wait_ready "${WINDOWS_BOOT_WAIT:-30}" "boot"
+  else
+    [ -f "$DISK" ] && die "$VM already exists, and a sample starts from a fresh install: delete it first (./windows/$SELF delete)"
+    WINDOWS_QEMU_CLEAN=1 create
+  fi
   step "Sensor: Sysmon, PowerShell and process auditing, Atomic Red Team; Defender off"
   sensor
   ssh_vm "\$s = Get-MpComputerStatus; 'REALTIME=' + \$s.RealTimeProtectionEnabled" | tr -d '\r' | grep -q 'REALTIME=False' \
-    || die "Defender's real-time protection is still on (Tamper Protection). Turn Tamper Protection off in the VM (Windows Security > Virus & threat protection > Manage settings; screen on vnc://127.0.0.1:5959), then: ./windows/$SELF sensor, and carry on with record and capture by hand"
+    || die "Defender's real-time protection is still on (Tamper Protection). Turn Tamper Protection off in the VM (Windows Security > Virus & threat protection > Manage settings; screen on vnc://127.0.0.1:5959), then: WINDOWS_SAMPLE_RESUME=1 ./windows/$SELF sample $dest"
   step "Atomic Red Team: $SAMPLE_TECHNIQUES"
   MORDOR_NO_CLEANUP=1 record "$SAMPLE_TECHNIQUES" "$run" "$dest/recording"
   step "Capture"
