@@ -162,7 +162,7 @@ start_vm() {
   fi
   rm -f "$QMP_SOCK"
   info "Starting $VM (SSH on 127.0.0.1:$PORT, screen on vnc://127.0.0.1:5959)"
-  qemu-system-x86_64 -name "$VM" -machine "q35,accel=$accel" -cpu host \
+  qemu-system-x86_64 -name "$VM" -machine "q35,accel=$accel" -cpu "${WINDOWS_QEMU_CPU:-host}" \
     -smp "$WINDOWS_VM_CPUS" -m "$WINDOWS_VM_MEMORY_MB" \
     -drive "if=pflash,format=raw,readonly=on,file=$code" -drive "if=pflash,format=raw,file=$VARS" \
     -device ahci,id=ahci \
