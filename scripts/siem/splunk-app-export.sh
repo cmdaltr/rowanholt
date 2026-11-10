@@ -110,7 +110,7 @@ label = Elrond DFIR
 supported_themes = light,dark
 
 [launcher]
-author = cyberg3cko
+author = cmdaltr
 description = Digital Forensics and Incident Response (DFIR) analysis app for the Rowanholt DF Acceleration Suite. Provides MITRE ATT&CK technique mapping, artifact analysis dashboards, and IOC detection capabilities.
 version = ${VERSION}
 
@@ -133,7 +133,7 @@ cat > "${EXPORT_DIR}/${APP_NAME}/app.manifest" << EOF
     },
     "author": [
       {
-        "name": "cyberg3cko",
+        "name": "cmdaltr",
         "email": null,
         "company": null
       }
@@ -222,7 +222,7 @@ MIT License
 
 Author
 ------
-cyberg3cko
+cmdaltr
 EOF
 fi
 

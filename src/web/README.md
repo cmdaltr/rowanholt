@@ -359,8 +359,8 @@ A shared, production install is Rowanholt's server profile: Caddy with TLS in fr
 ## Support
 
 For issues, questions, or contributions:
-- GitHub Issues: https://github.com/cyberg3cko/elrond/issues
-- Documentation: https://github.com/cyberg3cko/elrond
+- GitHub Issues: https://github.com/cmdaltr/elrond/issues
+- Documentation: https://github.com/cmdaltr/elrond
 
 ## License
 

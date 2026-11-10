@@ -757,7 +757,7 @@ def mount_vmdk_image(
                     pass
                 else:
                     print(
-                        "   An error occured when mounting '{}'.\n    Perhaps this is a macOS-based image and requires apfs-fuse (https://github.com/cyberg3cko/apfs-fuse)?\n    Alternatively, the disk may not be supported and/or may be corrupt? You can raise an issue via https://github.com/cyberg3cko/elrond/issues".format(
+                        "   An error occured when mounting '{}'.\n    Perhaps this is a macOS-based image and requires apfs-fuse (https://github.com/cmdaltr/apfs-fuse)?\n    Alternatively, the disk may not be supported and/or may be corrupt? You can raise an issue via https://github.com/cmdaltr/elrond/issues".format(
                             disk_file
                         )
                     )

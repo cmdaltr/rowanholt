@@ -11,7 +11,7 @@ sudo mv /tmp/apps/*.py /opt/elrond/elrond/rowanholt/post/splunk/apps/
 clear
 
 # downloading latest version
-sudo git clone https://github.com/cyberg3cko/elrond.git
+sudo git clone https://github.com/cmdaltr/elrond.git
 
 # downloading latest version of additional repos
 /opt/elrond/elrond/tools/config/scripts/./repo.sh

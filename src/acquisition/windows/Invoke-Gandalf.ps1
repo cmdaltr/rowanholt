@@ -2,11 +2,11 @@
  .Synopsis
  Collects forensic artefacts on Windows hosts; compatible with elrond
  Version: 1.0
- Author : cyberg3cko
+ Author : cmdaltr
  License: MIT
  .Description
  Collects digital forensic artefacts from Windows hosts. Output is compatible
-  with elrond (https://github.com/cyberg3cko/elrond)
+  with elrond (https://github.com/cmdaltr/elrond)
  .Parameter EncryptionObject
  Method of encryption used for archive file - Key, Password or None
  .Parameter Acquisition

@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
-    {name = "Ben Smith", email = "cyberg3cko@users.noreply.github.com"}
+    {name = "Ben Smith", email = "cmdaltr@users.noreply.github.com"}
 ]
 keywords = ["forensics", "dfir", "incident-response", "memory-forensics", "digital-forensics", "acquisition", "remote-forensics"]
 classifiers = [

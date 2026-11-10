@@ -396,7 +396,7 @@ label.control-label {
         elif sd.endswith("default/"):
             with open(sd + "app.conf", "w") as appconf:
                 appconf.write(
-                    "#\n# Splunk app configuration file\n#\n\n[install]\nis_configured = 0\n\n[ui]\nis_visible = 1\nlabel = elrond\n\n[launcher]\nauthor = cyberg3cko [cyberg3ckothon (at) gmail (dot) com]\ndescription = Accompanying Splunk app for elrond script\nversion = 1.2.0\n\n[package]\nid = elrond\n"
+                    "#\n# Splunk app configuration file\n#\n\n[install]\nis_configured = 0\n\n[ui]\nis_visible = 1\nlabel = elrond\n\n[launcher]\nauthor = cmdaltr [cmdaltrthon (at) gmail (dot) com]\ndescription = Accompanying Splunk app for elrond script\nversion = 1.2.0\n\n[package]\nid = elrond\n"
                 )
             with open(sd + "fields.conf", "w") as fieldsconf:
                 fieldsconf.write("[mitre_technique_name]\nINDEXED = True\n\n")
