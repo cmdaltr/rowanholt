@@ -120,7 +120,7 @@ class Fetching(unittest.TestCase):
             samples.fetch_file(s, s["files"][0], self.root)
 
     def test_digital_corpora_hash_from_its_api(self):
-        rows = [{"key": "corpora/x/other.7z", "sha2_256": "aa"}, {"key": "corpora/x/2022 CTF - Linux.7z", "sha2_256": "BB"}]
+        rows = [{"s3key": "corpora/x/other.7z", "sha2_256": "aa"}, {"s3key": "corpora/x/2022 CTF - Linux.7z", "sha2_256": "BB"}]
         with serving(json.dumps(rows).encode()):
             self.assertEqual(samples.published_hash({"name": "2022 CTF - Linux.7z", "sha256_from": "digitalcorpora"}),
                              ("sha256", "bb"))

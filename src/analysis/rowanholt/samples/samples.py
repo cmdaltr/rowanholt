@@ -81,7 +81,7 @@ def published_hash(entry: Dict) -> Optional[Tuple[str, str]]:
         with _open(DIGITAL_CORPORA.format(q=urllib.parse.quote(entry["name"]))) as response:
             rows = json.load(response)
         digest = next((r["sha2_256"] for r in rows
-                       if str(r.get("key", "")).endswith(entry["name"]) and r.get("sha2_256")), None)
+                       if str(r.get("s3key") or r.get("key", "")).endswith(entry["name"]) and r.get("sha2_256")), None)
         if not digest:
             raise SampleError(f"Digital Corpora publishes no SHA-256 for {entry['name']}")
         return "sha256", digest.lower()
