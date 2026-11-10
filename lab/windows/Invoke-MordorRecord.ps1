@@ -84,6 +84,8 @@ $pktmon = $IsWindows -and -not $NoCapture -and (Get-Command pktmon.exe -ErrorAct
 $tcpdump = if ($IsLinux -and -not $NoCapture) { (Get-Command tcpdump -ErrorAction SilentlyContinue).Source }
 if ($IsLinux -and -not $NoCapture -and -not $tcpdump) { Write-Warning 'tcpdump not installed: no capture.pcap' }
 if ($pktmon) { & pktmon.exe filter remove | Out-Null }
+# Which logs exist, once: listing every log on the machine took seconds per test
+$presentLogs = if ($IsWindows) { $windowsLogs | Where-Object { Get-WinEvent -ListLog $_ -ErrorAction SilentlyContinue } }
 
 function Start-Capture([string]$Dir) {
     if ($pktmon) {
@@ -140,6 +142,9 @@ function Write-PlistChanges($before, $after, $file) {
     if ($lines) { $lines | Set-Content -Path $file }
 }
 
+# Where each test's time goes, printed after it: the per-test overhead is most of a run
+function Lap([string]$Phase) { $took[$Phase] = [int]$clock.Elapsed.TotalSeconds; $clock.Restart() }
+
 foreach ($t in $Techniques) {
     $yaml = Join-Path $AtomicsPath "$t/$t.yaml"
     if (-not (Test-Path $yaml)) { Write-Warning "$t has no atomics here"; continue }
@@ -152,7 +157,9 @@ foreach ($t in $Techniques) {
         $dir = Join-Path $runDir $folder
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
         Write-Host "==> $t test ${i}: $($test.name)"
+        $clock = [Diagnostics.Stopwatch]::StartNew(); $took = [ordered]@{}
         try { Invoke-AtomicTest $t -TestNumbers $i -GetPrereqs -PathToAtomicsFolder $AtomicsPath | Out-Null } catch { Write-Warning "prerequisites: $_" }
+        Lap 'prerequisites'
 
         $es = $null
         if ($IsMacOS) {
@@ -161,15 +168,18 @@ foreach ($t in $Techniques) {
             Start-Sleep -Seconds 2
         }
         $capture = Start-Capture $dir
+        Lap 'capture start'
         $start = Get-Date
         try { Invoke-AtomicTest $t -TestNumbers $i -PathToAtomicsFolder $AtomicsPath -TimeoutSeconds $Timeout } catch { Write-Warning "test: $_" }
+        Lap 'test'
         Start-Sleep -Seconds $Settle
         $end = Get-Date
+        Lap 'settle'
         Stop-Capture $dir $capture
+        Lap 'capture stop'
 
         if ($IsWindows) {
-            $present = Get-WinEvent -ListLog * -ErrorAction SilentlyContinue | Select-Object -ExpandProperty LogName
-            $xml = foreach ($log in $windowsLogs | Where-Object { $present -contains $_ }) {
+            $xml = foreach ($log in $presentLogs) {
                 Get-WinEvent -FilterHashtable @{ LogName = $log; StartTime = $start; EndTime = $end } -ErrorAction SilentlyContinue | ForEach-Object { $_.ToXml() }
             }
             if ($xml) { $xml | Set-Content -Path (Join-Path $dir 'events.xml') -Encoding utf8 }
@@ -189,11 +199,14 @@ foreach ($t in $Techniques) {
             Write-PlistChanges $plistsBefore (Get-PlistState) (Join-Path $dir 'plists.ndjson')
         }
 
+        Lap 'logs'
         if (-not $NoCleanup) { try { Invoke-AtomicTest $t -TestNumbers $i -Cleanup -PathToAtomicsFolder $AtomicsPath | Out-Null } catch { } }
         $manifest.tests += [ordered]@{ technique = $t; test = $i; name = $test.name; folder = $folder
                                        start = $start.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'); end = $end.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') }
         # Saved after every test, so a run that stops part-way is still usable
         $manifest | ConvertTo-Json -Depth 5 | Set-Content $manifestPath
+        Lap 'cleanup'
+        Write-Host "    took: $(($took.Keys | ForEach-Object { "$_ $($took[$_])s" }) -join ', ')"
     }
 }
 Write-Host "Recorded $($manifest.tests.Count) tests in $runDir"
