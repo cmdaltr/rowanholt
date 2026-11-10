@@ -18,7 +18,7 @@
 | 2026-11-04 | Rowanholt logo and wordmark adopted across the web app, desktop app icons and docs | commit `a95bf84` "the Rowanholt logo"; `docs/images/rowanholt.png` |
 | 2026-11-10 | Preliminary clearance search (see Notes) | TMview and Companies House, 2026-11-10 |
 | 2026-11-10 | **™ first asserted** on the logo, README and app, with a trademark notice | commit `e161a1b` |
-| ____ | **Domain `rowanholt.uk` registered** under the Rowanholt name | Nominet registration (registrar receipt / account) |
+| 2026-11-10 | **Domain `rowanholt.uk` registered** under the Rowanholt name | Nominet registration (registrar receipt / account) |
 
 ## Continued / public use
 
@@ -28,7 +28,7 @@
 
 ## To add as it happens (strengthens the record)
 
-- [ ] Domain **rowanholt.uk** registered (date: ____) — Nominet .uk
+- [x] Domain registered for Rowanholt — **rowanholt.uk**, registered 2026-11-10 (Nominet .uk)
 - [ ] First tagged release / GitHub release **published** under the Rowanholt name (version / date: ____) — none yet
 - [ ] First blog post naming Rowanholt — *Adventures of Benny and Claude* (date / URL: ____)
 - [ ] First LinkedIn / YouTube post under **@cmdaltr** naming Rowanholt (date / URL: ____)
@@ -37,7 +37,7 @@
 ## Notes
 
 - ™ (used here) signals a claimed, unregistered mark — no registration required.
-- The `LICENSE` file doesn't name Rowanholt: it is the MIT text with "Copyright (c) 2020 cyberg3cko", an earlier handle of the same owner.
+- The `LICENSE` file is the MIT text, "Copyright (c) 2020-2026 cmdaltr" (until 2026-11-10 it carried "cyberg3cko", an earlier handle of the same owner); it covers the code, not the name.
 - Preliminary clearance (TMview, covering UKIPO, EUIPO and USPTO, and Companies House, 2026-11-10): no mark, live or dead, contains "Rowanholt" or "Rowan Holt", and no UK company has the name. Of the live marks containing "ROWAN" in classes 9 and 42, one overlaps in goods: **ROWAN** (USPTO reg. 6847922, Rowan TELS Corp., classes 9, 35 and 42, including "computer software for use in data analytics"). Not identical, but Rowanholt begins with the whole of it; get a US attorney's view before any USPTO filing or US launch. Nothing comparable in the UK or EU registers.
 - Registration (UKIPO / EUIPO / USPTO, classes 9 + 42) gives stronger, enforceable rights. `rowanholt.com` is registered to someone else (Namecheap, 21 April 2026).
 - This document is a record of use to support a later application or a passing-off / common-law position. It is not legal advice and not a registration.
