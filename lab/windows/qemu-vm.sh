@@ -77,8 +77,31 @@ PY
 
 # The UTM answer file, made x64: amd64 components, and no virtio driver paths (SATA and e1000e
 # need none)
+# What the answer file has to match on this ISO: its language (sources/lang.ini) and edition
+# (sources/EI.CFG). An evaluation ISO is single-language (en-GB, say) and Enterprise Evaluation,
+# which takes no product key; asked for another language or edition, Setup stops at its first page.
+# Prints "<language> <eval:0|1>"; en-us and 0 when the ISO can't be read.
+iso_facts() {
+  local iso="$1" dir="" lang="" ei=""
+  if is_macos; then
+    dir="$(hdiutil attach -readonly -nobrowse "$iso" 2>/dev/null | tail -1 | cut -f3-)"
+    if [ -n "$dir" ]; then
+      lang="$(cat "$dir/sources/lang.ini" 2>/dev/null || true)"
+      ei="$(cat "$dir/sources/EI.CFG" "$dir/sources/ei.cfg" 2>/dev/null || true)"
+      hdiutil detach "$dir" -quiet || true
+    fi
+  elif command -v bsdtar >/dev/null; then
+    lang="$(bsdtar -xOf "$iso" sources/lang.ini 2>/dev/null || true)"
+    ei="$(bsdtar -xOf "$iso" sources/ei.cfg 2>/dev/null || bsdtar -xOf "$iso" sources/EI.CFG 2>/dev/null || true)"
+  fi
+  lang="$(printf '%s\n' "$lang" | tr -d '\r' | sed -n '/Available UI Languages/,/^\[/p' | grep -m1 -oE '^[a-zA-Z]{2}-[a-zA-Z]{2}' || true)"
+  printf '%s %s\n' "${WINDOWS_UI_LANGUAGE:-${lang:-en-us}}" "$(printf '%s' "$ei" | grep -qi eval && echo 1 || echo 0)"
+}
+
 build_config_iso() {
-  local stage="$QEMU_DIR/labcfg" pw_xml
+  local win="$1" stage="$QEMU_DIR/labcfg" pw_xml lang eval
+  read -r lang eval <<<"$(iso_facts "$win")"
+  info "Windows ISO: language $lang$([ "$eval" = 1 ] && echo ", Enterprise Evaluation")"
   rm -rf "${stage:?}"
   mkdir -p "$stage/lab-scripts" "$stage/gandalf-src"
   cp "$LAB_ROOT/windows/utm/firstlogon.ps1" "$stage/"
@@ -88,14 +111,18 @@ build_config_iso() {
   [ "${WINDOWS_QEMU_CLEAN:-0}" = 1 ] && : > "$stage/clean.txt"
   cp "$ISO_DIR/OpenSSH-Win64.zip" "$stage/"
   pw_xml="$(printf '%s' "$LAB_PASSWORD" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g')"
-  python3 - "$LAB_ROOT/windows/utm/autounattend.xml" "$stage/autounattend.xml" "$pw_xml" "$COMPUTERNAME" <<'PY'
+  python3 - "$LAB_ROOT/windows/utm/autounattend.xml" "$stage/autounattend.xml" "$pw_xml" "$COMPUTERNAME" "$lang" "$eval" <<'PY'
 import re, sys
-src, dst, pw, name = sys.argv[1:5]
+src, dst, pw, name, lang, evaluation = sys.argv[1:7]
 text = open(src, encoding="utf-8").read()
 text = re.sub(r'\s*<!-- VirtIO disk and network drivers.*?</component>', "", text, count=1, flags=re.S)
 text = text.replace('processorArchitecture="arm64"', 'processorArchitecture="amd64"')
+text = re.sub(r"<(SetupUILanguage><UILanguage|UILanguage)>en-US<", lambda m: f"<{m.group(1)}>{lang}<", text)
+if evaluation == "1":  # one image, no key
+    text = text.replace("<Key>/IMAGE/NAME</Key><Value>Windows 11 Pro</Value>", "<Key>/IMAGE/INDEX</Key><Value>1</Value>")
+    text = re.sub(r"\s*<ProductKey>.*?</ProductKey>", "", text, flags=re.S)
 text = text.replace("@@PASSWORD@@", pw).replace("@@COMPUTERNAME@@", name)
-assert "viostor" not in text and "arm64" not in text
+assert "viostor" not in text and "arm64" not in text and "en-US<" not in text
 open(dst, "w", encoding="utf-8").write(text)
 PY
   rm -f "$CFG_ISO"
@@ -206,7 +233,7 @@ create() {
     download "$OPENSSH_URL" "$ISO_DIR/OpenSSH-Win64.zip"
     info "Windows ISO: $win"
     mkdir -p "$QEMU_DIR"
-    build_config_iso
+    build_config_iso "$win"
     create_vm "$win"
     start_vm
     press_to_boot
