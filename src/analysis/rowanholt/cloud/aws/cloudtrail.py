@@ -39,15 +39,15 @@ class CloudTrailAnalyzer:
 
     # Suspicious event names mapped to MITRE ATT&CK
     SUSPICIOUS_EVENTS = {
-        # Stealth (T1070.003) - Log Tampering
-        "DeleteTrail": ["T1070.003"],  # Clear Cloud Logs
-        "StopLogging": ["T1070.003"],
-        "UpdateTrail": ["T1070.003"],
-        "PutEventSelectors": ["T1070.003"],
+        # Defense Impairment (T1685.002) - Log Tampering
+        "DeleteTrail": ["T1685.002"],  # Disable or Modify Cloud Log
+        "StopLogging": ["T1685.002"],
+        "UpdateTrail": ["T1685.002"],
+        "PutEventSelectors": ["T1685.002"],
         # Impact, Stealth and Defense Impairment - Policy Modification
         "DeleteBucket": ["T1485"],  # Data Destruction
-        "PutBucketLogging": ["T1070.003"],
-        "DeleteFlowLogs": ["T1070.003"],
+        "PutBucketLogging": ["T1685.002"],
+        "DeleteFlowLogs": ["T1685.002"],
         "DeleteDetector": ["T1685"],  # Disable or Modify Tools (GuardDuty)
         # Privilege Escalation
         "CreateAccessKey": ["T1098"],  # Account Manipulation

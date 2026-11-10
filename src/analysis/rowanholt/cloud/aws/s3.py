@@ -72,7 +72,7 @@ class S3Forensics:
 
             # Determine ATT&CK techniques based on findings
             if not analysis["configuration"]["logging_enabled"]:
-                analysis["attck_techniques"].append("T1070.003")  # Clear Cloud Logs
+                analysis["attck_techniques"].append("T1685.002")  # Disable or Modify Cloud Log
 
             if analysis["configuration"].get("public_access", False):
                 analysis["attck_techniques"].append("T1530")  # Data from Cloud Storage
