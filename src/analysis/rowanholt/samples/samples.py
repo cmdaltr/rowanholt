@@ -4,14 +4,17 @@ checked against their publishers' hashes, unpacking, and the job each becomes.
 A file is kept under its own name only once its hash has matched (until then it's <name>.part,
 and a mismatch leaves <name>.bad), so a file being there means it was checked. Its SHA-256 goes
 into SHA256SUMS in the samples folder; a file whose publisher gives no hash is checked against
-that from its first download on. Stdlib only: the CLI runs on the host (Python 3.8+), the worker
-fetches for Aragorn, the backend reads the status.
+that from its first download on. A sample with a build in place of files is one Rowanholt's lab
+builds on a machine of its own (an image that can't be downloaded): it's never fetched, only found
+once built, its answer key the build's expected.json. Stdlib only: the CLI runs on the host
+(Python 3.8+), the worker fetches for Aragorn, the backend reads the status.
 """
 
 import hashlib
 import json
 import logging
 import os
+import shlex
 import shutil
 import subprocess
 import tarfile
@@ -41,9 +44,56 @@ class SampleError(Exception):
     """A sample that couldn't be fetched, checked, unpacked or found."""
 
 
+BUILD_KEYS = ("command", "host", "produces", "takes")
+
+
+def check(sample_: Dict) -> None:
+    """Raise SampleError unless the entry has files to fetch or a build (one, not both), a build
+    with its command (writing to {dest}), host, products and time, and, built, an answer key
+    that's a file in its folder."""
+    sid = sample_.get("id", "?")
+    if bool(sample_.get("files")) == bool(sample_.get("build")):
+        raise SampleError(f"{sid}: needs files to fetch or a build, not both or neither")
+    build = sample_.get("build")
+    if build:
+        missing = [k for k in BUILD_KEYS if not build.get(k)]
+        if missing:
+            raise SampleError(f"{sid}: its build has no {', '.join(missing)}")
+        if "{dest}" not in build["command"]:
+            raise SampleError(f"{sid}: its build command doesn't say where it writes ({{dest}})")
+        answers = sample_.get("answers", "")
+        if answers and ("://" in answers or not _safe(answers)):
+            raise SampleError(f"{sid}: a built sample's answers are a file in its folder, not {answers}")
+
+
 def catalogue() -> List[Dict]:
-    """Every sample in the catalogue."""
-    return json.loads(CATALOGUE.read_text(encoding="utf-8"))["samples"]
+    """Every sample in the catalogue, each checked."""
+    listed = json.loads(CATALOGUE.read_text(encoding="utf-8"))["samples"]
+    for s in listed:
+        check(s)
+    return listed
+
+
+def built(sample_: Dict) -> bool:
+    """Whether the sample is built locally (a build) rather than fetched (files)."""
+    return bool(sample_.get("build"))
+
+
+def build_command(sample_: Dict, root: Path) -> str:
+    """The sample's build command, writing into its folder under the samples folder."""
+    return sample_["build"]["command"].replace("{dest}", shlex.quote(str(root / sample_["folder"])))
+
+
+def answers_file(sample_: Dict, root: Path) -> Optional[Path]:
+    """A built sample's answer key (its expected.json), once it's there."""
+    if not built(sample_) or not sample_.get("answers"):
+        return None
+    path = root / sample_["folder"] / sample_["answers"]
+    return path if path.is_file() else None
+
+
+def _not_built(sample_: Dict, root: Path) -> str:
+    return f"built locally ({sample_['build']['host']}): {build_command(sample_, root)}"
 
 
 def sample(sample_id: str) -> Dict:
@@ -197,13 +247,18 @@ def _stem(archive: Path) -> str:
 
 
 def images(sample_: Dict, root: Path) -> List[Path]:
-    """The sample's evidence in its folder: what each of its image patterns finds, once."""
+    """The sample's evidence in its folder: what each of its image patterns finds, once. A built
+    sample's only once the build is done: every pattern found, and its answer key (written last)."""
     folder = root / sample_["folder"]
     found: List[Path] = []
     for pattern in sample_["images"]:
-        for path in sorted(folder.rglob(pattern)) if folder.is_dir() else []:
-            if path not in found and not path.name.endswith((".part", ".bad")):
-                found.append(path)
+        matched = [p for p in (sorted(folder.rglob(pattern)) if folder.is_dir() else [])
+                   if not p.name.endswith((".part", ".bad"))]
+        if built(sample_) and not matched:
+            return []
+        found.extend(p for p in matched if p not in found)
+    if built(sample_) and sample_.get("answers") and answers_file(sample_, root) is None:
+        return []
     return found
 
 
@@ -212,6 +267,8 @@ def unpack(sample_: Dict, root: Path) -> List[Path]:
     any inner archives it names; returns its evidence."""
     if images(sample_, root):
         return images(sample_, root)
+    if built(sample_):
+        raise SampleError(f"{sample_['id']}: not built yet; it's {_not_built(sample_, root)}")
     folder = root / sample_["folder"]
     for entry in sample_["files"]:
         archive = folder / entry["name"]
@@ -231,10 +288,23 @@ def unpack(sample_: Dict, root: Path) -> List[Path]:
     return found
 
 
+def fetch(sample_: Dict, root: Path, progress: Optional[Progress] = None) -> List[Path]:
+    """Download, check and unpack a sample; returns its evidence. A built sample is refused."""
+    if built(sample_):
+        raise SampleError(f"{sample_['id']} can't be downloaded: it's {_not_built(sample_, root)}")
+    for entry in sample_["files"]:
+        fetch_file(sample_, entry, root, progress)
+    return unpack(sample_, root)
+
+
 def status(sample_: Dict, root: Path) -> Dict:
-    """Which of the sample's files are there (checked), part-downloaded or bad, and its evidence."""
+    """Which of the sample's files are there (checked), part-downloaded or bad, and its evidence;
+    for a built sample, whether its images are there yet."""
     folder = root / sample_["folder"]
     files = []
+    if built(sample_):
+        found = images(sample_, root)
+        return {"id": sample_["id"], "files": files, "images": [str(p) for p in found], "ready": bool(found)}
     for entry in sample_["files"]:
         target = folder / entry["name"]
         part = target.with_name(target.name + ".part")

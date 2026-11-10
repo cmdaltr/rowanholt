@@ -64,7 +64,9 @@ function SampleData() {
         Public forensic images, each a ready case: a Windows disk and memory, Linux disk and memory, a Mac, an Android
         phone and an iPhone. Fetch downloads one into {state ? <code>{state.dir}</code> : 'the samples folder'}{' '}
         (ROWANHOLT_SAMPLES_DIR), checking it against its publisher&apos;s hash; Import starts it as a job. Tens of
-        gigabytes each; <code>rowanholt samples fetch</code> does the same from a terminal.
+        gigabytes each; <code>rowanholt samples fetch</code> does the same from a terminal. The lab&apos;s own
+        samples (Windows 11, and macOS, whose licence rules out sharing one) are built rather than fetched, by the
+        command shown; once built they import the same way.
       </p>
       {error && <div className="error-message">{error}</div>}
       {state && (
@@ -77,19 +79,31 @@ function SampleData() {
               <tr key={s.id}>
                 <td>
                   <a href={s.page} target="_blank" rel="noreferrer">{s.title}</a>
-                  <div className="aragorn-note">{s.os}; {s.publisher}{s.answers && <> · <a href={s.answers} target="_blank" rel="noreferrer">answers</a></>}</div>
+                  <div className="aragorn-note">
+                    {s.os}; {s.publisher}
+                    {s.answers && !s.build && <> · <a href={s.answers} target="_blank" rel="noreferrer">answers</a></>}
+                    {s.answers && s.build && <> · answers: <code>{s.answers}</code></>}
+                  </div>
                   {s.catches && <div className="aragorn-note">{s.catches}</div>}
                 </td>
                 <td>{s.covers.join(', ')}</td>
                 <td>
-                  {s.images.length > 0 ? 'ready' : s.files.map((f) => (
+                  {s.images.length > 0 && 'ready'}
+                  {s.images.length === 0 && s.build && (
+                    <div className="aragorn-note">
+                      Not built. On {s.build.host} (takes {s.build.takes}), from the repo:{' '}
+                      <code>{s.build.command}</code>; built elsewhere, copy the folder there.
+                      Makes {s.build.produces.join(', ')}.
+                    </div>
+                  )}
+                  {s.images.length === 0 && !s.build && s.files.map((f) => (
                     <div key={f.name}>{f.name}: {f.state}{f.bytes > 0 && f.state !== 'ready' ? ` (${sizeOf(f.bytes)})` : ''}</div>
                   ))}
                 </td>
                 <td className="aragorn-actions">
                   {busy[s.id] ? <span className="aragorn-note">{busy[s.id]}</span> : (
                     <>
-                      {s.images.length === 0 && <button className="secondary" onClick={() => fetchOne(s.id)}>Fetch</button>}
+                      {s.images.length === 0 && !s.build && <button className="secondary" onClick={() => fetchOne(s.id)}>Fetch</button>}
                       {s.images.length > 0 && <button onClick={() => importOne(s.id)}>Import</button>}
                     </>
                   )}

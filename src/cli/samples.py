@@ -10,7 +10,8 @@ Usage:
 The samples folder is ROWANHOLT_SAMPLES_DIR (or --dir; default /tmp/rowanholt/samples): a path
 the worker can read, as the jobs it starts read the images where they are. Import uses
 Rowanholt's API: ROWANHOLT_API (default http://localhost:5688) and, on a team server,
-ROWANHOLT_TOKEN.
+ROWANHOLT_TOKEN. The lab's own samples aren't downloaded but built (list shows the command;
+fetch --all passes over them); once built in their folders, import starts them like the rest.
 """
 
 import argparse
@@ -49,7 +50,12 @@ def cmd_list(root: Path) -> int:
     logger.info("Samples folder: %s\n", root)
     for s in samples.catalogue():
         st = samples.status(s, root)
-        state = "ready" if st["images"] else ", ".join(f"{f['name']}: {f['state']}" for f in st["files"])
+        if st["images"]:
+            state = "ready"
+        elif samples.built(s):
+            state = f"not built: {samples.build_command(s, root)} (on {s['build']['host']})"
+        else:
+            state = ", ".join(f"{f['name']}: {f['state']}" for f in st["files"])
         logger.info("%-22s %s\n%22s %s; %s\n%22s %s\n", s["id"], s["title"], "", s["os"], " + ".join(s["covers"]),
                     "", state)
     return 0
@@ -71,9 +77,7 @@ def cmd_fetch(root: Path, chosen: List[dict]) -> int:
     failed = 0
     for s in chosen:
         try:
-            for entry in s["files"]:
-                samples.fetch_file(s, entry, root, _progress())
-            found = samples.unpack(s, root)
+            found = samples.fetch(s, root, _progress())
             logger.info("%s: ready (%s)", s["id"], ", ".join(p.name for p in found))
         except (samples.SampleError, OSError) as exc:
             logger.error("%s: %s", s["id"], exc)
@@ -89,6 +93,8 @@ def cmd_import(root: Path, chosen: List[dict], force: bool) -> int:
     for s in chosen:
         try:
             found = samples.images(s, root)
+            if not found and samples.built(s):
+                raise samples.SampleError(f"not built yet: {samples.build_command(s, root)}")
             if not found:
                 raise samples.SampleError(f"not fetched yet: rowanholt samples fetch {s['id']}")
             job = samples.create_job(samples.job_request(s, found, force), api, token)
@@ -120,6 +126,8 @@ def main() -> int:
             return cmd_list(root)
         chosen = _chosen(args.ids, args.all)
         if args.command == "fetch":
+            if args.all:
+                chosen = [s for s in chosen if not samples.built(s)]
             return cmd_fetch(root, chosen)
         return cmd_import(root, chosen, args.force)
     except samples.SampleError as exc:
