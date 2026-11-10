@@ -93,6 +93,7 @@ The **Windows VM** (`windows-vm create`) is Windows 11, provisioned with a Run k
 
 - On x86-64 hosts it's `gusztavvargadr/windows-11` under Vagrant, with PowerShell remoting. The first boot takes 10–20 minutes.
 - On Apple silicon it's Windows 11 ARM in UTM, built unattended from Microsoft's ISO, or an installed VM you bring with `adopt`. See [Windows 11 ARM on Apple silicon](#windows-11-arm-on-apple-silicon).
+- On an x86-64 host with QEMU and no Vagrant (the Intel Mac Mini), it's Windows 11 x64 in plain QEMU (`windows/qemu-vm.sh`, HVF or KVM), built unattended from Microsoft's x64 ISO in `<data>/isos` with the UTM answer file made x64. SSH is on 127.0.0.1:2232 and the screen on VNC at 127.0.0.1:5959 (loopback only: `ssh -L 5959:127.0.0.1:5959 <host>` from elsewhere). `windows-vm sample [dir]` builds one of Rowanholt's sample cases on it: a fresh install with nothing seeded, the Mordor sensor (Sysmon, PowerShell and process auditing, Defender's real-time protection off), Atomic Red Team with nothing cleaned up afterwards (discovery first, log clearing last), then memory and disk captured at the same moment (the VM paused, `memory.mem` and `disk.dd` raw, `SHA256SUMS`), and `expected.json`, the tests that ran and when. If Tamper Protection keeps real-time protection on, it stops and says how to turn it off.
 
 The collectors run from a controller container (`rowanholt-lab-controller`) that reaches the VMs via `host.docker.internal`, so nothing is installed on the host. Output goes where Elrond's `--Gandalf` mode expects it:
 

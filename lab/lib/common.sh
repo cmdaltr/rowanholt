@@ -91,6 +91,8 @@ uses_vagrant() { case "$(host_profile)" in macos-x86_64|linux-x86_64) return 0 ;
 uses_tart() { [ "$(host_profile)" = macos-arm64 ]; }
 # Kept for readability in messages: Intel/x86-64 hosts run x64 Windows.
 is_intel() { uses_vagrant; }
+# An x86-64 host with QEMU and no Vagrant (the Intel Mac Mini): Windows in plain QEMU (windows/qemu-vm.sh)
+uses_qemu_windows() { uses_vagrant && ! command -v vagrant >/dev/null 2>&1 && command -v qemu-system-x86_64 >/dev/null 2>&1; }
 is_arm() { uses_tart; }
 
 host_ram_gb() {

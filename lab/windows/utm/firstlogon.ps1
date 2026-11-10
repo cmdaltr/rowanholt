@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  First logon of the lab's Windows 11 ARM VM (UTM): drivers, the lab target
+  First logon of the lab's Windows 11 VM (ARM in UTM, x64 in QEMU): drivers, the lab target
   provisioning, and an SSH server so the Mac can drive Gandalf and fetch the
   archive. Runs from the LABCFG config ISO via autounattend.xml, or with
   -Source <folder> when utm-vm.sh adopts an installed VM over SSH.
@@ -21,6 +21,8 @@ if ($Source) {
         Where-Object { $_.FullName -match '\\w11\\ARM64\\' } |
         ForEach-Object { pnputil.exe /add-driver $_.FullName /install | Out-Null }
     Write-Host "virtio drivers installed"
+} elseif ($env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
+    Write-Host "x64 (qemu-vm.sh): Windows' own SATA and e1000e drivers"
 } else {
     Write-Warning "virtio-win ISO not attached: no network driver"
 }
@@ -41,10 +43,12 @@ $env:LAB_PASSWORD = (Get-Content -Raw "$cfg\lab-password.txt").Trim()
 Remove-Item Env:\LAB_PASSWORD
 Remove-Item -Force -ErrorAction SilentlyContinue "$cfg\lab-password.txt"
 
-# OpenSSH server from the Win32-OpenSSH ARM64 release (works offline)
-$ssh = "C:\Program Files\OpenSSH-ARM64"
-if (-not (Get-Service sshd -ErrorAction SilentlyContinue) -and (Test-Path "$cfg\OpenSSH-ARM64.zip")) {
-    Expand-Archive -Force "$cfg\OpenSSH-ARM64.zip" "C:\Program Files"
+# OpenSSH server from the Win32-OpenSSH release for this architecture (works offline): ARM64 in
+# UTM, Win64 in the QEMU VM (qemu-vm.sh)
+$flavour = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "OpenSSH-ARM64" } else { "OpenSSH-Win64" }
+$ssh = "C:\Program Files\$flavour"
+if (-not (Get-Service sshd -ErrorAction SilentlyContinue) -and (Test-Path "$cfg\$flavour.zip")) {
+    Expand-Archive -Force "$cfg\$flavour.zip" "C:\Program Files"
     & "$ssh\install-sshd.ps1"
 }
 Set-Service sshd -StartupType Automatic

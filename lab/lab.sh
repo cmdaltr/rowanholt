@@ -306,6 +306,16 @@ cmd_windows_vm() {
     "$LAB_ROOT/windows/utm-vm.sh" "$sub" "$@"
     return
   fi
+  if uses_qemu_windows; then
+    if [ -z "$sub" ]; then
+      menu "Windows 11 x64 VM (QEMU; SSH on 127.0.0.1:2232, screen on vnc://127.0.0.1:5959)" "Create / install (needs the x64 ISO in $LAB_DATA_DIR/isos)" "Start" "Stop" "Destroy" "Status" "Build a Rowanholt sample (Atomic Red Team, then memory and disk)"
+      case "$MENU_CHOICE" in 1) sub=create ;; 2) sub=start ;; 3) sub=stop ;; 4) sub=delete ;; 5) sub=status ;; 6) sub=sample ;; *) return ;; esac
+    fi
+    shift || true
+    if [ "$sub" = sample ] && [ -z "${1:-}" ]; then set -- "$LAB_DATA_DIR/samples/win11-atomics-$(date +%Y%m%d)"; fi
+    "$LAB_ROOT/windows/qemu-vm.sh" "$sub" "$@"
+    return
+  fi
   if ! uses_vagrant; then warn "No Windows VM option on $(host_label)."; return; fi
   if [ -z "$sub" ]; then
     menu "Windows 11 x64 VM (Vagrant + VirtualBox)" "Create / provision (~15 GB box download)" "Start" "Stop" "Re-run provisioning" "Open console (VirtualBox GUI)" "Destroy" "Status"
@@ -452,6 +462,7 @@ cmd_mordor_sensor() {
   warn "This installs Atomic Red Team and disables Defender real-time protection inside the lab VM."
   confirm "Continue?" n || return
   if uses_tart; then "$LAB_ROOT/windows/utm-vm.sh" sensor; return; fi
+  if uses_qemu_windows; then "$LAB_ROOT/windows/qemu-vm.sh" sensor; return; fi
   vagrant_env
   vagrant winrm win -e -c "powershell -NoProfile -ExecutionPolicy Bypass -File C:\\lab\\scripts\\Install-MordorSensor.ps1"
 }
@@ -532,6 +543,8 @@ cmd_mordor_record() {
   [ -n "$run" ] || run="lab-win11-$preset-$(date +%Y%m%d-%H%M)"
   if uses_tart; then
     "$LAB_ROOT/windows/utm-vm.sh" record "$techniques" "$run" "$TELEMETRY_LAB" || return 1
+  elif uses_qemu_windows; then
+    "$LAB_ROOT/windows/qemu-vm.sh" record "$techniques" "$run" "$TELEMETRY_LAB" || return 1
   else
     vagrant_env
     # C:\lab\mordor is the shared $MORDOR_ROOT
@@ -726,7 +739,7 @@ Usage: ./lab.sh [command]
   linux-targets [up|stacking|down|reset|status]   Two seeded Linux containers (stacking: plus two clean Ubuntu)
   linux-vm [create|start|stop|delete|status]
   macos-vm [create|start|stop|delete|status|move <dir>]   (Apple silicon)
-  windows-vm [create|start|stop|provision|gui|delete|status]
+  windows-vm [create|start|stop|provision|gui|delete|status|sample <dir>]
   gandalf-collect [bash|python|powershell|all] ["targets"]
   stacking-eval       Collect the Linux stacking targets, run Elrond, score stacking.csv (adds a row to README.md)
                       --reuse [CASE-ID]: Elrond over an earlier case's collection, no collecting
