@@ -179,8 +179,18 @@ foreach ($t in $Techniques) {
         Lap 'capture stop'
 
         if ($IsWindows) {
+            # EventLogReader, not Get-WinEvent: the same ToXml() strings in the same order, but
+            # Get-WinEvent renders every event's message too, which took 40-110 s a test (Atomic
+            # Red Team's own script blocks fill PowerShell/Operational) against under a second
+            $window = "*[System[TimeCreated[@SystemTime>='$($start.ToUniversalTime().ToString('o'))' and @SystemTime<='$($end.ToUniversalTime().ToString('o'))']]]"
             $xml = foreach ($log in $presentLogs) {
-                Get-WinEvent -FilterHashtable @{ LogName = $log; StartTime = $start; EndTime = $end } -ErrorAction SilentlyContinue | ForEach-Object { $_.ToXml() }
+                $query = New-Object System.Diagnostics.Eventing.Reader.EventLogQuery($log, [System.Diagnostics.Eventing.Reader.PathType]::LogName, $window)
+                $query.ReverseDirection = $true
+                try {
+                    $reader = New-Object System.Diagnostics.Eventing.Reader.EventLogReader($query)
+                    while ($record = $reader.ReadEvent()) { $record.ToXml(); $record.Dispose() }
+                    $reader.Dispose()
+                } catch { Write-Warning "$log`: $_" }
             }
             if ($xml) { $xml | Set-Content -Path (Join-Path $dir 'events.xml') -Encoding utf8 }
         } elseif ($IsLinux) {
