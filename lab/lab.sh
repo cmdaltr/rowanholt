@@ -258,10 +258,15 @@ cmd_macos_vm() {
     return
   fi
   if [ -z "$sub" ]; then
-    menu "macOS VM (Tart; SSH on 127.0.0.1:2231)" "Create / provision (~25 GB download)" "Start" "Stop" "Destroy" "Status"
-    case "$MENU_CHOICE" in 1) sub=create ;; 2) sub=start ;; 3) sub=stop ;; 4) sub=delete ;; 5) sub=status ;; *) return ;; esac
+    menu "macOS VM (Tart; SSH on 127.0.0.1:2231)" "Create / provision (~25 GB download)" "Start" "Stop" "Destroy" "Status" "Build a Rowanholt sample (macOS 15, Atomic Red Team, then its disk)"
+    case "$MENU_CHOICE" in 1) sub=create ;; 2) sub=start ;; 3) sub=stop ;; 4) sub=delete ;; 5) sub=status ;; 6) sub=sample ;; *) return ;; esac
   fi
   shift || true
+  if [ "$sub" = sample ]; then
+    # Its own VM (rowan-lab-macos15-sample); ./macos/tart-vm.sh stop|delete|status macos-sample for that
+    "$LAB_ROOT/macos/tart-vm.sh" sample macos-sample "${1:-$LAB_DATA_DIR/samples/macos15-atomics-$(date +%Y%m%d)}"
+    return
+  fi
   "$LAB_ROOT/macos/tart-vm.sh" "$sub" macos "$@"
 }
 
@@ -738,7 +743,7 @@ Usage: ./lab.sh [command]
   configure           Data location, VM sizes, lab password
   linux-targets [up|stacking|down|reset|status]   Two seeded Linux containers (stacking: plus two clean Ubuntu)
   linux-vm [create|start|stop|delete|status]
-  macos-vm [create|start|stop|delete|status|move <dir>]   (Apple silicon)
+  macos-vm [create|start|stop|delete|status|move <dir>|sample [dir]]   (Apple silicon)
   windows-vm [create|start|stop|provision|gui|delete|status|sample <dir>]
   gandalf-collect [bash|python|powershell|all] ["targets"]
   stacking-eval       Collect the Linux stacking targets, run Elrond, score stacking.csv (adds a row to README.md)
