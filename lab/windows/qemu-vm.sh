@@ -11,7 +11,7 @@
 # and boots the Windows ISO with it. Windows installs itself and starts an SSH server, forwarded to
 # 127.0.0.1:2232. The disk is SATA and the network card e1000e, both Windows' own drivers, so no
 # virtio ISO; TPM and Secure Boot checks are bypassed (LabConfig), as in UTM.
-# The screen is on VNC at 127.0.0.1:5959 (no password, loopback only): from another machine,
+# The screen is on VNC at 127.0.0.1:5959 (the lab password's first 8 characters, loopback only): from another machine,
 # ssh -L 5959:127.0.0.1:5959 <host>, then open vnc://127.0.0.1:5959.
 # The Windows 11 x64 ISO is the one manual download: put it in $LAB_DATA_DIR/isos/, or set
 # WINDOWS_X64_ISO=/path/to.iso.
@@ -169,11 +169,15 @@ start_vm() {
     -drive "id=disk,file=$DISK,if=none,format=qcow2,discard=unmap" -device "ide-hd,drive=disk,bus=ahci.0,bootindex=9" \
     ${media[@]+"${media[@]}"} \
     -netdev "user,id=net0,hostfwd=tcp:127.0.0.1:$PORT-:22" -device e1000e,netdev=net0 \
-    -device qemu-xhci -device usb-tablet -vga std -display none -vnc 127.0.0.1:59 \
+    -device qemu-xhci -device usb-tablet -vga std -display none -vnc 127.0.0.1:59,password=on \
     -rtc base=utc -qmp "unix:$QMP_SOCK,server=on,wait=off" -pidfile "$PIDFILE" -daemonize \
     ${WINDOWS_QEMU_ARGS:-}  # e.g. "-action reboot=shutdown,shutdown=pause" to stop on a crash and keep its screen; resuming then needs qmp.py set-action '{"reboot":"reset"}' before system_reset and cont, since that action turns system_reset into another shutdown
-  for i in $(seq 1 20); do [ -S "$QMP_SOCK" ] && return 0; sleep 1; done
-  die "QEMU started but its control socket ($QMP_SOCK) didn't appear"
+  for i in $(seq 1 20); do [ -S "$QMP_SOCK" ] && break; sleep 1; done
+  [ -S "$QMP_SOCK" ] || die "QEMU started but its control socket ($QMP_SOCK) didn't appear"
+  # macOS Screen Sharing won't connect to a VNC server without a password. VNC keeps 8 characters.
+  require_password
+  qmp set_password "{\"protocol\":\"vnc\",\"password\":\"${LAB_PASSWORD:0:8}\"}" >/dev/null \
+    || warn "Couldn't set the VNC password; the screen won't open until it's set"
 }
 
 stop_vm() {
