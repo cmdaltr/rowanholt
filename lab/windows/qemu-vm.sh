@@ -44,7 +44,14 @@ DISK_GB="${WINDOWS_QEMU_DISK_GB:-48}"
 # so it wipes only what came before it (as an intruder's would)
 SAMPLE_TECHNIQUES="${SAMPLE_TECHNIQUES:-T1082,T1087.001,T1016,T1547.001,T1053.005,T1543.003,T1552.001,T1003.001,T1218.011,T1562.001,T1070.001}"
 
-running() { [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; }
+# The pidfile, else the process by name: a second QEMU refused the disk's lock removes the
+# first one's pidfile and socket as it exits, and a VM that looked stopped then got started twice
+vm_pid() {
+  local p
+  p="$(cat "$PIDFILE" 2>/dev/null || true)"
+  if [ -n "$p" ] && kill -0 "$p" 2>/dev/null; then echo "$p"; else pgrep -f "qemu-system-x86_64 -name $VM " | head -1 || true; fi
+}
+running() { [ -n "$(vm_pid)" ]; }
 vm_status() { if running; then echo started; elif [ -f "$DISK" ]; then echo stopped; else echo "not created"; fi; }
 qmp() { python3 -I "$QMP" "$QMP_SOCK" "$@"; }
 . "$LAB_ROOT/windows/guest.sh"
@@ -186,7 +193,7 @@ stop_vm() {
   qmp system_powerdown >/dev/null || true
   local _
   for _ in $(seq 1 90); do running || break; sleep 2; done
-  if running; then warn "Windows didn't shut down in 3 minutes; stopping QEMU"; qmp quit >/dev/null || kill "$(cat "$PIDFILE")"; fi
+  if running; then warn "Windows didn't shut down in 3 minutes; stopping QEMU"; qmp quit >/dev/null || kill "$(vm_pid)"; fi
   rm -f "$PIDFILE" "$QMP_SOCK"
   ok "$VM stopped"
 }
