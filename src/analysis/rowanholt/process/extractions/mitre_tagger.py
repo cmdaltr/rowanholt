@@ -43,12 +43,12 @@ ARTEFACT_MITRE_MAPPING = {
     "unified_log": {
         "technique_ids": ["T1685.006"],
         "technique_names": ["Clear Linux or Mac System Logs"],
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Defense Impairment"],
     },
     "fsevent": {
         "technique_ids": ["T1083", "T1070.004"],
         "technique_names": ["File and Directory Discovery", "File Deletion"],
-        "tactics": ["Discovery", "Defense Evasion"],
+        "tactics": ["Stealth", "Discovery"],
     },
     "quarantine": {
         "technique_ids": ["T1105", "T1566"],
@@ -80,32 +80,32 @@ ARTEFACT_MITRE_MAPPING = {
     "journal": {
         "technique_ids": ["T1685.006"],
         "technique_names": ["Clear Linux or Mac System Logs"],
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Defense Impairment"],
     },
     "journalctl": {
         "technique_ids": ["T1685.006"],
         "technique_names": ["Clear Linux or Mac System Logs"],
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Defense Impairment"],
     },
     "audit": {
         "technique_ids": ["T1059", "T1059.004", "T1136", "T1087", "T1078", "T1110"],
         "technique_names": ["Command and Scripting Interpreter", "Unix Shell", "Create Account", "Account Discovery", "Valid Accounts", "Brute Force"],
-        "tactics": ["Execution", "Persistence", "Discovery", "Initial Access", "Credential Access"],
+        "tactics": ["Initial Access", "Execution", "Persistence", "Privilege Escalation", "Stealth", "Credential Access", "Discovery"],
     },
     "syslog": {
         "technique_ids": ["T1685.006"],
         "technique_names": ["Clear Linux or Mac System Logs"],
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Defense Impairment"],
     },
     "auth_log": {
         "technique_ids": ["T1078", "T1110", "T1021.004"],
         "technique_names": ["Valid Accounts", "Brute Force", "SSH"],
-        "tactics": ["Initial Access", "Persistence", "Credential Access", "Lateral Movement"],
+        "tactics": ["Initial Access", "Persistence", "Privilege Escalation", "Stealth", "Credential Access", "Lateral Movement"],
     },
     "secure_log": {
         "technique_ids": ["T1078", "T1110"],
         "technique_names": ["Valid Accounts", "Brute Force"],
-        "tactics": ["Initial Access", "Persistence", "Credential Access"],
+        "tactics": ["Initial Access", "Persistence", "Privilege Escalation", "Stealth", "Credential Access"],
     },
     "cron": {
         "technique_ids": ["T1053.003"],
@@ -130,19 +130,19 @@ ARTEFACT_MITRE_MAPPING = {
     "docker": {
         "technique_ids": ["T1610", "T1613", "T1611"],
         "technique_names": ["Deploy Container", "Container and Resource Discovery", "Escape to Host"],
-        "tactics": ["Defense Evasion", "Execution", "Discovery", "Privilege Escalation"],
+        "tactics": ["Execution", "Privilege Escalation", "Discovery"],
     },
 
     # Cross-platform Unix artifacts
     "bash_history": {
         "technique_ids": ["T1059.004", "T1070.003"],
         "technique_names": ["Unix Shell", "Clear Command History"],
-        "tactics": ["Execution", "Defense Evasion"],
+        "tactics": ["Execution", "Stealth"],
     },
     "zsh_history": {
         "technique_ids": ["T1059.004", "T1070.003"],
         "technique_names": ["Unix Shell", "Clear Command History"],
-        "tactics": ["Execution", "Defense Evasion"],
+        "tactics": ["Execution", "Stealth"],
     },
     "group": {
         "technique_ids": ["T1087.001", "T1069"],
@@ -196,12 +196,12 @@ ARTEFACT_MITRE_MAPPING = {
     "log": {
         "technique_ids": ["T1685.006"],
         "technique_names": ["Clear Linux or Mac System Logs"],
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Defense Impairment"],
     },
     "logs": {
         "technique_ids": ["T1685.006"],
         "technique_names": ["Clear Linux or Mac System Logs"],
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Defense Impairment"],
     },
 }
 

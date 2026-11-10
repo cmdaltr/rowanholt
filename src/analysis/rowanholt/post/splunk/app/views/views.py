@@ -22,8 +22,9 @@ try:
     from rowanholt.post.splunk.app.views.html.privilege_escalation import (
         create_privilege_escalation_html,
     )
-    from rowanholt.post.splunk.app.views.html.defense_evasion import (
-        create_defense_evasion_html,
+    from rowanholt.post.splunk.app.views.html.stealth import create_stealth_html
+    from rowanholt.post.splunk.app.views.html.defense_impairment import (
+        create_defense_impairment_html,
     )
     from rowanholt.post.splunk.app.views.html.credential_access import (
         create_credential_access_html,
@@ -45,7 +46,8 @@ except ImportError:
     create_execution_html = None
     create_persistence_html = None
     create_privilege_escalation_html = None
-    create_defense_evasion_html = None
+    create_stealth_html = None
+    create_defense_impairment_html = None
     create_credential_access_html = None
     create_discovery_html = None
     create_lateral_movement_html = None
@@ -61,7 +63,8 @@ try:
         create_execution_xml,
         create_persistence_xml,
         create_privilege_escalation_xml,
-        create_defense_evasion_xml,
+        create_stealth_xml,
+        create_defense_impairment_xml,
         create_credential_access_xml,
         create_discovery_xml,
         create_lateral_movement_xml,
@@ -78,7 +81,8 @@ except ImportError:
     create_execution_xml = None
     create_persistence_xml = None
     create_privilege_escalation_xml = None
-    create_defense_evasion_xml = None
+    create_stealth_xml = None
+    create_defense_impairment_xml = None
     create_credential_access_xml = None
     create_discovery_xml = None
     create_lateral_movement_xml = None
@@ -107,7 +111,8 @@ def create_htmls(sd):
     create_execution_html(sd, header, headings, footer)
     create_persistence_html(sd, header, headings, footer)
     create_privilege_escalation_html(sd, header, headings, footer)
-    create_defense_evasion_html(sd, header, headings, footer)
+    create_stealth_html(sd, header, headings, footer)
+    create_defense_impairment_html(sd, header, headings, footer)
     create_credential_access_html(sd, header, headings, footer)
     create_discovery_html(sd, header, headings, footer)
     create_lateral_movement_html(sd, header, headings, footer)
@@ -151,7 +156,8 @@ def create_xmls(sd):
         create_execution_xml(sd)
         create_persistence_xml(sd)
         create_privilege_escalation_xml(sd)
-        create_defense_evasion_xml(sd)
+        create_stealth_xml(sd)
+        create_defense_impairment_xml(sd)
         create_credential_access_xml(sd)
         create_discovery_xml(sd)
         create_lateral_movement_xml(sd)

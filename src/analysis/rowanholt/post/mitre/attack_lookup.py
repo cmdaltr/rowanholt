@@ -12,7 +12,7 @@ import csv
 import json
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, NamedTuple, Optional
+from typing import Dict, FrozenSet, List, NamedTuple, Optional, Tuple
 
 HERE = Path(__file__).resolve().parent
 TECHNIQUES_CSV = HERE / "attack_techniques.csv"
@@ -105,6 +105,61 @@ def all_techniques() -> List[Technique]:
 def platforms(domain: str) -> List[str]:
     """Every platform the domain's techniques name, sorted (Enterprise's include the cloud ones)."""
     return sorted({p for t in _techniques().values() if t.domain == domain for p in t.platforms})
+
+
+# Enterprise's tactics in kill-chain order. v20 split Defense Evasion into Stealth and Defense
+# Impairment; attack_release.json gives no matrix order, so the two sit where Defense Evasion
+# was. The names are ATT&CK's own (other tools match on them); a unit test holds this tuple to
+# the tactics attack_techniques.csv gives Enterprise's techniques.
+ENTERPRISE_TACTICS: Tuple[str, ...] = (
+    "Reconnaissance",
+    "Resource Development",
+    "Initial Access",
+    "Execution",
+    "Persistence",
+    "Privilege Escalation",
+    "Stealth",
+    "Defense Impairment",
+    "Credential Access",
+    "Discovery",
+    "Lateral Movement",
+    "Collection",
+    "Command and Control",
+    "Exfiltration",
+    "Impact",
+)
+
+
+def tactics_of(technique_id: str) -> List[str]:
+    """The technique's tactics as the pinned release gives them (a revoked ID's replacement's),
+    in kill-chain order; [] for an ID the release doesn't have."""
+    found = technique(technique_id)
+    return kill_chain_sorted(found.tactics) if found else []
+
+
+def kill_chain_sorted(tactics) -> List[str]:
+    """The tactic names in Enterprise's kill-chain order, any it doesn't have (Mobile's own,
+    such as its Defense Evasion) after them in the order given."""
+    order = {name: i for i, name in enumerate(ENTERPRISE_TACTICS)}
+    listed = list(dict.fromkeys(tactics))
+    return sorted(listed, key=lambda t: (order.get(t, len(order)), listed.index(t)))
+
+
+@lru_cache(maxsize=None)
+def tactic_names(domain: str = ENTERPRISE) -> FrozenSet[str]:
+    """Every tactic name the domain's techniques carry in the pinned release."""
+    return frozenset(t for tech in _techniques().values() if tech.domain == domain for t in tech.tactics)
+
+
+@lru_cache(maxsize=None)
+def tactic_shortnames(domain: str = ENTERPRISE) -> Dict[str, str]:
+    """Tactic name to ATT&CK's short name ("Defense Impairment" -> "defense-impairment"), as
+    the release pairs them. The CSV carries no TA numbers."""
+    pairs: Dict[str, str] = {}
+    for tech in _techniques().values():
+        if tech.domain == domain and len(tech.tactics) == len(tech.tactic_ids):
+            pairs.update(zip(tech.tactics, tech.tactic_ids))
+    return pairs
 
 
 def by_domain(technique_ids) -> Dict[str, List[str]]:

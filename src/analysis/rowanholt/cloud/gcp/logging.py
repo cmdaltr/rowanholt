@@ -37,7 +37,7 @@ class CloudLoggingAnalyzer:
 
     # Suspicious method names mapped to MITRE ATT&CK
     SUSPICIOUS_METHODS = {
-        # Defense Evasion
+        # Defense Impairment
         "google.logging.v2.ConfigServiceV2.DeleteSink": ["T1685.002"],  # Disable or Modify Cloud Log
         "google.logging.v2.ConfigServiceV2.UpdateSink": ["T1685.002"],
         # Privilege Escalation

@@ -4,8 +4,16 @@ MITRE ATT&CK Technique Dashboard Generator for Splunk
 
 This module generates individual XML dashboard views for each MITRE ATT&CK technique.
 The dashboards provide detailed views of events mapped to specific techniques.
-Updated for MITRE ATT&CK v18.1 with comprehensive technique coverage.
+
+Technique IDs and tactics are ATT&CK v20.1's (pinned in post/mitre/attack_techniques.csv).
+v20 split Defense Evasion into Stealth and Defense Impairment. Each technique's tactic below
+is one of the tactics the CSV gives it (its dashboard's section); the badges on a dashboard
+show every tactic the CSV gives it. tests/unit/test_attack_tactics.py holds both to the CSV.
 """
+
+from typing import Dict, List, Tuple
+
+from rowanholt.post.mitre import attack_lookup
 
 # Complete technique definitions organized by tactic
 # Format: {technique_id: (name, tactic, description)}
@@ -116,7 +124,7 @@ TECHNIQUES = {
     "T1566.004": ("Spearphishing Voice", "Initial Access", "Adversaries may use voice communications to ultimately gain access to victim systems. Spearphishing voice is a specific variant of spearphishing. It is different from other forms of spearphishing in that it employs the use of manipulating a user i..."),
     "T1091": ("Replication Through Removable Media", "Initial Access", "Adversaries may move onto systems, possibly those on disconnected or air-gapped networks, by copying malware to removable media and taking advantage of Autorun features when the media is inserted into a system and executes. In the case of Lateral ..."),
     "T1195": ("Supply Chain Compromise", "Initial Access", "Adversaries may manipulate products or product delivery mechanisms prior to receipt by a final consumer for the purpose of data or system compromise. Supply chain compromise can take place at any stage of the supply chain including: * Manipulation..."),
-    "T1195.001": ("Compromise Software Dependencies", "Initial Access", "Adversaries may manipulate software dependencies and development tools prior to receipt by a final consumer for the purpose of data or system compromise. Applications often depend on external software to function properly. Popular open source proj..."),
+    "T1195.001": ("Compromise Software Dependencies and Development Tools", "Initial Access", "Adversaries may manipulate software dependencies and development tools prior to receipt by a final consumer for the purpose of data or system compromise. Applications often depend on external software to function properly. Popular open source proj..."),
     "T1195.002": ("Compromise Software Supply Chain", "Initial Access", "Adversaries may manipulate application software prior to receipt by a final consumer for the purpose of data or system compromise. Supply chain compromise of software can take place in a number of ways, including manipulation of the application so..."),
     "T1195.003": ("Compromise Hardware Supply Chain", "Initial Access", "Adversaries may manipulate hardware components in products prior to receipt by a final consumer for the purpose of data or system compromise. By modifying hardware or firmware in the supply chain, adversaries can insert a backdoor into consumer ne..."),
     "T1199": ("Trusted Relationship", "Initial Access", "Adversaries may breach or otherwise leverage organizations who have access to intended victims. Access through trusted third party relationship abuses an existing connection that may not be protected or receives less scrutiny than standard mechani..."),
@@ -147,7 +155,7 @@ TECHNIQUES = {
     "T1559.003": ("XPC Services", "Execution", "Adversaries can provide malicious content to an XPC service daemon for local code execution. macOS uses XPC services for basic inter-process communication between various processes, such as between the XPC Service daemon and third-party applicatio..."),
     "T1106": ("Native API", "Execution", "Adversaries may interact with the native OS application programming interface (API) to execute behaviors. Native APIs provide a controlled means of calling low-level OS services within the kernel, such as those involving hardware/devices, memory, ..."),
     "T1053": ("Scheduled Task/Job", "Execution", "Adversaries may abuse task scheduling functionality to facilitate initial or recurring execution of malicious code. Utilities exist within all major operating systems to schedule programs or scripts to be executed at a specified date and time. A t..."),
-    "T1053.002": ("At (Windows)", "Execution", "Adversaries may abuse the [at](https://attack.mitre.org/software/S0110) utility to perform task scheduling for initial or recurring execution of malicious code. The [at](https://attack.mitre.org/software/S0110) utility exists as an executable with..."),
+    "T1053.002": ("At", "Execution", "Adversaries may abuse the [at](https://attack.mitre.org/software/S0110) utility to perform task scheduling for initial or recurring execution of malicious code. The [at](https://attack.mitre.org/software/S0110) utility exists as an executable with..."),
     "T1053.003": ("Cron", "Execution", "Adversaries may abuse the cron utility to perform task scheduling for initial or recurring execution of malicious code. The cron utility is a time-based job scheduler for Unix-like operating systems. The crontab file contains the schedule of cron ..."),
     "T1053.005": ("Scheduled Task", "Execution", "Adversaries may abuse the Windows Task Scheduler to perform task scheduling for initial or recurring execution of malicious code. There are multiple ways to access the Task Scheduler in Windows. The [schtasks](https://attack.mitre.org/software/S01..."),
     "T1053.006": ("Systemd Timers", "Execution", "Adversaries may abuse systemd timers to perform task scheduling for initial or recurring execution of malicious code. Systemd timers are unit files with file extension .timer that control services. Timers can be set to run on a calendar event or a..."),
@@ -162,6 +170,19 @@ TECHNIQUES = {
     "T1204.002": ("Malicious File", "Execution", "An adversary may rely upon a user opening a malicious file in order to gain execution. Users may be subjected to social engineering to get them to open a file that will lead to code execution. This user action will typically be observed as follow-..."),
     "T1204.003": ("Malicious Image", "Execution", "Adversaries may rely on a user running a malicious image to facilitate execution. Amazon Web Services (AWS) Amazon Machine Images (AMIs), Google Cloud Platform (GCP) Images, and Azure Images as well as popular container runtimes such as Docker can..."),
     "T1047": ("Windows Management Instrumentation", "Execution", "Adversaries may abuse Windows Management Instrumentation (WMI) to execute malicious commands and payloads. WMI is designed for programmers and is the infrastructure for management data and operations on Windows systems. WMI is an administration fe..."),
+    "T1574": ("Hijack Execution Flow", "Execution", "Adversaries may execute their own malicious payloads by hijacking the way operating systems run programs. Hijacking execution flow can be for the purposes of persistence, since this hijacked execution may reoccur over time. Adversaries may also us..."),
+    "T1574.001": ("DLL", "Execution", "Adversaries may abuse dynamic-link library files (DLLs) in order to achieve persistence, escalate privileges, and evade defenses. DLLs are libraries that contain code and data that can be simultaneously utilized by multiple programs. While DLLs ar..."),
+    "T1574.004": ("Dylib Hijacking", "Execution", "Adversaries may execute their own payloads by placing a malicious dynamic library (dylib) with an expected name in a path a victim application searches at runtime. The dynamic loader will try to find the dylibs based on the sequential order of the..."),
+    "T1574.005": ("Executable Installer File Permissions Weakness", "Execution", "Adversaries may execute their own malicious payloads by hijacking the binaries used by an installer. These processes may automatically execute specific binaries as part of their functionality or to perform other actions. If the permissions on the ..."),
+    "T1574.006": ("Dynamic Linker Hijacking", "Execution", "Adversaries may execute their own malicious payloads by hijacking environment variables the dynamic linker uses to load shared libraries. During the execution preparation phase of a program, the dynamic linker loads specified absolute paths of sha..."),
+    "T1574.007": ("Path Interception by PATH Environment Variable", "Execution", "Adversaries may execute their own malicious payloads by hijacking environment variables used to load libraries. The PATH environment variable contains a list of directories (User and System) that the OS searches sequentially through in search of t..."),
+    "T1574.008": ("Path Interception by Search Order Hijacking", "Execution", "Adversaries may execute their own malicious payloads by hijacking the search order used to load other programs. Because some programs do not call other programs using the full path, adversaries may place their own file in the directory where the c..."),
+    "T1574.009": ("Path Interception by Unquoted Path", "Execution", "Adversaries may execute their own malicious payloads by hijacking vulnerable file path references. Adversaries can take advantage of paths that lack surrounding quotations by placing an executable in a higher level directory within the path, so th..."),
+    "T1574.010": ("Services File Permissions Weakness", "Execution", "Adversaries may execute their own malicious payloads by hijacking the binaries used by services. Adversaries may use flaws in the permissions of Windows services to replace the binary that is executed upon service start. These service processes ma..."),
+    "T1574.011": ("Services Registry Permissions Weakness", "Execution", "Adversaries may execute their own malicious payloads by hijacking the Registry entries used by services. Flaws in the permissions for Registry keys related to services can allow adversaries to redirect the originally specified executable to one th..."),
+    "T1574.012": ("COR_PROFILER", "Execution", "Adversaries may leverage the COR_PROFILER environment variable to hijack the execution flow of programs that load the .NET CLR. The COR_PROFILER is a .NET Framework feature which allows developers to specify an unmanaged (or external of .NET) prof..."),
+    "T1574.013": ("KernelCallbackTable", "Execution", "Adversaries may abuse the KernelCallbackTable of a process to hijack its execution flow in order to run their own payloads. The KernelCallbackTable can be found in the Process Environment Block (PEB) and is initialized to an array of graphic funct..."),
+    "T1574.014": ("AppDomainManager", "Execution", "Adversaries may execute their own malicious payloads by hijacking how the .NET `AppDomainManager` loads assemblies. The .NET framework uses the `AppDomainManager` class to create and manage one or more isolated runtime environments (called applica..."),
 
     # ==================== PERSISTENCE ====================
     "T1098": ("Account Manipulation", "Persistence", "Adversaries may manipulate accounts to maintain and/or elevate access to victim systems. Account manipulation may consist of any action that preserves or modifies adversary access to a compromised account, such as modifying credentials or permissi..."),
@@ -193,8 +214,8 @@ TECHNIQUES = {
     "T1037.003": ("Network Logon Script", "Persistence", "Adversaries may use network logon scripts automatically executed at logon initialization to establish persistence. Network logon scripts can be assigned using Active Directory or Group Policy Objects. These logon scripts run with the privileges of..."),
     "T1037.004": ("RC Scripts", "Persistence", "Adversaries may establish persistence by modifying RC scripts, which are executed during a Unix-like system’s startup. These files allow system administrators to map and start custom services at startup for different run levels. RC scripts require..."),
     "T1037.005": ("Startup Items", "Persistence", "Adversaries may use startup items automatically executed at boot initialization to establish persistence. Startup items execute during the final phase of the boot process and contain shell scripts or other executable files along with configuration..."),
-    "T1176": ("Browser Extensions", "Persistence", "Adversaries may abuse software extensions to establish persistent access to victim systems. Software extensions are modular components that enhance or customize the functionality of software applications, including web browsers, Integrated Develop..."),
-    "T1554": ("Compromise Client Software Binary", "Persistence", "Adversaries may modify host software binaries to establish persistent access to systems. Software binaries/executables provide a wide range of system commands or services, programs, and libraries. Common software binaries are SSH clients, FTP clie..."),
+    "T1176": ("Software Extensions", "Persistence", "Adversaries may abuse software extensions to establish persistent access to victim systems. Software extensions are modular components that enhance or customize the functionality of software applications, including web browsers, Integrated Develop..."),
+    "T1554": ("Compromise Host Software Binary", "Persistence", "Adversaries may modify host software binaries to establish persistent access to systems. Software binaries/executables provide a wide range of system commands or services, programs, and libraries. Common software binaries are SSH clients, FTP clie..."),
     "T1136": ("Create Account", "Persistence", "Adversaries may create an account to maintain access to victim systems. With a sufficient level of access, creating such accounts may be used to establish secondary credentialed access that do not require persistent remote access tools to be deplo..."),
     "T1136.001": ("Local Account", "Persistence", "Adversaries may create a local account to maintain access to victim systems. Local accounts are those configured by an organization for use by users, remote support, services, or for administration on a single system or service. For example, with ..."),
     "T1136.002": ("Domain Account", "Persistence", "Adversaries may create a domain account to maintain access to victim systems. Domain accounts are those managed by Active Directory Domain Services where access and permissions are configured across systems and services that are part of that domai..."),
@@ -221,19 +242,6 @@ TECHNIQUES = {
     "T1546.014": ("Emond", "Persistence", "Adversaries may gain persistence and elevate privileges by executing malicious content triggered by the Event Monitor Daemon (emond). Emond is a [Launch Daemon](https://attack.mitre.org/techniques/T1543/004) that accepts events from various servic..."),
     "T1546.015": ("Component Object Model Hijacking", "Persistence", "Adversaries may establish persistence by executing malicious content triggered by hijacked references to Component Object Model (COM) objects. COM is a system within Windows to enable interaction between software components through the operating s..."),
     "T1546.016": ("Installer Packages", "Persistence", "Adversaries may establish persistence and elevate privileges by using an installer to trigger the execution of malicious content. Installer packages are OS specific and contain the resources an operating system needs to install applications on a s..."),
-    "T1574": ("Hijack Execution Flow", "Persistence", "Adversaries may execute their own malicious payloads by hijacking the way operating systems run programs. Hijacking execution flow can be for the purposes of persistence, since this hijacked execution may reoccur over time. Adversaries may also us..."),
-    "T1574.001": ("DLL Search Order Hijacking", "Persistence", "Adversaries may abuse dynamic-link library files (DLLs) in order to achieve persistence, escalate privileges, and evade defenses. DLLs are libraries that contain code and data that can be simultaneously utilized by multiple programs. While DLLs ar..."),
-    "T1574.004": ("Dylib Hijacking", "Persistence", "Adversaries may execute their own payloads by placing a malicious dynamic library (dylib) with an expected name in a path a victim application searches at runtime. The dynamic loader will try to find the dylibs based on the sequential order of the..."),
-    "T1574.005": ("Executable Installer File Permissions Weakness", "Persistence", "Adversaries may execute their own malicious payloads by hijacking the binaries used by an installer. These processes may automatically execute specific binaries as part of their functionality or to perform other actions. If the permissions on the ..."),
-    "T1574.006": ("Dynamic Linker Hijacking", "Persistence", "Adversaries may execute their own malicious payloads by hijacking environment variables the dynamic linker uses to load shared libraries. During the execution preparation phase of a program, the dynamic linker loads specified absolute paths of sha..."),
-    "T1574.007": ("Path Interception by PATH Environment Variable", "Persistence", "Adversaries may execute their own malicious payloads by hijacking environment variables used to load libraries. The PATH environment variable contains a list of directories (User and System) that the OS searches sequentially through in search of t..."),
-    "T1574.008": ("Path Interception by Search Order Hijacking", "Persistence", "Adversaries may execute their own malicious payloads by hijacking the search order used to load other programs. Because some programs do not call other programs using the full path, adversaries may place their own file in the directory where the c..."),
-    "T1574.009": ("Path Interception by Unquoted Path", "Persistence", "Adversaries may execute their own malicious payloads by hijacking vulnerable file path references. Adversaries can take advantage of paths that lack surrounding quotations by placing an executable in a higher level directory within the path, so th..."),
-    "T1574.010": ("Services File Permissions Weakness", "Persistence", "Adversaries may execute their own malicious payloads by hijacking the binaries used by services. Adversaries may use flaws in the permissions of Windows services to replace the binary that is executed upon service start. These service processes ma..."),
-    "T1574.011": ("Services Registry Permissions Weakness", "Persistence", "Adversaries may execute their own malicious payloads by hijacking the Registry entries used by services. Flaws in the permissions for Registry keys related to services can allow adversaries to redirect the originally specified executable to one th..."),
-    "T1574.012": ("COR_PROFILER", "Persistence", "Adversaries may leverage the COR_PROFILER environment variable to hijack the execution flow of programs that load the .NET CLR. The COR_PROFILER is a .NET Framework feature which allows developers to specify an unmanaged (or external of .NET) prof..."),
-    "T1574.013": ("KernelCallbackTable", "Persistence", "Adversaries may abuse the KernelCallbackTable of a process to hijack its execution flow in order to run their own payloads. The KernelCallbackTable can be found in the Process Environment Block (PEB) and is initialized to an array of graphic funct..."),
-    "T1574.014": ("AppDomainManager", "Persistence", "Adversaries may execute their own malicious payloads by hijacking how the .NET `AppDomainManager` loads assemblies. The .NET framework uses the `AppDomainManager` class to create and manage one or more isolated runtime environments (called applica..."),
     "T1525": ("Implant Internal Image", "Persistence", "Adversaries may implant cloud or container images with malicious code to establish persistence after gaining access to an environment. Amazon Web Services (AWS) Amazon Machine Images (AMIs), Google Cloud Platform (GCP) Images, and Azure Images as ..."),
     "T1556": ("Modify Authentication Process", "Persistence", "Adversaries may modify authentication mechanisms and processes to access user credentials or enable otherwise unwarranted access to accounts. The authentication process is handled by mechanisms, such as the Local Security Authentication Server (LS..."),
     "T1556.001": ("Domain Controller Authentication", "Persistence", "Adversaries may patch the authentication process on a domain controller to bypass the typical authentication mechanisms and enable access to accounts. Malware may be used to inject false credentials into the authentication process on a domain cont..."),
@@ -281,9 +289,9 @@ TECHNIQUES = {
     "T1134.003": ("Make and Impersonate Token", "Privilege Escalation", "Adversaries may make new tokens and impersonate users to escalate privileges and bypass access controls. For example, if an adversary has a username and password but the user is not logged onto the system the adversary can then create a logon sess..."),
     "T1134.004": ("Parent PID Spoofing", "Privilege Escalation", "Adversaries may spoof the parent process identifier (PPID) of a new process to evade process-monitoring defenses or to elevate privileges. New processes are typically spawned directly from their parent, or calling, process unless explicitly specif..."),
     "T1134.005": ("SID-History Injection", "Privilege Escalation", "Adversaries may use SID-History Injection to escalate privileges and bypass access controls. The Windows security identifier (SID) is a unique value that identifies a user or group account. SIDs are used by Windows security in both security descri..."),
-    "T1484": ("Domain Policy Modification", "Privilege Escalation", "Adversaries may modify the configuration settings of a domain or identity tenant to evade defenses and/or escalate privileges in centrally managed environments. Such services provide a centralized means of managing identity resources such as devic..."),
+    "T1484": ("Domain or Tenant Policy Modification", "Privilege Escalation", "Adversaries may modify the configuration settings of a domain or identity tenant to evade defenses and/or escalate privileges in centrally managed environments. Such services provide a centralized means of managing identity resources such as devic..."),
     "T1484.001": ("Group Policy Modification", "Privilege Escalation", "Adversaries may modify Group Policy Objects (GPOs) to subvert the intended discretionary access controls for a domain, usually with the intention of escalating privileges on the domain. Group policy allows for centralized management of user and co..."),
-    "T1484.002": ("Domain Trust Modification", "Privilege Escalation", "Adversaries may add new domain trusts, modify the properties of existing domain trusts, or otherwise change the configuration of trust relationships between domains and tenants to evade defenses and/or elevate privileges.Trust details, such as whe..."),
+    "T1484.002": ("Trust Modification", "Privilege Escalation", "Adversaries may add new domain trusts, modify the properties of existing domain trusts, or otherwise change the configuration of trust relationships between domains and tenants to evade defenses and/or elevate privileges.Trust details, such as whe..."),
     "T1611": ("Escape to Host", "Privilege Escalation", "Adversaries may break out of a container or virtualized environment to gain access to the underlying host. This can allow an adversary access to other containerized or virtualized resources from the host level or to the host itself. In principle, ..."),
     "T1068": ("Exploitation for Privilege Escalation", "Privilege Escalation", "Adversaries may exploit software vulnerabilities in an attempt to elevate privileges. Exploitation of a software vulnerability occurs when an adversary takes advantage of a programming error in a program, service, or within the operating system so..."),
     "T1055": ("Process Injection", "Privilege Escalation", "Adversaries may inject code into processes in order to evade process-based defenses as well as possibly elevate privileges. Process injection is a method of executing arbitrary code in the address space of a separate live process. Running code in ..."),
@@ -300,139 +308,131 @@ TECHNIQUES = {
     "T1055.014": ("VDSO Hijacking", "Privilege Escalation", "Adversaries may inject malicious code into processes via VDSO hijacking in order to evade process-based defenses as well as possibly elevate privileges. Virtual dynamic shared object (vdso) hijacking is a method of executing arbitrary code in the ..."),
     "T1055.015": ("ListPlanting", "Privilege Escalation", "Adversaries may abuse list-view controls to inject malicious code into hijacked processes in order to evade process-based defenses as well as possibly elevate privileges. ListPlanting is a method of executing arbitrary code in the address space of..."),
 
-    # ==================== DEFENSE EVASION ====================
-    "T1612": ("Build Image on Host", "Defense Evasion", "Adversaries may build a container image directly on a host to bypass defenses that monitor for the retrieval of malicious images from a public registry. A remote build request may be sent to the Docker API that includes a Dockerfile that pulls a v..."),
-    "T1622": ("Debugger Evasion", "Defense Evasion", "Adversaries may employ various means to detect and avoid debuggers. Debuggers are typically used by defenders to trace and/or analyze the execution of potential malware payloads. Debugger evasion may include changing behaviors based on the results..."),
-    "T1140": ("Deobfuscate/Decode Files or Information", "Defense Evasion", "Adversaries may use [Obfuscated Files or Information](https://attack.mitre.org/techniques/T1027) to hide artifacts of an intrusion from analysis. They may require separate mechanisms to decode or deobfuscate that information depending on how they ..."),
-    "T1610": ("Deploy Container", "Defense Evasion", "Adversaries may deploy a container into an environment to facilitate execution or evade defenses. In some cases, adversaries may deploy a new container to execute processes associated with a particular image or deployment, such as processes that e..."),
-    "T1006": ("Direct Volume Access", "Defense Evasion", "Adversaries may directly access a volume to bypass file access controls and file system monitoring. Windows allows programs to have direct access to logical volumes. Programs with direct access may read and write files directly from the drive by a..."),
-    "T1484": ("Domain Policy Modification", "Defense Evasion", "Adversaries may modify the configuration settings of a domain or identity tenant to evade defenses and/or escalate privileges in centrally managed environments. Such services provide a centralized means of managing identity resources such as devic..."),
-    "T1480": ("Execution Guardrails", "Defense Evasion", "Adversaries may use execution guardrails to constrain execution or actions based on adversary supplied and environment specific conditions that are expected to be present on the target. Guardrails ensure that a payload only executes against an int..."),
-    "T1480.001": ("Environmental Keying", "Defense Evasion", "Adversaries may environmentally key payloads or other features of malware to evade defenses and constraint execution to a specific target environment. Environmental keying uses cryptography to constrain execution or actions based on adversary supp..."),
-    "T1211": ("Exploitation for Defense Evasion", "Defense Evasion", "Adversaries may exploit a system or application vulnerability to bypass security features. Exploitation of a vulnerability occurs when an adversary takes advantage of a programming error in a program, service, or within the operating system softwa..."),
-    "T1222": ("File and Directory Permissions Modification", "Defense Evasion", "Adversaries may modify file or directory permissions/attributes to evade access control lists (ACLs) and access protected files. File and directory permissions are commonly managed by ACLs configured by the file or directory owner, or users with t..."),
-    "T1222.001": ("Windows File and Directory Permissions Modification", "Defense Evasion", "Adversaries may modify file or directory permissions/attributes to evade access control lists (ACLs) and access protected files. File and directory permissions are commonly managed by ACLs configured by the file or directory owner, or users with t..."),
-    "T1222.002": ("Linux and Mac File and Directory Permissions Modification", "Defense Evasion", "Adversaries may modify file or directory permissions/attributes to evade access control lists (ACLs) and access protected files. File and directory permissions are commonly managed by ACLs configured by the file or directory owner, or users with t..."),
-    "T1564": ("Hide Artifacts", "Defense Evasion", "Adversaries may attempt to hide artifacts associated with their behaviors to evade detection. Operating systems may have features to hide various artifacts, such as important system files and administrative task execution, to avoid disrupting user..."),
-    "T1564.001": ("Hidden Files and Directories", "Defense Evasion", "Adversaries may set files and directories to be hidden to evade detection mechanisms. To prevent normal users from accidentally changing special files on a system, most operating systems have the concept of a ‘hidden’ file. These files don’t show ..."),
-    "T1564.002": ("Hidden Users", "Defense Evasion", "Adversaries may use hidden users to hide the presence of user accounts they create or modify. Administrators may want to hide users when there are many user accounts on a given system or if they want to hide their administrative or other managemen..."),
-    "T1564.003": ("Hidden Window", "Defense Evasion", "Adversaries may use hidden windows to conceal malicious activity from the plain sight of users. In some cases, windows that would typically be displayed when an application carries out an operation can be hidden. This may be utilized by system adm..."),
-    "T1564.004": ("NTFS File Attributes", "Defense Evasion", "Adversaries may use NTFS file attributes to hide their malicious data in order to evade detection. Every New Technology File System (NTFS) formatted partition contains a Master File Table (MFT) that maintains a record for every file/directory on t..."),
-    "T1564.005": ("Hidden File System", "Defense Evasion", "Adversaries may use a hidden file system to conceal malicious activity from users and security tools. File systems provide a structure to store and access data from physical storage. Typically, a user engages with a file system through application..."),
-    "T1564.006": ("Run Virtual Instance", "Defense Evasion", "Adversaries may carry out malicious operations using a virtual instance to avoid detection. A wide variety of virtualization technologies exist that allow for the emulation of a computer or computing environment. By running malicious code inside o..."),
-    "T1564.007": ("VBA Stomping", "Defense Evasion", "Adversaries may hide malicious Visual Basic for Applications (VBA) payloads embedded within MS Office documents by replacing the VBA source code with benign data. MS Office documents with embedded VBA content store source code inside of module str..."),
-    "T1564.008": ("Email Hiding Rules", "Defense Evasion", "Adversaries may use email rules to hide inbound emails in a compromised user's mailbox. Many email clients allow users to create inbox rules for various email functions, including moving emails to other folders, marking emails as read, or deleting..."),
-    "T1564.009": ("Resource Forking", "Defense Evasion", "Adversaries may abuse resource forks to hide malicious code or executables to evade detection and bypass security applications. A resource fork provides applications a structured way to store resources such as thumbnail images, menu definitions, i..."),
-    "T1564.010": ("Process Argument Spoofing", "Defense Evasion", "Adversaries may attempt to hide process command-line arguments by overwriting process memory. Process command-line arguments are stored in the process environment block (PEB), a data structure used by Windows to store various information about/use..."),
-    "T1564.011": ("Ignore Process Interrupts", "Defense Evasion", "Adversaries may evade defensive mechanisms by executing commands that hide from process interrupt signals. Many operating systems use signals to deliver messages to control process behavior. Command interpreters often include specific commands/fla..."),
-    "T1685": ("Disable or Modify Tools", "Defense Evasion", "Adversaries may modify and/or disable security tools to avoid possible detection of their malware/tools and activities. This may take many forms, such as killing security software processes or services, modifying / deleting Registry keys or config..."),
-    "T1685.001": ("Disable or Modify Windows Event Log", "Defense Evasion", "Adversaries may disable Windows event logging to limit data that can be leveraged for detections and audits. Windows event logs record user and system activity such as login attempts, process creation, and much more. This data is used by security ..."),
-    "T1685.002": ("Disable or Modify Cloud Log", "Defense Evasion", "An adversary may disable or modify cloud logging capabilities and integrations to limit what data is collected on their activities and avoid detection. Cloud environments allow for collection and analysis of audit and application logs that provide..."),
-    "T1685.003": ("Modify or Spoof Tool UI", "Defense Evasion", "Adversaries may spoof security alerting from tools, presenting false evidence to impair defenders’ awareness of malicious activity. Messages produced by defensive tools contain information about potential security events as well as the functioning..."),
-    "T1685.004": ("Disable or Modify Linux Audit System Log", "Defense Evasion", "Adversaries may disable or modify the Linux audit system to hide malicious activity and avoid detection. Linux admins use the Linux Audit system to track security-relevant information on a system. The Linux Audit system operates at the kernel-leve..."),
-    "T1685.005": ("Clear Windows Event Logs", "Defense Evasion", "Adversaries may clear Windows Event Logs to hide the activity of an intrusion. Windows Event Logs are a record of a computer's alerts and notifications. There are three system-defined sources of events: System, Application, and Security, with five..."),
-    "T1685.006": ("Clear Linux or Mac System Logs", "Defense Evasion", "Adversaries may clear system logs to hide evidence of an intrusion. macOS and Linux both keep track of system or user-initiated actions via system logs. The majority of native system logging is stored under the /var/log/ directory. Subfolders in t..."),
-    "T1686": ("Disable or Modify System Firewall", "Defense Evasion", "Adversaries may disable or modify system firewalls in order to bypass controls limiting network usage. Changes could be disabling the entire mechanism as well as adding, deleting, or modifying particular rules. This can be done numerous ways depen..."),
-    "T1686.001": ("Cloud Firewall", "Defense Evasion", "Adversaries may disable or modify a firewall within a cloud environment to bypass controls that limit access to cloud resources. Cloud firewalls are separate from system firewalls that are described in [Disable or Modify System Firewall](https://a..."),
-    "T1688": ("Safe Mode Boot", "Defense Evasion", "Adversaries may abuse Windows safe mode to disable endpoint defenses. Safe mode starts up the Windows operating system with a limited set of drivers and services. Third-party security software such as endpoint detection and response (EDR) tools ma..."),
-    "T1689": ("Downgrade Attack", "Defense Evasion", "Adversaries may downgrade or use a version of system features that may be outdated, vulnerable, and/or does not support updated security controls. Downgrade attacks typically take advantage of a system’s backward compatibility to force it into les..."),
-    "T1690": ("Prevent Command History Logging", "Defense Evasion", "Adversaries may impair command history logging to hide commands they run on a compromised system. Various command interpreters keep track of the commands users type in their terminal so that users can retrace what they've done. On Linux and macOS,..."),
-    "T1684.001": ("Impersonation", "Defense Evasion", "Adversaries may impersonate a trusted person or organization in order to persuade and trick a target into performing some action on their behalf. For example, adversaries may communicate with victims (via [Phishing for Information](https://attack...."),
-    "T1070": ("Indicator Removal", "Defense Evasion", "Adversaries may delete or modify artifacts generated within systems to remove evidence of their presence or hinder defenses. Various artifacts may be created by an adversary or something that can be attributed to an adversary’s actions. Typically ..."),
-    "T1070.003": ("Clear Command History", "Defense Evasion", "In addition to clearing system logs, an adversary may clear the command history of a compromised account to conceal the actions undertaken during an intrusion. Various command interpreters keep track of the commands users type in their terminal so..."),
-    "T1070.004": ("File Deletion", "Defense Evasion", "Adversaries may delete files left behind by the actions of their intrusion activity. Malware, tools, or other non-native files dropped or created on a system by an adversary (ex: [Ingress Tool Transfer](https://attack.mitre.org/techniques/T1105)) ..."),
-    "T1070.005": ("Network Share Connection Removal", "Defense Evasion", "Adversaries may remove share connections that are no longer useful in order to clean up traces of their operation. Windows shared drive and [SMB/Windows Admin Shares](https://attack.mitre.org/techniques/T1021/002) connections can be removed when n..."),
-    "T1070.006": ("Timestomp", "Defense Evasion", "Adversaries may modify file time attributes to hide new files or changes to existing files. Timestomping is a technique that modifies the timestamps of a file (the modify, access, create, and change times), often to mimic files that are in the sam..."),
-    "T1070.007": ("Clear Network Connection History and Configurations", "Defense Evasion", "Adversaries may clear or remove evidence of malicious network connections in order to clean up traces of their operations. Configuration settings as well as various artifacts that highlight connection history may be created on a system and/or in a..."),
-    "T1070.008": ("Clear Mailbox Data", "Defense Evasion", "Adversaries may modify mail and mail application data to remove evidence of their activity. Email applications allow users and other programs to export and delete mailbox data via command line tools or use of APIs. Mail application data can be ema..."),
-    "T1070.009": ("Clear Persistence", "Defense Evasion", "Adversaries may clear artifacts associated with previously established persistence on a host system to remove evidence of their activity. This may involve various actions, such as removing services, deleting executables, [Modify Registry](https://..."),
-    "T1202": ("Indirect Command Execution", "Defense Evasion", "Adversaries may abuse utilities that allow for command execution to bypass security restrictions that limit the use of command-line interpreters. Various Windows utilities may be used to execute commands, possibly without invoking [cmd](https://at..."),
-    "T1036": ("Masquerading", "Defense Evasion", "Adversaries may attempt to manipulate features of their artifacts to make them appear legitimate or benign to users and/or security tools. Masquerading occurs when the name or location of an object, legitimate or malicious, is manipulated or abuse..."),
-    "T1036.001": ("Invalid Code Signature", "Defense Evasion", "Adversaries may attempt to mimic features of valid code signatures to increase the chance of deceiving a user, analyst, or tool. Code signing provides a level of authenticity on a binary from the developer and a guarantee that the binary has not b..."),
-    "T1036.002": ("Right-to-Left Override", "Defense Evasion", "Adversaries may abuse the right-to-left override (RTLO or RLO) character (U+202E) to disguise a string and/or file name to make it appear benign. RTLO is a non-printing Unicode character that causes the text that follows it to be displayed in reve..."),
-    "T1036.003": ("Rename System Utilities", "Defense Evasion", "Adversaries may rename legitimate / system utilities to try to evade security mechanisms concerning the usage of those utilities. Security monitoring and control mechanisms may be in place for legitimate utilities adversaries are capable of abusin..."),
-    "T1036.004": ("Masquerade Task or Service", "Defense Evasion", "Adversaries may attempt to manipulate the name of a task or service to make it appear legitimate or benign. Tasks/services executed by the Task Scheduler or systemd will typically be given a name and/or description. Windows services will have a se..."),
-    "T1036.005": ("Match Legitimate Name or Location", "Defense Evasion", "Adversaries may match or approximate the name or location of legitimate files, Registry keys, or other resources when naming/placing them. This is done for the sake of evading defenses and observation. This may be done by placing an executable in ..."),
-    "T1036.006": ("Space after Filename", "Defense Evasion", "Adversaries can hide a program's true filetype by changing the extension of a file. With certain file types (specifically this does not work with .app extensions), appending a space to the end of a filename will change how the file is processed by..."),
-    "T1036.007": ("Double File Extension", "Defense Evasion", "Adversaries may abuse a double extension in the filename as a means of masquerading the true file type. A file name may include a secondary file type extension that may cause only the first extension to be displayed (ex: File.txt.exe may render in..."),
-    "T1036.008": ("Masquerade File Type", "Defense Evasion", "Adversaries may masquerade malicious payloads as legitimate files through changes to the payload's formatting, including the file’s signature, extension, icon, and contents. Various file types have a typical standard format, including how they are..."),
-    "T1036.009": ("Break Process Trees", "Defense Evasion", "An adversary may attempt to evade process tree-based analysis by modifying executed malware's parent process ID (PPID). If endpoint protection software leverages the “parent-child\" relationship for detection, breaking this relationship could result in the adversary’s behavior not being associated..."),
-    "T1556": ("Modify Authentication Process", "Defense Evasion", "Adversaries may modify authentication mechanisms and processes to access user credentials or enable otherwise unwarranted access to accounts. The authentication process is handled by mechanisms, such as the Local Security Authentication Server (LS..."),
-    "T1578": ("Modify Cloud Compute Infrastructure", "Defense Evasion", "An adversary may attempt to modify a cloud account's compute service infrastructure to evade defenses. A modification to the compute service infrastructure can include the creation, deletion, or modification of one or more components such as compu..."),
-    "T1578.001": ("Create Snapshot", "Defense Evasion", "An adversary may create a snapshot or data backup within a cloud account to evade defenses. A snapshot is a point-in-time copy of an existing cloud compute component such as a virtual machine (VM), virtual hard drive, or volume. An adversary may l..."),
-    "T1578.002": ("Create Cloud Instance", "Defense Evasion", "An adversary may create a new instance or virtual machine (VM) within the compute service of a cloud account to evade defenses. Creating a new instance may allow an adversary to bypass firewall rules and permissions that exist on instances current..."),
-    "T1578.003": ("Delete Cloud Instance", "Defense Evasion", "An adversary may delete a cloud instance after they have performed malicious activities in an attempt to evade detection and remove evidence of their presence. Deleting an instance or virtual machine can remove valuable forensic artifacts and othe..."),
-    "T1578.004": ("Revert Cloud Instance", "Defense Evasion", "An adversary may revert changes made to a cloud instance after they have performed malicious activities in attempt to evade detection and remove evidence of their presence. In highly virtualized environments, such as cloud-based infrastructure, th..."),
-    "T1578.005": ("Modify Cloud Compute Configurations", "Defense Evasion", "Adversaries may modify settings that directly affect the size, locations, and resources available to cloud compute infrastructure in order to evade defenses. These settings may include service quotas, subscription associations, tenant-wide policie..."),
-    "T1112": ("Modify Registry", "Defense Evasion", "Adversaries may interact with the Windows Registry as part of a variety of other techniques to aid in defense evasion, persistence, and execution. Access to specific areas of the Registry depends on account permissions, with some keys requiring ad..."),
-    "T1601": ("Modify System Image", "Defense Evasion", "Adversaries may make changes to the operating system of embedded network devices to weaken defenses and provide new capabilities for themselves. On such devices, the operating systems are typically monolithic and most of the device functionality a..."),
-    "T1601.001": ("Patch System Image", "Defense Evasion", "Adversaries may modify the operating system of a network device to introduce new capabilities or weaken existing defenses. Some network devices are built with a monolithic architecture, where the entire operating system and most of the functionali..."),
-    "T1601.002": ("Downgrade System Image", "Defense Evasion", "Adversaries may install an older version of the operating system of a network device to weaken security. Older operating system versions on network devices often have weaker encryption ciphers and, in general, fewer/less updated defensive features..."),
-    "T1599": ("Network Boundary Bridging", "Defense Evasion", "Adversaries may bridge network boundaries by compromising perimeter network devices or internal devices responsible for network segmentation. Breaching these devices may enable an adversary to bypass restrictions on traffic routing that otherwise ..."),
-    "T1599.001": ("Network Address Translation Traversal", "Defense Evasion", "Adversaries may bridge network boundaries by modifying a network device’s Network Address Translation (NAT) configuration. Malicious modifications to NAT may enable an adversary to bypass restrictions on traffic routing that otherwise separate tru..."),
-    "T1027": ("Obfuscated Files or Information", "Defense Evasion", "Adversaries may attempt to make an executable or file difficult to discover or analyze by encrypting, encoding, or otherwise obfuscating its contents on the system or in transit. This is common behavior that can be used across different platforms ..."),
-    "T1027.001": ("Binary Padding", "Defense Evasion", "Adversaries may use binary padding to add junk data and change the on-disk representation of malware. This can be done without affecting the functionality or behavior of a binary, but can increase the size of the binary beyond what some security t..."),
-    "T1027.002": ("Software Packing", "Defense Evasion", "Adversaries may perform software packing or virtual machine software protection to conceal their code. Software packing is a method of compressing or encrypting an executable. Packing an executable changes the file signature in an attempt to avoid..."),
-    "T1027.003": ("Steganography", "Defense Evasion", "Adversaries may use steganography techniques in order to prevent the detection of hidden information. Steganographic techniques can be used to hide data in digital media such as images, audio tracks, video clips, or text files. [Duqu](https://atta..."),
-    "T1027.004": ("Compile After Delivery", "Defense Evasion", "Adversaries may attempt to make payloads difficult to discover and analyze by delivering files to victims as uncompiled code. Text-based source code files may subvert analysis and scrutiny from protections targeting executables/binaries. These pay..."),
-    "T1027.005": ("Indicator Removal from Tools", "Defense Evasion", "Adversaries may remove indicators from tools if they believe their malicious tool was detected, quarantined, or otherwise curtailed. They can modify the tool by removing the indicator and using the updated version that is no longer detected by the..."),
-    "T1027.006": ("HTML Smuggling", "Defense Evasion", "Adversaries may smuggle data and files past content filters by hiding malicious payloads inside of seemingly benign HTML files. HTML documents can store large binary objects known as JavaScript Blobs (immutable data that represents raw bytes) that..."),
-    "T1027.007": ("Dynamic API Resolution", "Defense Evasion", "Adversaries may obfuscate then dynamically resolve API functions called by their malware in order to conceal malicious functionalities and impair defensive analysis. Malware commonly uses various [Native API](https://attack.mitre.org/techniques/T1..."),
-    "T1027.008": ("Stripped Payloads", "Defense Evasion", "Adversaries may attempt to make a payload difficult to analyze by removing symbols, strings, and other human readable information. Scripts and executables may contain variables names and other strings that help developers document code functionali..."),
-    "T1027.009": ("Embedded Payloads", "Defense Evasion", "Adversaries may embed payloads within other files to conceal malicious content from defenses. Otherwise seemingly benign files (such as scripts and executables) may be abused to carry and obfuscate malicious payloads and content. In some cases, em..."),
-    "T1027.010": ("Command Obfuscation", "Defense Evasion", "Adversaries may obfuscate content during command execution to impede detection. Command-line obfuscation is a method of making strings and patterns within commands and scripts more difficult to signature and analyze. This type of obfuscation can b..."),
-    "T1027.011": ("Fileless Storage", "Defense Evasion", "Adversaries may store data in \"fileless\" formats to conceal malicious activity from defenses. Fileless storage can be broadly defined as any format other than a file. Common examples of non-volatile fileless storage in Windows systems include the Windows Registry, event logs, or WMI repository. S..."),
-    "T1027.012": ("LNK Icon Smuggling", "Defense Evasion", "Adversaries may smuggle commands to download malicious payloads past content filters by hiding them within otherwise seemingly benign windows shortcut files. Windows shortcut files (.LNK) include many metadata fields, including an icon location fi..."),
-    "T1647": ("Plist File Modification", "Defense Evasion", "Adversaries may modify property list files (plist files) to enable other malicious activity, while also potentially evading and bypassing system defenses. macOS applications use plist files, such as the info.plist file, to store properties and con..."),
-    "T1620": ("Reflective Code Loading", "Defense Evasion", "Adversaries may reflectively load code into a process in order to conceal the execution of malicious payloads. Reflective loading involves allocating then executing payloads directly within the memory of the process, vice creating a thread or proc..."),
-    "T1207": ("Rogue Domain Controller", "Defense Evasion", "Adversaries may register a rogue Domain Controller to enable manipulation of Active Directory data. DCShadow may be used to create a rogue Domain Controller (DC). DCShadow is a method of manipulating Active Directory (AD) data, including objects a..."),
-    "T1014": ("Rootkit", "Defense Evasion", "Adversaries may use rootkits to hide the presence of programs, files, network connections, services, drivers, and other system components. Rootkits are programs that hide the existence of malware by intercepting/hooking and modifying operating sys..."),
-    "T1553": ("Subvert Trust Controls", "Defense Evasion", "Adversaries may undermine security controls that will either warn users of untrusted activity or prevent execution of untrusted programs. Operating systems and security products may contain mechanisms to identify programs or websites as possessing..."),
-    "T1553.001": ("Gatekeeper Bypass", "Defense Evasion", "Adversaries may modify file attributes and subvert Gatekeeper functionality to evade user prompts and execute untrusted programs. Gatekeeper is a set of technologies that act as layer of Apple’s security model to ensure only trusted applications a..."),
-    "T1553.002": ("Code Signing", "Defense Evasion", "Adversaries may create, acquire, or steal code signing materials to sign their malware or tools. Code signing provides a level of authenticity on a binary from the developer and a guarantee that the binary has not been tampered with. The certifica..."),
-    "T1553.003": ("SIP and Trust Provider Hijacking", "Defense Evasion", "Adversaries may tamper with SIP and trust provider components to mislead the operating system and application control tools when conducting signature validation checks. In user mode, Windows Authenticode digital signatures are used to verify a fil..."),
-    "T1553.004": ("Install Root Certificate", "Defense Evasion", "Adversaries may install a root certificate on a compromised system to avoid warnings when connecting to adversary controlled web servers. Root certificates are used in public key cryptography to identify a root certificate authority (CA). When a r..."),
-    "T1553.005": ("Mark-of-the-Web Bypass", "Defense Evasion", "Adversaries may abuse specific file formats to subvert Mark-of-the-Web (MOTW) controls. In Windows, when files are downloaded from the Internet, they are tagged with a hidden NTFS Alternate Data Stream (ADS) named Zone.Identifier with a specific v..."),
-    "T1553.006": ("Code Signing Policy Modification", "Defense Evasion", "Adversaries may modify code signing policies to enable execution of unsigned or self-signed code. Code signing provides a level of authenticity on a program from a developer and a guarantee that the program has not been tampered with. Security con..."),
-    "T1218": ("System Binary Proxy Execution", "Defense Evasion", "Adversaries may bypass process and/or signature-based defenses by proxying execution of malicious content with signed, or otherwise trusted, binaries. Binaries used in this technique are often Microsoft-signed files, indicating that they have been..."),
-    "T1218.001": ("Compiled HTML File", "Defense Evasion", "Adversaries may abuse Compiled HTML files (.chm) to conceal malicious code. CHM files are commonly distributed as part of the Microsoft HTML Help system. CHM files are compressed compilations of various content such as HTML documents, images, and ..."),
-    "T1218.002": ("Control Panel", "Defense Evasion", "Adversaries may abuse control.exe to proxy execution of malicious payloads. The Windows Control Panel process binary (control.exe) handles execution of Control Panel items, which are utilities that allow users to view and adjust computer settings...."),
-    "T1218.003": ("CMSTP", "Defense Evasion", "Adversaries may abuse CMSTP to proxy execution of malicious code. The Microsoft Connection Manager Profile Installer (CMSTP.exe) is a command-line program used to install Connection Manager service profiles. CMSTP.exe accepts an installation infor..."),
-    "T1218.004": ("InstallUtil", "Defense Evasion", "Adversaries may use InstallUtil to proxy execution of code through a trusted Windows utility. InstallUtil is a command-line utility that allows for installation and uninstallation of resources by executing specific installer components specified i..."),
-    "T1218.005": ("Mshta", "Defense Evasion", "Adversaries may abuse mshta.exe to proxy execution of malicious .hta files and Javascript or VBScript through a trusted Windows utility. There are several examples of different types of threats leveraging mshta.exe during initial compromise and fo..."),
-    "T1218.007": ("Msiexec", "Defense Evasion", "Adversaries may abuse msiexec.exe to proxy execution of malicious payloads. Msiexec.exe is the command-line utility for the Windows Installer and is thus commonly associated with executing installation packages (.msi). The Msiexec.exe binary may a..."),
-    "T1218.008": ("Odbcconf", "Defense Evasion", "Adversaries may abuse odbcconf.exe to proxy execution of malicious payloads. Odbcconf.exe is a Windows utility that allows you to configure Open Database Connectivity (ODBC) drivers and data source names. The Odbcconf.exe binary may be digitally s..."),
-    "T1218.009": ("Regsvcs/Regasm", "Defense Evasion", "Adversaries may abuse Regsvcs and Regasm to proxy execution of code through a trusted Windows utility. Regsvcs and Regasm are Windows command-line utilities that are used to register .NET [Component Object Model](https://attack.mitre.org/technique..."),
-    "T1218.010": ("Regsvr32", "Defense Evasion", "Adversaries may abuse Regsvr32.exe to proxy execution of malicious code. Regsvr32.exe is a command-line program used to register and unregister object linking and embedding controls, including dynamic link libraries (DLLs), on Windows systems. The..."),
-    "T1218.011": ("Rundll32", "Defense Evasion", "Adversaries may abuse rundll32.exe to proxy execution of malicious code. Using rundll32.exe, vice executing directly (i.e. [Shared Modules](https://attack.mitre.org/techniques/T1129)), may avoid triggering security tools that may not monitor execu..."),
-    "T1218.012": ("Verclsid", "Defense Evasion", "Adversaries may abuse verclsid.exe to proxy execution of malicious code. Verclsid.exe is known as the Extension CLSID Verification Host and is responsible for verifying each shell extension before they are used by Windows Explorer or the Windows S..."),
-    "T1218.013": ("Mavinject", "Defense Evasion", "Adversaries may abuse mavinject.exe to proxy execution of malicious code. Mavinject.exe is the Microsoft Application Virtualization Injector, a Windows utility that can inject code into external processes as part of Microsoft Application Virtualiz..."),
-    "T1218.014": ("MMC", "Defense Evasion", "Adversaries may abuse mmc.exe to proxy execution of malicious .msc files. Microsoft Management Console (MMC) is a binary that may be signed by Microsoft and is used in several ways in either its GUI or in a command prompt. MMC can be used to creat..."),
-    "T1216": ("System Script Proxy Execution", "Defense Evasion", "Adversaries may use trusted scripts, often signed with certificates, to proxy the execution of malicious files. Several Microsoft signed scripts that have been downloaded from Microsoft or are default on Windows installations can be used to proxy ..."),
-    "T1216.001": ("PubPrn", "Defense Evasion", "Adversaries may use PubPrn to proxy execution of malicious remote files. PubPrn.vbs is a [Visual Basic](https://attack.mitre.org/techniques/T1059/005) script that publishes a printer to Active Directory Domain Services. The script may be signed by..."),
-    "T1216.002": ("SyncAppvPublishingServer", "Defense Evasion", "Adversaries may abuse SyncAppvPublishingServer.vbs to proxy execution of malicious [PowerShell](https://attack.mitre.org/techniques/T1059/001) commands. SyncAppvPublishingServer.vbs is a Visual Basic script associated with how Windows virtualizes ..."),
-    "T1221": ("Template Injection", "Defense Evasion", "Adversaries may create or modify references in user document templates to conceal malicious code or force authentication attempts. For example, Microsoft’s Office Open XML (OOXML) specification defines an XML-based format for Office documents (.do..."),
-    "T1127": ("Trusted Developer Utilities Proxy Execution", "Defense Evasion", "Adversaries may take advantage of trusted developer utilities to proxy execution of malicious payloads. There are many utilities used for software development related tasks that can be used to execute code in various forms to assist in development..."),
-    "T1127.001": ("MSBuild", "Defense Evasion", "Adversaries may use MSBuild to proxy execution of code through a trusted Windows utility. MSBuild.exe (Microsoft Build Engine) is a software build platform used by Visual Studio. It handles XML formatted project files that define requirements for ..."),
-    "T1535": ("Unused/Unsupported Cloud Regions", "Defense Evasion", "Adversaries may create cloud instances in unused geographic service regions in order to evade detection. Access is usually obtained through compromising accounts used to manage cloud infrastructure. Cloud service providers often provide infrastruc..."),
-    "T1550": ("Use Alternate Authentication Material", "Defense Evasion", "Adversaries may use alternate authentication material, such as password hashes, Kerberos tickets, and application access tokens, in order to move laterally within an environment and bypass normal system access controls. Authentication processes ge..."),
-    "T1550.001": ("Application Access Token", "Defense Evasion", "Adversaries may use stolen application access tokens to bypass the typical authentication process and access restricted accounts, information, or services on remote systems. These tokens are typically stolen from users or services and used in lieu..."),
-    "T1550.002": ("Pass the Hash", "Defense Evasion", "Adversaries may “pass the hash” using stolen password hashes to move laterally within an environment, bypassing normal system access controls. Pass the hash (PtH) is a method of authenticating as a user without having access to the user's cleartex..."),
-    "T1550.003": ("Pass the Ticket", "Defense Evasion", "Adversaries may “pass the ticket” using stolen Kerberos tickets to move laterally within an environment, bypassing normal system access controls. Pass the ticket (PtT) is a method of authenticating to a system using Kerberos tickets without having..."),
-    "T1550.004": ("Web Session Cookie", "Defense Evasion", "Adversaries can use stolen session cookies to authenticate to web applications and services. This technique bypasses some multi-factor authentication protocols since the session is already authenticated. Authentication cookies are commonly used in..."),
-    "T1497": ("Virtualization/Sandbox Evasion", "Defense Evasion", "Adversaries may employ various means to detect and avoid virtualization and analysis environments. This may include changing behaviors based on the results of checks for the presence of artifacts indicative of a virtual machine environment (VME) o..."),
-    "T1497.001": ("System Checks", "Defense Evasion", "Adversaries may employ various system checks to detect and avoid virtualization and analysis environments. This may include changing behaviors based on the results of checks for the presence of artifacts indicative of a virtual machine environment..."),
-    "T1497.002": ("User Activity Based Checks", "Defense Evasion", "Adversaries may employ various user activity checks to detect and avoid virtualization and analysis environments. This may include changing behaviors based on the results of checks for the presence of artifacts indicative of a virtual machine envi..."),
-    "T1497.003": ("Time Based Evasion", "Defense Evasion", "Adversaries may employ various time-based methods to detect virtualization and analysis environments, particularly those that attempt to manipulate time mechanisms to simulate longer elapses of time. This may include enumerating time-based propert..."),
-    "T1600": ("Weaken Encryption", "Defense Evasion", "Adversaries may compromise a network device’s encryption capability in order to bypass encryption that would otherwise protect data communications. Encryption can be used to protect transmitted network traffic to maintain its confidentiality (prot..."),
-    "T1600.001": ("Reduce Key Space", "Defense Evasion", "Adversaries may reduce the level of effort required to decrypt data transmitted over the network by reducing the cipher strength of encrypted communications. Adversaries can weaken the encryption software on a compromised network device by reducin..."),
-    "T1600.002": ("Disable Crypto Hardware", "Defense Evasion", "Adversaries disable a network device’s dedicated hardware encryption, which may enable them to leverage weaknesses in software encryption in order to reduce the effort involved in collecting, manipulating, and exfiltrating transmitted data. Many n..."),
-    "T1220": ("XSL Script Processing", "Defense Evasion", "Adversaries may bypass application control and obscure execution of code by embedding scripts inside XSL files. Extensible Stylesheet Language (XSL) files are commonly used to describe the processing and rendering of data within XML files. To supp..."),
-    "T1642": ("Disable or Modify Cloud Firewall", "Defense Evasion", "Adversaries may disable or modify cloud firewall rules."),
+    # ==================== STEALTH ====================
+    "T1612": ("Build Image on Host", "Stealth", "Adversaries may build a container image directly on a host to bypass defenses that monitor for the retrieval of malicious images from a public registry. A remote build request may be sent to the Docker API that includes a Dockerfile that pulls a v..."),
+    "T1622": ("Debugger Evasion", "Stealth", "Adversaries may employ various means to detect and avoid debuggers. Debuggers are typically used by defenders to trace and/or analyze the execution of potential malware payloads. Debugger evasion may include changing behaviors based on the results..."),
+    "T1140": ("Deobfuscate/Decode Files or Information", "Stealth", "Adversaries may use [Obfuscated Files or Information](https://attack.mitre.org/techniques/T1027) to hide artifacts of an intrusion from analysis. They may require separate mechanisms to decode or deobfuscate that information depending on how they ..."),
+    "T1006": ("Direct Volume Access", "Stealth", "Adversaries may directly access a volume to bypass file access controls and file system monitoring. Windows allows programs to have direct access to logical volumes. Programs with direct access may read and write files directly from the drive by a..."),
+    "T1480": ("Execution Guardrails", "Stealth", "Adversaries may use execution guardrails to constrain execution or actions based on adversary supplied and environment specific conditions that are expected to be present on the target. Guardrails ensure that a payload only executes against an int..."),
+    "T1480.001": ("Environmental Keying", "Stealth", "Adversaries may environmentally key payloads or other features of malware to evade defenses and constraint execution to a specific target environment. Environmental keying uses cryptography to constrain execution or actions based on adversary supp..."),
+    "T1211": ("Exploitation for Stealth", "Stealth", "Adversaries may exploit a system or application vulnerability to bypass security features. Exploitation of a vulnerability occurs when an adversary takes advantage of a programming error in a program, service, or within the operating system softwa..."),
+    "T1564": ("Hide Artifacts", "Stealth", "Adversaries may attempt to hide artifacts associated with their behaviors to evade detection. Operating systems may have features to hide various artifacts, such as important system files and administrative task execution, to avoid disrupting user..."),
+    "T1564.001": ("Hidden Files and Directories", "Stealth", "Adversaries may set files and directories to be hidden to evade detection mechanisms. To prevent normal users from accidentally changing special files on a system, most operating systems have the concept of a ‘hidden’ file. These files don’t show ..."),
+    "T1564.002": ("Hidden Users", "Stealth", "Adversaries may use hidden users to hide the presence of user accounts they create or modify. Administrators may want to hide users when there are many user accounts on a given system or if they want to hide their administrative or other managemen..."),
+    "T1564.003": ("Hidden Window", "Stealth", "Adversaries may use hidden windows to conceal malicious activity from the plain sight of users. In some cases, windows that would typically be displayed when an application carries out an operation can be hidden. This may be utilized by system adm..."),
+    "T1564.004": ("NTFS File Attributes", "Stealth", "Adversaries may use NTFS file attributes to hide their malicious data in order to evade detection. Every New Technology File System (NTFS) formatted partition contains a Master File Table (MFT) that maintains a record for every file/directory on t..."),
+    "T1564.005": ("Hidden File System", "Stealth", "Adversaries may use a hidden file system to conceal malicious activity from users and security tools. File systems provide a structure to store and access data from physical storage. Typically, a user engages with a file system through application..."),
+    "T1564.006": ("Run Virtual Instance", "Stealth", "Adversaries may carry out malicious operations using a virtual instance to avoid detection. A wide variety of virtualization technologies exist that allow for the emulation of a computer or computing environment. By running malicious code inside o..."),
+    "T1564.007": ("VBA Stomping", "Stealth", "Adversaries may hide malicious Visual Basic for Applications (VBA) payloads embedded within MS Office documents by replacing the VBA source code with benign data. MS Office documents with embedded VBA content store source code inside of module str..."),
+    "T1564.008": ("Email Hiding Rules", "Stealth", "Adversaries may use email rules to hide inbound emails in a compromised user's mailbox. Many email clients allow users to create inbox rules for various email functions, including moving emails to other folders, marking emails as read, or deleting..."),
+    "T1564.009": ("Resource Forking", "Stealth", "Adversaries may abuse resource forks to hide malicious code or executables to evade detection and bypass security applications. A resource fork provides applications a structured way to store resources such as thumbnail images, menu definitions, i..."),
+    "T1564.010": ("Process Argument Spoofing", "Stealth", "Adversaries may attempt to hide process command-line arguments by overwriting process memory. Process command-line arguments are stored in the process environment block (PEB), a data structure used by Windows to store various information about/use..."),
+    "T1564.011": ("Ignore Process Interrupts", "Stealth", "Adversaries may evade defensive mechanisms by executing commands that hide from process interrupt signals. Many operating systems use signals to deliver messages to control process behavior. Command interpreters often include specific commands/fla..."),
+    "T1684.001": ("Impersonation", "Stealth", "Adversaries may impersonate a trusted person or organization in order to persuade and trick a target into performing some action on their behalf. For example, adversaries may communicate with victims (via [Phishing for Information](https://attack...."),
+    "T1070": ("Indicator Removal", "Stealth", "Adversaries may delete or modify artifacts generated within systems to remove evidence of their presence or hinder defenses. Various artifacts may be created by an adversary or something that can be attributed to an adversary’s actions. Typically ..."),
+    "T1070.003": ("Clear Command History", "Stealth", "In addition to clearing system logs, an adversary may clear the command history of a compromised account to conceal the actions undertaken during an intrusion. Various command interpreters keep track of the commands users type in their terminal so..."),
+    "T1070.004": ("File Deletion", "Stealth", "Adversaries may delete files left behind by the actions of their intrusion activity. Malware, tools, or other non-native files dropped or created on a system by an adversary (ex: [Ingress Tool Transfer](https://attack.mitre.org/techniques/T1105)) ..."),
+    "T1070.005": ("Network Share Connection Removal", "Stealth", "Adversaries may remove share connections that are no longer useful in order to clean up traces of their operation. Windows shared drive and [SMB/Windows Admin Shares](https://attack.mitre.org/techniques/T1021/002) connections can be removed when n..."),
+    "T1070.006": ("Timestomp", "Stealth", "Adversaries may modify file time attributes to hide new files or changes to existing files. Timestomping is a technique that modifies the timestamps of a file (the modify, access, create, and change times), often to mimic files that are in the sam..."),
+    "T1070.007": ("Clear Network Connection History and Configurations", "Stealth", "Adversaries may clear or remove evidence of malicious network connections in order to clean up traces of their operations. Configuration settings as well as various artifacts that highlight connection history may be created on a system and/or in a..."),
+    "T1070.008": ("Clear Mailbox Data", "Stealth", "Adversaries may modify mail and mail application data to remove evidence of their activity. Email applications allow users and other programs to export and delete mailbox data via command line tools or use of APIs. Mail application data can be ema..."),
+    "T1070.009": ("Clear Persistence", "Stealth", "Adversaries may clear artifacts associated with previously established persistence on a host system to remove evidence of their activity. This may involve various actions, such as removing services, deleting executables, [Modify Registry](https://..."),
+    "T1202": ("Indirect Command Execution", "Stealth", "Adversaries may abuse utilities that allow for command execution to bypass security restrictions that limit the use of command-line interpreters. Various Windows utilities may be used to execute commands, possibly without invoking [cmd](https://at..."),
+    "T1036": ("Masquerading", "Stealth", "Adversaries may attempt to manipulate features of their artifacts to make them appear legitimate or benign to users and/or security tools. Masquerading occurs when the name or location of an object, legitimate or malicious, is manipulated or abuse..."),
+    "T1036.001": ("Invalid Code Signature", "Stealth", "Adversaries may attempt to mimic features of valid code signatures to increase the chance of deceiving a user, analyst, or tool. Code signing provides a level of authenticity on a binary from the developer and a guarantee that the binary has not b..."),
+    "T1036.002": ("Right-to-Left Override", "Stealth", "Adversaries may abuse the right-to-left override (RTLO or RLO) character (U+202E) to disguise a string and/or file name to make it appear benign. RTLO is a non-printing Unicode character that causes the text that follows it to be displayed in reve..."),
+    "T1036.003": ("Rename Legitimate Utilities", "Stealth", "Adversaries may rename legitimate / system utilities to try to evade security mechanisms concerning the usage of those utilities. Security monitoring and control mechanisms may be in place for legitimate utilities adversaries are capable of abusin..."),
+    "T1036.004": ("Masquerade Task or Service", "Stealth", "Adversaries may attempt to manipulate the name of a task or service to make it appear legitimate or benign. Tasks/services executed by the Task Scheduler or systemd will typically be given a name and/or description. Windows services will have a se..."),
+    "T1036.005": ("Match Legitimate Resource Name or Location", "Stealth", "Adversaries may match or approximate the name or location of legitimate files, Registry keys, or other resources when naming/placing them. This is done for the sake of evading defenses and observation. This may be done by placing an executable in ..."),
+    "T1036.006": ("Space after Filename", "Stealth", "Adversaries can hide a program's true filetype by changing the extension of a file. With certain file types (specifically this does not work with .app extensions), appending a space to the end of a filename will change how the file is processed by..."),
+    "T1036.007": ("Double File Extension", "Stealth", "Adversaries may abuse a double extension in the filename as a means of masquerading the true file type. A file name may include a secondary file type extension that may cause only the first extension to be displayed (ex: File.txt.exe may render in..."),
+    "T1036.008": ("Masquerade File Type", "Stealth", "Adversaries may masquerade malicious payloads as legitimate files through changes to the payload's formatting, including the file’s signature, extension, icon, and contents. Various file types have a typical standard format, including how they are..."),
+    "T1036.009": ("Break Process Trees", "Stealth", "An adversary may attempt to evade process tree-based analysis by modifying executed malware's parent process ID (PPID). If endpoint protection software leverages the “parent-child\" relationship for detection, breaking this relationship could result in the adversary’s behavior not being associated..."),
+    "T1027": ("Obfuscated Files or Information", "Stealth", "Adversaries may attempt to make an executable or file difficult to discover or analyze by encrypting, encoding, or otherwise obfuscating its contents on the system or in transit. This is common behavior that can be used across different platforms ..."),
+    "T1027.001": ("Binary Padding", "Stealth", "Adversaries may use binary padding to add junk data and change the on-disk representation of malware. This can be done without affecting the functionality or behavior of a binary, but can increase the size of the binary beyond what some security t..."),
+    "T1027.002": ("Software Packing", "Stealth", "Adversaries may perform software packing or virtual machine software protection to conceal their code. Software packing is a method of compressing or encrypting an executable. Packing an executable changes the file signature in an attempt to avoid..."),
+    "T1027.003": ("Steganography", "Stealth", "Adversaries may use steganography techniques in order to prevent the detection of hidden information. Steganographic techniques can be used to hide data in digital media such as images, audio tracks, video clips, or text files. [Duqu](https://atta..."),
+    "T1027.004": ("Compile After Delivery", "Stealth", "Adversaries may attempt to make payloads difficult to discover and analyze by delivering files to victims as uncompiled code. Text-based source code files may subvert analysis and scrutiny from protections targeting executables/binaries. These pay..."),
+    "T1027.005": ("Indicator Removal from Tools", "Stealth", "Adversaries may remove indicators from tools if they believe their malicious tool was detected, quarantined, or otherwise curtailed. They can modify the tool by removing the indicator and using the updated version that is no longer detected by the..."),
+    "T1027.006": ("HTML Smuggling", "Stealth", "Adversaries may smuggle data and files past content filters by hiding malicious payloads inside of seemingly benign HTML files. HTML documents can store large binary objects known as JavaScript Blobs (immutable data that represents raw bytes) that..."),
+    "T1027.007": ("Dynamic API Resolution", "Stealth", "Adversaries may obfuscate then dynamically resolve API functions called by their malware in order to conceal malicious functionalities and impair defensive analysis. Malware commonly uses various [Native API](https://attack.mitre.org/techniques/T1..."),
+    "T1027.008": ("Stripped Payloads", "Stealth", "Adversaries may attempt to make a payload difficult to analyze by removing symbols, strings, and other human readable information. Scripts and executables may contain variables names and other strings that help developers document code functionali..."),
+    "T1027.009": ("Embedded Payloads", "Stealth", "Adversaries may embed payloads within other files to conceal malicious content from defenses. Otherwise seemingly benign files (such as scripts and executables) may be abused to carry and obfuscate malicious payloads and content. In some cases, em..."),
+    "T1027.010": ("Command Obfuscation", "Stealth", "Adversaries may obfuscate content during command execution to impede detection. Command-line obfuscation is a method of making strings and patterns within commands and scripts more difficult to signature and analyze. This type of obfuscation can b..."),
+    "T1027.011": ("Fileless Storage", "Stealth", "Adversaries may store data in \"fileless\" formats to conceal malicious activity from defenses. Fileless storage can be broadly defined as any format other than a file. Common examples of non-volatile fileless storage in Windows systems include the Windows Registry, event logs, or WMI repository. S..."),
+    "T1027.012": ("LNK Icon Smuggling", "Stealth", "Adversaries may smuggle commands to download malicious payloads past content filters by hiding them within otherwise seemingly benign windows shortcut files. Windows shortcut files (.LNK) include many metadata fields, including an icon location fi..."),
+    "T1620": ("Reflective Code Loading", "Stealth", "Adversaries may reflectively load code into a process in order to conceal the execution of malicious payloads. Reflective loading involves allocating then executing payloads directly within the memory of the process, vice creating a thread or proc..."),
+    "T1014": ("Rootkit", "Stealth", "Adversaries may use rootkits to hide the presence of programs, files, network connections, services, drivers, and other system components. Rootkits are programs that hide the existence of malware by intercepting/hooking and modifying operating sys..."),
+    "T1218": ("System Binary Proxy Execution", "Stealth", "Adversaries may bypass process and/or signature-based defenses by proxying execution of malicious content with signed, or otherwise trusted, binaries. Binaries used in this technique are often Microsoft-signed files, indicating that they have been..."),
+    "T1218.001": ("Compiled HTML File", "Stealth", "Adversaries may abuse Compiled HTML files (.chm) to conceal malicious code. CHM files are commonly distributed as part of the Microsoft HTML Help system. CHM files are compressed compilations of various content such as HTML documents, images, and ..."),
+    "T1218.002": ("Control Panel", "Stealth", "Adversaries may abuse control.exe to proxy execution of malicious payloads. The Windows Control Panel process binary (control.exe) handles execution of Control Panel items, which are utilities that allow users to view and adjust computer settings...."),
+    "T1218.003": ("CMSTP", "Stealth", "Adversaries may abuse CMSTP to proxy execution of malicious code. The Microsoft Connection Manager Profile Installer (CMSTP.exe) is a command-line program used to install Connection Manager service profiles. CMSTP.exe accepts an installation infor..."),
+    "T1218.004": ("InstallUtil", "Stealth", "Adversaries may use InstallUtil to proxy execution of code through a trusted Windows utility. InstallUtil is a command-line utility that allows for installation and uninstallation of resources by executing specific installer components specified i..."),
+    "T1218.005": ("Mshta", "Stealth", "Adversaries may abuse mshta.exe to proxy execution of malicious .hta files and Javascript or VBScript through a trusted Windows utility. There are several examples of different types of threats leveraging mshta.exe during initial compromise and fo..."),
+    "T1218.007": ("Msiexec", "Stealth", "Adversaries may abuse msiexec.exe to proxy execution of malicious payloads. Msiexec.exe is the command-line utility for the Windows Installer and is thus commonly associated with executing installation packages (.msi). The Msiexec.exe binary may a..."),
+    "T1218.008": ("Odbcconf", "Stealth", "Adversaries may abuse odbcconf.exe to proxy execution of malicious payloads. Odbcconf.exe is a Windows utility that allows you to configure Open Database Connectivity (ODBC) drivers and data source names. The Odbcconf.exe binary may be digitally s..."),
+    "T1218.009": ("Regsvcs/Regasm", "Stealth", "Adversaries may abuse Regsvcs and Regasm to proxy execution of code through a trusted Windows utility. Regsvcs and Regasm are Windows command-line utilities that are used to register .NET [Component Object Model](https://attack.mitre.org/technique..."),
+    "T1218.010": ("Regsvr32", "Stealth", "Adversaries may abuse Regsvr32.exe to proxy execution of malicious code. Regsvr32.exe is a command-line program used to register and unregister object linking and embedding controls, including dynamic link libraries (DLLs), on Windows systems. The..."),
+    "T1218.011": ("Rundll32", "Stealth", "Adversaries may abuse rundll32.exe to proxy execution of malicious code. Using rundll32.exe, vice executing directly (i.e. [Shared Modules](https://attack.mitre.org/techniques/T1129)), may avoid triggering security tools that may not monitor execu..."),
+    "T1218.012": ("Verclsid", "Stealth", "Adversaries may abuse verclsid.exe to proxy execution of malicious code. Verclsid.exe is known as the Extension CLSID Verification Host and is responsible for verifying each shell extension before they are used by Windows Explorer or the Windows S..."),
+    "T1218.013": ("Mavinject", "Stealth", "Adversaries may abuse mavinject.exe to proxy execution of malicious code. Mavinject.exe is the Microsoft Application Virtualization Injector, a Windows utility that can inject code into external processes as part of Microsoft Application Virtualiz..."),
+    "T1218.014": ("MMC", "Stealth", "Adversaries may abuse mmc.exe to proxy execution of malicious .msc files. Microsoft Management Console (MMC) is a binary that may be signed by Microsoft and is used in several ways in either its GUI or in a command prompt. MMC can be used to creat..."),
+    "T1216": ("System Script Proxy Execution", "Stealth", "Adversaries may use trusted scripts, often signed with certificates, to proxy the execution of malicious files. Several Microsoft signed scripts that have been downloaded from Microsoft or are default on Windows installations can be used to proxy ..."),
+    "T1216.001": ("PubPrn", "Stealth", "Adversaries may use PubPrn to proxy execution of malicious remote files. PubPrn.vbs is a [Visual Basic](https://attack.mitre.org/techniques/T1059/005) script that publishes a printer to Active Directory Domain Services. The script may be signed by..."),
+    "T1216.002": ("SyncAppvPublishingServer", "Stealth", "Adversaries may abuse SyncAppvPublishingServer.vbs to proxy execution of malicious [PowerShell](https://attack.mitre.org/techniques/T1059/001) commands. SyncAppvPublishingServer.vbs is a Visual Basic script associated with how Windows virtualizes ..."),
+    "T1221": ("Template Injection", "Stealth", "Adversaries may create or modify references in user document templates to conceal malicious code or force authentication attempts. For example, Microsoft’s Office Open XML (OOXML) specification defines an XML-based format for Office documents (.do..."),
+    "T1127": ("Trusted Developer Utilities Proxy Execution", "Stealth", "Adversaries may take advantage of trusted developer utilities to proxy execution of malicious payloads. There are many utilities used for software development related tasks that can be used to execute code in various forms to assist in development..."),
+    "T1127.001": ("MSBuild", "Stealth", "Adversaries may use MSBuild to proxy execution of code through a trusted Windows utility. MSBuild.exe (Microsoft Build Engine) is a software build platform used by Visual Studio. It handles XML formatted project files that define requirements for ..."),
+    "T1535": ("Unused/Unsupported Cloud Regions", "Stealth", "Adversaries may create cloud instances in unused geographic service regions in order to evade detection. Access is usually obtained through compromising accounts used to manage cloud infrastructure. Cloud service providers often provide infrastruc..."),
+    "T1497.001": ("System Checks", "Stealth", "Adversaries may employ various system checks to detect and avoid virtualization and analysis environments. This may include changing behaviors based on the results of checks for the presence of artifacts indicative of a virtual machine environment..."),
+    "T1497.002": ("User Activity Based Checks", "Stealth", "Adversaries may employ various user activity checks to detect and avoid virtualization and analysis environments. This may include changing behaviors based on the results of checks for the presence of artifacts indicative of a virtual machine envi..."),
+    "T1497.003": ("Time Based Checks", "Stealth", "Adversaries may employ various time-based methods to detect virtualization and analysis environments, particularly those that attempt to manipulate time mechanisms to simulate longer elapses of time. This may include enumerating time-based propert..."),
+    "T1220": ("XSL Script Processing", "Stealth", "Adversaries may bypass application control and obscure execution of code by embedding scripts inside XSL files. Extensible Stylesheet Language (XSL) files are commonly used to describe the processing and rendering of data within XML files. To supp..."),
+
+    # ==================== DEFENSE IMPAIRMENT ====================
+    "T1222": ("File and Directory Permissions Modification", "Defense Impairment", "Adversaries may modify file or directory permissions/attributes to evade access control lists (ACLs) and access protected files. File and directory permissions are commonly managed by ACLs configured by the file or directory owner, or users with t..."),
+    "T1222.001": ("Windows Permissions", "Defense Impairment", "Adversaries may modify file or directory permissions/attributes to evade access control lists (ACLs) and access protected files. File and directory permissions are commonly managed by ACLs configured by the file or directory owner, or users with t..."),
+    "T1222.002": ("Linux and Mac Permissions", "Defense Impairment", "Adversaries may modify file or directory permissions/attributes to evade access control lists (ACLs) and access protected files. File and directory permissions are commonly managed by ACLs configured by the file or directory owner, or users with t..."),
+    "T1685": ("Disable or Modify Tools", "Defense Impairment", "Adversaries may modify and/or disable security tools to avoid possible detection of their malware/tools and activities. This may take many forms, such as killing security software processes or services, modifying / deleting Registry keys or config..."),
+    "T1685.001": ("Disable or Modify Windows Event Log", "Defense Impairment", "Adversaries may disable Windows event logging to limit data that can be leveraged for detections and audits. Windows event logs record user and system activity such as login attempts, process creation, and much more. This data is used by security ..."),
+    "T1685.002": ("Disable or Modify Cloud Log", "Defense Impairment", "An adversary may disable or modify cloud logging capabilities and integrations to limit what data is collected on their activities and avoid detection. Cloud environments allow for collection and analysis of audit and application logs that provide..."),
+    "T1685.003": ("Modify or Spoof Tool UI", "Defense Impairment", "Adversaries may spoof security alerting from tools, presenting false evidence to impair defenders’ awareness of malicious activity. Messages produced by defensive tools contain information about potential security events as well as the functioning..."),
+    "T1685.004": ("Disable or Modify Linux Audit System Log", "Defense Impairment", "Adversaries may disable or modify the Linux audit system to hide malicious activity and avoid detection. Linux admins use the Linux Audit system to track security-relevant information on a system. The Linux Audit system operates at the kernel-leve..."),
+    "T1685.005": ("Clear Windows Event Logs", "Defense Impairment", "Adversaries may clear Windows Event Logs to hide the activity of an intrusion. Windows Event Logs are a record of a computer's alerts and notifications. There are three system-defined sources of events: System, Application, and Security, with five..."),
+    "T1685.006": ("Clear Linux or Mac System Logs", "Defense Impairment", "Adversaries may clear system logs to hide evidence of an intrusion. macOS and Linux both keep track of system or user-initiated actions via system logs. The majority of native system logging is stored under the /var/log/ directory. Subfolders in t..."),
+    "T1686": ("Disable or Modify System Firewall", "Defense Impairment", "Adversaries may disable or modify system firewalls in order to bypass controls limiting network usage. Changes could be disabling the entire mechanism as well as adding, deleting, or modifying particular rules. This can be done numerous ways depen..."),
+    "T1686.001": ("Cloud Firewall", "Defense Impairment", "Adversaries may disable or modify a firewall within a cloud environment to bypass controls that limit access to cloud resources. Cloud firewalls are separate from system firewalls that are described in [Disable or Modify System Firewall](https://a..."),
+    "T1688": ("Safe Mode Boot", "Defense Impairment", "Adversaries may abuse Windows safe mode to disable endpoint defenses. Safe mode starts up the Windows operating system with a limited set of drivers and services. Third-party security software such as endpoint detection and response (EDR) tools ma..."),
+    "T1689": ("Downgrade Attack", "Defense Impairment", "Adversaries may downgrade or use a version of system features that may be outdated, vulnerable, and/or does not support updated security controls. Downgrade attacks typically take advantage of a system’s backward compatibility to force it into les..."),
+    "T1690": ("Prevent Command History Logging", "Defense Impairment", "Adversaries may impair command history logging to hide commands they run on a compromised system. Various command interpreters keep track of the commands users type in their terminal so that users can retrace what they've done. On Linux and macOS,..."),
+    "T1578": ("Modify Cloud Compute Infrastructure", "Defense Impairment", "An adversary may attempt to modify a cloud account's compute service infrastructure to evade defenses. A modification to the compute service infrastructure can include the creation, deletion, or modification of one or more components such as compu..."),
+    "T1578.001": ("Create Snapshot", "Defense Impairment", "An adversary may create a snapshot or data backup within a cloud account to evade defenses. A snapshot is a point-in-time copy of an existing cloud compute component such as a virtual machine (VM), virtual hard drive, or volume. An adversary may l..."),
+    "T1578.002": ("Create Cloud Instance", "Defense Impairment", "An adversary may create a new instance or virtual machine (VM) within the compute service of a cloud account to evade defenses. Creating a new instance may allow an adversary to bypass firewall rules and permissions that exist on instances current..."),
+    "T1578.003": ("Delete Cloud Instance", "Defense Impairment", "An adversary may delete a cloud instance after they have performed malicious activities in an attempt to evade detection and remove evidence of their presence. Deleting an instance or virtual machine can remove valuable forensic artifacts and othe..."),
+    "T1578.004": ("Revert Cloud Instance", "Defense Impairment", "An adversary may revert changes made to a cloud instance after they have performed malicious activities in attempt to evade detection and remove evidence of their presence. In highly virtualized environments, such as cloud-based infrastructure, th..."),
+    "T1578.005": ("Modify Cloud Compute Configurations", "Defense Impairment", "Adversaries may modify settings that directly affect the size, locations, and resources available to cloud compute infrastructure in order to evade defenses. These settings may include service quotas, subscription associations, tenant-wide policie..."),
+    "T1112": ("Modify Registry", "Defense Impairment", "Adversaries may interact with the Windows Registry as part of a variety of other techniques to aid in defense evasion, persistence, and execution. Access to specific areas of the Registry depends on account permissions, with some keys requiring ad..."),
+    "T1601": ("Modify System Image", "Defense Impairment", "Adversaries may make changes to the operating system of embedded network devices to weaken defenses and provide new capabilities for themselves. On such devices, the operating systems are typically monolithic and most of the device functionality a..."),
+    "T1601.001": ("Patch System Image", "Defense Impairment", "Adversaries may modify the operating system of a network device to introduce new capabilities or weaken existing defenses. Some network devices are built with a monolithic architecture, where the entire operating system and most of the functionali..."),
+    "T1601.002": ("Downgrade System Image", "Defense Impairment", "Adversaries may install an older version of the operating system of a network device to weaken security. Older operating system versions on network devices often have weaker encryption ciphers and, in general, fewer/less updated defensive features..."),
+    "T1599": ("Network Boundary Bridging", "Defense Impairment", "Adversaries may bridge network boundaries by compromising perimeter network devices or internal devices responsible for network segmentation. Breaching these devices may enable an adversary to bypass restrictions on traffic routing that otherwise ..."),
+    "T1599.001": ("Network Address Translation Traversal", "Defense Impairment", "Adversaries may bridge network boundaries by modifying a network device’s Network Address Translation (NAT) configuration. Malicious modifications to NAT may enable an adversary to bypass restrictions on traffic routing that otherwise separate tru..."),
+    "T1647": ("Plist File Modification", "Defense Impairment", "Adversaries may modify property list files (plist files) to enable other malicious activity, while also potentially evading and bypassing system defenses. macOS applications use plist files, such as the info.plist file, to store properties and con..."),
+    "T1207": ("Rogue Domain Controller", "Defense Impairment", "Adversaries may register a rogue Domain Controller to enable manipulation of Active Directory data. DCShadow may be used to create a rogue Domain Controller (DC). DCShadow is a method of manipulating Active Directory (AD) data, including objects a..."),
+    "T1553": ("Subvert Trust Controls", "Defense Impairment", "Adversaries may undermine security controls that will either warn users of untrusted activity or prevent execution of untrusted programs. Operating systems and security products may contain mechanisms to identify programs or websites as possessing..."),
+    "T1553.001": ("Gatekeeper Bypass", "Defense Impairment", "Adversaries may modify file attributes and subvert Gatekeeper functionality to evade user prompts and execute untrusted programs. Gatekeeper is a set of technologies that act as layer of Apple’s security model to ensure only trusted applications a..."),
+    "T1553.002": ("Code Signing", "Defense Impairment", "Adversaries may create, acquire, or steal code signing materials to sign their malware or tools. Code signing provides a level of authenticity on a binary from the developer and a guarantee that the binary has not been tampered with. The certifica..."),
+    "T1553.003": ("SIP and Trust Provider Hijacking", "Defense Impairment", "Adversaries may tamper with SIP and trust provider components to mislead the operating system and application control tools when conducting signature validation checks. In user mode, Windows Authenticode digital signatures are used to verify a fil..."),
+    "T1553.004": ("Install Root Certificate", "Defense Impairment", "Adversaries may install a root certificate on a compromised system to avoid warnings when connecting to adversary controlled web servers. Root certificates are used in public key cryptography to identify a root certificate authority (CA). When a r..."),
+    "T1553.005": ("Mark-of-the-Web Bypass", "Defense Impairment", "Adversaries may abuse specific file formats to subvert Mark-of-the-Web (MOTW) controls. In Windows, when files are downloaded from the Internet, they are tagged with a hidden NTFS Alternate Data Stream (ADS) named Zone.Identifier with a specific v..."),
+    "T1553.006": ("Code Signing Policy Modification", "Defense Impairment", "Adversaries may modify code signing policies to enable execution of unsigned or self-signed code. Code signing provides a level of authenticity on a program from a developer and a guarantee that the program has not been tampered with. Security con..."),
+    "T1600": ("Weaken Encryption", "Defense Impairment", "Adversaries may compromise a network device’s encryption capability in order to bypass encryption that would otherwise protect data communications. Encryption can be used to protect transmitted network traffic to maintain its confidentiality (prot..."),
+    "T1600.001": ("Reduce Key Space", "Defense Impairment", "Adversaries may reduce the level of effort required to decrypt data transmitted over the network by reducing the cipher strength of encrypted communications. Adversaries can weaken the encryption software on a compromised network device by reducin..."),
+    "T1600.002": ("Disable Crypto Hardware", "Defense Impairment", "Adversaries disable a network device’s dedicated hardware encryption, which may enable them to leverage weaknesses in software encryption in order to reduce the effort involved in collecting, manipulating, and exfiltrating transmitted data. Many n..."),
 
     # ==================== CREDENTIAL ACCESS ====================
     "T1557": ("Adversary-in-the-Middle", "Credential Access", "Adversaries may attempt to position themselves between two or more networked devices using an adversary-in-the-middle (AiTM) technique to support follow-on behaviors such as [Network Sniffing](https://attack.mitre.org/techniques/T1040), [Transmitt..."),
-    "T1557.001": ("LLMNR/NBT-NS Poisoning and SMB Relay", "Credential Access", "By responding to LLMNR/NBT-NS network traffic, adversaries may spoof an authoritative source for name resolution to force communication with an adversary controlled system. This activity may be used to collect or relay authentication materials. Li..."),
+    "T1557.001": ("Name Resolution Poisoning and SMB Relay", "Credential Access", "By responding to LLMNR/NBT-NS network traffic, adversaries may spoof an authoritative source for name resolution to force communication with an adversary controlled system. This activity may be used to collect or relay authentication materials. Li..."),
     "T1557.002": ("ARP Cache Poisoning", "Credential Access", "Adversaries may poison Address Resolution Protocol (ARP) caches to position themselves between the communication of two or more networked devices. This activity may be used to enable follow-on behaviors such as [Network Sniffing](https://attack.mi..."),
     "T1557.003": ("DHCP Spoofing", "Credential Access", "Adversaries may redirect network traffic to adversary-owned systems by spoofing Dynamic Host Configuration Protocol (DHCP) traffic and acting as a malicious DHCP server on the victim network. By achieving the adversary-in-the-middle (AiTM) positio..."),
     "T1110": ("Brute Force", "Credential Access", "Adversaries may use brute force techniques to gain access to accounts when passwords are unknown or when password hashes are obtained. Without knowledge of the password for an account or set of accounts, an adversary may systematically guess the p..."),
@@ -480,7 +480,7 @@ TECHNIQUES = {
     "T1552": ("Unsecured Credentials", "Credential Access", "Adversaries may search compromised systems to find and obtain insecurely stored credentials. These credentials can be stored and/or misplaced in many locations on a system, including plaintext files (e.g. [Shell History](https://attack.mitre.org/t..."),
     "T1552.001": ("Credentials In Files", "Credential Access", "Adversaries may search local file systems and remote file shares for files containing insecurely stored credentials. These can be files created by users to store their own credentials, shared credential stores for a group of individuals, configura..."),
     "T1552.002": ("Credentials in Registry", "Credential Access", "Adversaries may search the Registry on compromised systems for insecurely stored credentials. The Windows Registry stores configuration information that can be used by the system or other programs. Adversaries may query the Registry looking for cr..."),
-    "T1552.003": ("Bash History", "Credential Access", "Adversaries may search the command history on compromised systems for insecurely stored credentials. On Linux and macOS systems, shells such as Bash and Zsh keep track of the commands users type on the command-line with the \"history\" utility. Once a user logs out, the history is flushed to the us..."),
+    "T1552.003": ("Shell History", "Credential Access", "Adversaries may search the command history on compromised systems for insecurely stored credentials. On Linux and macOS systems, shells such as Bash and Zsh keep track of the commands users type on the command-line with the \"history\" utility. Once a user logs out, the history is flushed to the us..."),
     "T1552.004": ("Private Keys", "Credential Access", "Adversaries may search for private key certificate files on compromised systems for insecurely stored credentials. Private cryptographic keys and certificates are used for authentication, encryption/decryption, and digital signatures. Common key a..."),
     "T1552.005": ("Cloud Instance Metadata API", "Credential Access", "Adversaries may attempt to access the Cloud Instance Metadata API to collect credentials and other sensitive data. Most cloud service providers support a Cloud Instance Metadata API which is a service provided to running virtual instances that all..."),
     "T1552.006": ("Group Policy Preferences", "Credential Access", "Adversaries may attempt to find unsecured credentials in Group Policy Preferences (GPP). GPP are tools that allow administrators to create domain policies with embedded credentials. These policies allow administrators to set local accounts. These ..."),
@@ -488,6 +488,7 @@ TECHNIQUES = {
     "T1552.008": ("Chat Messages", "Credential Access", "Adversaries may directly collect unsecured credentials stored or passed through user communication services. Credentials may be sent and stored in user chat communication applications such as email, chat services like Slack or Teams, collaboration..."),
 
     # ==================== DISCOVERY ====================
+    "T1497": ("Virtualization/Sandbox Evasion", "Discovery", "Adversaries may employ various means to detect and avoid virtualization and analysis environments. This may include changing behaviors based on the results of checks for the presence of artifacts indicative of a virtual machine environment (VME) o..."),
     "T1087": ("Account Discovery", "Discovery", "Adversaries may attempt to get a listing of valid accounts, usernames, or email addresses on a system or within a compromised environment. This information can help adversaries determine which accounts exist, which can aid in follow-on behavior su..."),
     "T1087.001": ("Local Account", "Discovery", "Adversaries may attempt to get a listing of local system accounts. This information can help adversaries determine which local accounts exist on a system to aid in follow-on behavior. Commands such as net user and net localgroup of the [Net](https..."),
     "T1087.002": ("Domain Account", "Discovery", "Adversaries may attempt to get a listing of domain accounts. This information can help adversaries determine which domain accounts exist to aid in follow-on behavior such as targeting specific accounts which possess particular privileges. Commands..."),
@@ -526,9 +527,13 @@ TECHNIQUES = {
     "T1033": ("System Owner/User Discovery", "Discovery", "Adversaries may attempt to identify the primary user, currently logged in user, set of users that commonly uses a system, or whether a user is actively using the system. They may do this, for example, by retrieving account usernames or by using [O..."),
     "T1007": ("System Service Discovery", "Discovery", "Adversaries may try to gather information about registered local system services. Adversaries may obtain information about services using tools as well as OS utility commands such as sc query, tasklist /svc, systemctl --type=service, and net start..."),
     "T1124": ("System Time Discovery", "Discovery", "An adversary may gather the system time and/or time zone settings from a local or remote system. The system time is set and stored by services, such as the Windows Time Service on Windows or systemsetup on macOS. These time settings may also be sy..."),
-    "T1497": ("Virtualization/Sandbox Evasion", "Discovery", "Adversaries may employ various means to detect and avoid virtualization and analysis environments. This may include changing behaviors based on the results of checks for the presence of artifacts indicative of a virtual machine environment (VME) o..."),
 
     # ==================== LATERAL MOVEMENT ====================
+    "T1550": ("Use Alternate Authentication Material", "Lateral Movement", "Adversaries may use alternate authentication material, such as password hashes, Kerberos tickets, and application access tokens, in order to move laterally within an environment and bypass normal system access controls. Authentication processes ge..."),
+    "T1550.001": ("Application Access Token", "Lateral Movement", "Adversaries may use stolen application access tokens to bypass the typical authentication process and access restricted accounts, information, or services on remote systems. These tokens are typically stolen from users or services and used in lieu..."),
+    "T1550.002": ("Pass the Hash", "Lateral Movement", "Adversaries may “pass the hash” using stolen password hashes to move laterally within an environment, bypassing normal system access controls. Pass the hash (PtH) is a method of authenticating as a user without having access to the user's cleartex..."),
+    "T1550.003": ("Pass the Ticket", "Lateral Movement", "Adversaries may “pass the ticket” using stolen Kerberos tickets to move laterally within an environment, bypassing normal system access controls. Pass the ticket (PtT) is a method of authenticating to a system using Kerberos tickets without having..."),
+    "T1550.004": ("Web Session Cookie", "Lateral Movement", "Adversaries can use stolen session cookies to authenticate to web applications and services. This technique bypasses some multi-factor authentication protocols since the session is already authenticated. Authentication cookies are commonly used in..."),
     "T1210": ("Exploitation of Remote Services", "Lateral Movement", "Adversaries may exploit remote services to gain unauthorized access to internal systems once inside of a network. Exploitation of a software vulnerability occurs when an adversary takes advantage of a programming error in a program, service, or wi..."),
     "T1534": ("Internal Spearphishing", "Lateral Movement", "After they already have access to accounts or systems within the environment, adversaries may use internal spearphishing to gain access to additional information or compromise other users within the same organization. Internal spearphishing is mul..."),
     "T1570": ("Lateral Tool Transfer", "Lateral Movement", "Adversaries may transfer tools or other files between systems in a compromised environment. Once brought into the victim environment (i.e., [Ingress Tool Transfer](https://attack.mitre.org/techniques/T1105)) files may then be copied from one syste..."),
@@ -544,13 +549,9 @@ TECHNIQUES = {
     "T1021.006": ("Windows Remote Management", "Lateral Movement", "Adversaries may use [Valid Accounts](https://attack.mitre.org/techniques/T1078) to interact with remote systems using Windows Remote Management (WinRM). The adversary may then perform actions as the logged-on user. WinRM is the name of both a Wind..."),
     "T1021.007": ("Cloud Services", "Lateral Movement", "Adversaries may log into accessible cloud services within a compromised environment using [Valid Accounts](https://attack.mitre.org/techniques/T1078) that are synchronized with or federated to on-premises user identities. The adversary may then pe..."),
     "T1021.008": ("Direct Cloud VM Connections", "Lateral Movement", "Adversaries may leverage [Valid Accounts](https://attack.mitre.org/techniques/T1078) to log directly into accessible cloud hosted compute infrastructure through cloud native methods. Many cloud providers offer interactive connections to virtual in..."),
-    "T1091": ("Replication Through Removable Media", "Lateral Movement", "Adversaries may move onto systems, possibly those on disconnected or air-gapped networks, by copying malware to removable media and taking advantage of Autorun features when the media is inserted into a system and executes. In the case of Lateral ..."),
-    "T1072": ("Software Deployment Tools", "Lateral Movement", "Adversaries may gain access to and use centralized software suites installed within an enterprise to execute commands and move laterally through the network. Configuration management and software deployment applications may be used in an enterpris..."),
     "T1080": ("Taint Shared Content", "Lateral Movement", "Adversaries may deliver payloads to remote systems by adding content to shared storage locations, such as network drives or internal code repositories. Content stored on network drives or in other shared locations may be tainted by adding maliciou..."),
-    "T1550": ("Use Alternate Authentication Material", "Lateral Movement", "Adversaries may use alternate authentication material, such as password hashes, Kerberos tickets, and application access tokens, in order to move laterally within an environment and bypass normal system access controls. Authentication processes ge..."),
 
     # ==================== COLLECTION ====================
-    "T1557": ("Adversary-in-the-Middle", "Collection", "Adversaries may attempt to position themselves between two or more networked devices using an adversary-in-the-middle (AiTM) technique to support follow-on behaviors such as [Network Sniffing](https://attack.mitre.org/techniques/T1040), [Transmitt..."),
     "T1560": ("Archive Collected Data", "Collection", "An adversary may compress and/or encrypt data that is collected prior to exfiltration. Compressing the data can help to obfuscate the collected data and minimize the amount of data sent over the network. Encryption can be used to hide information ..."),
     "T1560.001": ("Archive via Utility", "Collection", "Adversaries may use utilities to compress and/or encrypt collected data prior to exfiltration. Many utilities include functionalities to compress, encrypt, or otherwise package data into a format that is easier/more secure to transport. Adversarie..."),
     "T1560.002": ("Archive via Library", "Collection", "An adversary may compress or encrypt data that is collected prior to exfiltration using 3rd party libraries. Many libraries exist that can archive data, including [Python](https://attack.mitre.org/techniques/T1059/006) rarfile , libzip , and zlib ..."),
@@ -577,7 +578,6 @@ TECHNIQUES = {
     "T1114.001": ("Local Email Collection", "Collection", "Adversaries may target user email on local systems to collect sensitive information. Files containing email data can be acquired from a user’s local system, such as Outlook storage or cache files. Outlook stores data locally in offline data files ..."),
     "T1114.002": ("Remote Email Collection", "Collection", "Adversaries may target an Exchange server, Office 365, or Google Workspace to collect sensitive information. Adversaries may leverage a user's credentials and interact directly with the Exchange server to acquire information from within a network...."),
     "T1114.003": ("Email Forwarding Rule", "Collection", "Adversaries may setup email forwarding rules to collect sensitive information. Adversaries may abuse email forwarding rules to monitor the activities of a victim, steal information, and further gain intelligence on the victim or the victim’s organ..."),
-    "T1056": ("Input Capture", "Collection", "Adversaries may use methods of capturing user input to obtain credentials or collect information. During normal system usage, users often provide credentials to various different locations, such as login pages/portals or system dialog boxes. Input..."),
     "T1113": ("Screen Capture", "Collection", "Adversaries may attempt to take screen captures of the desktop to gather information over the course of an operation. Screen capturing functionality may be included as a feature of a remote access tool used in post-compromise operations. Taking a ..."),
     "T1125": ("Video Capture", "Collection", "An adversary can leverage a computer's peripheral devices (e.g., integrated cameras or webcams) or applications (e.g., video call services) to capture video recordings for the purpose of gathering information. Images may also be captured from devi..."),
 
@@ -588,14 +588,13 @@ TECHNIQUES = {
     "T1071.003": ("Mail Protocols", "Command and Control", "Adversaries may communicate using application layer protocols associated with electronic mail delivery to avoid detection/network filtering by blending in with existing traffic. Commands to the remote system, and often the results of those command..."),
     "T1071.004": ("DNS", "Command and Control", "Adversaries may communicate using the Domain Name System (DNS) application layer protocol to avoid detection/network filtering by blending in with existing traffic. Commands to the remote system, and often the results of those commands, will be em..."),
     "T1092": ("Communication Through Removable Media", "Command and Control", "Adversaries can perform command and control between compromised hosts on potentially disconnected networks using removable media to transfer commands from system to system. Both systems would need to be compromised, with the likelihood that an Int..."),
-    "T1659": ("Content Injection", "Command and Control", "Adversaries may gain access and continuously communicate with victims by injecting malicious content into systems through online network traffic. Rather than luring victims to malicious payloads hosted on a compromised website (i.e., [Drive-by Tar..."),
     "T1132": ("Data Encoding", "Command and Control", "Adversaries may encode data to make the content of command and control traffic more difficult to detect. Command and control (C2) information can be encoded using a standard data encoding system. Use of data encoding may adhere to existing protoco..."),
     "T1132.001": ("Standard Encoding", "Command and Control", "Adversaries may encode data with a standard data encoding system to make the content of command and control traffic more difficult to detect. Command and control (C2) information can be encoded using a standard data encoding system that adheres to..."),
     "T1132.002": ("Non-Standard Encoding", "Command and Control", "Adversaries may encode data with a non-standard data encoding system to make the content of command and control traffic more difficult to detect. Command and control (C2) information can be encoded using a non-standard data encoding system that di..."),
     "T1001": ("Data Obfuscation", "Command and Control", "Adversaries may obfuscate command and control traffic to make it more difficult to detect. Command and control (C2) communications are hidden (but not necessarily encrypted) in an attempt to make the content more difficult to discover or decipher ..."),
     "T1001.001": ("Junk Data", "Command and Control", "Adversaries may add junk data to protocols used for command and control to make detection more difficult. By adding random or meaningless data to the protocols used for command and control, adversaries can prevent trivial methods for decoding, dec..."),
     "T1001.002": ("Steganography", "Command and Control", "Adversaries may use steganographic techniques to hide command and control traffic to make detection efforts more difficult. Steganographic techniques can be used to hide data in digital messages that are transferred between systems. This hidden in..."),
-    "T1001.003": ("Protocol Impersonation", "Command and Control", "Adversaries may impersonate legitimate protocols or web service traffic to disguise command and control activity and thwart analysis efforts. By impersonating legitimate protocols or web services, adversaries can make their command and control tra..."),
+    "T1001.003": ("Protocol or Service Impersonation", "Command and Control", "Adversaries may impersonate legitimate protocols or web service traffic to disguise command and control activity and thwart analysis efforts. By impersonating legitimate protocols or web services, adversaries can make their command and control tra..."),
     "T1568": ("Dynamic Resolution", "Command and Control", "Adversaries may dynamically establish connections to command and control infrastructure to evade common detections and remediations. This may be achieved by using malware that shares a common algorithm with the infrastructure the adversary uses to..."),
     "T1568.001": ("Fast Flux DNS", "Command and Control", "Adversaries may use Fast Flux DNS to hide a command and control channel behind an array of rapidly changing IP addresses linked to a single domain resolution. This technique uses a fully qualified domain name, with multiple IP addresses assigned t..."),
     "T1568.002": ("Domain Generation Algorithms", "Command and Control", "Adversaries may make use of Domain Generation Algorithms (DGAs) to dynamically identify a destination domain for command and control traffic rather than relying on a list of static IP addresses or domains. This has the advantage of making it much ..."),
@@ -614,8 +613,7 @@ TECHNIQUES = {
     "T1090.002": ("External Proxy", "Command and Control", "Adversaries may use an external proxy to act as an intermediary for network communications to a command and control server to avoid direct connections to their infrastructure. Many tools exist that enable traffic redirection through proxies or por..."),
     "T1090.003": ("Multi-hop Proxy", "Command and Control", "Adversaries may chain together multiple proxies to disguise the source of malicious traffic. Typically, a defender will be able to identify the last proxy traffic traversed before it enters their network; the defender may or may not be able to ide..."),
     "T1090.004": ("Domain Fronting", "Command and Control", "Adversaries may take advantage of routing schemes in Content Delivery Networks (CDNs) and other services which host multiple domains to obfuscate the intended destination of HTTPS traffic or traffic tunneled through HTTPS. Domain fronting involves..."),
-    "T1219": ("Remote Access Software", "Command and Control", "An adversary may use legitimate remote access tools to establish an interactive command and control channel within a network. Remote access tools create a session between two trusted hosts through a graphical interface, a command line interaction,..."),
-    "T1205": ("Traffic Signaling", "Command and Control", "Adversaries may use traffic signaling to hide open ports or other malicious functionality used for persistence or command and control. Traffic signaling involves the use of a magic value or sequence that must be sent to a system to trigger a speci..."),
+    "T1219": ("Remote Access Tools", "Command and Control", "An adversary may use legitimate remote access tools to establish an interactive command and control channel within a network. Remote access tools create a session between two trusted hosts through a graphical interface, a command line interaction,..."),
     "T1102": ("Web Service", "Command and Control", "Adversaries may use an existing, legitimate external Web service as a means for relaying data to/from a compromised system. Popular websites, cloud services, and social media acting as a mechanism for C2 may give a significant amount of cover due ..."),
     "T1102.001": ("Dead Drop Resolver", "Command and Control", "Adversaries may use an existing, legitimate external Web service to host information that points to additional command and control (C2) infrastructure. Adversaries may post content, known as a dead drop resolver, on Web services with embedded (and..."),
     "T1102.002": ("Bidirectional Communication", "Command and Control", "Adversaries may use an existing, legitimate external Web service as a means for sending commands to and receiving output from a compromised system over the Web service channel. Compromised systems may leverage popular websites and social media to ..."),
@@ -672,73 +670,15 @@ TECHNIQUES = {
     "T1529": ("System Shutdown/Reboot", "Impact", "Adversaries may shutdown/reboot systems to interrupt access to, or aid in the destruction of, those systems. Operating systems may contain commands to initiate a shutdown/reboot of a machine or network device. In some cases, these commands may als..."),
 }
 
-# Techniques that belong to multiple tactics (technique_id -> list of tactics)
-# Based on MITRE ATT&CK Enterprise Matrix
-MULTI_TACTIC_TECHNIQUES = {
-    "T1659": ["Initial Access", "Command and Control"],
-    "T1078": ["Initial Access", "Persistence", "Privilege Escalation", "Defense Evasion"],
-    "T1133": ["Initial Access", "Persistence"],
-    "T1091": ["Initial Access", "Lateral Movement"],
-    "T1053": ["Execution", "Persistence", "Privilege Escalation"],
-    "T1072": ["Execution", "Lateral Movement"],
-    "T1569": ["Execution"],
-    "T1047": ["Execution"],
-    "T1059": ["Execution"],
-    "T1106": ["Execution"],
-    "T1204": ["Execution"],
-    "T1098": ["Persistence", "Privilege Escalation"],
-    "T1197": ["Persistence", "Defense Evasion"],
-    "T1547": ["Persistence", "Privilege Escalation"],
-    "T1037": ["Persistence", "Privilege Escalation"],
-    "T1543": ["Persistence", "Privilege Escalation"],
-    "T1546": ["Persistence", "Privilege Escalation"],
-    "T1574": ["Persistence", "Privilege Escalation", "Defense Evasion"],
-    "T1556": ["Persistence", "Credential Access", "Defense Evasion"],
-    "T1542": ["Persistence", "Defense Evasion"],
-    "T1205": ["Persistence", "Defense Evasion", "Command and Control"],
-    "T1548": ["Privilege Escalation", "Defense Evasion"],
-    "T1134": ["Privilege Escalation", "Defense Evasion"],
-    "T1484": ["Privilege Escalation", "Defense Evasion"],
-    "T1055": ["Privilege Escalation", "Defense Evasion"],
-    "T1610": ["Execution", "Defense Evasion"],
-    "T1622": ["Discovery", "Defense Evasion"],
-    "T1564": ["Defense Evasion"],
-    "T1685": ["Defense Evasion"],
-    "T1070": ["Defense Evasion"],
-    "T1036": ["Defense Evasion"],
-    "T1027": ["Defense Evasion"],
-    "T1218": ["Defense Evasion"],
-    "T1216": ["Defense Evasion"],
-    "T1553": ["Defense Evasion"],
-    "T1550": ["Lateral Movement", "Defense Evasion"],
-    "T1497": ["Discovery", "Defense Evasion"],
-    "T1040": ["Discovery", "Credential Access"],
-    "T1056": ["Collection", "Credential Access"],
-    "T1557": ["Collection", "Credential Access"],
-    "T1114": ["Collection"],
-    "T1560": ["Collection"],
-    "T1071": ["Command and Control"],
-    "T1105": ["Command and Control"],
-    "T1090": ["Command and Control"],
-    "T1573": ["Command and Control"],
-    "T1132": ["Command and Control"],
-    "T1001": ["Command and Control"],
-    "T1568": ["Command and Control"],
-    "T1008": ["Command and Control"],
-    "T1102": ["Command and Control"],
-    "T1219": ["Command and Control"],
-    "T1048": ["Exfiltration"],
-    "T1041": ["Exfiltration"],
-    "T1567": ["Exfiltration"],
-    "T1020": ["Exfiltration"],
-    "T1030": ["Exfiltration"],
-    "T1486": ["Impact"],
-    "T1485": ["Impact"],
-    "T1490": ["Impact"],
-    "T1491": ["Impact"],
-    "T1561": ["Impact"],
-    "T1499": ["Impact"],
-}
+
+def technique_tactics(technique_id: str) -> List[str]:
+    """Every tactic ATT&CK v20.1 gives the technique, in kill-chain order; the tactic
+    TECHNIQUES files it under when the CSV doesn't have the ID."""
+    tactics = attack_lookup.tactics_of(technique_id)
+    if tactics:
+        return tactics
+    entry = TECHNIQUES.get(technique_id)
+    return [entry[1]] if entry else []
 
 
 def generate_technique_xml(technique_id, name, tactics, description):
@@ -767,7 +707,8 @@ def generate_technique_xml(technique_id, name, tactics, description):
         "Execution": "#4DB6AC",             # Green-teal
         "Persistence": "#81C784",           # Green
         "Privilege Escalation": "#AED581",  # Light green
-        "Defense Evasion": "#DCE775",       # Yellow-green
+        "Stealth": "#DCE775",               # Yellow-green
+        "Defense Impairment": "#EEEE6E",    # Lime-yellow
         "Credential Access": "#FFF176",     # Yellow
         "Discovery": "#FFD54F",             # Amber
         "Lateral Movement": "#FFB74D",      # Orange
@@ -963,26 +904,8 @@ def create_all_technique_xmls(views_dir):
     """Generate all technique XML files in the specified directory."""
     import os
     count = 0
-
-    # Build a merged technique dictionary with all tactics
-    merged_techniques = {}
-    for tid, (name, tactic, description) in TECHNIQUES.items():
-        # Get base technique ID (without sub-technique suffix)
-        base_tid = tid.split('.')[0]
-
-        # Check if this technique has multiple tactics defined
-        if tid in MULTI_TACTIC_TECHNIQUES:
-            tactics = MULTI_TACTIC_TECHNIQUES[tid]
-        elif base_tid in MULTI_TACTIC_TECHNIQUES:
-            # Sub-technique inherits parent's tactics
-            tactics = MULTI_TACTIC_TECHNIQUES[base_tid]
-        else:
-            tactics = [tactic]
-
-        merged_techniques[tid] = (name, tactics, description)
-
-    for tid, (name, tactics, description) in merged_techniques.items():
-        xml_content = generate_technique_xml(tid, name, tactics, description)
+    for tid, (name, _tactic, description) in TECHNIQUES.items():
+        xml_content = generate_technique_xml(tid, name, technique_tactics(tid), description)
         # Replace dots with underscores for sub-technique filenames
         filename = os.path.join(views_dir, f"{tid.lower().replace('.', '_')}.xml")
         with open(filename, 'w') as f:
@@ -991,131 +914,95 @@ def create_all_technique_xmls(views_dir):
     return count
 
 
+def techniques_for_tactic(tactic: str) -> Dict[str, Tuple[str, str, str]]:
+    """The TECHNIQUES entries filed under the tactic."""
+    return {k: v for k, v in TECHNIQUES.items() if v[1] == tactic}
+
+
+def create_tactic_xml(sd: str, tactic: str) -> int:
+    """Generate the XMLs of the techniques filed under one tactic; returns how many."""
+    techniques = techniques_for_tactic(tactic)
+    for tid, (name, _tactic, description) in techniques.items():
+        xml_content = generate_technique_xml(tid, name, technique_tactics(tid), description)
+        with open(f"{sd}{tid.lower().replace('.', '_')}.xml", 'w') as f:
+            f.write(xml_content)
+    return len(techniques)
+
+
 # Tactic-based generation functions for backwards compatibility
 def create_initial_access_xml(sd):
     """Generate Initial Access technique XMLs."""
-    techniques = {k: v for k, v in TECHNIQUES.items() if v[1] == "Initial Access"}
-    for tid, (name, tactic, description) in techniques.items():
-        xml_content = generate_technique_xml(tid, name, tactic, description)
-        with open(f"{sd}{tid.lower().replace('.', '_')}.xml", 'w') as f:
-            f.write(xml_content)
+    return create_tactic_xml(sd, "Initial Access")
 
 
 def create_execution_xml(sd):
     """Generate Execution technique XMLs."""
-    techniques = {k: v for k, v in TECHNIQUES.items() if v[1] == "Execution"}
-    for tid, (name, tactic, description) in techniques.items():
-        xml_content = generate_technique_xml(tid, name, tactic, description)
-        with open(f"{sd}{tid.lower().replace('.', '_')}.xml", 'w') as f:
-            f.write(xml_content)
+    return create_tactic_xml(sd, "Execution")
 
 
 def create_persistence_xml(sd):
     """Generate Persistence technique XMLs."""
-    techniques = {k: v for k, v in TECHNIQUES.items() if v[1] == "Persistence"}
-    for tid, (name, tactic, description) in techniques.items():
-        xml_content = generate_technique_xml(tid, name, tactic, description)
-        with open(f"{sd}{tid.lower().replace('.', '_')}.xml", 'w') as f:
-            f.write(xml_content)
+    return create_tactic_xml(sd, "Persistence")
 
 
 def create_privilege_escalation_xml(sd):
     """Generate Privilege Escalation technique XMLs."""
-    techniques = {k: v for k, v in TECHNIQUES.items() if v[1] == "Privilege Escalation"}
-    for tid, (name, tactic, description) in techniques.items():
-        xml_content = generate_technique_xml(tid, name, tactic, description)
-        with open(f"{sd}{tid.lower().replace('.', '_')}.xml", 'w') as f:
-            f.write(xml_content)
+    return create_tactic_xml(sd, "Privilege Escalation")
 
 
-def create_defense_evasion_xml(sd):
-    """Generate Defense Evasion technique XMLs."""
-    techniques = {k: v for k, v in TECHNIQUES.items() if v[1] == "Defense Evasion"}
-    for tid, (name, tactic, description) in techniques.items():
-        xml_content = generate_technique_xml(tid, name, tactic, description)
-        with open(f"{sd}{tid.lower().replace('.', '_')}.xml", 'w') as f:
-            f.write(xml_content)
+def create_stealth_xml(sd):
+    """Generate Stealth technique XMLs."""
+    return create_tactic_xml(sd, "Stealth")
+
+
+def create_defense_impairment_xml(sd):
+    """Generate Defense Impairment technique XMLs."""
+    return create_tactic_xml(sd, "Defense Impairment")
 
 
 def create_credential_access_xml(sd):
     """Generate Credential Access technique XMLs."""
-    techniques = {k: v for k, v in TECHNIQUES.items() if v[1] == "Credential Access"}
-    for tid, (name, tactic, description) in techniques.items():
-        xml_content = generate_technique_xml(tid, name, tactic, description)
-        with open(f"{sd}{tid.lower().replace('.', '_')}.xml", 'w') as f:
-            f.write(xml_content)
+    return create_tactic_xml(sd, "Credential Access")
 
 
 def create_discovery_xml(sd):
     """Generate Discovery technique XMLs."""
-    techniques = {k: v for k, v in TECHNIQUES.items() if v[1] == "Discovery"}
-    for tid, (name, tactic, description) in techniques.items():
-        xml_content = generate_technique_xml(tid, name, tactic, description)
-        with open(f"{sd}{tid.lower().replace('.', '_')}.xml", 'w') as f:
-            f.write(xml_content)
+    return create_tactic_xml(sd, "Discovery")
 
 
 def create_lateral_movement_xml(sd):
     """Generate Lateral Movement technique XMLs."""
-    techniques = {k: v for k, v in TECHNIQUES.items() if v[1] == "Lateral Movement"}
-    for tid, (name, tactic, description) in techniques.items():
-        xml_content = generate_technique_xml(tid, name, tactic, description)
-        with open(f"{sd}{tid.lower().replace('.', '_')}.xml", 'w') as f:
-            f.write(xml_content)
+    return create_tactic_xml(sd, "Lateral Movement")
 
 
 def create_collection_xml(sd):
     """Generate Collection technique XMLs."""
-    techniques = {k: v for k, v in TECHNIQUES.items() if v[1] == "Collection"}
-    for tid, (name, tactic, description) in techniques.items():
-        xml_content = generate_technique_xml(tid, name, tactic, description)
-        with open(f"{sd}{tid.lower().replace('.', '_')}.xml", 'w') as f:
-            f.write(xml_content)
+    return create_tactic_xml(sd, "Collection")
 
 
 def create_command_and_control_xml(sd):
     """Generate Command and Control technique XMLs."""
-    techniques = {k: v for k, v in TECHNIQUES.items() if v[1] == "Command and Control"}
-    for tid, (name, tactic, description) in techniques.items():
-        xml_content = generate_technique_xml(tid, name, tactic, description)
-        with open(f"{sd}{tid.lower().replace('.', '_')}.xml", 'w') as f:
-            f.write(xml_content)
+    return create_tactic_xml(sd, "Command and Control")
 
 
 def create_exfiltration_xml(sd):
     """Generate Exfiltration technique XMLs."""
-    techniques = {k: v for k, v in TECHNIQUES.items() if v[1] == "Exfiltration"}
-    for tid, (name, tactic, description) in techniques.items():
-        xml_content = generate_technique_xml(tid, name, tactic, description)
-        with open(f"{sd}{tid.lower().replace('.', '_')}.xml", 'w') as f:
-            f.write(xml_content)
+    return create_tactic_xml(sd, "Exfiltration")
 
 
 def create_impact_xml(sd):
     """Generate Impact technique XMLs."""
-    techniques = {k: v for k, v in TECHNIQUES.items() if v[1] == "Impact"}
-    for tid, (name, tactic, description) in techniques.items():
-        xml_content = generate_technique_xml(tid, name, tactic, description)
-        with open(f"{sd}{tid.lower().replace('.', '_')}.xml", 'w') as f:
-            f.write(xml_content)
+    return create_tactic_xml(sd, "Impact")
 
 
 def create_reconnaissance_xml(sd):
     """Generate Reconnaissance technique XMLs."""
-    techniques = {k: v for k, v in TECHNIQUES.items() if v[1] == "Reconnaissance"}
-    for tid, (name, tactic, description) in techniques.items():
-        xml_content = generate_technique_xml(tid, name, tactic, description)
-        with open(f"{sd}{tid.lower().replace('.', '_')}.xml", 'w') as f:
-            f.write(xml_content)
+    return create_tactic_xml(sd, "Reconnaissance")
 
 
 def create_resource_development_xml(sd):
     """Generate Resource Development technique XMLs."""
-    techniques = {k: v for k, v in TECHNIQUES.items() if v[1] == "Resource Development"}
-    for tid, (name, tactic, description) in techniques.items():
-        xml_content = generate_technique_xml(tid, name, tactic, description)
-        with open(f"{sd}{tid.lower().replace('.', '_')}.xml", 'w') as f:
-            f.write(xml_content)
+    return create_tactic_xml(sd, "Resource Development")
 
 
 if __name__ == "__main__":

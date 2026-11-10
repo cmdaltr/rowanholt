@@ -37,7 +37,7 @@ class ActivityLogAnalyzer:
 
     # Suspicious operations mapped to MITRE ATT&CK
     SUSPICIOUS_OPERATIONS = {
-        # Defense Evasion
+        # Defense Impairment
         "Microsoft.Insights/DiagnosticSettings/Delete": ["T1685.002"],  # Disable or Modify Cloud Log
         "Microsoft.Security/securityContacts/delete": ["T1685"],  # Disable or Modify Tools
         # Privilege Escalation

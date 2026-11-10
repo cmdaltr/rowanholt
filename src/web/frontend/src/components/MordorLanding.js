@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import MordorCatalog from './MordorCatalog';
 import { getLocalMordorDatasets, refreshMordorCatalog, getMordorCatalog, downloadMordorDataset } from '../api';
 
-// MITRE ATT&CK Tactic ID to Name mapping
+// MITRE ATT&CK Tactic ID to Name mapping, for the OTRF datasets' own tags, which predate
+// ATT&CK v20: their TA0005 is Defense Evasion, which v20 split into Stealth and Defense
+// Impairment (the pinned v20.1 data gives those no TA numbers to map here)
 const TACTIC_NAMES = {
   'TA0001': 'Initial Access',
   'TA0002': 'Execution',
   'TA0003': 'Persistence',
   'TA0004': 'Privilege Escalation',
-  'TA0005': 'Defense Evasion',
+  'TA0005': 'Defense Evasion (now Stealth, Defense Impairment)',
   'TA0006': 'Credential Access',
   'TA0007': 'Discovery',
   'TA0008': 'Lateral Movement',

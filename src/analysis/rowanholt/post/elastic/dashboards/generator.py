@@ -11,6 +11,8 @@ import os
 import uuid
 from datetime import datetime
 
+from rowanholt.post.mitre import attack_lookup
+
 from .techniques import (
     TECHNIQUES,
     get_technique_by_id,
@@ -305,7 +307,10 @@ def generate_technique_dashboard(technique_id, case_name, index_pattern):
         return None
 
     technique_name = technique_info.get("name", "Unknown Technique")
-    tactic = technique_info.get("tactic", "Unknown Tactic")
+    # Every tactic ATT&CK v20.1 gives the technique (Stealth, Defense Impairment, not v19's
+    # Defense Evasion); the table's own tactic for an ID the release doesn't have
+    tactics = attack_lookup.tactics_of(technique_id) or [technique_info.get("tactic", "Unknown Tactic")]
+    tactic = ", ".join(tactics)
     parent = technique_info.get("parent")
 
     dashboard_id = f"technique-{technique_id.lower()}-{case_name}"
@@ -316,7 +321,7 @@ def generate_technique_dashboard(technique_id, case_name, index_pattern):
     technique_description = f"""
 ## {technique_name} ({technique_id})
 
-**Tactic:** {tactic}
+**{"Tactics" if len(tactics) > 1 else "Tactic"}:** {tactic}
 {"**Parent Technique:** " + parent if parent else ""}
 
 [View on MITRE ATT&CK](https://attack.mitre.org/techniques/{technique_id.replace('.', '/')})

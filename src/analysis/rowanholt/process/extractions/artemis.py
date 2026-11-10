@@ -37,13 +37,13 @@ ARTEFACT_MITRE_MAPPING = {
     "eventlogs": {
         "technique_id": "T1685.005",
         "technique_name": "Clear Windows Event Logs",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Defense Impairment"],
         "groups": ["APT28", "APT29", "APT41", "Lazarus Group"]
     },
     "mft": {
         "technique_id": "T1070.006",
         "technique_name": "Timestomp",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "groups": ["APT28", "APT29", "APT41", "Lazarus Group"]
     },
     "shimcache": {
@@ -61,7 +61,7 @@ ARTEFACT_MITRE_MAPPING = {
     "registry": {
         "technique_id": "T1112",
         "technique_name": "Modify Registry",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Persistence", "Defense Impairment"],
         "groups": ["APT28", "APT29", "Turla", "Lazarus Group"]
     },
     "userassist": {
@@ -79,13 +79,13 @@ ARTEFACT_MITRE_MAPPING = {
     "usnjrnl": {
         "technique_id": "T1070.004",
         "technique_name": "File Deletion",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "groups": ["APT28", "APT29", "Turla", "Lazarus Group"]
     },
     "bits": {
         "technique_id": "T1197",
         "technique_name": "BITS Jobs",
-        "tactics": ["Defense Evasion", "Persistence"],
+        "tactics": ["Execution", "Persistence", "Stealth"],
         "groups": ["APT41", "Leviathan", "Turla"]
     },
     "srum": {
@@ -127,7 +127,7 @@ ARTEFACT_MITRE_MAPPING = {
     "recyclebin": {
         "technique_id": "T1070.004",
         "technique_name": "File Deletion",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "groups": ["APT28", "APT29", "Lazarus Group"]
     },
     "outlook": {

@@ -94,7 +94,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1078": {
         "name": "Valid Accounts",
-        "tactics": ["Initial Access", "Persistence", "Privilege Escalation", "Defense Evasion"],
+        "tactics": ["Initial Access", "Persistence", "Privilege Escalation", "Stealth"],
         "description": "Adversaries may obtain and abuse credentials of existing accounts.",
         "groups": ["APT28", "APT29", "APT41", "FIN7", "Wizard Spider", "Sandworm Team"],
         "software": ["Mimikatz", "Cobalt Strike"],
@@ -418,7 +418,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1197": {
         "name": "BITS Jobs",
-        "tactics": ["Defense Evasion", "Persistence"],
+        "tactics": ["Execution", "Persistence", "Stealth"],
         "description": "Adversaries may abuse BITS jobs to download, execute, and clean up.",
         "groups": ["APT41", "Leviathan", "Turla"],
         "software": ["Cobalt Strike"],
@@ -444,7 +444,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     # ==================== PRIVILEGE ESCALATION ====================
     "T1548": {
         "name": "Abuse Elevation Control Mechanism",
-        "tactics": ["Privilege Escalation", "Defense Evasion"],
+        "tactics": ["Privilege Escalation"],
         "description": "Adversaries may circumvent mechanisms designed to control elevated privileges.",
         "groups": ["APT28", "APT29", "Lazarus Group"],
         "software": [],
@@ -452,7 +452,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1548.002": {
         "name": "Bypass User Account Control",
-        "tactics": ["Privilege Escalation", "Defense Evasion"],
+        "tactics": ["Privilege Escalation"],
         "description": "Adversaries may bypass UAC mechanisms to elevate privileges.",
         "groups": ["APT28", "APT29", "Lazarus Group", "APT41", "FIN7"],
         "software": ["Cobalt Strike", "Empire"],
@@ -460,7 +460,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1548.003": {
         "name": "Sudo and Sudo Caching",
-        "tactics": ["Privilege Escalation", "Defense Evasion"],
+        "tactics": ["Privilege Escalation"],
         "description": "Adversaries may abuse sudo or sudo caching to elevate privileges.",
         "groups": ["TeamTNT", "Rocke"],
         "software": [],
@@ -476,7 +476,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1134": {
         "name": "Access Token Manipulation",
-        "tactics": ["Defense Evasion", "Privilege Escalation"],
+        "tactics": ["Privilege Escalation", "Stealth"],
         "description": "Adversaries may modify access tokens to operate under different security contexts.",
         "groups": ["APT28", "APT29", "Lazarus Group", "FIN7"],
         "software": ["Cobalt Strike", "Mimikatz"],
@@ -484,17 +484,17 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1134.001": {
         "name": "Token Impersonation/Theft",
-        "tactics": ["Defense Evasion", "Privilege Escalation"],
+        "tactics": ["Privilege Escalation", "Stealth"],
         "description": "Adversaries may duplicate then impersonate access tokens.",
         "groups": ["APT28", "APT29", "FIN7", "Wizard Spider"],
         "software": ["Cobalt Strike", "Mimikatz"],
         "procedure_examples": ["APT28 has used incognito to impersonate tokens."]
     },
 
-    # ==================== DEFENSE EVASION ====================
+    # ============ STEALTH AND DEFENSE IMPAIRMENT (v20's split of Defense Evasion) ============
     "T1070": {
         "name": "Indicator Removal",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "description": "Adversaries may delete or modify artifacts generated to remove evidence.",
         "groups": ["APT28", "APT29", "Lazarus Group", "APT41", "Turla"],
         "software": [],
@@ -502,7 +502,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1685.005": {
         "name": "Clear Windows Event Logs",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Defense Impairment"],
         "description": "Adversaries may clear Windows Event Logs to hide activity.",
         "groups": ["APT28", "APT29", "APT41", "Lazarus Group", "Turla"],
         "software": [],
@@ -510,7 +510,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1685.006": {
         "name": "Clear Linux or Mac System Logs",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Defense Impairment"],
         "description": "Adversaries may clear system logs to hide activity.",
         "groups": ["TeamTNT", "Rocke"],
         "software": [],
@@ -518,7 +518,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1070.003": {
         "name": "Clear Command History",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "description": "Adversaries may clear command history to conceal commands.",
         "groups": ["APT28", "APT29", "TeamTNT"],
         "software": [],
@@ -526,7 +526,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1070.004": {
         "name": "File Deletion",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "description": "Adversaries may delete files to remove indicators of intrusion.",
         "groups": ["APT28", "APT29", "Lazarus Group", "Turla", "APT41"],
         "software": [],
@@ -534,7 +534,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1070.005": {
         "name": "Network Share Connection Removal",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "description": "Adversaries may remove share connections after operations.",
         "groups": ["APT28", "APT29"],
         "software": [],
@@ -542,7 +542,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1070.006": {
         "name": "Timestomp",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "description": "Adversaries may modify file timestamps to hide activity.",
         "groups": ["APT28", "APT29", "APT41", "Lazarus Group", "Turla"],
         "software": ["Cobalt Strike"],
@@ -550,7 +550,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1112": {
         "name": "Modify Registry",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Persistence", "Defense Impairment"],
         "description": "Adversaries may modify the Windows Registry for defense evasion.",
         "groups": ["APT28", "APT29", "Lazarus Group", "Turla", "FIN7", "APT41"],
         "software": ["Cobalt Strike", "Empire"],
@@ -558,7 +558,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1140": {
         "name": "Deobfuscate/Decode Files or Information",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "description": "Adversaries may deobfuscate files or information to execute.",
         "groups": ["APT28", "APT29", "Lazarus Group", "FIN7", "APT41"],
         "software": ["Cobalt Strike"],
@@ -566,7 +566,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1027": {
         "name": "Obfuscated Files or Information",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "description": "Adversaries may obfuscate payloads to make analysis difficult.",
         "groups": ["APT28", "APT29", "Lazarus Group", "FIN7", "APT41", "Turla"],
         "software": ["Cobalt Strike", "Empire"],
@@ -574,7 +574,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1027.004": {
         "name": "Compile After Delivery",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "description": "Adversaries may compile payloads after delivery to evade detection.",
         "groups": ["APT28", "Turla"],
         "software": [],
@@ -582,7 +582,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1036": {
         "name": "Masquerading",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "description": "Adversaries may masquerade as legitimate files or processes.",
         "groups": ["APT28", "APT29", "Lazarus Group", "FIN7", "APT41"],
         "software": [],
@@ -590,7 +590,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1036.003": {
         "name": "Rename System Utilities",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "description": "Adversaries may rename system utilities to evade detection.",
         "groups": ["APT28", "APT29", "Lazarus Group"],
         "software": [],
@@ -598,7 +598,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1036.004": {
         "name": "Masquerade Task or Service",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "description": "Adversaries may masquerade malicious tasks or services as legitimate.",
         "groups": ["APT28", "APT29", "Lazarus Group", "APT41"],
         "software": [],
@@ -606,7 +606,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1036.005": {
         "name": "Match Legitimate Name or Location",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "description": "Adversaries may match legitimate names or locations.",
         "groups": ["APT28", "APT29", "Lazarus Group", "FIN7"],
         "software": [],
@@ -614,7 +614,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1055": {
         "name": "Process Injection",
-        "tactics": ["Defense Evasion", "Privilege Escalation"],
+        "tactics": ["Privilege Escalation", "Stealth"],
         "description": "Adversaries may inject code into processes to evade defenses.",
         "groups": ["APT28", "APT29", "Lazarus Group", "FIN7", "APT41", "Turla"],
         "software": ["Cobalt Strike", "Metasploit", "Empire"],
@@ -622,7 +622,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1055.001": {
         "name": "Dynamic-link Library Injection",
-        "tactics": ["Defense Evasion", "Privilege Escalation"],
+        "tactics": ["Privilege Escalation", "Stealth"],
         "description": "Adversaries may inject DLLs into processes.",
         "groups": ["APT28", "APT29", "Lazarus Group", "Turla"],
         "software": ["Cobalt Strike", "Metasploit"],
@@ -630,7 +630,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1055.012": {
         "name": "Process Hollowing",
-        "tactics": ["Defense Evasion", "Privilege Escalation"],
+        "tactics": ["Privilege Escalation", "Stealth"],
         "description": "Adversaries may inject malicious code into suspended processes.",
         "groups": ["APT28", "APT29", "Lazarus Group", "FIN7"],
         "software": ["Cobalt Strike"],
@@ -638,7 +638,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1218": {
         "name": "System Binary Proxy Execution",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "description": "Adversaries may bypass process and signature-based defenses.",
         "groups": ["APT28", "APT29", "Lazarus Group", "FIN7"],
         "software": [],
@@ -646,7 +646,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1218.001": {
         "name": "Compiled HTML File",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "description": "Adversaries may abuse CHM files to conceal malicious code.",
         "groups": ["APT28", "Lazarus Group", "APT41"],
         "software": [],
@@ -654,7 +654,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1218.005": {
         "name": "Mshta",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "description": "Adversaries may abuse mshta.exe to execute malicious code.",
         "groups": ["APT28", "Lazarus Group", "FIN7", "MuddyWater"],
         "software": [],
@@ -662,7 +662,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1218.011": {
         "name": "Rundll32",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "description": "Adversaries may abuse rundll32.exe to execute malicious code.",
         "groups": ["APT28", "APT29", "Lazarus Group", "FIN7", "APT41"],
         "software": ["Cobalt Strike"],
@@ -670,7 +670,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1564": {
         "name": "Hide Artifacts",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "description": "Adversaries may hide artifacts to evade detection.",
         "groups": ["APT28", "APT29", "Lazarus Group", "Turla"],
         "software": [],
@@ -678,7 +678,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1564.001": {
         "name": "Hidden Files and Directories",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "description": "Adversaries may set files to hidden to evade detection.",
         "groups": ["APT28", "APT29", "Lazarus Group", "Turla", "TeamTNT"],
         "software": [],
@@ -686,7 +686,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1564.003": {
         "name": "Hidden Window",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "description": "Adversaries may run processes in hidden windows.",
         "groups": ["APT28", "APT29", "Lazarus Group", "FIN7"],
         "software": ["Cobalt Strike"],
@@ -694,7 +694,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1564.004": {
         "name": "NTFS File Attributes",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "description": "Adversaries may abuse NTFS file attributes to hide activities.",
         "groups": ["APT28", "APT29", "Turla"],
         "software": [],
@@ -702,7 +702,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1553": {
         "name": "Subvert Trust Controls",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Defense Impairment"],
         "description": "Adversaries may undermine security controls that rely on trust.",
         "groups": ["APT28", "APT29", "Lazarus Group"],
         "software": [],
@@ -710,7 +710,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1553.001": {
         "name": "Gatekeeper Bypass",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Defense Impairment"],
         "description": "Adversaries may modify file attributes to bypass Gatekeeper.",
         "groups": ["Lazarus Group", "APT32"],
         "software": [],
@@ -718,7 +718,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1553.004": {
         "name": "Install Root Certificate",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Defense Impairment"],
         "description": "Adversaries may install root certificates to intercept traffic.",
         "groups": ["APT28", "Turla"],
         "software": [],
@@ -726,7 +726,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1553.006": {
         "name": "Code Signing Policy Modification",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Defense Impairment"],
         "description": "Adversaries may modify code signing policies to enable execution.",
         "groups": ["Lazarus Group"],
         "software": [],
@@ -734,7 +734,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1220": {
         "name": "XSL Script Processing",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "description": "Adversaries may use XSL files to bypass application control.",
         "groups": ["APT28", "Lazarus Group", "MuddyWater"],
         "software": [],
@@ -742,7 +742,7 @@ ATTACK_TECHNIQUES: Dict[str, Dict] = {
     },
     "T1221": {
         "name": "Template Injection",
-        "tactics": ["Defense Evasion"],
+        "tactics": ["Stealth"],
         "description": "Adversaries may exploit Office templates for execution.",
         "groups": ["APT28", "Gamaredon Group", "MuddyWater"],
         "software": [],
@@ -1541,7 +1541,9 @@ def get_techniques_for_tactic(tactic: str) -> List[Dict]:
     results = []
 
     for tech_id, data in ATTACK_TECHNIQUES.items():
-        tactics = [t.lower() for t in data.get("tactics", [])]
+        # The pinned release's tactics where it has the ID (Stealth and Defense Impairment,
+        # not v19's Defense Evasion)
+        tactics = [t.lower() for t in (attack_lookup.tactics_of(tech_id) or data.get("tactics", []))]
         if tactic_lower in tactics:
             results.append({"technique_id": tech_id, **data})
 

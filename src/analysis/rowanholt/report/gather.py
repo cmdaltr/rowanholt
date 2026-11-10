@@ -635,7 +635,8 @@ def _recorded_techniques(report: CaseReport, root: Path) -> None:
 def attack_names(wanted: List[str]) -> Dict[str, Tuple[str, str]]:
     """(name, tactics) for each technique, Enterprise or Mobile, from the pinned ATT&CK release
     (post/mitre/attack_lookup.py); a sub-technique's name is given with its parent's, as ATT&CK
-    writes it. A Mobile technique's tactics say so ("Defense Evasion (Mobile)")."""
+    writes it. A Mobile technique's tactics say so ("Defense Evasion (Mobile)": Mobile kept Defense
+    Evasion in v20, where Enterprise split it into Stealth and Defense Impairment)."""
     named = {}
     for tid in wanted:
         found = attack_lookup.technique(tid)
