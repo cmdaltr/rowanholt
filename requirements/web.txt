@@ -37,6 +37,7 @@ pyotp>=2.9.0  # TOTP for MFA
 qrcode>=7.4.2  # QR code generation for MFA setup
 cryptography>=41.0.0  # For encrypting MFA secrets and backup codes
 bleach>=6.0.0  # HTML sanitization
+samarkand==0.1.0  # licence, webhooks, STIX, TAXII, Navigator layers (also scripts/admin/sign_licence.py)
 
 # Include SIEM dependencies for web interface
 -r siem.txt
