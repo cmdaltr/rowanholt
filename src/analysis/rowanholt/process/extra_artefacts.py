@@ -113,8 +113,10 @@ def _route_unix(rel: str, name: str, artefact: str, host: str) -> Optional[Route
         spool = "/var/spool/cron/" if folder == "cron_jobs" else "/var/spool/at/" if folder == "at_jobs" else "/"
         rows = unix_config.at_rows(artefact, spool + name.replace("+", "/"))
         return "at_jobs", rows, "at job", ["T1053.002"] if rows else []
-    if folder == "cron_jobs" or name.endswith("+crontab") or re.search(r"spool\+cron|cron\+tabs|crontabs\+", name):
-        # a user's crontab: /var/spool/cron/[crontabs/]<user>, or macOS cron/<user>+crontab
+    if folder == "cron_jobs" or name.endswith("+crontab") or "/at+tabs/" in rel or \
+            re.search(r"spool\+cron|cron\+tabs|crontabs\+", name):
+        # a user's crontab: /var/spool/cron/[crontabs/]<user>, or macOS's /var/at/tabs/<user>, which
+        # gandalf.sh and Elrond take as cron/<user>+crontab and gandalf.py as cron/at+tabs/<user>
         user = name[:-len("+crontab")] if name.endswith("+crontab") else name.rpartition("+")[2]
         rows = unix_config.cron_rows(artefact, "crontab of " + user, user=user)
         return "cron", rows, "user crontab", ["T1053.003"] if any(r["Flag"] for r in rows) else []

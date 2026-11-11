@@ -47,3 +47,11 @@ def test_a_users_keychain_is_collected(tmp_path):
     (keychains / "login.keychain-db").write_bytes(b"kych")
     collect(root, dest, out, "/Users/")
     assert (dest / "admin+login.keychain-db").exists()
+
+
+def test_the_crontabs_are_collected_with_the_extras(tmp_path):
+    root, dest, out = data_volume(tmp_path)
+    (root / "private" / "var" / "at" / "tabs").mkdir(parents=True)
+    (root / "private" / "var" / "at" / "tabs" / "root").write_text("* * * * * /tmp/evil.sh\n")
+    mac.collect_macos_extras(str(root), str(dest) + "/", "disk.img::macOS", str(out), "collecting", 0)
+    assert (dest / "cron" / "root+crontab").read_text() == "* * * * * /tmp/evil.sh\n"

@@ -348,3 +348,12 @@ def test_keywords_search_the_host_output_after_processing(tmp_path):
     assert (row["host"], row["artefact"], row["keyword"], row["line_number"]) == ("HOST", "keyword_matches", "api_key", 2)
     assert row["Filename"].endswith("notes.txt") and row["line_entry"] == "the api_key is in here"
     assert row["timestamp"] and not (tmp_path / "HOST" / "analysis" / "keyword_matches.csv").exists()
+
+
+def test_a_macos_crontab_is_a_users_whichever_gandalf_took_it(tmp_path):
+    out, raw = host(tmp_path)
+    (raw / "cron" / "at+tabs").mkdir(parents=True)
+    (raw / "cron" / "at+tabs" / "root").write_text("*/5 * * * * /tmp/.x/beacon.sh\n")
+    (raw / "cron" / "admin+crontab").write_text("@reboot /Users/admin/.x/run.sh\n")
+    assert run(out, raw / "cron" / "at+tabs" / "root") and run(out, raw / "cron" / "admin+crontab")
+    assert sorted(r["Source"] for r in rows(out, "cron")) == ["crontab of admin", "crontab of root"]

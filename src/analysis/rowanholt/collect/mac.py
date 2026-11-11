@@ -23,6 +23,8 @@ MACOS_EXTRA_FILES = (
     "/private/etc/rc.common", "/Library/Receipts/InstallHistory.plist",
     "/Users/*/Library/Application Support/com.apple.backgroundtaskmanagementagent/backgrounditems.btm",
 )
+# Per-user crontabs, into raw/cron/ as <user>+crontab, as gandalf.sh takes them
+MACOS_CRONTABS = ("/private/var/at/tabs/*", "/usr/lib/cron/tabs/*")
 MACOS_POWERLOG = "/private/var/db/powerlog/Library/BatteryLife/CurrentPowerlog.PLSQL"
 # directory, depth, largest file, file name suffixes (empty: any)
 MACOS_EXTRA_DIRS = (
@@ -94,7 +96,7 @@ def collect_macos_extras(mnt, dest, img, output_directory, stage, verbosity):
     """
     BTM items, shared file lists, Notification Center, ExecPolicy, KextPolicy,
     XProtect, emond, periodic, InstallHistory, PowerLog and Biome from a mounted
-    macOS image, into raw/macos/; the unified-log store into raw/unified_log_store/, Spotlight's
+    macOS image, into raw/macos/; per-user crontabs into raw/cron/; the unified-log store into raw/unified_log_store/, Spotlight's
     index into raw/spotlight/.
     """
     macos = dest + "macos/"
@@ -133,6 +135,15 @@ def collect_macos_extras(mnt, dest, img, output_directory, stage, verbosity):
                     break
                 take(source, 10 << 20)
                 biome += 1
+    for pattern in MACOS_CRONTABS:
+        for source in sorted(glob.glob(mnt + pattern)):
+            if os.path.isfile(source) and not os.path.islink(source):
+                os.makedirs(dest + "cron/", exist_ok=True)
+                try:
+                    shutil.copy2(source, dest + "cron/" + os.path.basename(source) + "+crontab")
+                    count += 1
+                except OSError:
+                    pass
     count += collect_macos_log_store(mnt, dest)
     count += collect_macos_spotlight(mnt, dest)
     entry, prnt = "{},{},{},macos background items and policy databases\n".format(
