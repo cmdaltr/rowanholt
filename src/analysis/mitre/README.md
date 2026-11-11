@@ -505,7 +505,7 @@ techniques = mapper.map_artifact_to_techniques(
 - [ ] Automated threat hunting rules
 - [ ] Integration with threat intelligence feeds
 - [ ] Real-time technique detection
-- [x] Mobile ATT&CK (names, layers: `rowanholt/post/mitre/attack_lookup.py`, `layers.py`)
+- [x] Mobile ATT&CK (names, layers: `rowanholt/post/mitre/attack_lookup.py`, `layers.py` over `samarkand.navigator`)
 - [ ] ICS ATT&CK support
 - [ ] Custom technique definitions
 

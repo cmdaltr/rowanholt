@@ -5,11 +5,16 @@ web app's of confirmed findings (case_routes.py).
 
 A case's Enterprise layer is assets/<case>.json and its Mobile layer assets/<case>.mobile.json:
 the server's Navigator check (auth/access.py) gives both the case's own access.
+
+The layer itself is samarkand.navigator's, the suite's shared builder; the ATT&CK version and each
+domain's platforms come from the pinned release (attack_lookup).
 """
 
 import importlib.util
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
+from samarkand import navigator
 
 
 def _load_attack_lookup():
@@ -27,8 +32,8 @@ def _load_attack_lookup():
 
 attack_lookup = _load_attack_lookup()
 
-NAVIGATOR_VERSION = "5.3.2"  # docker-compose.yml's navigator service clones this tag
-LAYER_VERSION = "4.5"
+NAVIGATOR_VERSION = navigator.NAVIGATOR_VERSION  # docker-compose.yml's navigator service clones this tag
+LAYER_VERSION = navigator.LAYER_VERSION
 MOBILE_SUFFIX = ".mobile"
 
 
@@ -39,38 +44,19 @@ def layer_file(case: str, domain: str) -> str:
 
 def attack_major() -> str:
     """The release's major version ("20"), the one the Navigator's config and layers name."""
-    return attack_lookup.version().split(".")[0]
+    return navigator.attack_major(attack_lookup.version())
 
 
 def build_layer(name: str, domain: str, techniques: Dict[str, Tuple[str, str]], description: str = "",
                 legend: Optional[List[Dict[str, str]]] = None, show_ids: bool = False) -> Dict:
     """A layer of ``techniques`` ({ID: (colour, comment)}, all of ``domain``). With no tactic
     given, the Navigator marks a technique under every tactic it has; a parent whose
-    sub-techniques are marked opens to show them."""
-    parents = {tid.split(".")[0] for tid in techniques if "." in tid}
-    return {
-        "name": name,
-        "versions": {"attack": attack_major(), "navigator": NAVIGATOR_VERSION, "layer": LAYER_VERSION},
-        "domain": domain,
-        "description": description,
-        # Every platform the domain has: Enterprise's cloud ones (IaaS, SaaS, Office Suite,
-        # Identity Provider) included, or cloud-only techniques would be filtered out of sight
-        "filters": {"platforms": attack_lookup.platforms(domain)},
-        "sorting": 0,
-        "layout": {"layout": "side", "aggregateFunction": "average", "showID": show_ids, "showName": True,
-                   "showAggregateScores": False, "countUnscored": False},
-        "hideDisabled": False,
-        "techniques": [{"techniqueID": tid, "color": colour, "comment": comment, "enabled": True,
-                        "metadata": [], "showSubtechniques": tid in parents}
-                       for tid, (colour, comment) in sorted(techniques.items())],
-        "gradient": {"colors": ["#ff6666ff", "#ffe766ff", "#8ec843ff"], "minValue": 0, "maxValue": 100},
-        "legendItems": legend or [],
-        "metadata": [],
-        "showTacticRowBackground": False,
-        "tacticRowBackground": "#dddddd",
-        "selectTechniquesAcrossTactics": True,
-        "selectSubtechniquesWithParent": False,
-    }
+    sub-techniques are marked opens to show them. It lists every platform the domain has:
+    Enterprise's cloud ones (IaaS, SaaS, Office Suite, Identity Provider) included, or cloud-only
+    techniques would be filtered out of sight."""
+    return navigator.build_layer(name, domain, techniques, attack_version=attack_lookup.version(),
+                                 platforms=attack_lookup.platforms(domain), description=description,
+                                 legend=legend, show_ids=show_ids, navigator_version=NAVIGATOR_VERSION)
 
 
 def navigator_config(default_layers: List[str]) -> Dict:
