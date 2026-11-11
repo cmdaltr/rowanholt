@@ -938,7 +938,7 @@ DIRS
     if command -v log &> /dev/null; then
         mkdir -p "$macos"
         log show --last "${GANDALF_UNIFIED_LOG_WINDOW:-1d}" --style ndjson --predicate \
-            'process IN {"sudo","su","sshd","sshd-session","loginwindow","screensharingd","syspolicyd","XprotectService","backgroundtaskmanagementd","authd"} OR subsystem IN {"com.apple.TCC","com.apple.xprotect","com.apple.syspolicy.exec","com.apple.backgroundtaskmanagement"}' \
+            'process IN {"sudo","su","sshd","sshd-session","loginwindow","screensharingd","syspolicyd","XprotectService","backgroundtaskmanagementd","authd","osascript"} OR subsystem IN {"com.apple.TCC","com.apple.xprotect","com.apple.syspolicy.exec","com.apple.backgroundtaskmanagement"}' \
             2>/dev/null | head -n 500000 > "${macos}/gandalf+unifiedlog.ndjson" || true
         if [ -s "${macos}/gandalf+unifiedlog.ndjson" ]; then
             log_audit "$audit_log" "$hostname" "unified log export"

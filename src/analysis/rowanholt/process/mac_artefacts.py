@@ -34,7 +34,7 @@ SPOTLIGHT = re.compile(r"^(.*/artefacts/raw/spotlight)/(.*)\+([^+]+)$")
 # What's kept from the store: the processes and subsystems of Gandalf's live export
 # (MACOS_UNIFIED_LOG_PREDICATE in gandalf.py's collector and gandalf.sh); keep them in step
 UNIFIED_LOG_PROCESSES = frozenset({"sudo", "su", "sshd", "sshd-session", "loginwindow", "screensharingd", "syspolicyd",
-                                   "XprotectService", "backgroundtaskmanagementd", "authd"})
+                                   "XprotectService", "backgroundtaskmanagementd", "authd", "osascript"})
 UNIFIED_LOG_SUBSYSTEMS = frozenset({"com.apple.TCC", "com.apple.xprotect", "com.apple.syspolicy.exec",
                                     "com.apple.backgroundtaskmanagement"})
 # logd's own plain-text log in the store (diagnostics/logd.0.log): `log erase` leaves "All logs erased" in it
@@ -52,8 +52,8 @@ HEADERS = {
     "notifications": ["Source", "App", "Title", "Subtitle", "Body", "LastWriteTime"],
     "emond_rules": ["Source", "Name", "Enabled", "EventTypes", "Actions", "Flag"],
     "periodic": ["Source", "LineNumber", "Line", "Flag"],
-    "unified_log": ["LastWriteTime", "Process", "PID", "Subsystem", "Category", "Type", "Message"],
-    "unified_log_store": ["LastWriteTime", "Process", "PID", "Subsystem", "Category", "Type", "Message"],
+    "unified_log": ["LastWriteTime", "Process", "PID", "Subsystem", "Category", "Type", "Message", "Technique"],
+    "unified_log_store": ["LastWriteTime", "Process", "PID", "Subsystem", "Category", "Type", "Message", "Technique"],
     "spotlight": spotlight.COLUMNS,
     "logd_log": ["LastWriteTime", "Process", "PID", "Message", "Flag"],
 }
@@ -302,6 +302,15 @@ def periodic_rows(path: str) -> List[Dict[str, str]]:
     return rows
 
 
+def unified_log_technique(process: str, message: str) -> str:
+    """The technique a unified-log message evidences: an AppleScript run, from osascript's own messages
+    or, where those are gone (a log erase spares some processes' messages), loginwindow's check-in of it."""
+    name = process.rsplit("/", 1)[-1]
+    if name == "osascript" or (name == "loginwindow" and "Checked in app : osascript" in message):
+        return "T1059.002"
+    return ""
+
+
 def unified_log_rows(path: str) -> List[Dict[str, str]]:
     """Gandalf's filtered unified-log export (log show --style ndjson)."""
     import json
@@ -318,7 +327,8 @@ def unified_log_rows(path: str) -> List[Dict[str, str]]:
             rows.append({"LastWriteTime": event.get("timestamp", ""), "Process": event.get("processImagePath", ""),
                          "PID": event.get("processID", ""), "Subsystem": event.get("subsystem", ""),
                          "Category": event.get("category", ""), "Type": event.get("messageType", ""),
-                         "Message": event.get("eventMessage", "")})
+                         "Message": event.get("eventMessage", ""),
+                         "Technique": unified_log_technique(event.get("processImagePath", ""), event.get("eventMessage", ""))})
     return rows
 
 
@@ -352,7 +362,10 @@ def unified_log_store_rows(path: str) -> List[Dict[str, str]]:
     match = LOG_STORE.match(path)
     if not match:
         return []
-    return list(tracev3.Reader(_log_store(match.group(1)), path).messages(_kept))
+    rows = list(tracev3.Reader(_log_store(match.group(1)), path).messages(_kept))
+    for row in rows:
+        row["Technique"] = unified_log_technique(row["Process"], row["Message"])
+    return rows
 
 
 def spotlight_rows(path: str) -> List[Dict[str, str]]:

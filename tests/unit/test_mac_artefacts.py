@@ -208,6 +208,21 @@ def test_unified_log_export(tmp_path):
     assert len(found) == 1 and found[0]["Process"] == "/usr/bin/sudo" and "COMMAND=/bin/sh" in found[0]["Message"]
 
 
+def test_an_applescript_run_is_tagged_from_osascript_or_loginwindows_check_in(tmp_path):
+    assert ma.unified_log_technique("/usr/bin/osascript", "CHECKIN: pid=2717") == "T1059.002"
+    assert ma.unified_log_technique("/System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow",
+                                    "-[ApplicationManager checkInAppContext:eventData:] | ApplicationManager: "
+                                    "Checked in app : osascript") == "T1059.002"
+    assert ma.unified_log_technique("/usr/bin/sudo", "Reading config") == ""
+    out, macos = host(tmp_path)
+    event = {"timestamp": "2026-11-10 14:56:55.000000+0000", "processImagePath": "/usr/bin/osascript", "processID": 2717,
+             "subsystem": "", "category": "", "messageType": "Default", "eventMessage": "CHECKIN: pid=2717"}
+    (macos / "gandalf+unifiedlog.ndjson").write_text(json.dumps(event) + "\n")
+    run(out, macos / "gandalf+unifiedlog.ndjson")
+    assert rows(out, "unified_log")[0]["Technique"] == "T1059.002"
+    assert "T1059.002" in Path(out, "HOST", "artefacts", "cooked", "unified_log.jsonl").read_text()
+
+
 def test_a_log_erase_is_found_in_logds_own_log(tmp_path):
     out, _ = host(tmp_path)
     diagnostics = Path(out) / "HOST" / "artefacts" / "raw" / "unified_log_store" / "diagnostics"

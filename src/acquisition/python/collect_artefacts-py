@@ -498,7 +498,7 @@ MACOS_EXTRA_DIRS = (("/private/etc/periodic", 2), ("/private/etc/emond.d", 2), (
 MACOS_BIOME_MAX_FILES = 2000
 MACOS_UNIFIED_LOG_PREDICATE = (
     'process IN {"sudo","su","sshd","sshd-session","loginwindow","screensharingd","syspolicyd","XprotectService",'
-    '"backgroundtaskmanagementd","authd"} OR subsystem IN {"com.apple.TCC","com.apple.xprotect",'
+    '"backgroundtaskmanagementd","authd","osascript"} OR subsystem IN {"com.apple.TCC","com.apple.xprotect",'
     '"com.apple.syspolicy.exec","com.apple.backgroundtaskmanagement"}'
 )
 MACOS_UNIFIED_LOG_MAX_EVENTS = 500000
