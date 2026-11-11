@@ -37,6 +37,9 @@ UNIFIED_LOG_PROCESSES = frozenset({"sudo", "su", "sshd", "sshd-session", "loginw
                                    "XprotectService", "backgroundtaskmanagementd", "authd"})
 UNIFIED_LOG_SUBSYSTEMS = frozenset({"com.apple.TCC", "com.apple.xprotect", "com.apple.syspolicy.exec",
                                     "com.apple.backgroundtaskmanagement"})
+# logd's own plain-text log in the store (diagnostics/logd.0.log): `log erase` leaves "All logs erased" in it
+LOGD_LOG = re.compile(r"/diagnostics/logd(?:_helper)?\.\d+\.log$")
+LOGD_LINE = re.compile(r"^(\d{4}-\d\d-\d\d) (\d\d:\d\d:\d\d)([+-]\d{4}) ([^\[:]+)\[(\d+)\]: (.*)$")
 MAC_EPOCH = datetime(2001, 1, 1, tzinfo=timezone.utc)
 UNIFIED_LOG_FIELDS = ("timestamp", "processImagePath", "processID", "subsystem", "category", "messageType", "eventMessage")
 APPLE_TEAMS = {"", "apple", "Apple", "APPLECOMPUTER"}
@@ -52,6 +55,7 @@ HEADERS = {
     "unified_log": ["LastWriteTime", "Process", "PID", "Subsystem", "Category", "Type", "Message"],
     "unified_log_store": ["LastWriteTime", "Process", "PID", "Subsystem", "Category", "Type", "Message"],
     "spotlight": spotlight.COLUMNS,
+    "logd_log": ["LastWriteTime", "Process", "PID", "Message", "Flag"],
 }
 
 
@@ -318,6 +322,21 @@ def unified_log_rows(path: str) -> List[Dict[str, str]]:
     return rows
 
 
+def logd_rows(path: str) -> List[Dict[str, str]]:
+    """logd's own log: one row per line, flagged where the store was erased (`log erase`)."""
+    rows = []
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            match = LOGD_LINE.match(line.rstrip("\n"))
+            if not match:
+                continue
+            day, clock, offset, process, pid, message = match.groups()
+            when = datetime.strptime(f"{day} {clock}{offset}", "%Y-%m-%d %H:%M:%S%z").astimezone(timezone.utc)
+            rows.append({"LastWriteTime": when.isoformat().replace("+00:00", "Z"), "Process": process, "PID": pid,
+                         "Message": message, "Flag": "log store erased" if "logs erased" in message.lower() else ""})
+    return rows
+
+
 @lru_cache(maxsize=1)
 def _log_store(root: str) -> tracev3.Store:
     """One store's format strings and timesync, read once for all its tracev3 files."""
@@ -366,6 +385,9 @@ def _route(artefact: str):
     if LOG_STORE.match(artefact):
         if name.endswith(".tracev3"):
             return "unified_log_store", unified_log_store_rows(artefact), "unified log store", []
+        if LOGD_LOG.search(artefact):
+            rows = logd_rows(artefact)
+            return "logd_log", rows, "logd log", ["T1685.006"] if any(r["Flag"] for r in rows) else []
         return "", [], "", []  # uuidtext and timesync: read with the tracev3 files
     if SPOTLIGHT.match(artefact):
         if name.endswith("+store.db"):

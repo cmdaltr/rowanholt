@@ -208,6 +208,19 @@ def test_unified_log_export(tmp_path):
     assert len(found) == 1 and found[0]["Process"] == "/usr/bin/sudo" and "COMMAND=/bin/sh" in found[0]["Message"]
 
 
+def test_a_log_erase_is_found_in_logds_own_log(tmp_path):
+    out, _ = host(tmp_path)
+    diagnostics = Path(out) / "HOST" / "artefacts" / "raw" / "unified_log_store" / "diagnostics"
+    diagnostics.mkdir(parents=True)
+    (diagnostics / "logd.0.log").write_text("2026-11-10 14:22:41+0000 logd[80]: Periodic complete. Removed 288502537 bytes.\n"
+                                            "2026-11-10 14:51:14+0000 logd[80]: All logs erased (mask:7)\n")
+    run(out, diagnostics / "logd.0.log")
+    found = rows(out, "logd_log")
+    assert [r["Flag"] for r in found] == ["", "log store erased"]
+    assert found[1]["LastWriteTime"] == "2026-11-10T14:51:14Z" and found[1]["Process"] == "logd"
+    assert techniques(out) == ["T1685.006"]
+
+
 def test_other_plists_fall_through_and_collected_only_files_are_consumed(tmp_path):
     out, macos = host(tmp_path)
     (macos / "Library+Receipts+InstallHistory.plist").write_bytes(plistlib.dumps([{"displayName": "x"}]))
