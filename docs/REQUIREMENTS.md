@@ -22,7 +22,7 @@
 ### Core Tools
 
 **Required:**
-- Python 3.8+
+- Python 3.10+
 - pip (Python package manager)
 - Git
 - SQLite 3

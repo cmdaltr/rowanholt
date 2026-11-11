@@ -24,7 +24,7 @@ Before installing Rowanholt, ensure you have:
 ### Required
 
 - **Git** - For cloning the repository
-- **Python 3.8+** - For running the installer and test scripts
+- **Python 3.10+** - For running the installer and test scripts
 - **Docker** or **OrbStack** - For running Rowanholt containers
 - **At least 10GB free disk space** - For Docker images and containers
 - **At least 12GB RAM** - Recommended 16GB for full stack, 10GB minimum for testing mode

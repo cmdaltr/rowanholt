@@ -1,7 +1,7 @@
 # Elrond - Digital Forensics Automation Tool
 
 [![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)](https://github.com/cmdaltr/elrond)
-[![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.10+-green.svg)](https://www.python.org/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/license-Elastic--2.0-orange.svg)](LICENSE)
 

@@ -144,8 +144,8 @@ class ToolInstaller:
 
         # Check Python version
         python_version = sys.version_info
-        if python_version < (3, 8):
-            self.logger.error(f"Python 3.8+ required, found {python_version.major}.{python_version.minor}")
+        if python_version < (3, 10):
+            self.logger.error(f"Python 3.10+ required, found {python_version.major}.{python_version.minor}")
             return False
 
         self.logger.info(f"✓ Python {python_version.major}.{python_version.minor}.{python_version.micro}")

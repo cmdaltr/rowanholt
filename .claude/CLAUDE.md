@@ -54,7 +54,7 @@ Gandalf (acquisition) → Elrond (analysis) → Aulë (AI analyst)
 
 ## Stack
 
-- Python 3.12 in the worker and backend images; host-side scripts and Gandalf's Python collector stay Python 3.8-compatible
+- Python 3.12 in the worker and backend images; the package needs 3.10+ (`requires-python`, for samarkand); host-side scripts that import nothing of the backend's or Elrond's (the launcher's helpers, `startup_progress.py`, `samples.py`) and Gandalf's Python collector stay Python 3.8-compatible
 - FastAPI, SQLAlchemy and Alembic over Postgres (users, jobs, history); Redis + Celery for the job queue; case data in case directories on disk
 - argparse for CLIs (`src/cli/rowanholt.py`, `elrond.py`)
 - openpyxl for XLSX output

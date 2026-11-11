@@ -9,7 +9,7 @@
   <i>rowan + Old English holt: the rowan wood</i><br><br>
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)]()
 </div>
 
@@ -469,7 +469,7 @@ Work a case together from **Browse Case** on a completed job, on one machine or 
 ## 🛠️ Installation Requirements
 
 **Core Requirements:**
-- Python 3.12 (`pyproject.toml` allows 3.8+, but the stack is built and tested on 3.12)
+- Python 3.12 (`pyproject.toml` allows 3.10+, but the stack is built and tested on 3.12)
 - Volatility 3
 - Plaso/log2timeline
 - 30+ forensic utilities

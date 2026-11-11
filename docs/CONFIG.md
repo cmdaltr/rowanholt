@@ -272,7 +272,7 @@ add_header Strict-Transport-Security "max-age=31536000; includeSubDomains";
 
 | Tool | Purpose | Installation |
 |------|---------|--------------|
-| **Python 3.8+** | Backend runtime | `apt install python3` |
+| **Python 3.10+** | Backend runtime | `apt install python3` |
 | **Node.js 16+** | Frontend build | `apt install nodejs npm` |
 | **PostgreSQL 12+** | Database | `apt install postgresql` |
 | **Redis 6+** | Task queue | `apt install redis-server` |

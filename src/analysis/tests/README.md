@@ -395,5 +395,5 @@ For issues or questions:
 ---
 
 **Last Updated**: 2025-01-15
-**Python Version**: 3.8+
+**Python Version**: 3.10+
 **Pytest Version**: 7.4+
