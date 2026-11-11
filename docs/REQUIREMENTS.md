@@ -7,7 +7,7 @@
 - **CPU**: 4 cores recommended (2 cores minimum)
 - **RAM**: 8GB minimum (16GB+ recommended for memory analysis)
 - **Storage**: 50GB free space minimum (500GB+ for large cases)
-- **Python**: 3.8 or higher
+- **Python**: 3.10 or higher
 
 ### Recommended Requirements
 - **CPU**: 8+ cores
