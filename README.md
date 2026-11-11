@@ -557,11 +557,13 @@ We welcome contributions! Open an issue or pull request at https://github.com/cm
 
 ---
 
-## 📄 License
+## 📄 Licence
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Copyright (c) 2020-2026 cmdaltr.
 
-**Rowanholt™** and the Rowanholt logo are trademarks of cmdaltr. The MIT License covers the software; it does not grant any right to use the Rowanholt name or logo, whether to brand a fork or otherwise.
+Rowanholt is source-available under the [Elastic License 2.0](LICENSE): you can use, copy and change it for free (the **Free** edition), but you may not provide it to others as a hosted or managed service, or get around its licence key. The **Pro** and **Services** editions add the terms in [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md) — Pro for organisations using Rowanholt for themselves, Services for MSSPs and consultancies running it for clients. Contact @cmdaltr on GitHub. Releases published before this (under the MIT License) keep that licence. Outside contributions need a contributor licence agreement before they can be merged.
+
+**Rowanholt™** and the Rowanholt logo are trademarks of cmdaltr. The licence covers the software; it does not grant any right to use the Rowanholt name or logo, whether to brand a fork or otherwise.
 
 ---
 

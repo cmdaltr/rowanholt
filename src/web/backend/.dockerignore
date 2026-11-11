@@ -57,3 +57,4 @@ Dockerfile
 # src/web/backend, never from the image, and an image shouldn't carry password hashes
 data/users.json
 data/.jwt_secret
+data/licence.json

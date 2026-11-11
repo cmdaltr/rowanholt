@@ -3,7 +3,7 @@
 [![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)](https://github.com/cmdaltr/elrond)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://www.python.org/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
-[![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Elastic--2.0-orange.svg)](LICENSE)
 
 **Elrond** is a comprehensive digital forensics automation tool designed to streamline the analysis of disk images, memory dumps, and digital evidence. Named after the wise Elven lord from Middle-earth, Elrond brings wisdom and power to forensic investigations.
 
@@ -396,7 +396,7 @@ Elrond is designed for defensive security and forensic analysis only. Please:
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Elastic License 2.0 - see the [LICENSE](../../LICENSE) file for details. Releases published before it keep the MIT License.
 
 ## 🙏 Acknowledgments
 

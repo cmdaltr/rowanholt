@@ -3502,3 +3502,19 @@ a.mt-pill-link:hover { border-color: #66d9ef; }
   max-height: 24rem;
   overflow: auto;
 }
+
+/* Licence: a grace-period warning on every page for admins, and the Licence page's notices */
+.licence-banner {
+  margin: 0 auto;
+  padding: 0.6rem 1rem;
+  max-width: 1200px;
+  background: rgba(223, 81, 78, 0.18);
+  border: 1px solid #df514e;
+  border-radius: 6px;
+  color: #f0dba5;
+  text-align: center;
+}
+
+.licence-notice {
+  color: #df514e;
+}

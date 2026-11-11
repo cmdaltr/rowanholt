@@ -33,6 +33,8 @@ try:
     from . import case_routes  # The case browser, findings, notes and assignments
     from . import aule_offline
     from . import backup_secrets  # Phone backup passwords, job form to worker
+    from . import licence  # A team server's licence and seats
+    from .licence_routes import router as licence_router
     from .models.job import (
         Job,
         JobCreate,
@@ -60,6 +62,8 @@ except ImportError:
     import case_routes  # The case browser, findings, notes and assignments
     import aule_offline
     import backup_secrets  # Phone backup passwords, job form to worker
+    import licence  # A team server's licence and seats
+    from licence_routes import router as licence_router
     from models.job import (
         Job,
         JobCreate,
@@ -133,6 +137,7 @@ job_storage = JobStorage()
 access.configure(job_storage)
 threat_intel_store.configure(job_storage)
 case_routes.configure(job_storage)
+licence.configure(job_storage)
 aule_offline.FINDINGS = case_routes.findings_for_case
 
 
@@ -191,6 +196,7 @@ app.include_router(symbol_router)
 app.include_router(sample_router)
 app.include_router(threat_intel_router)
 app.include_router(case_routes.router)
+app.include_router(licence_router)
 
 # Include Anduril (Docker administration) routes; /api/aragorn is the name before the rename
 app.include_router(anduril_router, prefix="/api/anduril")

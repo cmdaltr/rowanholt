@@ -147,7 +147,7 @@ cat > "${EXPORT_DIR}/${APP_NAME}/app.manifest" << EOF
     },
     "commonInformationModels": null,
     "license": {
-      "name": "MIT",
+      "name": "Elastic License 2.0",
       "text": null,
       "uri": null
     },
@@ -218,7 +218,7 @@ For issues and feature requests, please use the GitHub issue tracker.
 
 License
 -------
-MIT License
+Elastic License 2.0 (see LICENSE in the Rowanholt repository)
 
 Author
 ------

@@ -69,6 +69,16 @@ def test_root_owned_user_store_read_through_the_backend(tmp_path):
     assert (out / "users.json").read_text().strip() == '{"via": "backend"}'
 
 
+def test_an_installed_licence_is_backed_up_with_the_accounts(tmp_path):
+    """licence.json sits beside users.json, gitignored like it: lose it and the server is Free again."""
+    root, env = tree(tmp_path)
+    (root / "src" / "web" / "backend" / "data" / "licence.json").write_text('{"licence": "rowanholt-licence-1.a.b"}')
+    done = backup(root, env, tmp_path / "backups")
+    assert done.returncode == 0, done.stderr
+    [out] = (tmp_path / "backups").iterdir()
+    assert sorted(p.name for p in out.iterdir()) == [".env", "licence.json", "rowanholt.pgdump", "users.json"]
+
+
 def test_newest_kept(tmp_path):
     root, env = tree(tmp_path)
     dest = tmp_path / "backups"

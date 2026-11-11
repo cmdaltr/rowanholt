@@ -20,9 +20,11 @@ from jose import JWTError, jwt
 try:
     from ..config import settings
     from .users import load_users, new_user, save_users
+    from .. import licence
 except ImportError:
     from config import settings
     from auth.users import load_users, new_user, save_users
+    import licence
 
 CACHE_SECONDS = 3600
 STATE_SECONDS = 600
@@ -163,6 +165,10 @@ def user_for(claims: dict) -> dict:
     users = load_users()
     user = next((u for u in users.values() if u.get("oidc_subject") == subject), None)
     if user is None:
+        # A first sign-in adds an account, so it needs a free place; anyone already here signs in regardless
+        refusal = licence.seat_refusal(users, settings.rowanholt_server_mode)
+        if refusal:
+            raise SignInRefused(f"Rowanholt has no place for a new account. {refusal}")
         user = new_user(_username_for(claims, users), claims.get("email", ""), role="user",
                         full_name=claims.get("name"), oidc_subject=subject)
         users[user["id"]] = user

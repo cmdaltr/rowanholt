@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Home from './components/Home';
@@ -20,11 +20,13 @@ import Aragorn from './components/Aragorn';
 import ThreatIntel from './components/ThreatIntel';
 import CaseBrowser from './components/CaseBrowser';
 import StartOffer from './components/StartOffer';
+import Licence, { LicenceNotice } from './components/Licence';
+import { getAuthConfig } from './api';
 import './App.css';
 
-function Navigation({ onGuide }) {
+function Navigation({ onGuide, serverMode }) {
   const navigate = useNavigate();
-  const { logout, isAuthenticated } = useAuth();
+  const { logout, isAuthenticated, user } = useAuth();
 
   const handleLogout = async () => {
     await logout();
@@ -38,6 +40,8 @@ function Navigation({ onGuide }) {
         <Link to="/elrond">Elrond</Link>
         <Link to="/pippin">Pippin</Link>
         <Link to="/aragorn">Aragorn</Link>
+        {/* A team server's licence; local mode needs none */}
+        {serverMode && user?.role === 'admin' && <Link to="/licence">Licence</Link>}
         <Link to="/ai">Aulë</Link>
       </div>
       {/* Mordor opens the right: the datasets sit beside the jobs they feed */}
@@ -85,6 +89,10 @@ function AppContent() {
   const [scrollProgress, setScrollProgress] = useState(0);
   const [offerRequested, setOfferRequested] = useState(false);
   const closeOfferRequest = useCallback(() => setOfferRequested(false), []);
+  const [serverMode, setServerMode] = useState(false);
+  useEffect(() => {
+    getAuthConfig().then((config) => setServerMode(!!config.server_mode)).catch(() => {});
+  }, []);
   const mapBackground = `${process.env.PUBLIC_URL}/images/middle_earth.png`;
 
   return (
@@ -102,8 +110,9 @@ function AppContent() {
       }}
     >
       <header className="App-header">
-        <Navigation onGuide={() => setOfferRequested(true)} />
+        <Navigation onGuide={() => setOfferRequested(true)} serverMode={serverMode} />
       </header>
+      <LicenceNotice serverMode={serverMode} />
 
         <StartOffer offerRequested={offerRequested} onOfferClosed={closeOfferRequest} />
 
@@ -130,6 +139,7 @@ function AppContent() {
             <Route path="/archive" element={<Archive />} />
             <Route path="/account" element={<AccountPage />} />
             <Route path="/aragorn" element={<Aragorn />} />
+            <Route path="/licence" element={<Licence />} />
             <Route path="/lab" element={<Navigate to="/aragorn#lab" replace />} />
           </Routes>
         </main>
@@ -141,7 +151,7 @@ function AppContent() {
           <p className="attribution">
             This project contains references to "The Lord of the Rings" by J.R.R. Tolkien. This code is not affiliated with or endorsed by the Tolkien Estate or Peter Jackson.<br />
             All trademarks and copyrights for that work belong to their respective owners.<br />
-            Rowanholt™ and the Rowanholt logo are trademarks of cmdaltr. The MIT License covers the software; it does not grant any right to use the Rowanholt name or logo.
+            Rowanholt™ and the Rowanholt logo are trademarks of cmdaltr. The licence covers the software; it does not grant any right to use the Rowanholt name or logo.
           </p>
           <p style={{
             marginTop: '1rem',

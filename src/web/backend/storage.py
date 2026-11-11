@@ -168,6 +168,23 @@ class CaseActivityModel(Base):
     created_at = Column(DateTime, default=datetime.now, index=True)
 
 
+class AuditLogModel(Base):
+    """Security events outside a case, append-only: licence installs and removals (licence.py).
+    The shape of models/database.py's AuditLog, but with no foreign key: Rowanholt's accounts live
+    in users.json, not in the database, so user_id is the users.json id and username is kept too."""
+    __tablename__ = "audit_logs"
+
+    id = Column(String(36), primary_key=True)
+    user_id = Column(String(36), nullable=True, index=True)
+    username = Column(String, nullable=True)
+    action = Column(String(100), nullable=False, index=True)
+    resource_type = Column(String(50), nullable=True)
+    resource_id = Column(String(36), nullable=True)
+    details = Column(JSON, nullable=True)
+    ip_address = Column(String(45), nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
 class JobStorage:
     """PostgreSQL-based job storage using SQLAlchemy."""
 

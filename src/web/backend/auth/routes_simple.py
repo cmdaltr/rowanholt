@@ -23,6 +23,7 @@ try:
                         new_user, public, save_users)
     from . import access, oidc, tokens
     from .throttle import throttle
+    from .. import licence
 except ImportError:
     from config import settings
     from auth.security import hash_password, verify_password, create_access_token
@@ -30,6 +31,7 @@ except ImportError:
                             new_user, public, save_users)
     from auth import access, oidc, tokens
     from auth.throttle import throttle
+    import licence
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 logger = logging.getLogger(__name__)
@@ -94,6 +96,13 @@ def _session(response: Response, user: dict) -> dict:
 def _check_password_strength(password: str) -> None:
     if settings.rowanholt_server_mode and len(password) < MIN_PASSWORD:
         raise HTTPException(status_code=400, detail=f"Passwords need at least {MIN_PASSWORD} characters")
+
+
+def _room_for_one_more(users: dict) -> None:
+    """Refuse adding an account past the licence's places (server mode only; never retroactive)."""
+    refusal = licence.seat_refusal(users, settings.rowanholt_server_mode)
+    if refusal:
+        raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=refusal)
 
 
 def _users_or_503() -> dict:
@@ -215,6 +224,7 @@ async def register(request: RegisterRequest, http_request: Request):
                 detail="Username already taken",
             )
 
+    _room_for_one_more(users)
     try:
         user = new_user(request.username, request.email, role=role, password=request.password,
                         full_name=request.full_name)
@@ -374,6 +384,7 @@ async def create_user(request: RegisterRequest, http_request: Request):
     users = _users_or_503()
     if find_user(users, request.username) or find_user(users, request.email):
         raise HTTPException(status_code=400, detail="Username or email already taken")
+    _room_for_one_more(users)
     try:
         user = new_user(request.username, request.email, role=request.role, password=request.password,
                         full_name=request.full_name)
@@ -401,6 +412,8 @@ async def update_user(user_id: str, update: UserUpdate, admin: dict = Depends(ac
             raise HTTPException(status_code=400, detail="Role must be admin or user")
         user["role"] = update.role
     if update.is_active is not None:
+        if update.is_active and not user.get("is_active", True):
+            _room_for_one_more(users)
         user["is_active"] = update.is_active
     if update.password:
         _check_password_strength(update.password)

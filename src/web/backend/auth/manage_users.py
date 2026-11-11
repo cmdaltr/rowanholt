@@ -14,11 +14,15 @@ import getpass
 import sys
 
 try:
+    from ..config import settings
     from .security import hash_password
     from .users import find_user, init_default_admin, load_users, new_user, save_users
+    from .. import licence
 except ImportError:
+    from config import settings
     from auth.security import hash_password
     from auth.users import find_user, init_default_admin, load_users, new_user, save_users
+    import licence
 
 MIN_PASSWORD = 12
 
@@ -30,6 +34,13 @@ def _password(prompt: str = "Password: ") -> str:
     if getpass.getpass("Again: ") != first:
         raise SystemExit("The passwords don't match")
     return first
+
+
+def _room_for_one_more(users: dict) -> None:
+    """Adding or re-enabling someone needs a free place on the licence; nobody already in is affected."""
+    refusal = licence.seat_refusal(users, settings.rowanholt_server_mode)
+    if refusal:
+        raise SystemExit(refusal)
 
 
 def _user(users: dict, name: str) -> dict:
@@ -65,6 +76,7 @@ def main(argv: list) -> int:
     if args.command == "add":
         if find_user(users, args.username) or find_user(users, args.email):
             raise SystemExit("Username or email already taken")
+        _room_for_one_more(users)
         user = new_user(args.username, args.email, role="admin" if args.admin else "user", password=_password())
         users[user["id"]] = user
     else:
@@ -78,6 +90,8 @@ def main(argv: list) -> int:
         elif args.command == "role":
             user["role"] = args.role
         else:
+            if args.command == "enable" and not user.get("is_active", True):
+                _room_for_one_more(users)
             user["is_active"] = args.command == "enable"
     save_users(users)
     print(f"Done: {args.command} {args.username}")

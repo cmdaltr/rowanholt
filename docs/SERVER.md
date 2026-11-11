@@ -184,6 +184,18 @@ ROWANHOLT_LOCAL_LOGIN=false          # optional: SSO only; admins keep a passwor
 
 The ID token is verified against the issuer's published keys, its audience and the sign-in's nonce. Users are matched on issuer and subject, so a renamed account stays the same Rowanholt user; the first sign-in creates them. With `OIDC_ADMIN_GROUP` set, the role follows the group at every sign-in. Entra ID puts group object IDs in the `groups` claim (enable it under Token configuration); Okta and Keycloak need a groups claim mapper.
 
+## Licence
+
+A team server runs the Free edition, up to 4 accounts that can sign in, until a licence is installed; Pro and Services raise that to the licence's seats, and Services adds the right to run Rowanholt for clients ([COMMERCIAL-LICENSE.md](../COMMERCIAL-LICENSE.md)). Local mode needs no licence. Admins install one from the **Licence** page (beside Aragorn): paste the line, check it, read the terms, tick to accept them for the licensee, install. From the host:
+
+```bash
+rowanholt server licence show
+rowanholt server licence install northwind.licence --accept-terms "Your Name <you@example.org>"
+rowanholt server licence remove
+```
+
+The places are checked only when someone is added (an account created or re-enabled, a first single sign-on, `rowanholt server users add|enable`); a licence ending, or being removed, never disables anyone. After the expiry date it keeps working for 30 days' grace, with a warning to admins on every page. Installs and removals, with the version of the terms accepted, are in the `audit_logs` table. See [LICENSING_MODEL.md](LICENSING_MODEL.md).
+
 ## Sharing jobs
 
 A job belongs to the user who created it. On its page, the Access panel shows the owner and who it's shared with; the owner or an admin adds and removes people. The people it's shared with can see and work on it (cancel, restart into its output with `fresh=false`, export, ask Aulë), but can't reshare it, delete or archive it, or restart it with fresh output: those lose the owner's work, so they're the owner's or an admin's. Jobs created before the server existed have no owner: admins see them and can share them.
@@ -201,7 +213,7 @@ People can use the server from the desktop app instead of a browser tab: in setu
 - **Andúril holds the Docker socket.** It's opt-in (`rowanholt anduril enable`) and admin-only on a server, but whoever administers it administers the host's Docker.
 - **Splunk and Kibana** have their own users and indexes. Rowanholt's sign-in in front of them keeps out anyone without a Rowanholt account, but doesn't map job sharing onto their data. The Navigator does follow it: a case's layer is served only to people who can see the case, and layers from command-line runs (no job) only to admins.
 - **Sessions are 24-hour tokens** (`access_token_expire_minutes`); disabling a user stops their next request, since every request checks the user store.
-- **Accounts live in the checkout, not the database.** The user store is `src/web/backend/data/users.json`, on the host through the backend's bind mount and kept out of the images by `.dockerignore`, so a rebuild or a pull leaves accounts alone. It's gitignored, so `git clean -x` deletes it: `rowanholt server backup` (below) keeps it with `.env` and the database.
+- **Accounts live in the checkout, not the database.** The user store is `src/web/backend/data/users.json` (the installed licence, `licence.json`, sits beside it), on the host through the backend's bind mount and kept out of the images by `.dockerignore`, so a rebuild or a pull leaves accounts alone. It's gitignored, so `git clean -x` deletes it: `rowanholt server backup` (below) keeps it with `.env` and the database.
 
 ## Backups
 
@@ -209,13 +221,13 @@ People can use the server from the desktop app instead of a browser tab: in setu
 rowanholt server backup /backups/rowanholt            # --keep 14 by default
 ```
 
-Each run writes a dated folder holding the database dump (jobs, findings, notes, activity, API tokens, threat intelligence), `users.json`, `.env` and `docker-compose.local.yml`. The dump is read back before the backup counts, and a failed run leaves nothing behind. The folder holds the server's secrets, so it's created owner-only: keep it off shared storage. Case output and evidence aren't in it; back up the evidence storage on its own. Daily from cron, to storage that isn't the server's own disk:
+Each run writes a dated folder holding the database dump (jobs, findings, notes, activity, API tokens, threat intelligence), `users.json`, `licence.json` if a licence is installed, `.env` and `docker-compose.local.yml`. The dump is read back before the backup counts, and a failed run leaves nothing behind. The folder holds the server's secrets, so it's created owner-only: keep it off shared storage. Case output and evidence aren't in it; back up the evidence storage on its own. Daily from cron, to storage that isn't the server's own disk:
 
 ```
 30 3 * * * /path/to/rowanholt server backup /backups/rowanholt >/dev/null
 ```
 
-To restore on a fresh checkout: put `.env`, `users.json` (in `src/web/backend/data/`) and `docker-compose.local.yml` back, `rowanholt start`, then load the dump and restart the backend:
+To restore on a fresh checkout: put `.env`, `users.json` and `licence.json` (in `src/web/backend/data/`) and `docker-compose.local.yml` back, `rowanholt start`, then load the dump and restart the backend:
 
 ```bash
 docker exec -i rowanholt-postgres pg_restore -U rowanholt -d rowanholt --clean --if-exists --no-owner < rowanholt.pgdump

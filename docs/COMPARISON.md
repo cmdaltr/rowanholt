@@ -4,7 +4,7 @@ Rowanholt sits among a well-established set of DFIR tools, free and commercial. 
 
 **Legend:** ✓ built in · ◐ partial, an add-on, or one platform only · — not offered, or not found in the public documentation
 
-## Free and open-source tools
+## Free and open-source or source-available tools
 
 | | Rowanholt | Velociraptor | Autopsy | KAPE + EZ Tools | Plaso + Timesketch | Dissect |
 |---|---|---|---|---|---|---|
@@ -22,7 +22,7 @@ Rowanholt sits among a well-established set of DFIR tools, free and commercial. 
 | SIEM export | ✓ Splunk, Elasticsearch | ✓ | — | — | — | ◐ `rdump` to Splunk |
 | Mobile devices | — | — | ◐ Android and iOS extractions (ALEAPP, iLEAPP) | — | ◐ some parsers | — |
 | File system and file viewer | ◐ case tables, no hex or file viewer | ✓ VFS | ✓ | ◐ Explorer tools | ◐ timeline only | ◐ shell |
-| Licence | MIT | AGPL-3.0 | Apache 2.0 | KAPE: free for non-commercial use only, enterprise licence for client or business work; EZ Tools: free | Apache 2.0 | AGPL-3.0 |
+| Licence | Elastic License 2.0 (source-available) | AGPL-3.0 | Apache 2.0 | KAPE: free for non-commercial use only, enterprise licence for client or business work; EZ Tools: free | Apache 2.0 | AGPL-3.0 |
 
 Hayabusa and Chainsaw aren't in the table because they do one job, Windows event logs against Sigma rules, and do it very well. They sit beside any of these tools rather than competing with them.
 

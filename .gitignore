@@ -134,6 +134,8 @@ config/secrets.yml
 # Backend user store and generated JWT secret
 src/web/backend/data/users.json
 src/web/backend/data/.jwt_secret
+# The installed licence and who accepted its terms (licence.py), beside users.json
+src/web/backend/data/licence.json
 
 # SIEM credentials
 splunk_credentials.txt
@@ -182,3 +184,10 @@ symbols/mac/*.json*
 symbols/mac/rowanholt.index
 symbols/*/rowanholt-symbols.log
 symbols/incoming/
+
+# Licensing: never commit a signing key or an issued licence
+licences/
+*licence-signing-key*
+*licence-signing.key
+*.lic.key
+*.licence

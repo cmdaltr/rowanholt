@@ -46,7 +46,7 @@ Name:           rowanholt
 Version:        $RPM_VERSION
 Release:        1
 Summary:        DFIR platform: desktop launcher
-License:        MIT
+License:        Elastic-2.0
 URL:            https://github.com/cmdaltr/rowanholt
 BuildArch:      noarch
 Requires:       bash, curl, tar, gzip, xdg-utils

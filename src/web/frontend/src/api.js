@@ -188,6 +188,14 @@ export const getAuthConfig = async () => {
   return response.data;
 };
 
+// A team server's licence (admins). Local mode needs none, and these answer 404 there.
+export const getLicence = async () => (await api.get('/api/licence')).data;
+export const getLicenceTerms = async () => (await api.get('/api/licence/terms')).data;
+export const checkLicence = async (text) => (await api.post('/api/licence/check', { text })).data;
+export const installLicence = async (text, termsVersion) =>
+  (await api.put('/api/licence', { text, accept_terms: true, terms_version: termsVersion })).data;
+export const removeLicence = async () => (await api.delete('/api/licence')).data;
+
 // After single sign-on the session is a cookie; trade it for the bearer token the rest
 // of the app keeps
 export const completeSsoSignIn = async () => {

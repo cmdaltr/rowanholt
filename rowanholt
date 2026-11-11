@@ -22,7 +22,7 @@ The platform (Docker):
   start | stop | restart | status   Run the stack (--testing: no Splunk/Elastic; --logs: follow logs;
                                     --server: the shared-server profile, automatic after 'server init';
                                     --progress[=zenity]: phases and an ETA, waiting for the web UI)
-  server init|users|ca              A team server: TLS proxy, sign-in, per-user jobs (docs/SERVER.md)
+  server init|users|licence|ca      A team server: TLS proxy, sign-in, per-user jobs, licence (docs/SERVER.md)
   anduril <command>                 Administer Rowanholt's containers (status, logs, restart, ...)
 
 Forensics (run from the directory you're working in; relative paths stay relative):

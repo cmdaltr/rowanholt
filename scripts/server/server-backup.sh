@@ -4,13 +4,14 @@
 #   rowanholt server backup <folder> [--keep N]
 #
 # Writes <folder>/rowanholt-<date>-<time>/: rowanholt.pgdump (jobs, findings, notes, case
-# activity, API tokens, threat intelligence), users.json (the accounts), .env (the secrets,
+# activity, API tokens, threat intelligence, the licence audit log), users.json (the accounts),
+# licence.json (the installed licence and who accepted its terms) if there is one, .env (the secrets,
 # so the backup is mode 700: keep it off shared storage) and docker-compose.local.yml if
 # there is one. The dump is read back before it counts; the newest N backups are kept
 # (default 14). Case output and evidence aren't included: they live on the evidence storage,
 # which needs a backup of its own.
 #
-# Restore on a fresh checkout: put .env, users.json (src/web/backend/data/) and
+# Restore on a fresh checkout: put .env, users.json and licence.json (src/web/backend/data/) and
 # docker-compose.local.yml back, rowanholt start, then
 #   docker exec -i rowanholt-postgres pg_restore -U rowanholt -d rowanholt --clean --if-exists --no-owner < rowanholt.pgdump
 # and docker restart rowanholt-backend.
@@ -46,14 +47,16 @@ docker exec -i rowanholt-postgres pg_restore --list < "$OUT/rowanholt.pgdump" > 
 for file in .env docker-compose.local.yml; do
     [ -f "$ROOT/$file" ] && cp "$ROOT/$file" "$OUT/$file"
 done
-# The backend writes the user store as root, mode 600: a backup run as the server's user
-# reads it through the backend instead
-USERS="$ROOT/src/web/backend/data/users.json"
-if [ -r "$USERS" ]; then
-    cp "$USERS" "$OUT/users.json"
-elif [ -e "$USERS" ]; then
-    docker exec rowanholt-backend cat /app/data/users.json > "$OUT/users.json"
-fi
+# The backend writes the user store and the licence as root, mode 600: a backup run as the
+# server's user reads them through the backend instead
+for name in users.json licence.json; do
+    FILE="$ROOT/src/web/backend/data/$name"
+    if [ -r "$FILE" ]; then
+        cp "$FILE" "$OUT/$name"
+    elif [ -e "$FILE" ]; then
+        docker exec rowanholt-backend cat "/app/data/$name" > "$OUT/$name"
+    fi
+done
 DONE=true
 
 # Oldest first past the newest KEEP (the names sort by time)
