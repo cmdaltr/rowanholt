@@ -30,7 +30,7 @@ rowanholt server init rowanholt.dfir.example.org
 rowanholt start
 ```
 
-`server init` writes the server settings into `.env` (mode 600): the hostname, the certificate choice, a random `SECRET_KEY`, the first admin's password (printed once), and random Postgres, Elastic and Splunk passwords for stores that don't exist yet. It also writes `ROWANHOLT_SYMBOL_DOWNLOADS=off`: the worker doesn't fetch Volatility symbol tables or Windows PDBs for memory images. A job that needs one names the `rowanholt symbols fetch` command an administrator runs, or set it `on` (`symbols/README.md`). Run it again to change the hostname or certificate; secrets already set are kept. From then on, `rowanholt start`, `stop` and `status` use the server profile without being asked (`--server` forces it).
+`server init` is `deploy/linux/install.sh`, at the same path as Shikari's and Ostraka's team-server installers (the Compose overrides it starts sit beside it in `deploy/server/`). It writes the server settings into `.env` (mode 600): the hostname, the certificate choice, a random `SECRET_KEY`, the first admin's password (printed once), and random Postgres, Elastic and Splunk passwords for stores that don't exist yet. It also writes `ROWANHOLT_SYMBOL_DOWNLOADS=off`: the worker doesn't fetch Volatility symbol tables or Windows PDBs for memory images. A job that needs one names the `rowanholt symbols fetch` command an administrator runs, or set it `on` (`symbols/README.md`). Run it again to change the hostname or certificate; secrets already set are kept. From then on, `rowanholt start`, `stop` and `status` use the server profile without being asked (`--server` forces it).
 
 With Splunk, Elastic and the Navigator:
 
@@ -39,6 +39,10 @@ COMPOSE_PROFILES=siem rowanholt start
 ```
 
 Sign in at `https://rowanholt.dfir.example.org` as `admin` with the printed password, and change it under Account.
+
+### Removing a server
+
+`rowanholt server uninstall` (`deploy/linux/uninstall.sh`) stops the server's stack and keeps its data: the volumes (the database with every job, finding and note, the search indexes, Caddy's certificates), `.env` and `src/web/backend/data` (accounts, API tokens, the licence, webhooks, brands). `--purge` removes those too, after asking unless `--yes`. Case output and evidence folders are never touched, nor is the code; firewalld ports, a Tailscale Service and a renewal cron line are left as they are.
 
 ### Certificates
 
@@ -95,11 +99,11 @@ sudo usermod -aG docker "$USER"    # then sign in again
 
 ### Windows Server
 
-Rowanholt's images are Linux containers, and Docker Desktop isn't supported or licensed on Windows Server, so on Windows Server 2022 or 2025 the server is a WSL 2 distribution of its own running Docker Engine. `scripts/server/windows/Install-RowanholtServer.ps1` sets it all up, from an administrator PowerShell on the server:
+Rowanholt's images are Linux containers, and Docker Desktop isn't supported or licensed on Windows Server, so on Windows Server 2022 or 2025 the server is a WSL 2 distribution of its own running Docker Engine. `deploy/windows/install-service.ps1` sets it all up, from an administrator PowerShell on the server:
 
 ```powershell
 git clone https://github.com/cmdaltr/rowanholt.git; cd rowanholt
-.\scripts\server\windows\Install-RowanholtServer.ps1 -Hostname rowanholt.dfir.example.org `
+\deploy\windows\install-service.ps1 -Hostname rowanholt.dfir.example.org `
     -CertificateThumbprint 3F2A... -EvidencePath D:\Evidence -WslPath E:\Rowanholt\wsl
 ```
 
@@ -117,7 +121,7 @@ Windows Server 2022 needs its cumulative updates first: WSL comes from Microsoft
 
 **Evidence on Windows volumes** goes through WSL's file sharing, which is far slower than its own disk: for large images, copy them into the distribution first (`\\wsl$\Rowanholt\srv\evidence` from Windows, mounted like any Linux folder). WSL 2 takes half the server's memory by default; set `memory=` under `[wsl2]` in the account's `.wslconfig` for more.
 
-Inside, it's a Linux server: `wsl -d Rowanholt -u root -- /opt/rowanholt/rowanholt <command>` (`status`, `server users`, `stop`), and a `git pull` there updates it. Run the script again to change the hostname, certificate or evidence folders.
+Inside, it's a Linux server: `wsl -d Rowanholt -u root -- /opt/rowanholt/rowanholt <command>` (`status`, `server users`, `stop`), and a `git pull` there updates it. Run the script again to change the hostname, certificate or evidence folders. `deploy\windows\uninstall-service.ps1` (elevated) removes the boot task, the port forwarding and the firewall rule and stops the stack, keeping the data; `-Purge` also removes it, after asking unless `-Yes`. The distribution and its disk stay: `wsl --unregister Rowanholt` deletes them.
 
 ### Evidence
 
@@ -206,7 +210,7 @@ Case numbers name output directories, so they're unique across the server: creat
 
 ## The desktop app
 
-People can use the server from the desktop app instead of a browser tab: in setup, choose **Connect to my team's Rowanholt server** and enter the hostname. Nothing runs locally: no Docker, no files. The Mac app needs the server's certificate to be trusted by the Mac (Keychain); the Linux and Windows apps open it in an Edge or Chromium app window. See `app/README.md`.
+People can use the server from the desktop app instead of a browser tab: in setup, choose **Connect to my team's Rowanholt server** and enter the hostname. Nothing runs locally: no Docker, no files. The Mac app needs the server's certificate to be trusted by the Mac (Keychain); the Linux and Windows apps open it in an Edge or Chromium app window. See `desktop/README.md`.
 
 ## Limits worth knowing
 

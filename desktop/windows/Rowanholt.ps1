@@ -5,7 +5,7 @@
     server (ROWANHOLT_SERVER, or the one setup saved) it just opens the server: nothing
     runs here.
 .DESCRIPTION
-    From a checkout (app\windows\ in a clone) it runs that checkout. Installed from the MSI
+    From a checkout (desktop\windows\ in a clone) it runs that checkout. Installed from the MSI
     (%LOCALAPPDATA%\Programs\cmdaltr\Rowanholt, beside rowanholt-src.tar.gz), its first run is
     setup, as the Linux packages' is: either a team server's address, or a check for Docker
     Desktop, Rowanholt's files unpacked into a folder you choose (or a copy you already have)
@@ -25,7 +25,11 @@
 [CmdletBinding()]
 param(
     [switch]$Stop,
-    [switch]$Setup
+    [switch]$Setup,
+    # -Update installs the newest release now (desktop\install.ps1, which the MSI carries in
+    # seed\); -Update -Check only says whether there is one
+    [switch]$Update,
+    [switch]$Check
 )
 
 $ErrorActionPreference = 'Stop'
@@ -55,8 +59,35 @@ function Get-AppVersion {
     return '0'
 }
 
+# The server IT has set (Group Policy or Intune): it wins, and setup can't change it
+$PolicyKey = 'SOFTWARE\Policies\cmdaltr\Rowanholt'
+$script:ServerManaged = $false
+
+function Get-ManagedServer {
+    foreach ($hive in 'HKLM:', 'HKCU:') {
+        try {
+            $value = (Get-ItemProperty -Path "$hive\$PolicyKey" -Name ServerURL -ErrorAction Stop).ServerURL
+            if ("$value".Trim()) { return "$value".Trim() }
+        } catch { }
+    }
+    return ''
+}
+
+# IT's server, then ROWANHOLT_SERVER (a URL, or 'local' to run here whatever setup saved), then setup's
 function Get-SavedServer {
-    if ($env:ROWANHOLT_SERVER) { return $env:ROWANHOLT_SERVER }
+    $managed = Get-ManagedServer
+    if ($managed) {
+        $url = ConvertTo-ServerUrl $managed -AllowHttp
+        if (-not $url) { throw "The server address IT set ($managed, in $PolicyKey) isn't a web address." }
+        $script:ServerManaged = $true
+        return $url
+    }
+    if ($env:ROWANHOLT_SERVER) {
+        if ($env:ROWANHOLT_SERVER.Trim() -eq 'local') { return '' }
+        $url = ConvertTo-ServerUrl $env:ROWANHOLT_SERVER -AllowHttp
+        if (-not $url) { throw "ROWANHOLT_SERVER ($env:ROWANHOLT_SERVER) isn't a web address." }
+        return $url
+    }
     if (Test-Path $ServerFile) { return (Get-Content $ServerFile -Raw).Trim() }
     return ''
 }
@@ -70,15 +101,16 @@ function Test-Copy([string]$Dir) {
     return $Dir -and (Test-Path (Join-Path $Dir 'docker-compose.yml')) -and (Test-Path (Join-Path $Dir 'rowanholt'))
 }
 
-# A typed address as https://host[:port]; '' if it isn't one (http for localhost only)
-function ConvertTo-ServerUrl([string]$Text) {
+# A typed address as https://host[:port]; '' if it isn't one. http only for localhost, unless IT
+# or ROWANHOLT_SERVER set it (-AllowHttp), for a server on a network they trust
+function ConvertTo-ServerUrl([string]$Text, [switch]$AllowHttp) {
     $Text = ($Text -replace '\s', '')
     if ($Text -notmatch '://') { $Text = "https://$Text" }
     if ($Text -notmatch '^(?<scheme>[A-Za-z]+)://(?<host>[^/]+)') { return '' }
     $scheme = $Matches.scheme.ToLower(); $hostPort = $Matches.host
     if ($hostPort -notmatch '^[A-Za-z0-9.-]+(:\d+)?$') { return '' }
     if ($scheme -eq 'https') { return "https://$hostPort" }
-    if ($scheme -eq 'http' -and ($hostPort -split ':')[0] -in 'localhost', '127.0.0.1') { return "http://$hostPort" }
+    if ($scheme -eq 'http' -and ($AllowHttp -or ($hostPort -split ':')[0] -in 'localhost', '127.0.0.1')) { return "http://$hostPort" }
     return ''
 }
 
@@ -89,7 +121,7 @@ function Select-Mode {
     $form.Text = 'Set up Rowanholt'
     $form.FormBorderStyle = 'FixedDialog'; $form.MaximizeBox = $false; $form.MinimizeBox = $false
     $form.StartPosition = 'CenterScreen'; $form.ClientSize = New-Object System.Drawing.Size(520, 230)
-    $iconFile = Join-Path $AppDir 'app\icons\rowanholt.ico'
+    $iconFile = Join-Path $AppDir 'desktop\icons\rowanholt.ico'
     if (Test-Path $iconFile) { $form.Icon = New-Object System.Drawing.Icon($iconFile) }
     $label = New-Object System.Windows.Forms.Label
     $label.Text = "Where does Rowanholt run?`n`nA server needs nothing here but a window onto it: no Docker, no evidence, no 70 MB of files."
@@ -243,7 +275,7 @@ function Invoke-Setup {
 
 function Resolve-Root([switch]$NoSetup) {
     if ($env:ROWANHOLT_ROOT -and (Test-Copy $env:ROWANHOLT_ROOT)) { return $env:ROWANHOLT_ROOT }
-    # A checkout's own app\windows: run that checkout
+    # A checkout's own desktop\windows: run that checkout
     if (-not $Packaged) { return $AppDir }
     if (Test-Path $RootFile) {
         $saved = (Get-Content $RootFile -Raw).Trim()
@@ -471,6 +503,111 @@ function Invoke-ComposeUp($J, [string[]]$Extra, [int]$Builds) {
     if ($code -ne 0) { throw "docker compose up exited with status $code" }
 }
 
+# ── Updates (the MSI's app) ───────────────────────────────────────────────────
+# Once a day, ask GitHub for the latest published release (drafts and prereleases aren't
+# 'latest'); offer it once the window is open. Nothing but the request is sent. Off with
+# ROWANHOLT_UPDATE_CHECK=0, or "check": false in update.json
+$UpdateFile = Join-Path $State 'update.json'
+$Repo = 'cmdaltr/rowanholt'
+
+function ConvertTo-VersionParts([string]$Text) {
+    # 'v2.1.0' as 2,1,0; anything after the numbers (-dev.4, -rc1) is ignored, as Shikari does
+    if ("$Text".Trim() -notmatch '^v?(\d+(\.\d+)*)') { return @() }
+    return @($Matches[1].Split('.') | ForEach-Object { [int]$_ })
+}
+
+function Test-Newer([string]$Latest, [string]$Current) {
+    $a = @(ConvertTo-VersionParts $Latest); $b = @(ConvertTo-VersionParts $Current)
+    if (-not $a.Count) { return $false }
+    for ($i = 0; $i -lt [math]::Max($a.Count, $b.Count); $i++) {
+        $x = if ($i -lt $a.Count) { $a[$i] } else { 0 }
+        $y = if ($i -lt $b.Count) { $b[$i] } else { 0 }
+        if ($x -ne $y) { return $x -gt $y }
+    }
+    return $false
+}
+
+function Read-UpdateState {
+    try { return (Get-Content $UpdateFile -Raw | ConvertFrom-Json) } catch { return [pscustomobject]@{} }
+}
+
+function Write-UpdateState($UpdateState) {
+    try { $UpdateState | ConvertTo-Json -Depth 4 | Set-Content -Path $UpdateFile -Encoding UTF8 } catch { }
+}
+
+function Get-LatestRelease {
+    # The repository is public; a token only lifts GitHub's rate limit
+    $headers = @{ Accept = 'application/vnd.github+json'; 'User-Agent' = 'rowanholt-update' }
+    $token = if ($env:GH_TOKEN) { $env:GH_TOKEN } elseif ($env:GITHUB_TOKEN) { $env:GITHUB_TOKEN } else { '' }
+    if ($token) { $headers.Authorization = "Bearer $token" }
+    $r = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers $headers -TimeoutSec 10
+    return [pscustomobject]@{ tag = "$($r.tag_name)"; version = "$($r.tag_name)".TrimStart('v'); url = "$($r.html_url)" }
+}
+
+function Test-UpdateChecks {
+    if ("$env:ROWANHOLT_UPDATE_CHECK".Trim().ToLower() -in '0', 'false', 'no', 'off') { return $false }
+    return (Read-UpdateState).check -ne $false
+}
+
+function Get-DailyUpdate {
+    # The newer release, or $null; GitHub at most once a day, and a failed check is just $null
+    if (-not (Test-UpdateChecks)) { return $null }
+    $st = Read-UpdateState
+    $now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    if (-not $st.checked_at -or ($now - [double]$st.checked_at) -ge 86400) {
+        $latest = $null
+        try { $latest = Get-LatestRelease } catch { }
+        $st | Add-Member -Force -NotePropertyName latest -NotePropertyValue $latest
+        $st | Add-Member -Force -NotePropertyName checked_at -NotePropertyValue $now
+        Write-UpdateState $st
+    }
+    if ($st.latest -and (Test-Newer $st.latest.version (Get-AppVersion)) -and $st.latest.version -ne $st.skipped) { return $st.latest }
+    return $null
+}
+
+function Start-AppUpdate([string]$Tag, [switch]$Foreground) {
+    $script = Join-Path $AppDir 'seed\install.ps1'
+    if (-not (Test-Path $script)) { throw "No installer beside the app ($script): reinstall Rowanholt." }
+    $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$script`"", '-Version', $Tag)
+    if ($Foreground) { & powershell @arguments; return }
+    Start-Process powershell -ArgumentList ($arguments + '-Launch')
+}
+
+function Show-UpdateNotice($Latest) {
+    # Update, Later (until the next start) or Skip this version (until a newer one)
+    Add-Type -AssemblyName System.Windows.Forms
+    $form = New-Object System.Windows.Forms.Form
+    $form.Text = 'Rowanholt'; $form.Width = 440; $form.Height = 170; $form.StartPosition = 'CenterScreen'
+    $form.FormBorderStyle = 'FixedDialog'; $form.MaximizeBox = $false; $form.TopMost = $true
+    $label = New-Object System.Windows.Forms.Label
+    $label.Text = "Rowanholt $($Latest.version) is available (you have $(Get-AppVersion)).`n`nUpdate downloads it, checks it against the release's SHA256SUMS and installs it."
+    $label.SetBounds(12, 10, 410, 70)
+    $form.Controls.Add($label)
+    foreach ($b in @(@('Update', 'now', 150), @('Later', 'later', 240), @('Skip this version', 'skip', 330))) {
+        $button = New-Object System.Windows.Forms.Button
+        $button.Text = $b[0]; $button.Tag = $b[1]; $button.SetBounds($b[2] - 70, 88, 90, 28)
+        $button.Add_Click({ $script:UpdateAnswer = $this.Tag; $this.FindForm().Close() })
+        $form.Controls.Add($button)
+    }
+    $script:UpdateAnswer = 'later'  # closing the window is Later
+    [void]$form.ShowDialog()
+    switch ($script:UpdateAnswer) {
+        'now' { Start-AppUpdate $Latest.tag }
+        'skip' {
+            $st = Read-UpdateState
+            $st | Add-Member -Force -NotePropertyName skipped -NotePropertyValue $Latest.version
+            Write-UpdateState $st
+        }
+    }
+}
+
+function Invoke-UpdateCheck {
+    # After the window opens, for the MSI's app only: a checkout updates with git
+    if (-not $Packaged) { return }
+    $latest = Get-DailyUpdate
+    if ($latest) { Show-UpdateNotice $latest }
+}
+
 function Open-Window {
     # Edge ships with Windows 10 and 11; Chrome is the fallback, then the default browser
     $browsers = @(
@@ -488,7 +625,19 @@ function Open-Window {
 }
 
 try {
+    if ($Update) {
+        if (-not $Packaged) { Write-Host "This is a checkout's launcher: update it with git pull."; exit 0 }
+        $latest = Get-LatestRelease
+        if (-not (Test-Newer $latest.version (Get-AppVersion))) { Write-Host "Rowanholt $(Get-AppVersion) is the latest."; exit 0 }
+        Write-Host "Rowanholt $($latest.version) is available (you have $(Get-AppVersion)): $($latest.url)"
+        if (-not $Check) { Start-AppUpdate $latest.tag -Foreground }
+        exit 0
+    }
     if ($Setup) {
+        if ((Get-SavedServer) -and $script:ServerManaged) {
+            Show-Message "Your organisation has set Rowanholt to open $(Get-SavedServer), so there's nothing to set up." | Out-Null
+            exit 0
+        }
         if (-not $Packaged) {
             Show-Message "This is a checkout's launcher: it always runs $AppDir." | Out-Null
             exit 0
@@ -507,6 +656,7 @@ try {
         }
         $Url = $Server
         Open-Window
+        Invoke-UpdateCheck
         exit 0
     }
 
@@ -529,7 +679,7 @@ try {
     # Setup may just have chosen a server
     $Server = Get-SavedServer
     if (-not $Root -or $Server) {
-        if ($Server) { $Url = $Server; Open-Window }
+        if ($Server) { $Url = $Server; Open-Window; Invoke-UpdateCheck }
         exit 0
     }
     Update-Copy
@@ -567,6 +717,7 @@ try {
         Complete-Journey $script:Journey
     }
     Open-Window
+    Invoke-UpdateCheck
 } catch {
     Write-Host ''
     Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red

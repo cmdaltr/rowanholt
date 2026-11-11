@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
-    Set Windows Server 2022 or 2025 up as a Rowanholt team server, through WSL 2.
+    Set Windows Server 2022 or 2025 up as a Rowanholt team server, through WSL 2
+    (deploy\windows\install-service.ps1, as Shikari's and Ostraka's; deploy\windows\uninstall-service.ps1 removes it).
 .DESCRIPTION
     Rowanholt's images are Linux containers, and Docker Desktop isn't supported or licensed on
     Windows Server, so the server is Linux: a WSL 2 distribution of its own (Ubuntu 24.04, named
@@ -19,7 +20,7 @@
 
     Run it again to change the hostname, certificate or evidence folders; it keeps what exists.
 .EXAMPLE
-    .\Install-RowanholtServer.ps1 -Hostname rowanholt.dfir.example.org -CertificateThumbprint 3F2A... -EvidencePath D:\Evidence
+    .\deploy\windows\install-service.ps1 -Hostname rowanholt.dfir.example.org -CertificateThumbprint 3F2A... -EvidencePath D:\Evidence
 #>
 [CmdletBinding()]
 param(
@@ -232,7 +233,7 @@ Invoke-Wsl "cd $Root && ./rowanholt server init $($initArgs -join ' ')"
 # 5. Evidence folders: D:\Evidence is /mnt/d/Evidence, read-only in the backend
 $mounts = @($EvidencePath | ForEach-Object { ConvertTo-WslPath $_ })
 if ($mounts.Count -gt 0) {
-    $yaml = @('# Written by Install-RowanholtServer.ps1: -EvidencePath folders', 'services:')
+    $yaml = @('# Written by deploy\windows\install-service.ps1: -EvidencePath folders', 'services:')
     foreach ($service in 'backend', 'celery-worker') {
         $yaml += "  ${service}:", '    volumes:'
         foreach ($mount in $mounts) {
@@ -258,7 +259,8 @@ New-NetFirewallRule -DisplayName 'Rowanholt (proxy)' -Group Rowanholt -Direction
     -LocalPort $ports -Action Allow | Out-Null
 @{ Distribution = $Distro; Root = $Root; Ports = $ports } | ConvertTo-Json | Set-Content (Join-Path $State 'server.json')
 $starter = Join-Path $State 'Start-RowanholtServer.ps1'
-Copy-Item (Join-Path $PSScriptRoot 'Start-RowanholtServer.ps1') $starter -Force
+# deploy\windows\start-service.ps1, copied under its old name so a task registered before the move still finds it
+Copy-Item (Join-Path $PSScriptRoot 'start-service.ps1') $starter -Force
 
 $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$starter`""
 $trigger = New-ScheduledTaskTrigger -AtStartup

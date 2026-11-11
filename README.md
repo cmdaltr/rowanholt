@@ -19,14 +19,14 @@
 
 ### Installation
 
-The desktop app (macOS `.dmg`, Windows installer, Ubuntu/Debian `.deb`) from the [releases](https://github.com/cmdaltr/rowanholt/releases) installs Rowanholt without a terminal: its first launch checks for Docker (and installs OrbStack on a Mac), puts Rowanholt's files in place and opens the UI. See [app/README.md](app/README.md). From source:
+The desktop app (macOS `.dmg`, Windows installer, Ubuntu/Debian `.deb`) from the [releases](https://github.com/cmdaltr/rowanholt/releases) installs Rowanholt without a terminal: its first launch checks for Docker (and installs OrbStack on a Mac), puts Rowanholt's files in place and opens the UI. See [desktop/README.md](desktop/README.md). From source:
 
 ```bash
 # 1. Clone repository
 git clone https://github.com/cmdaltr/rowanholt.git
 cd rowanholt
 ./rowanholt install   # optional: run `rowanholt` from anywhere
-./rowanholt app install   # optional: Rowanholt in the Dock/app menu (app/README.md; Windows: app\windows\install.ps1)
+./rowanholt app install   # optional: Rowanholt in the Dock/app menu (desktop/README.md; Windows: desktop\windows\install.ps1)
 
 # 2. Install OrbStack (macOS - RECOMMENDED) or Docker Desktop
 # OrbStack: 2-3x faster, uses less RAM, no networking bugs

@@ -8,7 +8,10 @@
 # server's address, or check for Docker, unpack the bundled source (or take an existing
 # checkout) and mount evidence. A server (ROWANHOLT_SERVER, or the one setup saved)
 # needs nothing local: the window opens on it.
-#   rowanholt-app.sh [--setup | --stop]
+# IT can set the server in /etc/rowanholt/client.json ({"server_url": "https://..."}): it wins,
+# and setup can't change it. Installed from the .deb, it checks GitHub for a newer release once a
+# day and says so (ROWANHOLT_UPDATE_CHECK=0 turns that off).
+#   rowanholt-app.sh [--setup | --stop | --update [--check]]
 
 SOURCE="${BASH_SOURCE[0]}"
 while [ -L "$SOURCE" ]; do
@@ -46,21 +49,47 @@ app_version() { cat "$HERE/VERSION" 2>/dev/null || echo 0; }
 
 up() { curl -s -o /dev/null --max-time 2 "$URL"; }
 
+POLICY=/etc/rowanholt/client.json
+UPDATE_STATE="$CONFIG/update"
+REPO=cmdaltr/rowanholt
+
+# The server IT set: server_url from $POLICY (python3 reads the JSON; sed when it isn't there)
+managed_server() {
+    [ -r "$POLICY" ] || return 0
+    if command -v python3 &>/dev/null; then
+        python3 -c 'import json,sys; print((json.load(open(sys.argv[1])).get("server_url") or "").strip())' "$POLICY" 2>/dev/null
+    else
+        sed -n 's/.*"server_url"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$POLICY" | head -1
+    fi
+}
+
+# IT's server, then ROWANHOLT_SERVER (a URL, or "local" to run here whatever setup saved), then setup's
 saved_server() {
-    if [ -n "${ROWANHOLT_SERVER:-}" ]; then echo "$ROWANHOLT_SERVER"; return; fi
+    local managed
+    managed="$(managed_server)"
+    if [ -n "$managed" ]; then
+        normalise_server "$managed" allow-http || { say error "The server address IT set in $POLICY ($managed) isn't a web address."; exit 1; }
+        return
+    fi
+    if [ -n "${ROWANHOLT_SERVER:-}" ]; then
+        [ "$ROWANHOLT_SERVER" = local ] && return
+        normalise_server "$ROWANHOLT_SERVER" allow-http || { say error "ROWANHOLT_SERVER ($ROWANHOLT_SERVER) isn't a web address."; exit 1; }
+        return
+    fi
     cat "$CONFIG/server" 2>/dev/null
 }
 
-# A typed address as https://host[:port], or nothing if it isn't one (http for localhost only)
+# A typed address as https://host[:port], or nothing if it isn't one. http for localhost only,
+# unless IT or ROWANHOLT_SERVER set it (allow-http), for a server on a network they trust
 normalise_server() {
-    local text="$1" scheme rest host
+    local text="$1" allow="${2:-}" scheme rest host
     text="$(printf '%s' "$text" | tr -d '[:space:]')"
     [[ "$text" == *://* ]] || text="https://$text"
     scheme="${text%%://*}"; rest="${text#*://}"; host="${rest%%/*}"
     [[ "$host" =~ ^[A-Za-z0-9.-]+(:[0-9]+)?$ ]] || return 1
     case "$scheme" in
         https) ;;
-        http) [[ "${host%%:*}" =~ ^(localhost|127\.0\.0\.1)$ ]] || return 1 ;;
+        http) [ "$allow" = allow-http ] || [[ "${host%%:*}" =~ ^(localhost|127\.0\.0\.1)$ ]] || return 1 ;;
         *) return 1 ;;
     esac
     echo "$scheme://$host"
@@ -196,7 +225,7 @@ setup() {
 # ── Which copy to run ─────────────────────────────────────────────────────────
 resolve_root() {
     if [ -n "${ROWANHOLT_ROOT:-}" ] && is_copy "$ROWANHOLT_ROOT"; then echo "$ROWANHOLT_ROOT"; return; fi
-    # A checkout's own app/linux: run that checkout
+    # A checkout's own desktop/linux: run that checkout
     if [ ! -f "$BUNDLED" ] && is_copy "$HERE/../.."; then (cd -P "$HERE/../.." && pwd); return; fi
     local saved
     saved="$(cat "$CONFIG/root" 2>/dev/null)"
@@ -216,7 +245,66 @@ maybe_update() {
     fi
 }
 
+# ── Updates (the .deb's app) ──────────────────────────────────────────────────
+# GitHub's latest published release (drafts and prereleases aren't 'latest'), asked at most once a
+# day; nothing but the request is sent. The notice gives the command: apt needs sudo, which a
+# desktop entry has no terminal to ask for
+version_parts() { printf '%s' "${1#v}" | sed -n 's/^\([0-9][0-9.]*\).*/\1/p' | sed 's/\.$//'; }
+
+# is_newer <latest> <current>: numbers only (2.1.0-dev.4 is 2.1.0), as Shikari compares
+is_newer() {
+    local a b i x y
+    a="$(version_parts "$1")"; b="$(version_parts "$2")"
+    [ -n "$a" ] || return 1
+    IFS=. read -r -a A <<< "$a"; IFS=. read -r -a B <<< "${b:-0}"
+    for ((i = 0; i < ${#A[@]} || i < ${#B[@]}; i++)); do
+        x="${A[i]:-0}"; y="${B[i]:-0}"
+        ((10#$x > 10#$y)) && return 0
+        ((10#$x < 10#$y)) && return 1
+    done
+    return 1
+}
+
+state_get() { sed -n "s/^$1=//p" "$UPDATE_STATE" 2>/dev/null | tail -1; }
+state_set() {
+    { grep -v "^$1=" "$UPDATE_STATE" 2>/dev/null; echo "$1=$2"; } > "$UPDATE_STATE.tmp" && mv "$UPDATE_STATE.tmp" "$UPDATE_STATE"
+}
+
+latest_tag() {
+    local token="${GH_TOKEN:-${GITHUB_TOKEN:-}}" auth=()
+    [ -n "$token" ] && auth=(-H "Authorization: Bearer $token")  # the repository is public: only for the rate limit
+    curl -fsSL --max-time 10 "${auth[@]}" -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null |
+        grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/'
+}
+
+update_command() { echo "sh $HERE/install.sh --version $1"; }
+
+daily_update_check() {
+    [ -f "$BUNDLED" ] || return 0  # a checkout updates with git
+    case "${ROWANHOLT_UPDATE_CHECK:-}" in 0|false|no|off) return 0 ;; esac
+    [ "$(state_get check)" = false ] && return 0
+    local now checked tag
+    now="$(date +%s)"; checked="$(state_get checked_at)"
+    if [ -z "$checked" ] || [ $((now - checked)) -ge 86400 ]; then
+        state_set latest "$(latest_tag)"
+        state_set checked_at "$now"
+    fi
+    tag="$(state_get latest)"
+    is_newer "$tag" "$(app_version)" && [ "${tag#v}" != "$(state_get skipped)" ] || return 0
+    notify "Rowanholt ${tag#v} is available: $(update_command "$tag")"
+    has_zenity || return 0
+    # Later (OK) or Skip this version (until a newer one)
+    if ! zenity --question --title=Rowanholt --width=480 --ok-label=Later --cancel-label="Skip this version" \
+        --text="Rowanholt ${tag#v} is available (you have $(app_version)).\n\nTo install it, run this in a terminal (apt asks for your password):\n\n    $(update_command "$tag")" 2>/dev/null; then
+        state_set skipped "${tag#v}"
+    fi
+}
+
 open_window() {
+    # The check runs beside the window: the exec below replaces this shell, not its child
+    daily_update_check &>/dev/null &
+    disown 2>/dev/null || true
     local browser
     # --class (with its own profile) gives the window WM_CLASS Rowanholt, which the
     # desktop entry's StartupWMClass matches, so the dock shows Rowanholt's icon
@@ -228,8 +316,28 @@ open_window() {
     exec xdg-open "$URL"
 }
 
+# A broken IT setting stops here rather than quietly running Rowanholt on this computer instead
+MANAGED="$(managed_server)"
+if [ -n "$MANAGED" ] && ! normalise_server "$MANAGED" allow-http >/dev/null; then
+    say error "The server address IT set in $POLICY ($MANAGED) isn't a web address."
+    exit 1
+fi
+
 case "${1:-}" in
+    --update)
+        [ -f "$BUNDLED" ] || { echo "This is a checkout's launcher: update it with git pull."; exit 0; }
+        tag="$(latest_tag)"
+        [ -n "$tag" ] || { echo "Couldn't read the latest release of $REPO from GitHub." >&2; exit 1; }
+        if ! is_newer "$tag" "$(app_version)"; then echo "Rowanholt $(app_version) is the latest."; exit 0; fi
+        echo "Rowanholt ${tag#v} is available (you have $(app_version))."
+        [ "${2:-}" = --check ] && { echo "Install it with: $(update_command "$tag")"; exit 0; }
+        exec sh "$HERE/install.sh" --version "$tag"
+        ;;
     --setup)
+        if [ -n "$(managed_server)" ]; then
+            say info "Your organisation has set Rowanholt to open $(saved_server), so there's nothing to set up."
+            exit 0
+        fi
         [ -f "$BUNDLED" ] || { say info "This is a checkout's launcher: it always runs $(cd -P "$HERE/../.." && pwd)."; exit 0; }
         setup >/dev/null
         [ -n "$(saved_server)" ] || exit 0

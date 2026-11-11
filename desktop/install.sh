@@ -1,5 +1,5 @@
 #!/bin/sh
-# Install or upgrade the Rowanholt desktop app on macOS or Linux from a GitHub release (app/README.md).
+# Install or upgrade the Rowanholt desktop app on macOS or Linux from a GitHub release (desktop/README.md).
 #
 #   sh desktop/install.sh                    the latest release
 #   sh desktop/install.sh --version v1.4.0   a given release
@@ -45,7 +45,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# One package per platform runs on every CPU (app/README.md): the packages hold the launcher and the
+# One package per platform runs on every CPU (desktop/README.md): the packages hold the launcher and the
 # source tree, and Docker builds the stack's images for this machine when it first starts
 case "$(uname -s)" in
     Darwin) kind=dmg; suffix=-macos-universal.dmg ;;

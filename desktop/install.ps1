@@ -1,5 +1,5 @@
 <#
-Install or upgrade the Rowanholt desktop app on Windows from a GitHub release (app/README.md).
+Install or upgrade the Rowanholt desktop app on Windows from a GitHub release (desktop/README.md).
 
     powershell -ExecutionPolicy Bypass -File desktop\install.ps1                      the latest release
     powershell -ExecutionPolicy Bypass -File desktop\install.ps1 -Version v1.4.0      a given release
@@ -144,8 +144,8 @@ try {
     Done "Installed$(if ($p.ExitCode -eq 3010) { ' (Windows wants a restart for something else)' })"
 
     Step "Finding the installed app"
-    # A per-user install, always here (app\windows\rowanholt.wxs)
-    $launcher = Join-Path $env:LOCALAPPDATA "Programs\cmdaltr\Rowanholt\app\windows\Rowanholt.ps1"
+    # A per-user install, always here (desktop\windows\rowanholt.wxs)
+    $launcher = Join-Path $env:LOCALAPPDATA "Programs\cmdaltr\Rowanholt\desktop\windows\Rowanholt.ps1"
     if (Test-Path $launcher) { Done $launcher } else { $launcher = $null; Write-Warning "The launcher isn't where the MSI puts it" }
     $took = (Get-Date) - $started
     Write-Host ""

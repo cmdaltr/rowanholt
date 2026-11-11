@@ -5,8 +5,8 @@
     The release workflow runs it; it also runs on any Windows PC with the .NET SDK:
         dotnet tool install --global wix --version 5.0.2
         wix extension add --global WixToolset.UI.wixext/5.0.2
-        powershell -File app\windows\build-msi.ps1 -Version 1.4.0 -Tarball rowanholt-src.tar.gz -OutDir dist
-    The tarball is app/source-tarball.sh's (the source tree the launcher unpacks); the launcher,
+        powershell -File desktop\windows\build-msi.ps1 -Version 1.4.0 -Tarball rowanholt-src.tar.gz -OutDir dist
+    The tarball is desktop/source-tarball.sh's (the source tree the launcher unpacks); the launcher,
     icon, LICENSE and the install scripts come from this checkout, which is the same commit in CI.
 #>
 [CmdletBinding()]

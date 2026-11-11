@@ -54,7 +54,7 @@ It follows its own link back to the repository, so moving the clone means runnin
 | `rowanholt scripts` | Lists every script under `scripts/` |
 | `rowanholt <group> <name> [args]` | One of them, e.g. `rowanholt jobs status`, `rowanholt siem splunk-restart`, `rowanholt docker clean` |
 | `rowanholt map [realm\|elrond\|gandalf\|journey]` | Opens an architecture page; `journey` (3D, also `machine`) is served on 127.0.0.1:5690 until Ctrl-C |
-| `rowanholt app [install\|uninstall] [--dock]` | The desktop app: builds `Rowanholt.app` on macOS (`--dock` pins it), a menu entry on Linux; see `app/README.md` |
+| `rowanholt app [install\|uninstall] [--dock]` | The desktop app: builds `Rowanholt.app` on macOS (`--dock` pins it), a menu entry on Linux; see `desktop/README.md` |
 | `rowanholt where` | Prints the repository path |
 
 Forensic commands keep the directory you call them from, so relative evidence and output paths work as typed. Scripts under `scripts/` and the stack commands run from the repository root. Scripts are found when they're run (`scripts/<group>/<group>-<name>.sh`, `scripts/<group>/<name>.sh` or `.py`, or `scripts/<name>.sh`), so a new script needs no wiring. Python commands use `python3`; set `ROWANHOLT_PYTHON` to use a virtualenv with Rowanholt's requirements installed instead. The Windows collector is PowerShell and runs on Windows: `Invoke-Gandalf.ps1` in `src/acquisition/windows`.

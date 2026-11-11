@@ -15,8 +15,10 @@ NAME = "rowanholt.tail1234.ts.net"
 def tree(tmp_path: Path) -> tuple:
     root = tmp_path / "rowanholt"
     (root / "scripts" / "server").mkdir(parents=True)
-    for script in ("server-init.sh", "server-cert.sh"):
-        shutil.copy(REPO / "scripts" / "server" / script, root / "scripts" / "server" / script)
+    (root / "deploy" / "linux").mkdir(parents=True)
+    # server init is deploy/linux/install.sh; it runs scripts/server/server-cert.sh for the certificate
+    shutil.copy(REPO / "deploy" / "linux" / "install.sh", root / "deploy" / "linux" / "install.sh")
+    shutil.copy(REPO / "scripts" / "server" / "server-cert.sh", root / "scripts" / "server" / "server-cert.sh")
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "90", "-subj", f"/CN={NAME}",
@@ -39,8 +41,8 @@ def tree(tmp_path: Path) -> tuple:
 
 
 def run(root: Path, env: dict, *args: str) -> subprocess.CompletedProcess:
-    script = "server-init.sh" if args[0] == "init" else "server-cert.sh"
-    return subprocess.run(["bash", str(root / "scripts" / "server" / script), *args[1:]], env=env,
+    script = root / "deploy" / "linux" / "install.sh" if args[0] == "init" else root / "scripts" / "server" / "server-cert.sh"
+    return subprocess.run(["bash", str(script), *args[1:]], env=env,
                           capture_output=True, text=True)
 
 

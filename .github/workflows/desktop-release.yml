@@ -33,12 +33,14 @@ jobs:
             version="$(sed -n 's/^version *= *"\(.*\)"/\1/p' pyproject.toml | head -1)-dev.$GITHUB_RUN_NUMBER"
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+      # A release file itself (as Shikari's and Ostraka's), and what every package carries inside as
+      # rowanholt-src.tar.gz; its top folder is rowanholt-<version>/
       - name: Source tarball
-        run: app/source-tarball.sh rowanholt-src.tar.gz
+        run: desktop/source-tarball.sh "rowanholt-${{ steps.version.outputs.version }}-source.tar.gz" "${{ steps.version.outputs.version }}"
       - uses: actions/upload-artifact@v4
         with:
-          name: source
-          path: rowanholt-src.tar.gz
+          name: rowanholt-source
+          path: rowanholt-*-source.tar.gz
 
   macos:
     needs: source
@@ -50,7 +52,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: source
+          name: rowanholt-source
       - name: Import the signing certificate
         if: env.HAS_CERT == 'true'
         env:
@@ -73,7 +75,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-        run: app/macos/package.sh --version "$VERSION" --source rowanholt-src.tar.gz dist
+        run: desktop/macos/package.sh --version "$VERSION" --source "rowanholt-$VERSION-source.tar.gz" dist
       # Installed and removed with the scripts a user runs, as Shikari's smoke job does. The stack
       # can't start here (GitHub's macOS runners have no Docker), so this checks what the DMG puts
       # down and takes away
@@ -91,9 +93,12 @@ jobs:
           for f in LICENSE install.sh uninstall.sh; do
             [ -f "$app/Contents/Resources/$f" ] || { echo "Contents/Resources/$f is missing"; exit 1; }
           done
-          id=$(defaults read "$app/Contents/Info" CFBundleIdentifier)
+          # PlistBuddy, not defaults: defaults can fail on a bundle's Info.plist on a fresh runner, and
+          # under set -e a failing $(...) ends the step with nothing said
+          id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist") \
+            || { echo "couldn't read the bundle id"; exit 1; }
           [ "$id" = io.github.cmdaltr.rowanholt ] || { echo "bundle id is $id"; exit 1; }
-          codesign --verify --deep --strict "$app"
+          codesign --verify --deep --strict "$app" || { echo "codesign --verify failed"; exit 1; }
           # The app's own uninstaller, copied out first as a user's would run: it deletes the app it's in
           cp "$app/Contents/Resources/uninstall.sh" "$RUNNER_TEMP/uninstall.sh"
           sh "$RUNNER_TEMP/uninstall.sh" --yes
@@ -116,9 +121,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: source
+          name: rowanholt-source
       - name: Package
-        run: app/linux/package-deb.sh --version "$VERSION" --source rowanholt-src.tar.gz dist
+        run: desktop/linux/package-deb.sh --version "$VERSION" --source "rowanholt-$VERSION-source.tar.gz" dist
       - name: Check the package
         run: |
           dpkg-deb --info dist/*.deb
@@ -159,7 +164,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: source
+          name: rowanholt-source
       # WiX pinned, so a release builds with the toolset it was tested with
       - name: WiX Toolset
         shell: pwsh
@@ -168,7 +173,7 @@ jobs:
           wix extension add --global WixToolset.UI.wixext/5.0.2
       - name: Build the MSI
         shell: pwsh
-        run: app\windows\build-msi.ps1 -Version $env:VERSION -Tarball rowanholt-src.tar.gz -OutDir dist
+        run: desktop\windows\build-msi.ps1 -Version $env:VERSION -Tarball "rowanholt-$($env:VERSION)-source.tar.gz" -OutDir dist
       - name: Sign the MSI
         if: env.HAS_CERT == 'true'
         shell: pwsh
@@ -197,7 +202,7 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           $dir = Join-Path $env:LOCALAPPDATA 'Programs\cmdaltr\Rowanholt'
           $programs = [Environment]::GetFolderPath('Programs')
-          $expected = @("$dir\app\windows\Rowanholt.ps1", "$dir\rowanholt-src.tar.gz", "$dir\LICENSE", "$dir\VERSION",
+          $expected = @("$dir\desktop\windows\Rowanholt.ps1", "$dir\rowanholt-src.tar.gz", "$dir\LICENSE", "$dir\VERSION",
                         "$dir\seed\install.ps1", "$dir\seed\uninstall.ps1",
                         "$programs\Rowanholt.lnk", "$programs\Stop Rowanholt.lnk", "$programs\Set Up Rowanholt.lnk")
           $missing = @($expected | Where-Object { -not (Test-Path $_) })

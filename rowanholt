@@ -22,7 +22,9 @@ The platform (Docker):
   start | stop | restart | status   Run the stack (--testing: no Splunk/Elastic; --logs: follow logs;
                                     --server: the shared-server profile, automatic after 'server init';
                                     --progress[=zenity]: phases and an ETA, waiting for the web UI)
-  server init|users|licence|ca      A team server: TLS proxy, sign-in, per-user jobs, licence (docs/SERVER.md)
+  server init|uninstall|users|licence|ca
+                                    A team server: TLS proxy, sign-in, per-user jobs, licence (docs/SERVER.md);
+                                    init and uninstall are deploy/linux/install.sh and deploy/linux/uninstall.sh
   anduril <command>                 Administer Rowanholt's containers (status, logs, restart, ...)
 
 Forensics (run from the directory you're working in; relative paths stay relative):
@@ -454,6 +456,9 @@ list_scripts() {
             printf '  rowanholt %-34s %s\n' "$name" "$(script_summary "$file")"
         fi
     done
+    # The team-server installers, in deploy/linux/ (dispatched by name, below)
+    printf '  rowanholt %-34s %s\n' "server init" "$(script_summary "$ROOT/deploy/linux/install.sh")"
+    printf '  rowanholt %-34s %s\n' "server uninstall" "$(script_summary "$ROOT/deploy/linux/uninstall.sh")"
 }
 
 run_script() {
@@ -496,8 +501,8 @@ uninstall_link() {
     fi
 }
 
-# The desktop app: app/macos builds Rowanholt.app, app/linux installs a desktop entry;
-# on Windows it's app/windows/install.ps1, run from PowerShell
+# The desktop app: desktop/macos builds Rowanholt.app, desktop/linux installs a desktop entry;
+# on Windows it's desktop/windows/install.ps1, run from PowerShell
 desktop_app() {
     local action="${1:-install}"
     [ $# -gt 0 ] && shift
@@ -508,17 +513,17 @@ desktop_app() {
     case "$(uname -s)" in
         Darwin)
             if [ "$action" = uninstall ]; then
-                exec bash "$ROOT/app/macos/build.sh" --uninstall "$@"
+                exec bash "$ROOT/desktop/macos/build.sh" --uninstall "$@"
             fi
-            exec bash "$ROOT/app/macos/build.sh" "$@" ;;
+            exec bash "$ROOT/desktop/macos/build.sh" "$@" ;;
         Linux)
             if [ "$action" = uninstall ]; then
-                exec bash "$ROOT/app/linux/install.sh" --uninstall
+                exec bash "$ROOT/desktop/linux/install.sh" --uninstall
             fi
-            exec bash "$ROOT/app/linux/install.sh" ;;
+            exec bash "$ROOT/desktop/linux/install.sh" ;;
         *)
             echo "On Windows, from PowerShell:" >&2
-            echo "  powershell -ExecutionPolicy Bypass -File \"$ROOT/app/windows/install.ps1\"" >&2
+            echo "  powershell -ExecutionPolicy Bypass -File \"$ROOT/desktop/windows/install.ps1\"" >&2
             return 1 ;;
     esac
 }
@@ -578,6 +583,14 @@ case "$COMMAND" in
     mcp) PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}" exec "${ROWANHOLT_MCP_PYTHON:-$PYTHON}" -m aule_mcp.server "$@" ;;
     scripts) list_scripts ;;
     *)
+        # The team-server installers live in deploy/linux/, at Shikari's and Ostraka's paths, not
+        # under scripts/server/ with the other server helpers that the generic lookup finds
+        if [ "$COMMAND" = server ]; then
+            case "${1:-}" in
+                init) shift; exec bash "$ROOT/deploy/linux/install.sh" "$@" ;;
+                uninstall) shift; exec bash "$ROOT/deploy/linux/uninstall.sh" "$@" ;;
+            esac
+        fi
         if [ -d "$ROOT/scripts/$COMMAND" ] && [ -z "${1:-}" ]; then
             list_scripts | grep -E "^  rowanholt $COMMAND " || true
             exit 0

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Remove the Rowanholt desktop app from macOS or Linux (app/README.md).
+# Remove the Rowanholt desktop app from macOS or Linux (desktop/README.md).
 #
 #   sh desktop/uninstall.sh              remove the app, then ask before deleting its files folder and
 #                                Rowanholt's Docker data
@@ -44,7 +44,7 @@ confirm() {
     case "$answer" in [yY]*) return 0 ;; *) return 1 ;; esac
 }
 
-BUNDLE_ID=io.github.cmdaltr.rowanholt  # the release app's (app/macos/build.sh); a checkout's ends .local
+BUNDLE_ID=io.github.cmdaltr.rowanholt  # the release app's (desktop/macos/build.sh); a checkout's ends .local
 case "$(uname -s)" in
     Darwin) os=mac ;;
     Linux) os=linux; config="${XDG_CONFIG_HOME:-$HOME/.config}/rowanholt" ;;

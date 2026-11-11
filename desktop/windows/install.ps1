@@ -5,7 +5,7 @@
     The shortcuts run Rowanholt.ps1 with the Rowanholt icon. Windows doesn't let a script
     pin to the taskbar: right-click the Start menu entry and choose Pin to taskbar.
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File app\windows\install.ps1
+    powershell -ExecutionPolicy Bypass -File desktop\windows\install.ps1
 #>
 [CmdletBinding()]
 param(
@@ -31,7 +31,7 @@ if ($Uninstall) {
 }
 
 $Launcher = Join-Path $PSScriptRoot 'Rowanholt.ps1'
-$Icon = Join-Path $Root 'app\icons\rowanholt.ico'
+$Icon = Join-Path $Root 'desktop\icons\rowanholt.ico'
 $Shell = New-Object -ComObject WScript.Shell
 foreach ($link in $Shortcuts.Keys) {
     $shortcut = $Shell.CreateShortcut($link)

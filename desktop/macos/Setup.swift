@@ -33,15 +33,16 @@ final class SetupState {
     var installTarget: URL { installParent.appendingPathComponent("Rowanholt") }
 }
 
-/// A server address as typed, as the URL to open: https unless it's this machine,
-/// scheme added when missing, nothing after the host and port
-func parseServerAddress(_ text: String) -> URL? {
+/// A server address as typed, as the URL to open: https unless it's this machine (or IT or
+/// ROWANHOLT_SERVER set it, allowHTTP: a network they trust), scheme added when missing,
+/// nothing after the host and port
+func parseServerAddress(_ text: String, allowHTTP: Bool = false) -> URL? {
     var text = text.trimmingCharacters(in: .whitespacesAndNewlines)
     if !text.contains("://") { text = "https://\(text)" }
     guard let parts = URLComponents(string: text), let host = parts.host, !host.isEmpty,
           let scheme = parts.scheme?.lowercased() else { return nil }
     let local = ["localhost", "127.0.0.1", "::1"].contains(host)
-    guard scheme == "https" || (scheme == "http" && local) else { return nil }
+    guard scheme == "https" || (scheme == "http" && (local || allowHTTP)) else { return nil }
     var clean = URLComponents()
     clean.scheme = scheme
     clean.host = host

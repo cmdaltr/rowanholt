@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Set this Rowanholt up as a team's shared server (writes the server settings into .env)
+# deploy/linux/install.sh, as Shikari's and Ostraka's team-server installers; `rowanholt server init`
+# runs it, and deploy/linux/uninstall.sh undoes it.
 #
 #   rowanholt server init <hostname> [--tls internal|<acme-email>|files|tailscale] [--https-port N]
 #                                    [--service <name>|off]
@@ -33,7 +35,7 @@ while [ $# -gt 0 ]; do
         --tls) TLS="$2"; shift ;;
         --https-port) HTTPS_PORT="$2"; shift ;;
         --service) SERVICE_ARG="$2"; shift ;;
-        -h|--help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*) echo "Error: unknown option: $1" >&2; exit 1 ;;
         *) HOSTNAME_ARG="$1" ;;
     esac

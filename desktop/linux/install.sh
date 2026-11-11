@@ -25,7 +25,7 @@ fi
 command -v curl &>/dev/null || echo "Warning: curl isn't installed; the launcher needs it to see whether Rowanholt is up." >&2
 
 mkdir -p "$(dirname "$DESKTOP")" "$(dirname "$ICON")"
-cp "$ROOT/app/icons/rowanholt.png" "$ICON"
+cp "$ROOT/desktop/icons/rowanholt.png" "$ICON"
 chmod +x "$HERE/rowanholt-app.sh"
 "$HERE/desktop-entry.sh" "$HERE/rowanholt-app.sh" > "$DESKTOP"
 chmod +x "$DESKTOP"

@@ -25,8 +25,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     var unreportedStart: Date?
     var orbObservation: NSKeyValueObservation?
     var licenceWindow: NSWindow?
+    var updateOffered = false
 
     static func main() {
+        // Rowanholt.app/Contents/MacOS/Rowanholt update [--check], from a terminal
+        if CommandLine.arguments.dropFirst().first == "update" {
+            exit(Updates.command(check: CommandLine.arguments.contains("--check")))
+        }
         let app = NSApplication.shared
         let delegate = AppDelegate()
         app.delegate = delegate
@@ -43,9 +48,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         Bundle.main.url(forResource: "rowanholt-src", withExtension: "tar.gz")
     }
 
-    /// The team server chosen in setup; when set, nothing runs on this Mac
+    /// The ServerURL IT has enforced with a configuration profile for this app's bundle ID, as text
+    var managedServerText: String? {
+        let key = "ServerURL" as CFString
+        let domain = (Bundle.main.bundleIdentifier ?? "io.github.cmdaltr.rowanholt") as CFString
+        guard CFPreferencesAppValueIsForced(key, domain),
+              let value = CFPreferencesCopyAppValue(key, domain) as? String else { return nil }
+        let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
+    }
+
+    /// IT's server: it wins, and setup can't change it
+    var managedServer: URL? { managedServerText.flatMap { parseServerAddress($0, allowHTTP: true) } }
+
+    /// The server to open, if any (nothing runs on this Mac then): IT's, then ROWANHOLT_SERVER
+    /// (a URL, or "local" to run here whatever setup saved), then the one chosen in setup
     var serverURL: URL? {
-        UserDefaults.standard.string(forKey: "RowanholtServer").flatMap(URL.init(string:))
+        if let managed = managedServer { return managed }
+        if let env = ProcessInfo.processInfo.environment["ROWANHOLT_SERVER"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !env.isEmpty {
+            return env == "local" ? nil : parseServerAddress(env, allowHTTP: true)
+        }
+        return UserDefaults.standard.string(forKey: "RowanholtServer").flatMap(URL.init(string:))
     }
 
     /// Where the web UI is: the server, or the local stack
@@ -91,6 +115,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     // MARK: Starting the stack
 
     func launch() {
+        // A broken IT setting stops here rather than quietly running Rowanholt on this Mac instead
+        if let text = managedServerText, managedServer == nil {
+            showSplash()
+            splashError("The server address your organisation set (\(text)) isn't a web address. Ask IT to correct it.")
+            return
+        }
         if let server = serverURL {
             connect(to: server)
             return
@@ -267,6 +297,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         show(.ui)
         window.title = serverURL.map { "Rowanholt — \($0.host ?? "")" } ?? "Rowanholt"
         webView.load(URLRequest(url: uiURL))
+        dailyUpdateCheck()
     }
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -353,6 +384,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             return serverURL == nil && root != nil
         case #selector(startStackMenu(_:)):
             return serverURL == nil
+        case #selector(setupMenu(_:)):
+            return managedServer == nil  // IT chose the server
+        case #selector(checkForUpdates(_:)):
+            return isRelease
         default:
             return true
         }
@@ -441,12 +476,95 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
         let helpItem = NSMenuItem()
         let helpMenu = NSMenu(title: "Help")
+        helpMenu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates(_:)), keyEquivalent: "")
         helpMenu.addItem(withTitle: "Licence", action: #selector(showLicence(_:)), keyEquivalent: "")
         helpItem.submenu = helpMenu
         main.addItem(helpItem)
         NSApp.helpMenu = helpMenu
 
         NSApp.mainMenu = main
+    }
+
+    // MARK: Updates
+
+    /// A release build (it carries the source tree): a checkout's build updates with git
+    var isRelease: Bool { bundledSource != nil }
+
+    /// Once a day, once the UI is up: a newer release offered as a sheet, never while setting up
+    func dailyUpdateCheck() {
+        guard isRelease, !updateOffered, Updates.checksEnabled else { return }
+        updateOffered = true
+        DispatchQueue.global(qos: .utility).async {
+            let latest = Updates.daily(current: self.appVersion)
+            DispatchQueue.main.async {
+                if let latest = latest, self.page == .ui { self.offerUpdate(latest) }
+            }
+        }
+    }
+
+    func offerUpdate(_ latest: Updates.Release) {
+        let alert = NSAlert()
+        alert.messageText = "Rowanholt \(latest.version) is available"
+        alert.informativeText = "You have \(appVersion). Update downloads it, checks it against the release's SHA256SUMS, closes Rowanholt, installs it and reopens it. The stack keeps running."
+        alert.addButton(withTitle: "Update")
+        alert.addButton(withTitle: "Later")
+        alert.addButton(withTitle: "Skip This Version")
+        alert.beginSheetModal(for: window) { answer in
+            switch answer {
+            case .alertFirstButtonReturn: self.installUpdate(latest)
+            case .alertThirdButtonReturn: Updates.skip(latest.version)
+            default: break  // Later: until the next launch
+            }
+        }
+    }
+
+    /// The install script the app carries, run once this app has quit (it replaces the app)
+    func installUpdate(_ latest: Updates.Release) {
+        guard let script = Bundle.main.url(forResource: "install", withExtension: "sh") else {
+            splashError("This copy of Rowanholt doesn't carry its installer: download the new version from GitHub.")
+            return
+        }
+        let logs = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Rowanholt")
+        try? FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
+        let log = logs.appendingPathComponent("update.log").path
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", "while kill -0 \(pid) 2>/dev/null; do sleep 1; done; "
+                             + "sh \"$0\" --version \"$1\" --launch > \"$2\" 2>&1",
+                             script.path, latest.tag, log]
+        do {
+            try process.run()
+            NSApp.terminate(nil)
+        } catch {
+            NSAlert(error: error).runModal()
+        }
+    }
+
+    @objc func checkForUpdates(_ sender: Any?) {
+        let alert = NSAlert()
+        alert.showsSuppressionButton = true
+        alert.suppressionButton?.title = "Check for updates once a day"
+        alert.suppressionButton?.state = Updates.checksEnabled ? .on : .off
+        var latest: Updates.Release?
+        switch Updates.latest() {
+        case .success(let release) where Updates.isNewer(release.version, than: appVersion):
+            latest = release
+            alert.messageText = "Rowanholt \(release.version) is available"
+            alert.informativeText = "You have \(appVersion)."
+            alert.addButton(withTitle: "Update")
+            alert.addButton(withTitle: "Later")
+        case .success:
+            alert.messageText = "Rowanholt \(appVersion) is the latest"
+            alert.addButton(withTitle: "OK")
+        case .failure(let error):
+            alert.messageText = "Couldn't check for updates"
+            alert.informativeText = error.localizedDescription
+            alert.addButton(withTitle: "OK")
+        }
+        let answer = alert.runModal()
+        Updates.setChecks(alert.suppressionButton?.state == .on)
+        if let latest = latest, answer == .alertFirstButtonReturn { installUpdate(latest) }
     }
 
     // MARK: Navigation, downloads, pop-ups
@@ -614,5 +732,118 @@ func recordStart(seconds: Double) {
         handle.closeFile()
     } else {
         try? line.write(to: startHistory, atomically: true, encoding: .utf8)
+    }
+}
+
+/// GitHub's latest published release of Rowanholt, asked at most once a day (drafts and
+/// prereleases are never "latest"). Nothing but the request is sent; the repository is public,
+/// so a token (GH_TOKEN, GITHUB_TOKEN) only lifts the rate limit. Off with
+/// ROWANHOLT_UPDATE_CHECK=0 or Help > Check for Updates' switch
+enum Updates {
+    struct Release { let tag: String; let version: String; let url: String }
+
+    static let repo = "cmdaltr/rowanholt"
+    static let defaults = UserDefaults.standard
+
+    /// "v2.1.0" as [2, 1, 0]; anything after the numbers (-dev.4, -rc1) is ignored, as Shikari does
+    static func parts(_ text: String) -> [Int] {
+        var t = Substring(text.trimmingCharacters(in: .whitespaces))
+        if t.hasPrefix("v") { t = t.dropFirst() }
+        let numeric = t.prefix { $0.isNumber || $0 == "." }
+        return numeric.split(separator: ".").compactMap { Int($0) }
+    }
+
+    static func isNewer(_ latest: String, than current: String) -> Bool {
+        let a = parts(latest), b = parts(current)
+        guard !a.isEmpty else { return false }
+        for i in 0..<max(a.count, b.count) {
+            let x = i < a.count ? a[i] : 0, y = i < b.count ? b[i] : 0
+            if x != y { return x > y }
+        }
+        return false
+    }
+
+    static var checksEnabled: Bool {
+        let env = ProcessInfo.processInfo.environment["ROWANHOLT_UPDATE_CHECK"]?.lowercased() ?? ""
+        if ["0", "false", "no", "off"].contains(env) { return false }
+        return defaults.object(forKey: "RowanholtUpdateCheck") as? Bool ?? true
+    }
+
+    static func setChecks(_ on: Bool) { defaults.set(on, forKey: "RowanholtUpdateCheck") }
+
+    static func skip(_ version: String) { defaults.set(version, forKey: "RowanholtUpdateSkipped") }
+
+    static func latest(timeout: TimeInterval = 10) -> Result<Release, Error> {
+        var request = URLRequest(url: URL(string: "https://api.github.com/repos/\(repo)/releases/latest")!,
+                                 timeoutInterval: timeout)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("rowanholt-update", forHTTPHeaderField: "User-Agent")
+        let env = ProcessInfo.processInfo.environment
+        if let token = env["GH_TOKEN"] ?? env["GITHUB_TOKEN"], !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        var result: Result<Release, Error> = .failure(SetupError(message: "GitHub didn't answer"))
+        let done = DispatchSemaphore(value: 0)
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            defer { done.signal() }
+            if let error = error { result = .failure(error); return }
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard status == 200, let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let tag = json["tag_name"] as? String else {
+                result = .failure(SetupError(message: status == 404 ? "No release of \(repo) is published yet."
+                                                                   : "GitHub answered HTTP \(status)."))
+                return
+            }
+            result = .success(Release(tag: tag, version: tag.hasPrefix("v") ? String(tag.dropFirst()) : tag,
+                                      url: json["html_url"] as? String ?? ""))
+        }.resume()
+        done.wait()
+        return result
+    }
+
+    /// The newer release, or nil; asks GitHub at most once a day, and a failed check is just nil
+    static func daily(current: String, now: Date = Date()) -> Release? {
+        let checked = defaults.double(forKey: "RowanholtUpdateCheckedAt")
+        if checked == 0 || now.timeIntervalSince1970 - checked >= 86_400 {
+            if case .success(let release) = latest() {
+                defaults.set(["tag": release.tag, "version": release.version, "url": release.url],
+                             forKey: "RowanholtUpdateLatest")
+            } else {
+                defaults.removeObject(forKey: "RowanholtUpdateLatest")
+            }
+            defaults.set(now.timeIntervalSince1970, forKey: "RowanholtUpdateCheckedAt")
+        }
+        guard let saved = defaults.dictionary(forKey: "RowanholtUpdateLatest") as? [String: String],
+              let tag = saved["tag"], let version = saved["version"],
+              isNewer(version, than: current),
+              version != defaults.string(forKey: "RowanholtUpdateSkipped") else { return nil }
+        return Release(tag: tag, version: version, url: saved["url"] ?? "")
+    }
+
+    /// `update` from a terminal: say whether there's a newer release, and install it unless --check
+    static func command(check: Bool) -> Int32 {
+        let current = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
+        switch latest() {
+        case .failure(let error):
+            FileHandle.standardError.write("Couldn't check for updates: \(error.localizedDescription)\n".data(using: .utf8)!)
+            return 1
+        case .success(let release) where !isNewer(release.version, than: current):
+            print("Rowanholt \(current) is the latest.")
+            return 0
+        case .success(let release):
+            print("Rowanholt \(release.version) is available (you have \(current)): \(release.url)")
+            if check { return 0 }
+            guard let script = Bundle.main.path(forResource: "install", ofType: "sh") else {
+                FileHandle.standardError.write("This copy doesn't carry desktop/install.sh.\n".data(using: .utf8)!)
+                return 1
+            }
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/sh")
+            process.arguments = [script, "--version", release.tag]
+            do { try process.run() } catch { return 1 }
+            process.waitUntilExit()
+            return process.terminationStatus
+        }
     }
 }

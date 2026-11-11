@@ -1,5 +1,5 @@
 <#
-Remove the Rowanholt desktop app from Windows (app/README.md).
+Remove the Rowanholt desktop app from Windows (desktop/README.md).
 
     powershell -ExecutionPolicy Bypass -File desktop\uninstall.ps1             remove the app, then ask before deleting its data
     powershell -ExecutionPolicy Bypass -File desktop\uninstall.ps1 -KeepData   remove the app only: the data stays for a reinstall
@@ -65,7 +65,7 @@ if (-not $docker) {
 }
 
 Step "Removing the app"
-# Asked of Windows Installer by the MSI's UpgradeCode (app/windows/rowanholt.wxs): a per-user MSI
+# Asked of Windows Installer by the MSI's UpgradeCode (desktop/windows/rowanholt.wxs): a per-user MSI
 # has no key under HKCU's Uninstall, which only lists non-MSI per-user installs
 $upgradeCode = "{2960092C-3402-4618-A64F-289055BDD7C2}"
 $installer = New-Object -ComObject WindowsInstaller.Installer

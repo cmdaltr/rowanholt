@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    What the Rowanholt scheduled task runs at boot (Install-RowanholtServer.ps1 copies it to
+    What the Rowanholt scheduled task runs at boot (deploy\windows\install-service.ps1 copies it to
     %ProgramData%\Rowanholt): start the stack in WSL, forward the proxy's ports to it, and hold
     the distribution open.
 .DESCRIPTION
@@ -19,7 +19,7 @@ $Distro = $config.Distribution
 function Write-Log([string]$Text) { Add-Content -Path $Log -Value "[$(Get-Date -Format s)] $Text" }
 
 Write-Log 'Starting Rowanholt'
-# WSL's MSI (Install-RowanholtServer.ps1), not System32's wsl.exe, which on Server 2022 predates it
+# WSL's MSI (deploy\windows\install-service.ps1), not System32's wsl.exe, which on Server 2022 predates it
 $wslExe = Join-Path $env:ProgramFiles 'WSL\wsl.exe'
 if (Test-Path $wslExe) { Set-Alias -Name wsl.exe -Value $wslExe -Scope Script }
 # Windows PowerShell turns a redirected stderr line into a terminating error under 'Stop', and
