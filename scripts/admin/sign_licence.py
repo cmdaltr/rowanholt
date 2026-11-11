@@ -32,7 +32,8 @@ from cryptography.hazmat.primitives.serialization import (
     load_pem_private_key,
 )
 
-# licence.py needs only the standard library, cryptography and samarkand, so it imports without the backend's settings
+# licence.py needs only the standard library, cryptography and samarkand, so it imports without the
+# backend's settings
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "web" / "backend"))
 import licence  # noqa: E402
 

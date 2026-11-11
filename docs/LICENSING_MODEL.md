@@ -43,9 +43,9 @@ differs:
 
 Webhooks work the same everywhere, sent by `samarkand.webhooks` (the reference for them): an
 admin registers a URL and the events it wants; each delivery is a POST of
-`{"event", "sent_at", "data"}` (`sent_at` ISO 8601 in UTC) with `X-<Product>-Event` and, when the webhook has a secret,
-`X-<Product>-Signature: sha256=<hex HMAC-SHA256 of the raw body>`; three tries with backoff; the last
-20 deliveries kept per webhook for the admin page. Webhook bodies pass the same masking as the
+`{"event", "sent_at", "data"}` (`sent_at` ISO 8601 in UTC) with `X-<Product>-Event` and, when the
+webhook has a secret, `X-<Product>-Signature: sha256=<hex HMAC-SHA256 of the raw body>`; three tries
+with backoff; the last 20 deliveries kept per webhook for the admin page. Webhook bodies pass the same masking as the
 product's other outward messages.
 
 ### The licence
