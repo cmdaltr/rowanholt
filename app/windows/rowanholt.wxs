@@ -87,8 +87,8 @@
            it without the repository -->
       <Component Id="Seed" Directory="SeedDir" Guid="23E53571-9291-4BD0-A7CB-6A545FCA8413">
         <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="Seed" Type="integer" Value="1" KeyPath="yes" />
-        <File Id="InstallPs1" Source="$(var.Root)\app\install.ps1" Name="install.ps1" />
-        <File Id="UninstallPs1" Source="$(var.Root)\app\uninstall.ps1" Name="uninstall.ps1" />
+        <File Id="InstallPs1" Source="$(var.Root)\desktop\install.ps1" Name="install.ps1" />
+        <File Id="UninstallPs1" Source="$(var.Root)\desktop\uninstall.ps1" Name="uninstall.ps1" />
         <RemoveFolder Id="RemoveSeedDir" On="uninstall" />
       </Component>
       <Component Id="StartMenu" Directory="ProgramMenuFolder">

@@ -1,17 +1,17 @@
 #!/bin/sh
 # Install or upgrade the Rowanholt desktop app on macOS or Linux from a GitHub release (app/README.md).
 #
-#   sh app/install.sh                    the latest release
-#   sh app/install.sh --version v1.4.0   a given release
-#   sh app/install.sh --file Rowanholt-1.4.0-macos-universal.dmg
+#   sh desktop/install.sh                    the latest release
+#   sh desktop/install.sh --version v1.4.0   a given release
+#   sh desktop/install.sh --file Rowanholt-1.4.0-macos-universal.dmg
 #                                    an installer already downloaded (no checksum: you chose the file)
-#   sh app/install.sh --launch           open Rowanholt when it's installed
-#   sh app/install.sh --clean            a clean install: once the new installer is downloaded and checked,
+#   sh desktop/install.sh --launch           open Rowanholt when it's installed
+#   sh desktop/install.sh --clean            a clean install: once the new installer is downloaded and checked,
 #                                    remove the current app, its files folder and Rowanholt's Docker
 #                                    data (the job database: cases' findings and notes) first
 #
 # The repository is public, so no token is needed; GH_TOKEN, GITHUB_TOKEN or a logged-in gh is used
-# when there is one, for GitHub's higher rate limit (as app/install.ps1). The installer is checked
+# when there is one, for GitHub's higher rate limit (as desktop/install.ps1). The installer is checked
 # against the release's SHA256SUMS before use.
 set -eu
 
@@ -74,7 +74,7 @@ trap 'rm -rf "$tmp"' EXIT
 # --clean runs the uninstaller beside this script (the repository's app/, or the installed app's
 # Resources or /opt/rowanholt). Copied out first: it deletes the app this script may be running from
 if [ -n "$clean" ]; then
-    [ -f "$(dirname "$0")/uninstall.sh" ] || die "--clean needs uninstall.sh beside install.sh: app/uninstall.sh in the repository, Rowanholt.app/Contents/Resources/uninstall.sh or /opt/rowanholt/uninstall.sh"
+    [ -f "$(dirname "$0")/uninstall.sh" ] || die "--clean needs uninstall.sh beside install.sh: desktop/uninstall.sh in the repository, Rowanholt.app/Contents/Resources/uninstall.sh or /opt/rowanholt/uninstall.sh"
     cp "$(dirname "$0")/uninstall.sh" "$tmp/uninstall.sh"
 fi
 

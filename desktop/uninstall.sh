@@ -1,10 +1,10 @@
 #!/bin/sh
 # Remove the Rowanholt desktop app from macOS or Linux (app/README.md).
 #
-#   sh app/uninstall.sh              remove the app, then ask before deleting its files folder and
+#   sh desktop/uninstall.sh              remove the app, then ask before deleting its files folder and
 #                                Rowanholt's Docker data
-#   sh app/uninstall.sh --keep-data  remove the app only: the files folder and Docker data stay for a reinstall
-#   sh app/uninstall.sh --yes        don't ask: delete the files folder and the Docker data too
+#   sh desktop/uninstall.sh --keep-data  remove the app only: the files folder and Docker data stay for a reinstall
+#   sh desktop/uninstall.sh --yes        don't ask: delete the files folder and the Docker data too
 #
 # The files folder is the copy of Rowanholt the app unpacked (~/Rowanholt unless setup chose another):
 # .env, the evidence mounts in docker-compose.local.yml, the stack's source. The Docker data is the

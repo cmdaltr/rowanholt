@@ -1,13 +1,13 @@
 <#
 Install or upgrade the Rowanholt desktop app on Windows from a GitHub release (app/README.md).
 
-    powershell -ExecutionPolicy Bypass -File install.ps1                      the latest release
-    powershell -ExecutionPolicy Bypass -File install.ps1 -Version v1.4.0      a given release
-    powershell -ExecutionPolicy Bypass -File install.ps1 -File Rowanholt.msi  an installer already downloaded
-    powershell -ExecutionPolicy Bypass -File install.ps1 -Launch              open Rowanholt when it's installed
-    powershell -ExecutionPolicy Bypass -File install.ps1 -Clean               a clean install: once the new installer is
+    powershell -ExecutionPolicy Bypass -File desktop\install.ps1                      the latest release
+    powershell -ExecutionPolicy Bypass -File desktop\install.ps1 -Version v1.4.0      a given release
+    powershell -ExecutionPolicy Bypass -File desktop\install.ps1 -File Rowanholt.msi  an installer already downloaded
+    powershell -ExecutionPolicy Bypass -File desktop\install.ps1 -Launch              open Rowanholt when it's installed
+    powershell -ExecutionPolicy Bypass -File desktop\install.ps1 -Clean               a clean install: once the new installer is
                                                                               downloaded and checked, remove the current app and
-                                                                              its data (uninstall.ps1 -Yes) first
+                                                                              its data (desktop\uninstall.ps1 -Yes) first
 
 The installer is checked against the release's SHA256SUMS before use. The repository is public, so
 no token is needed; GH_TOKEN (or GITHUB_TOKEN, or a logged-in gh) is used when there is one, for

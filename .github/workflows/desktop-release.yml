@@ -145,7 +145,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $msi = (Get-ChildItem dist\*-windows-universal.msi).FullName
-          & powershell -NoProfile -ExecutionPolicy Bypass -File app\install.ps1 -File $msi
+          & powershell -NoProfile -ExecutionPolicy Bypass -File desktop\install.ps1 -File $msi
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           $dir = Join-Path $env:LOCALAPPDATA 'Programs\cmdaltr\Rowanholt'
           $programs = [Environment]::GetFolderPath('Programs')
@@ -155,14 +155,17 @@ jobs:
           $missing = @($expected | Where-Object { -not (Test-Path $_) })
           if ($missing) { throw "Not installed: $($missing -join ', ')" }
           if ((Get-Content "$dir\VERSION" -Raw).Trim() -ne $env:VERSION) { throw "VERSION isn't $env:VERSION" }
-          $entry = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*' |
-            Where-Object { $_.DisplayName -eq 'Rowanholt' }
-          if (-not $entry) { throw 'No Settings > Apps entry' }
-          Write-Host "Installed $($entry.DisplayVersion); removing it"
+          # Settings > Apps lists what Windows Installer has registered: asked by the MSI's UpgradeCode
+          $installer = New-Object -ComObject WindowsInstaller.Installer
+          $code = @($installer.RelatedProducts('{2960092C-3402-4618-A64F-289055BDD7C2}'))[0]
+          if (-not $code) { throw 'No Settings > Apps entry' }
+          if ($installer.ProductInfo($code, 'ProductName') -ne 'Rowanholt') { throw 'The registered product isn''t Rowanholt' }
+          Write-Host "Installed $($installer.ProductInfo($code, 'VersionString')); removing it"
           & powershell -NoProfile -ExecutionPolicy Bypass -File "$dir\seed\uninstall.ps1" -Yes
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           $left = @($expected | Where-Object { Test-Path $_ })
           if ($left) { throw "Left behind: $($left -join ', ')" }
+          if (@($installer.RelatedProducts('{2960092C-3402-4618-A64F-289055BDD7C2}')).Count) { throw 'Still registered with Windows Installer' }
       - uses: actions/upload-artifact@v4
         with:
           name: rowanholt-windows

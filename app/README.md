@@ -11,7 +11,7 @@ Each `v*` tag builds four packages (`.github/workflows/desktop-release.yml`) and
 | OS | Download | Installing it | First-run setup |
 |---|---|---|---|
 | macOS 12+ | `Rowanholt-<version>-macos-universal.dmg` (Apple silicon and Intel) | Drag Rowanholt to Applications | In the app's window |
-| Windows 10/11 | `Rowanholt-<version>-windows-universal.msi` (x64 and Arm) | Double-click, or `app/install.ps1` (no admin needed) | In the app, on first launch |
+| Windows 10/11 | `Rowanholt-<version>-windows-universal.msi` (x64 and Arm) | Double-click, or `desktop/install.ps1` (no admin needed) | In the app, on first launch |
 | Debian, Ubuntu | `rowanholt_<version>-1_all.deb` | Double-click (App Center), or `sudo apt install ./rowanholt_*.deb` | Zenity dialogs on first launch |
 
 One package per platform runs on every architecture: the packages hold the launcher and the source tree, with nothing compiled for a CPU but the Mac app's own universal binary, and Docker builds or pulls images for the machine when the stack first starts. (Shikari splits per architecture because its installers bundle a compiled Python; the rule for both is to split only when the contents differ.) Every package carries `LICENSE`: in the Mac app's `Contents/Resources`, at `/usr/share/doc/rowanholt/copyright` and `/opt/rowanholt/LICENSE` in the `.deb`, and in the Windows install folder (`%LOCALAPPDATA%\Programs\cmdaltr\Rowanholt`); the MSI shows it when double-clicked. The Mac app shows it under Help › Licence, and the web UI's About under Licence.
@@ -22,7 +22,7 @@ Setup covers the same three things everywhere.
 
 **Rowanholt's files.** By default they go into a `Rowanholt` folder in the home directory (`%USERPROFILE%\Rowanholt` on Windows), or another folder you choose. You can point setup at a checkout you already have instead. A copy the app unpacked carries `.rowanholt-version`: when a newer app version launches, it offers to update the files in place (`.env`, evidence mounts and cases stay), and the next `rowanholt start` rebuilds the images once. A git checkout is never overwritten, so keep it current with `git pull`. On its first start, an unpacked copy gets a `.env` with a random `SECRET_KEY`.
 
-Rocky, RHEL and Alma have no desktop package, as Shikari has none: they run Rowanholt as a team server (`rowanholt server init`, [docs/SERVER.md](../docs/SERVER.md#rocky-rhel-and-alma)), and `app/install.sh` says so there. A checkout's `rowanholt app install` still works on a Rocky desktop: the launcher there says Docker Engine comes from Docker's own repository, not the distribution's (which ships Podman, unsupported), and SELinux stays enforcing, the containers that mount evidence folders running unlabelled rather than relabelling the evidence.
+Rocky, RHEL and Alma have no desktop package, as Shikari has none: they run Rowanholt as a team server (`rowanholt server init`, [docs/SERVER.md](../docs/SERVER.md#rocky-rhel-and-alma)), and `desktop/install.sh` says so there. A checkout's `rowanholt app install` still works on a Rocky desktop: the launcher there says Docker Engine comes from Docker's own repository, not the distribution's (which ships Podman, unsupported), and SELinux stays enforcing, the containers that mount evidence folders running unlabelled rather than relabelling the evidence.
 
 **Evidence folders** (optional). Setup writes `docker-compose.local.yml`, which the launcher adds to the stack when it exists. The file is gitignored, so pulls never touch it. Each folder is mounted read-only in the backend and read-write in the worker. On macOS and Linux it appears at the same path inside the containers. On Windows, `D:\Cases` appears as `/mnt/d/Cases`. A `docker-compose.local.yml` you wrote by hand is left alone. To change the folders later: **Rowanholt › Set Up Rowanholt…** (macOS), the **Set Up Rowanholt** action on the menu entry (Linux), or the **Set Up Rowanholt** Start menu entry (Windows).
 
@@ -88,8 +88,8 @@ In setup, **Connect to my team's Rowanholt server** takes a hostname (`https://`
 | `macos/journey.html` | The start-up journey (its map, `journey.png`, is cut from `docs/images/middle_earth.png` at build time) |
 | `macos/build.sh`, `macos/package.sh` | Checkout and release builds; the signed, notarised DMG |
 | `linux/rowanholt-app.sh` | Launcher and zenity setup, for a checkout or the `.deb` |
-| `linux/rowanholt.desktop.in`, `linux/desktop-entry.sh`, `linux/install.sh`, `linux/package-deb.sh` | Menu entry, checkout install, `.deb` |
-| `windows/Rowanholt.ps1`, `windows/install.ps1`, `windows/rowanholt.wxs`, `windows/build-msi.ps1` | Launcher and first-run setup, checkout shortcuts, the MSI (WiX 5) and its build |
-| `install.ps1`, `uninstall.ps1` | Install, upgrade or remove the Windows release, as Shikari's do; the MSI carries both in `seed\` |
+| `linux/rowanholt.desktop.in`, `linux/desktop-entry.sh`, `app/linux/install.sh`, `linux/package-deb.sh` | Menu entry, checkout install, `.deb` |
+| `windows/Rowanholt.ps1`, `app/windows/install.ps1`, `windows/rowanholt.wxs`, `windows/build-msi.ps1` | Launcher and first-run setup, checkout shortcuts, the MSI (WiX 5) and its build |
+| `../desktop/install.sh`, `../desktop/uninstall.sh`, `../desktop/install.ps1`, `../desktop/uninstall.ps1` | The release installers (`desktop/` at the repository's top level, as Shikari's): install, upgrade or remove a release. The Mac app carries the `.sh` pair in `Contents/Resources`, the `.deb` in `/opt/rowanholt`, the MSI the `.ps1` pair in `seed\` |
 | `source-tarball.sh` | The source tree the packages carry (`git archive HEAD`) |
 | `icons/` | `rowanholt.icns`, `.ico`, `.png`, committed; `icons/build.sh` regenerates them from the logo on a Mac |

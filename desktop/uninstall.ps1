@@ -1,9 +1,9 @@
 <#
 Remove the Rowanholt desktop app from Windows (app/README.md).
 
-    powershell -ExecutionPolicy Bypass -File uninstall.ps1             remove the app, then ask before deleting its data
-    powershell -ExecutionPolicy Bypass -File uninstall.ps1 -KeepData   remove the app only: the data stays for a reinstall
-    powershell -ExecutionPolicy Bypass -File uninstall.ps1 -Yes        don't ask: delete the data too
+    powershell -ExecutionPolicy Bypass -File desktop\uninstall.ps1             remove the app, then ask before deleting its data
+    powershell -ExecutionPolicy Bypass -File desktop\uninstall.ps1 -KeepData   remove the app only: the data stays for a reinstall
+    powershell -ExecutionPolicy Bypass -File desktop\uninstall.ps1 -Yes        don't ask: delete the data too
 
 Rowanholt's data is the folder setup unpacked it into (%USERPROFILE%\Rowanholt unless you chose
 another: .env, docker-compose.local.yml, the stack's files), its Docker volumes (the database of
@@ -65,14 +65,13 @@ if (-not $docker) {
 }
 
 Step "Removing the app"
-# A per-user install registers under HKCU; a machine-wide one under HKLM (either registry view)
-$keys = @(
-    "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
-    "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
-    "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
-)
-$entries = @(Get-ItemProperty $keys -ErrorAction SilentlyContinue |
-    Where-Object { $_.DisplayName -eq "Rowanholt" -and $_.PSChildName -match '^\{[0-9A-Fa-f-]+\}$' })
+# Asked of Windows Installer by the MSI's UpgradeCode (app/windows/rowanholt.wxs): a per-user MSI
+# has no key under HKCU's Uninstall, which only lists non-MSI per-user installs
+$upgradeCode = "{2960092C-3402-4618-A64F-289055BDD7C2}"
+$installer = New-Object -ComObject WindowsInstaller.Installer
+$entries = @(foreach ($code in @($installer.RelatedProducts($upgradeCode))) {
+    [pscustomobject]@{ PSChildName = $code; DisplayVersion = $installer.ProductInfo($code, "VersionString") }
+})
 if (-not $entries) {
     Done "Rowanholt isn't installed"
 } else {

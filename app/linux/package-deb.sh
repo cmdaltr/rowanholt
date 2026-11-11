@@ -40,8 +40,8 @@ echo "$VERSION" > "$OPT/VERSION"
 # the terms ship with the package, so using it is accepting them (README)
 install -m 644 "$ROOT/LICENSE" "$PKG/usr/share/doc/rowanholt/copyright"
 install -m 644 "$ROOT/LICENSE" "$OPT/LICENSE"
-# app/install.sh and app/uninstall.sh (the release installer, not app/linux/install.sh) side by side, so an installed copy can upgrade (--clean) or remove itself
-install -m 755 "$ROOT/app/install.sh" "$ROOT/app/uninstall.sh" "$OPT/"
+# desktop/install.sh and desktop/uninstall.sh (the release installer, not app/linux/install.sh) side by side, so an installed copy can upgrade (--clean) or remove itself
+install -m 755 "$ROOT/desktop/install.sh" "$ROOT/desktop/uninstall.sh" "$OPT/"
 "$HERE/desktop-entry.sh" /opt/rowanholt/rowanholt-app.sh > "$PKG/usr/share/applications/rowanholt.desktop"
 
 cat > "$PKG/DEBIAN/control" <<EOF
