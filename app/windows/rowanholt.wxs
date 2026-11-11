@@ -34,7 +34,7 @@
     <Property Id="ARPPRODUCTICON" Value="rowanholt.ico" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/cmdaltr/rowanholt" />
     <Property Id="ARPHELPLINK" Value="https://github.com/cmdaltr/rowanholt/issues" />
-    <Property Id="ARPNOMODIFY" Value="1" />
+    <!-- ARPNOMODIFY (no Modify in Settings > Apps) comes with WixUI_Minimal, which defines it -->
     <!-- msiexec /i Rowanholt-....msi DESKTOPSHORTCUT=1 adds a desktop shortcut too -->
     <Property Id="DESKTOPSHORTCUT" Secure="yes" />
 

@@ -42,7 +42,7 @@ jobs:
 
   macos:
     needs: source
-    runs-on: macos-14
+    runs-on: macos-15  # macos-14 was retired; Shikari's builds use macos-15 too
     env:
       VERSION: ${{ needs.source.outputs.version }}
       HAS_CERT: ${{ secrets.MACOS_CERTIFICATE_P12 != '' }}
