@@ -74,6 +74,34 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: app/macos/package.sh --version "$VERSION" --source rowanholt-src.tar.gz dist
+      # Installed and removed with the scripts a user runs, as Shikari's smoke job does. The stack
+      # can't start here (GitHub's macOS runners have no Docker), so this checks what the DMG puts
+      # down and takes away
+      - name: Install, check and uninstall
+        run: |
+          set -eu
+          sh desktop/install.sh --file dist/*-macos-universal.dmg
+          app=/Applications/Rowanholt.app
+          [ -d "$app" ] || app="$HOME/Applications/Rowanholt.app"
+          [ -d "$app" ] || { echo "Rowanholt.app isn't installed"; exit 1; }
+          archs=$(lipo -archs "$app"/Contents/MacOS/*)
+          echo "Launcher: $archs"
+          case " $archs " in *" x86_64 "*) ;; *) echo "not universal: no x86_64"; exit 1 ;; esac
+          case " $archs " in *" arm64 "*) ;; *) echo "not universal: no arm64"; exit 1 ;; esac
+          for f in LICENSE install.sh uninstall.sh; do
+            [ -f "$app/Contents/Resources/$f" ] || { echo "Contents/Resources/$f is missing"; exit 1; }
+          done
+          id=$(defaults read "$app/Contents/Info" CFBundleIdentifier)
+          [ "$id" = io.github.cmdaltr.rowanholt ] || { echo "bundle id is $id"; exit 1; }
+          codesign --verify --deep --strict "$app"
+          # The app's own uninstaller, copied out first as a user's would run: it deletes the app it's in
+          cp "$app/Contents/Resources/uninstall.sh" "$RUNNER_TEMP/uninstall.sh"
+          sh "$RUNNER_TEMP/uninstall.sh" --yes
+          for left in /Applications/Rowanholt.app "$HOME/Applications/Rowanholt.app" \
+                      "$HOME/Library/Preferences/io.github.cmdaltr.rowanholt.plist"; do
+            [ ! -e "$left" ] || { echo "Left behind: $left"; exit 1; }
+          done
+          ! defaults read io.github.cmdaltr.rowanholt >/dev/null 2>&1 || { echo "Preferences left behind"; exit 1; }
       - uses: actions/upload-artifact@v4
         with:
           name: rowanholt-macos
@@ -81,7 +109,7 @@ jobs:
 
   linux:
     needs: source
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  # the oldest the .deb supports, as Shikari builds its .debs on
     env:
       VERSION: ${{ needs.source.outputs.version }}
     steps:
@@ -96,6 +124,26 @@ jobs:
           dpkg-deb --info dist/*.deb
           dpkg-deb --contents dist/*.deb | grep -E 'opt/rowanholt/|applications/rowanholt.desktop'
           dpkg-deb --fsys-tarfile dist/*.deb | tar -xO ./usr/share/applications/rowanholt.desktop | desktop-file-validate /dev/stdin || true
+      # Installed and removed with the scripts a user runs (apt pulls in the launcher's dependencies).
+      # The stack isn't started: this checks what the .deb puts down and takes away
+      - name: Install, check and uninstall
+        run: |
+          set -eu
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq desktop-file-utils >/dev/null
+          sh desktop/install.sh --file dist/*_all.deb
+          for f in LICENSE install.sh uninstall.sh VERSION rowanholt-app.sh rowanholt-src.tar.gz; do
+            [ -f "/opt/rowanholt/$f" ] || { echo "/opt/rowanholt/$f is missing"; exit 1; }
+          done
+          [ "$(cat /opt/rowanholt/VERSION)" = "$VERSION" ] || { echo "VERSION isn't $VERSION"; exit 1; }
+          cmp /usr/share/doc/rowanholt/copyright LICENSE
+          desktop-file-validate /usr/share/applications/rowanholt.desktop
+          # The installed uninstaller, copied out first: purging the package deletes /opt/rowanholt
+          cp /opt/rowanholt/uninstall.sh "$RUNNER_TEMP/uninstall.sh"
+          sh "$RUNNER_TEMP/uninstall.sh" --yes
+          ! dpkg -s rowanholt >/dev/null 2>&1 || { echo "rowanholt is still installed"; exit 1; }
+          [ ! -e /opt/rowanholt ] || { echo "Left behind: /opt/rowanholt"; ls -la /opt/rowanholt; exit 1; }
+          [ ! -e /usr/share/applications/rowanholt.desktop ] || { echo "Left behind: the menu entry"; exit 1; }
       - uses: actions/upload-artifact@v4
         with:
           name: rowanholt-linux
