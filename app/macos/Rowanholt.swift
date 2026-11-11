@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     /// the journey then walks against this Mac's earlier starts, and this one is recorded
     var unreportedStart: Date?
     var orbObservation: NSKeyValueObservation?
+    var licenceWindow: NSWindow?
 
     static func main() {
         let app = NSApplication.shared
@@ -278,6 +279,61 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     // MARK: Menu actions
 
+    // The bundled LICENSE, read-only: works offline and before the stack is up, unlike the web UI's
+    @objc func showLicence(_ sender: Any?) {
+        if let shown = licenceWindow {
+            shown.makeKeyAndOrderFront(nil)
+            return
+        }
+        let text = Bundle.main.url(forResource: "LICENSE", withExtension: nil)
+            .flatMap { try? String(contentsOf: $0, encoding: .utf8) }
+            ?? "The licence file is missing from this copy of the app. Rowanholt is under the Elastic License 2.0: https://github.com/cmdaltr/rowanholt/blob/main/LICENSE"
+        let commercial = "https://github.com/cmdaltr/rowanholt/blob/main/COMMERCIAL-LICENSE.md"
+        let licence = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 600),
+                               styleMask: [.titled, .closable, .resizable, .miniaturizable],
+                               backing: .buffered, defer: false)
+        licence.title = "Rowanholt Licence"
+        licence.isReleasedWhenClosed = false
+
+        let note = NSTextField(labelWithAttributedString: {
+            let line = NSMutableAttributedString(string: "Rowanholt is under the Elastic License 2.0, below. The Pro and Services editions add the Rowanholt Commercial Licence: ")
+            line.append(NSAttributedString(string: "COMMERCIAL-LICENSE.md", attributes: [.link: URL(string: commercial)!]))
+            line.append(NSAttributedString(string: "."))
+            return line
+        }())
+        note.allowsEditingTextAttributes = true  // makes the link clickable
+        note.isSelectable = true
+        note.lineBreakMode = .byWordWrapping
+        note.maximumNumberOfLines = 0
+        note.translatesAutoresizingMaskIntoConstraints = false
+
+        let scroll = NSTextView.scrollableTextView()
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        if let body = scroll.documentView as? NSTextView {
+            body.isEditable = false
+            body.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+            body.string = text
+            body.textContainerInset = NSSize(width: 8, height: 8)
+        }
+
+        let content = NSView()
+        content.addSubview(note)
+        content.addSubview(scroll)
+        NSLayoutConstraint.activate([
+            note.topAnchor.constraint(equalTo: content.topAnchor, constant: 12),
+            note.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 16),
+            note.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -16),
+            scroll.topAnchor.constraint(equalTo: note.bottomAnchor, constant: 10),
+            scroll.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            scroll.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+        ])
+        licence.contentView = content
+        licence.center()
+        licence.makeKeyAndOrderFront(nil)
+        licenceWindow = licence
+    }
+
     @objc func openInBrowser(_ sender: Any?) {
         NSWorkspace.shared.open(page == .ui ? webView.url ?? uiURL : uiURL)
     }
@@ -382,6 +438,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         windowItem.submenu = windowMenu
         main.addItem(windowItem)
         NSApp.windowsMenu = windowMenu
+
+        let helpItem = NSMenuItem()
+        let helpMenu = NSMenu(title: "Help")
+        helpMenu.addItem(withTitle: "Licence", action: #selector(showLicence(_:)), keyEquivalent: "")
+        helpItem.submenu = helpMenu
+        main.addItem(helpItem)
+        NSApp.helpMenu = helpMenu
 
         NSApp.mainMenu = main
     }

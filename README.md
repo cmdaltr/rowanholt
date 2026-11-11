@@ -563,6 +563,8 @@ Copyright (c) 2020-2026 cmdaltr.
 
 Rowanholt is source-available under the [Elastic License 2.0](LICENSE): you can use, copy and change it for free (the **Free** edition), but you may not provide it to others as a hosted or managed service, or get around its licence key. The **Pro** and **Services** editions add the terms in [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md) — Pro for organisations using Rowanholt for themselves, Services for MSSPs and consultancies running it for clients. Contact @cmdaltr on GitHub. Releases published before this (under the MIT License) keep that licence. Outside contributions need a contributor licence agreement before they can be merged.
 
+**By downloading, installing or using Rowanholt, you agree to the [Elastic License 2.0](LICENSE) — and, where you install a Pro or Services licence key, to the terms in [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md). If you do not agree, do not install or use the software.** This is why the macOS and Linux installers don't stop to ask: the terms ship with every package (the `.deb`'s `copyright` file, the Windows installer's licence page, and in-app under About → Licence, or Help → Licence in the Mac app), and use is what signifies acceptance.
+
 **Rowanholt™** and the Rowanholt logo are trademarks of cmdaltr. The licence covers the software; it does not grant any right to use the Rowanholt name or logo, whether to brand a fork or otherwise.
 
 ---
@@ -620,7 +622,6 @@ And 25+ additional tools. See [REQUIREMENTS.md](docs/REQUIREMENTS.md) for the co
 
 **Feature requests:** [docs/FEATURE_REQUESTS.md](docs/FEATURE_REQUESTS.md)
 - Team servers on Linux beyond Ubuntu (RHEL, Rocky, Alma) and on Windows Server
-- Desktop app RPM for Rocky Linux 9 / RHEL 9
 - Lab VM consoles in the browser
 - Mobile device forensics (iOS, Android)
 - Network forensics (PCAP, Zeek, NetFlow)

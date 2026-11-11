@@ -245,7 +245,7 @@ Every feature request built, each still open in `docs/FEATURE_REQUESTS.md` until
 |---|---|
 | Team servers on Rocky, RHEL and Alma: SELinux without relabelling evidence (`label=disable` on the services that mount host folders), firewalld, Docker's RHEL packages (FR-01) | `deploy/docker-compose.selinux.yml`, `server-init.sh`, [SERVER.md](SERVER.md#rocky-rhel-and-alma) |
 | Team servers on Windows Server 2022 and 2025, in a WSL 2 distribution of their own, started at boot with nobody signed in (FR-02) | `scripts/server/windows/`, [SERVER.md](SERVER.md#windows-server) |
-| The desktop app as an RPM for Rocky, RHEL and Alma 9 (FR-03) | `app/linux/package-rpm.sh`, `desktop-release.yml` |
+| The desktop app as an RPM for Rocky, RHEL and Alma 9 (FR-03); withdrawn 11 November 2026, as Shikari has no RPM: the desktop app is Debian and Ubuntu's, and Rocky, RHEL and Alma run team servers | `app/install.sh`, [SERVER.md](SERVER.md#rocky-rhel-and-alma) |
 | Lab VM consoles on Aragorn › Lab, through the lab agent, for admins only; opt-in with `LAB_VM_CONSOLE=1` (FR-04) | `src/mordor/lab/consoles.py`, `lab_routes.py`, `lab/README.md` |
 | Phones: iTunes/Finder and ADB backups, bug reports and extractions through iLEAPP and ALEAPP, ATT&CK Mobile techniques, the evidence hashed before and after (FR-05) | `core/mobile.py`, `process/mobile.py`, [CLI.md](CLI.md) |
 | Network evidence: PCAPs through Zeek, Zeek logs and NetFlow exports, joined to the hosts' IOCs (FR-06) | `process/network.py`, [CLI.md](CLI.md) |

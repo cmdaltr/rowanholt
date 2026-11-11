@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Rowanholt's Windows installer (WiX Toolset 5): Rowanholt-<version>-windows-universal.msi, for the
+  current user, with no administrator rights, into %LOCALAPPDATA%\Programs\cmdaltr\Rowanholt, the
+  way Shikari's MSI installs. It carries the launcher, the icon, LICENSE, the install and uninstall
+  scripts (seed\) and the source tree as rowanholt-src.tar.gz; the launcher's first run does the
+  setup (where Rowanholt runs, Docker, its files folder, evidence), as the Linux packages' does.
+
+  Nothing in it is compiled, so one x86 package serves x64 and Arm64 Windows alike (the per-user
+  folders and HKCU\Software aren't redirected for a 32-bit package). build-msi.ps1 builds it:
+    powershell -File app\windows\build-msi.ps1 -Version 1.4.0 -Tarball rowanholt-src.tar.gz -OutDir dist
+
+  Every component keys on an HKCU value, not a file: a per-user install has to (ICE38), so Windows
+  Installer can tell what's installed without reading the user's profile.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <!-- The UpgradeCode never changes: it's how a new MSI finds and replaces the installed one -->
+  <Package Name="Rowanholt"
+           Manufacturer="cmdaltr"
+           Version="$(var.ProductVersion)"
+           UpgradeCode="2960092C-3402-4618-A64F-289055BDD7C2"
+           Scope="perUser"
+           Compressed="yes"
+           InstallerVersion="500">
+    <SummaryInformation Description="Rowanholt DFIR platform" />
+
+    <!-- Same version allowed: a rebuilt release (or an -rc, whose MSI version is its x.y.z) still replaces -->
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="A newer Rowanholt is already installed. Remove it from Settings &gt; Apps first." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="rowanholt.ico" SourceFile="$(var.Root)\app\icons\rowanholt.ico" />
+    <Property Id="ARPPRODUCTICON" Value="rowanholt.ico" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/cmdaltr/rowanholt" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/cmdaltr/rowanholt/issues" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <!-- msiexec /i Rowanholt-....msi DESKTOPSHORTCUT=1 adds a desktop shortcut too -->
+    <Property Id="DESKTOPSHORTCUT" Secure="yes" />
+
+    <!-- Double-clicked, it shows the Elastic License to accept; install.ps1's /passive shows none,
+         and using the software is accepting it (README) -->
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenceRtf)" />
+    <ui:WixUI Id="WixUI_Minimal" />
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramsDir" Name="Programs">
+        <Directory Id="VendorDir" Name="cmdaltr">
+          <Directory Id="INSTALLFOLDER" Name="Rowanholt">
+            <Directory Id="AppDir" Name="app">
+              <Directory Id="WindowsDir" Name="windows" />
+              <Directory Id="IconsDir" Name="icons" />
+            </Directory>
+            <Directory Id="SeedDir" Name="seed" />
+          </Directory>
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+    <StandardDirectory Id="DesktopFolder" />
+
+    <Feature Id="Main" Title="Rowanholt">
+      <Component Id="Bundle" Directory="INSTALLFOLDER">
+        <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="Bundle" Type="string" Value="[ProductVersion]" KeyPath="yes" />
+        <File Id="Licence" Source="$(var.Root)\LICENSE" Name="LICENSE" />
+        <File Id="Source" Source="$(var.Tarball)" Name="rowanholt-src.tar.gz" />
+        <File Id="Version" Source="$(var.VersionFile)" Name="VERSION" />
+        <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />
+        <!-- cmdaltr\ goes too once nothing else of cmdaltr's is in it (RemoveFolder only removes an empty one) -->
+        <RemoveFolder Id="RemoveVendorDir" Directory="VendorDir" On="uninstall" />
+      </Component>
+      <Component Id="Launcher" Directory="WindowsDir">
+        <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="Launcher" Type="integer" Value="1" KeyPath="yes" />
+        <File Id="RowanholtPs1" Source="$(var.Root)\app\windows\Rowanholt.ps1" Name="Rowanholt.ps1" />
+        <RemoveFolder Id="RemoveWindowsDir" On="uninstall" />
+        <RemoveFolder Id="RemoveAppDir" Directory="AppDir" On="uninstall" />
+      </Component>
+      <Component Id="Icons" Directory="IconsDir">
+        <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="Icons" Type="integer" Value="1" KeyPath="yes" />
+        <File Id="RowanholtIco" Source="$(var.Root)\app\icons\rowanholt.ico" Name="rowanholt.ico" />
+        <RemoveFolder Id="RemoveIconsDir" On="uninstall" />
+      </Component>
+      <!-- install.ps1 and uninstall.ps1 travel with the app, as Shikari's seed\ does: upgrade or remove
+           it without the repository -->
+      <Component Id="Seed" Directory="SeedDir">
+        <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="Seed" Type="integer" Value="1" KeyPath="yes" />
+        <File Id="InstallPs1" Source="$(var.Root)\app\install.ps1" Name="install.ps1" />
+        <File Id="UninstallPs1" Source="$(var.Root)\app\uninstall.ps1" Name="uninstall.ps1" />
+        <RemoveFolder Id="RemoveSeedDir" On="uninstall" />
+      </Component>
+      <Component Id="StartMenu" Directory="ProgramMenuFolder">
+        <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="StartMenu" Type="integer" Value="1" KeyPath="yes" />
+        <!-- The console shows the road to Rowanholt while the stack starts, then closes -->
+        <Shortcut Id="RowanholtShortcut" Name="Rowanholt" Description="Rowanholt DFIR platform"
+                  Target="[System64Folder]WindowsPowerShell\v1.0\powershell.exe"
+                  Arguments="-NoProfile -ExecutionPolicy Bypass -File &quot;[WindowsDir]Rowanholt.ps1&quot;"
+                  WorkingDirectory="INSTALLFOLDER" Icon="rowanholt.ico" />
+        <Shortcut Id="StopShortcut" Name="Stop Rowanholt" Description="Stop Rowanholt's containers"
+                  Target="[System64Folder]WindowsPowerShell\v1.0\powershell.exe"
+                  Arguments="-NoProfile -ExecutionPolicy Bypass -File &quot;[WindowsDir]Rowanholt.ps1&quot; -Stop"
+                  WorkingDirectory="INSTALLFOLDER" Icon="rowanholt.ico" Show="minimized" />
+        <!-- Setup was the installer's pages; it's the launcher's now, and this runs it again -->
+        <Shortcut Id="SetupShortcut" Name="Set Up Rowanholt" Description="Choose where Rowanholt runs, its folder and evidence"
+                  Target="[System64Folder]WindowsPowerShell\v1.0\powershell.exe"
+                  Arguments="-NoProfile -ExecutionPolicy Bypass -File &quot;[WindowsDir]Rowanholt.ps1&quot; -Setup"
+                  WorkingDirectory="INSTALLFOLDER" Icon="rowanholt.ico" />
+      </Component>
+      <Component Id="DesktopShortcut" Directory="DesktopFolder" Condition="DESKTOPSHORTCUT = 1">
+        <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+        <Shortcut Id="RowanholtDesktop" Name="Rowanholt" Description="Rowanholt DFIR platform"
+                  Target="[System64Folder]WindowsPowerShell\v1.0\powershell.exe"
+                  Arguments="-NoProfile -ExecutionPolicy Bypass -File &quot;[WindowsDir]Rowanholt.ps1&quot;"
+                  WorkingDirectory="INSTALLFOLDER" Icon="rowanholt.ico" />
+      </Component>
+      <!-- Clears HKCU\Software\cmdaltr\Rowanholt on uninstall once its values are gone -->
+      <Component Id="RegistryKey" Directory="INSTALLFOLDER">
+        <RegistryKey Root="HKCU" Key="Software\cmdaltr\Rowanholt" ForceDeleteOnUninstall="yes">
+          <RegistryValue Name="InstallFolder" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
+        </RegistryKey>
+      </Component>
+    </Feature>
+  </Package>
+</Wix>

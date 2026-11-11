@@ -58,6 +58,7 @@ function Navigation({ onGuide, serverMode }) {
           <Link to="/help">About</Link>
           <div className="nav-menu__items">
             <button type="button" className="nav-guide" onClick={onGuide} title="The guide and a tip">Guide</button>
+            <Link to="/help#licence" title="The Elastic License 2.0 Rowanholt is under">Licence</Link>
           </div>
         </div>
         <Link to={isAuthenticated ? "/account" : "/login"}>Account</Link>

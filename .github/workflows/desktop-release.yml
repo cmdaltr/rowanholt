@@ -1,4 +1,4 @@
-# Builds the desktop app for macOS (.dmg), Windows (setup .exe) and Linux (.deb and .rpm), each
+# Builds the desktop app for macOS (.dmg), Windows (.msi) and Debian/Ubuntu (.deb), each
 # carrying the source tree at this commit. A v* tag attaches them to a draft release;
 # a manual run leaves them as workflow artifacts.
 #
@@ -101,33 +101,6 @@ jobs:
           name: rowanholt-linux
           path: dist/*.deb
 
-  linux-rpm:
-    needs: source
-    runs-on: ubuntu-latest
-    container: rockylinux:9
-    env:
-      VERSION: ${{ needs.source.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: source
-      - name: Build tools
-        run: dnf -q install -y rpm-build rpmlint desktop-file-utils
-      - name: Package
-        run: app/linux/package-rpm.sh --version "$VERSION" --source rowanholt-src.tar.gz dist
-      - name: Check the package
-        run: |
-          rpm -qpi dist/*.rpm
-          rpm -qpl dist/*.rpm | grep -E 'opt/rowanholt/|applications/rowanholt.desktop'
-          rpmlint -f app/linux/rpmlintrc dist/*.rpm
-          dnf -q install -y dist/*.rpm
-          desktop-file-validate /usr/share/applications/rowanholt.desktop
-      - uses: actions/upload-artifact@v4
-        with:
-          name: rowanholt-linux-rpm
-          path: dist/*.rpm
-
   windows:
     needs: source
     runs-on: windows-latest
@@ -139,17 +112,16 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: source
-      - name: Unpack the source
-        shell: bash
-        run: mkdir stage && tar -xzf rowanholt-src.tar.gz -C stage
-      - name: Build the installer
+      # WiX pinned, so a release builds with the toolset it was tested with
+      - name: WiX Toolset
         shell: pwsh
         run: |
-          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y | Out-Null }
-          & $iscc "/DAppVersion=$env:VERSION" "/DSourceDir=$PWD\stage\rowanholt" "/DOutputDir=$PWD\dist" app\windows\rowanholt.iss
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Sign the installer
+          dotnet tool install --global wix --version 5.0.2
+          wix extension add --global WixToolset.UI.wixext/5.0.2
+      - name: Build the MSI
+        shell: pwsh
+        run: app\windows\build-msi.ps1 -Version $env:VERSION -Tarball rowanholt-src.tar.gz -OutDir dist
+      - name: Sign the MSI
         if: env.HAS_CERT == 'true'
         shell: pwsh
         env:
@@ -160,19 +132,45 @@ jobs:
           [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:PFX))
           $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName | Select-Object -Last 1
           try {
-            & $signtool.FullName sign /f $pfx /p $env:PFX_PASSWORD /fd sha256 /tr http://timestamp.digicert.com /td sha256 (Get-ChildItem dist\*.exe).FullName
+            & $signtool.FullName sign /f $pfx /p $env:PFX_PASSWORD /fd sha256 /tr http://timestamp.digicert.com /td sha256 (Get-ChildItem dist\*.msi).FullName
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           } finally {
             Remove-Item $pfx
           }
+      # Installed and removed with the scripts a user runs, from Windows PowerShell as theirs would.
+      # The stack itself can't start here (the runner's Docker runs Windows containers only), so this
+      # checks what the MSI puts down and takes away
+      - name: Install, check and uninstall
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $msi = (Get-ChildItem dist\*-windows-universal.msi).FullName
+          & powershell -NoProfile -ExecutionPolicy Bypass -File app\install.ps1 -File $msi
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $dir = Join-Path $env:LOCALAPPDATA 'Programs\cmdaltr\Rowanholt'
+          $programs = [Environment]::GetFolderPath('Programs')
+          $expected = @("$dir\app\windows\Rowanholt.ps1", "$dir\rowanholt-src.tar.gz", "$dir\LICENSE", "$dir\VERSION",
+                        "$dir\seed\install.ps1", "$dir\seed\uninstall.ps1",
+                        "$programs\Rowanholt.lnk", "$programs\Stop Rowanholt.lnk", "$programs\Set Up Rowanholt.lnk")
+          $missing = @($expected | Where-Object { -not (Test-Path $_) })
+          if ($missing) { throw "Not installed: $($missing -join ', ')" }
+          if ((Get-Content "$dir\VERSION" -Raw).Trim() -ne $env:VERSION) { throw "VERSION isn't $env:VERSION" }
+          $entry = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*' |
+            Where-Object { $_.DisplayName -eq 'Rowanholt' }
+          if (-not $entry) { throw 'No Settings > Apps entry' }
+          Write-Host "Installed $($entry.DisplayVersion); removing it"
+          & powershell -NoProfile -ExecutionPolicy Bypass -File "$dir\seed\uninstall.ps1" -Yes
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $left = @($expected | Where-Object { Test-Path $_ })
+          if ($left) { throw "Left behind: $($left -join ', ')" }
       - uses: actions/upload-artifact@v4
         with:
           name: rowanholt-windows
-          path: dist/*.exe
+          path: dist/*.msi
 
   release:
     if: github.ref_type == 'tag'
-    needs: [source, macos, linux, linux-rpm, windows]
+    needs: [source, macos, linux, windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write

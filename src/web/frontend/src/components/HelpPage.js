@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import './HelpPage.css';
 
 // The backend's app_version (src/web/backend/config.py), package.json and docs/CLI.md
@@ -312,8 +313,28 @@ const findingStages = [
   },
 ];
 
+// The Elastic License as the package carries it (public/LICENSE.txt, a copy of LICENSE that
+// tests/unit/test_licence_units.py keeps identical): the terms ship with the app, so using it is accepting them
+function LicenceText() {
+  const [text, setText] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${process.env.PUBLIC_URL}/LICENSE.txt`)
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error(r.statusText))))
+      .then((t) => { if (!cancelled) setText(t); })
+      .catch(() => { if (!cancelled) setText(''); });
+    return () => { cancelled = true; };
+  }, []);
+  if (text === null) return <p>Loading the licence…</p>;
+  if (!text) return <p>The licence is at <ExternalLink href={`${REPO}/blob/main/LICENSE`}>github.com/cmdaltr/rowanholt/blob/main/LICENSE</ExternalLink>.</p>;
+  return <pre className="hp-licence" style={{ whiteSpace: 'pre-wrap', maxHeight: '32rem', overflow: 'auto' }}>{text}</pre>;
+}
+
 const HelpPage = () => {
   const [activeSection, setActiveSection] = useState('overview');
+  // About › Licence links here as /help#licence, from this page too
+  const { hash } = useLocation();
+  useEffect(() => { if (hash === '#licence') setActiveSection('licence'); }, [hash]);
 
   const sections = {
     overview: {
@@ -1081,6 +1102,20 @@ python3 src/analysis/elrond.py CASE-001 /cases/CASE-001 \\
         </>
       ),
     },
+    licence: {
+      title: 'Licence',
+      content: (
+        <>
+          <p>
+            By downloading, installing or using Rowanholt, you agree to the Elastic License 2.0 below and, where a Pro or
+            Services licence is installed, to the <ExternalLink href={`${REPO}/blob/main/COMMERCIAL-LICENSE.md`}>Rowanholt
+            Commercial Licence</ExternalLink>, which the Licence page shows before it installs one. If you do not agree, do
+            not install or use the software.
+          </p>
+          <LicenceText />
+        </>
+      ),
+    },
   };
 
   return (
@@ -1124,7 +1159,7 @@ python3 src/analysis/elrond.py CASE-001 /cases/CASE-001 \\
             <li><strong>Repository:</strong> <ExternalLink href={REPO}>github.com/cmdaltr/rowanholt</ExternalLink></li>
             <li><strong>Author:</strong> <ExternalLink href="https://github.com/cmdaltr">@cmdaltr</ExternalLink></li>
             <li><strong>Version:</strong> {VERSION}</li>
-            <li><strong>Licence:</strong> MIT</li>
+            <li><strong>Licence:</strong> <ExternalLink href={`${REPO}/blob/main/LICENSE`}>Elastic License 2.0</ExternalLink>; Pro and Services: <ExternalLink href={`${REPO}/blob/main/COMMERCIAL-LICENSE.md`}>commercial licence</ExternalLink></li>
           </ul>
         </div>
       </div>

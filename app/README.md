@@ -10,20 +10,21 @@ Each `v*` tag builds four packages (`.github/workflows/desktop-release.yml`) and
 
 | OS | Download | Installing it | First-run setup |
 |---|---|---|---|
-| macOS 12+ | `Rowanholt-<version>.dmg` (universal) | Drag Rowanholt to Applications | In the app's window |
-| Windows 10/11 | `Rowanholt-Setup-<version>.exe` | The installer (no admin needed) | In the installer |
-| Debian, Ubuntu | `rowanholt_<version>_all.deb` | Double-click (App Center), or `sudo apt install ./rowanholt_*.deb` | Zenity dialogs on first launch |
-| Rocky, RHEL, Alma 9 | `rowanholt-<version>-1.noarch.rpm` | `sudo dnf install ./rowanholt-*.rpm` | Zenity dialogs on first launch |
+| macOS 12+ | `Rowanholt-<version>-macos-universal.dmg` (Apple silicon and Intel) | Drag Rowanholt to Applications | In the app's window |
+| Windows 10/11 | `Rowanholt-<version>-windows-universal.msi` (x64 and Arm) | Double-click, or `app/install.ps1` (no admin needed) | In the app, on first launch |
+| Debian, Ubuntu | `rowanholt_<version>-1_all.deb` | Double-click (App Center), or `sudo apt install ./rowanholt_*.deb` | Zenity dialogs on first launch |
+
+One package per platform runs on every architecture: the packages hold the launcher and the source tree, with nothing compiled for a CPU but the Mac app's own universal binary, and Docker builds or pulls images for the machine when the stack first starts. (Shikari splits per architecture because its installers bundle a compiled Python; the rule for both is to split only when the contents differ.) Every package carries `LICENSE`: in the Mac app's `Contents/Resources`, at `/usr/share/doc/rowanholt/copyright` and `/opt/rowanholt/LICENSE` in the `.deb`, and in the Windows install folder (`%LOCALAPPDATA%\Programs\cmdaltr\Rowanholt`); the MSI shows it when double-clicked. The Mac app shows it under Help › Licence, and the web UI's About under Licence.
 
 Setup covers the same three things everywhere.
 
-**The container runtime.** On macOS, if neither OrbStack nor Docker Desktop is there, **Install OrbStack** downloads the DMG for the Mac's architecture and has `spctl` check it is a notarised Developer ID app before copying it into Applications and opening it. OrbStack's own first run then asks to install its helper; approve it, since Andúril mounts `/var/run/docker.sock`. Docker Desktop is a link to its download page. On Windows, the installer explains Docker Desktop and offers its download page at the end. On Linux, setup checks for `docker`, the compose plugin and membership of the `docker` group, and says what's missing. Docker itself is never installed silently: every OS needs admin rights and Docker's own setup for it. OrbStack and Docker Desktop are free for personal use; commercial use may need a licence.
+**The container runtime.** On macOS, if neither OrbStack nor Docker Desktop is there, **Install OrbStack** downloads the DMG for the Mac's architecture and has `spctl` check it is a notarised Developer ID app before copying it into Applications and opening it. OrbStack's own first run then asks to install its helper; approve it, since Andúril mounts `/var/run/docker.sock`. Docker Desktop is a link to its download page. On Windows, setup explains Docker Desktop and offers its download page. On Linux, setup checks for `docker`, the compose plugin and membership of the `docker` group, and says what's missing. Docker itself is never installed silently: every OS needs admin rights and Docker's own setup for it. OrbStack and Docker Desktop are free for personal use; commercial use may need a licence.
 
-**Rowanholt's files.** By default they go into a `Rowanholt` folder in the home directory (`%USERPROFILE%\Rowanholt` on Windows), or another folder you choose. On macOS and Linux you can point setup at a checkout you already have instead. A copy the app unpacked carries `.rowanholt-version`: when a newer app version launches, it offers to update the files in place (`.env`, evidence mounts and cases stay), and the next `rowanholt start` rebuilds the images once. A git checkout is never overwritten, so keep it current with `git pull`. On its first start, an unpacked copy gets a `.env` with a random `SECRET_KEY`.
+**Rowanholt's files.** By default they go into a `Rowanholt` folder in the home directory (`%USERPROFILE%\Rowanholt` on Windows), or another folder you choose. You can point setup at a checkout you already have instead. A copy the app unpacked carries `.rowanholt-version`: when a newer app version launches, it offers to update the files in place (`.env`, evidence mounts and cases stay), and the next `rowanholt start` rebuilds the images once. A git checkout is never overwritten, so keep it current with `git pull`. On its first start, an unpacked copy gets a `.env` with a random `SECRET_KEY`.
 
-Run end to end on a Rocky 9 GNOME desktop with SELinux enforcing on 9 November 2026: the RPM, the menu entry, setup, the stack. On Rocky, RHEL and Alma, Docker Engine comes from Docker's own repository, not the distribution's (which ships Podman, unsupported): setup says so and links Docker's RHEL guide, and the RPM only recommends `docker-ce` and `docker-compose-plugin`, so it installs without them. SELinux stays enforcing: the launcher runs the containers that mount evidence folders unlabelled rather than relabelling the evidence (`docs/SERVER.md`, Rocky, RHEL and Alma).
+Rocky, RHEL and Alma have no desktop package, as Shikari has none: they run Rowanholt as a team server (`rowanholt server init`, [docs/SERVER.md](../docs/SERVER.md#rocky-rhel-and-alma)), and `app/install.sh` says so there. A checkout's `rowanholt app install` still works on a Rocky desktop: the launcher there says Docker Engine comes from Docker's own repository, not the distribution's (which ships Podman, unsupported), and SELinux stays enforcing, the containers that mount evidence folders running unlabelled rather than relabelling the evidence.
 
-**Evidence folders** (optional). Setup writes `docker-compose.local.yml`, which the launcher adds to the stack when it exists. The file is gitignored, so pulls never touch it. Each folder is mounted read-only in the backend and read-write in the worker. On macOS and Linux it appears at the same path inside the containers. On Windows, `D:\Cases` appears as `/mnt/d/Cases`. A `docker-compose.local.yml` you wrote by hand is left alone. To change the folders later: **Rowanholt › Set Up Rowanholt…** (macOS), the **Set Up Rowanholt** action on the menu entry (Linux), or run the installer again (Windows).
+**Evidence folders** (optional). Setup writes `docker-compose.local.yml`, which the launcher adds to the stack when it exists. The file is gitignored, so pulls never touch it. Each folder is mounted read-only in the backend and read-write in the worker. On macOS and Linux it appears at the same path inside the containers. On Windows, `D:\Cases` appears as `/mnt/d/Cases`. A `docker-compose.local.yml` you wrote by hand is left alone. To change the folders later: **Rowanholt › Set Up Rowanholt…** (macOS), the **Set Up Rowanholt** action on the menu entry (Linux), or the **Set Up Rowanholt** Start menu entry (Windows).
 
 ### Signing
 
@@ -42,12 +43,13 @@ The packages build locally too, from a source tarball:
 app/source-tarball.sh /tmp/rowanholt-src.tar.gz
 app/macos/package.sh --version 1.4.0 --source /tmp/rowanholt-src.tar.gz dist     # on a Mac
 app/linux/package-deb.sh --version 1.4.0 --source /tmp/rowanholt-src.tar.gz dist # on Debian/Ubuntu
-app/linux/package-rpm.sh --version 1.4.0 --source /tmp/rowanholt-src.tar.gz dist # on Rocky/RHEL (rpm-build)
 ```
 
 ```powershell
-# On Windows, with Inno Setup 6 and the tarball unpacked to stage\rowanholt
-ISCC /DAppVersion=1.4.0 /DSourceDir=$PWD\stage\rowanholt /DOutputDir=$PWD\dist app\windows\rowanholt.iss
+# On Windows, with the .NET SDK and WiX 5
+dotnet tool install --global wix --version 5.0.2
+wix extension add --global WixToolset.UI.wixext/5.0.2
+app\windows\build-msi.ps1 -Version 1.4.0 -Tarball rowanholt-src.tar.gz -OutDir dist
 ```
 
 ## From a checkout
@@ -58,7 +60,7 @@ ISCC /DAppVersion=1.4.0 /DSourceDir=$PWD\stage\rowanholt /DOutputDir=$PWD\dist a
 | Linux | `rowanholt app install` | A menu entry for the current user, under `~/.local/share` |
 | Windows | `powershell -ExecutionPolicy Bypass -File app\windows\install.ps1` | Start menu and desktop shortcuts |
 
-The checkout build records the repo's path, so reinstall after moving the checkout. On macOS its bundle ID is `io.github.cmdaltr.rowanholt.local`, so it keeps its settings and web logins apart from a release install. `rowanholt app uninstall` (or `install.ps1 -Uninstall`) removes it.
+The checkout build records the repo's path, so reinstall after moving the checkout. On macOS its bundle ID is `io.github.cmdaltr.rowanholt.local`, so it keeps its settings and web logins apart from a release install. `rowanholt app uninstall` (or `app\windows\install.ps1 -Uninstall`) removes it.
 
 ## Using it
 
@@ -87,6 +89,7 @@ In setup, **Connect to my team's Rowanholt server** takes a hostname (`https://`
 | `macos/build.sh`, `macos/package.sh` | Checkout and release builds; the signed, notarised DMG |
 | `linux/rowanholt-app.sh` | Launcher and zenity setup, for a checkout or the `.deb` |
 | `linux/rowanholt.desktop.in`, `linux/desktop-entry.sh`, `linux/install.sh`, `linux/package-deb.sh` | Menu entry, checkout install, `.deb` |
-| `windows/Rowanholt.ps1`, `windows/install.ps1`, `windows/rowanholt.iss` | Launcher, checkout shortcuts, Inno Setup installer |
+| `windows/Rowanholt.ps1`, `windows/install.ps1`, `windows/rowanholt.wxs`, `windows/build-msi.ps1` | Launcher and first-run setup, checkout shortcuts, the MSI (WiX 5) and its build |
+| `install.ps1`, `uninstall.ps1` | Install, upgrade or remove the Windows release, as Shikari's do; the MSI carries both in `seed\` |
 | `source-tarball.sh` | The source tree the packages carry (`git archive HEAD`) |
 | `icons/` | `rowanholt.icns`, `.ico`, `.png`, committed; `icons/build.sh` regenerates them from the logo on a Mac |

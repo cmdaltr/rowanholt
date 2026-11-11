@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Release package for macOS: Rowanholt-<version>.dmg holding a universal Rowanholt.app
+# Release package for macOS: Rowanholt-<version>-macos-universal.dmg holding a universal Rowanholt.app
 # that carries the source tree. Signs and notarises when the environment has the means:
 #   MACOS_SIGN_IDENTITY                          "Developer ID Application: ..." in the keychain
 #   APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD  notarytool credentials (an app-specific password)
@@ -37,7 +37,9 @@ if [ -n "${MACOS_SIGN_IDENTITY:-}" ]; then
 fi
 
 ln -s /Applications "$STAGE/Applications"
-DMG="$OUT/Rowanholt-$VERSION.dmg"
+# Named like Shikari's per-architecture DMGs; one file serves both, since only the small
+# launcher is compiled (the stack's images are built for the Mac's CPU at first start)
+DMG="$OUT/Rowanholt-$VERSION-macos-universal.dmg"
 rm -f "$DMG"
 hdiutil create -volname "Rowanholt $VERSION" -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov "$DMG" >/dev/null
 

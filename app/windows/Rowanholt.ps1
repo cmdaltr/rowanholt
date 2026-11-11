@@ -2,14 +2,21 @@
 .SYNOPSIS
     What the Rowanholt shortcut runs: start the Docker stack if the web UI isn't
     answering, then open the UI in its own Edge (or Chrome) app window. With a team
-    server (ROWANHOLT_SERVER, or .rowanholt-server from the installer) it just opens
-    the server: nothing runs here.
+    server (ROWANHOLT_SERVER, or the one setup saved) it just opens the server: nothing
+    runs here.
+.DESCRIPTION
+    From a checkout (app\windows\ in a clone) it runs that checkout. Installed from the MSI
+    (%LOCALAPPDATA%\Programs\cmdaltr\Rowanholt, beside rowanholt-src.tar.gz), its first run is
+    setup, as the Linux packages' is: either a team server's address, or a check for Docker
+    Desktop, Rowanholt's files unpacked into a folder you choose (or a copy you already have)
+    and evidence folders mounted. -Setup (the Set Up Rowanholt shortcut) runs it again. When
+    a newer MSI is installed, the next start offers to update the files in place.
 .NOTES
-    The bash launcher doesn't run on Windows, so this does what 'rowanholt start'
-    does there: make sure Docker Desktop is up, then 'docker compose up -d' in the repo,
-    with docker-compose.local.yml (the installer's evidence folders) when it exists.
-    A copy the installer put down (.rowanholt-version) gets a .env with its own
-    SECRET_KEY on first start and an image rebuild after each upgrade.
+    The bash launcher doesn't run on Windows, so this does what 'rowanholt start' does
+    there: make sure Docker Desktop is up, then 'docker compose up -d' in the copy, with
+    docker-compose.local.yml (setup's evidence folders) when it exists. A copy setup
+    unpacked (.rowanholt-version) gets a .env with its own SECRET_KEY on first start and
+    an image rebuild after each upgrade.
 
     While the stack starts, the console shows the road to Rowanholt: the phase, where
     Gandalf has got to, and an ETA from this PC's earlier starts (the same history
@@ -17,22 +24,246 @@
 #>
 [CmdletBinding()]
 param(
-    [switch]$Stop
+    [switch]$Stop,
+    [switch]$Setup
 )
 
 $ErrorActionPreference = 'Stop'
-$Root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+# The install folder, or a checkout's root
+$AppDir = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$Bundled = Join-Path $AppDir 'rowanholt-src.tar.gz'
+$Packaged = Test-Path $Bundled
 $Url = 'http://localhost:5687'
-$ServerFile = Join-Path $Root '.rowanholt-server'
-$Server = if ($env:ROWANHOLT_SERVER) { $env:ROWANHOLT_SERVER }
-          elseif (Test-Path $ServerFile) { (Get-Content $ServerFile -Raw).Trim() }
-          else { '' }
-if ($Server) { $Url = $Server }
 $State = Join-Path $env:LOCALAPPDATA 'Rowanholt'
+$ServerFile = Join-Path $State 'server'
+$RootFile = Join-Path $State 'root'
 $BrowserProfile = Join-Path $State 'browser'
 New-Item -ItemType Directory -Force -Path $BrowserProfile | Out-Null
 $Host.UI.RawUI.WindowTitle = 'Rowanholt'
+$Root = $null
 
+# ── Setup (the MSI's app) ─────────────────────────────────────────────────────
+# What the Inno Setup installer's pages asked, asked on the first run instead: an MSI has no
+# room for questions, and the Linux packages already work this way
+$LocalHeader = "# Written by Rowanholt's desktop setup"
+# Copies the Inno Setup installer set up carry its header; they're setup's to rewrite too
+$OldLocalHeader = "# Written by Rowanholt's Windows installer"
+
+function Get-AppVersion {
+    $file = Join-Path $AppDir 'VERSION'
+    if (Test-Path $file) { return (Get-Content $file -Raw).Trim() }
+    return '0'
+}
+
+function Get-SavedServer {
+    if ($env:ROWANHOLT_SERVER) { return $env:ROWANHOLT_SERVER }
+    if (Test-Path $ServerFile) { return (Get-Content $ServerFile -Raw).Trim() }
+    return ''
+}
+
+function Show-Message([string]$Text, [string]$Buttons = 'OK', [string]$Icon = 'Information') {
+    Add-Type -AssemblyName System.Windows.Forms
+    return [string][System.Windows.Forms.MessageBox]::Show($Text, 'Rowanholt', $Buttons, $Icon)
+}
+
+function Test-Copy([string]$Dir) {
+    return $Dir -and (Test-Path (Join-Path $Dir 'docker-compose.yml')) -and (Test-Path (Join-Path $Dir 'rowanholt'))
+}
+
+# A typed address as https://host[:port]; '' if it isn't one (http for localhost only)
+function ConvertTo-ServerUrl([string]$Text) {
+    $Text = ($Text -replace '\s', '')
+    if ($Text -notmatch '://') { $Text = "https://$Text" }
+    if ($Text -notmatch '^(?<scheme>[A-Za-z]+)://(?<host>[^/]+)') { return '' }
+    $scheme = $Matches.scheme.ToLower(); $hostPort = $Matches.host
+    if ($hostPort -notmatch '^[A-Za-z0-9.-]+(:\d+)?$') { return '' }
+    if ($scheme -eq 'https') { return "https://$hostPort" }
+    if ($scheme -eq 'http' -and ($hostPort -split ':')[0] -in 'localhost', '127.0.0.1') { return "http://$hostPort" }
+    return ''
+}
+
+function Select-Mode {
+    # Where Rowanholt runs: 0 here (unpacked), 1 a copy already here, 2 a team server; $null cancelled
+    Add-Type -AssemblyName System.Windows.Forms
+    $form = New-Object System.Windows.Forms.Form
+    $form.Text = 'Set up Rowanholt'
+    $form.FormBorderStyle = 'FixedDialog'; $form.MaximizeBox = $false; $form.MinimizeBox = $false
+    $form.StartPosition = 'CenterScreen'; $form.ClientSize = New-Object System.Drawing.Size(520, 230)
+    $iconFile = Join-Path $AppDir 'app\icons\rowanholt.ico'
+    if (Test-Path $iconFile) { $form.Icon = New-Object System.Drawing.Icon($iconFile) }
+    $label = New-Object System.Windows.Forms.Label
+    $label.Text = "Where does Rowanholt run?`n`nA server needs nothing here but a window onto it: no Docker, no evidence, no 70 MB of files."
+    $label.SetBounds(16, 12, 490, 60)
+    $form.Controls.Add($label)
+    $options = @("Install Rowanholt $(Get-AppVersion) on this PC (needs Docker Desktop)",
+                 'Use a copy I already have (a git clone, for instance)',
+                 "Connect to my team's Rowanholt server")
+    $radios = for ($i = 0; $i -lt $options.Count; $i++) {
+        $radio = New-Object System.Windows.Forms.RadioButton
+        $radio.Text = $options[$i]; $radio.SetBounds(24, 78 + 28 * $i, 480, 24); $radio.Checked = ($i -eq 0)
+        $form.Controls.Add($radio); $radio
+    }
+    $ok = New-Object System.Windows.Forms.Button
+    $ok.Text = 'Next'; $ok.DialogResult = 'OK'; $ok.SetBounds(330, 190, 85, 28)
+    $cancel = New-Object System.Windows.Forms.Button
+    $cancel.Text = 'Cancel'; $cancel.DialogResult = 'Cancel'; $cancel.SetBounds(421, 190, 85, 28)
+    $form.Controls.AddRange(@($ok, $cancel)); $form.AcceptButton = $ok; $form.CancelButton = $cancel
+    if ($form.ShowDialog() -ne 'OK') { return $null }
+    for ($i = 0; $i -lt $radios.Count; $i++) { if ($radios[$i].Checked) { return $i } }
+    return 0
+}
+
+function Select-Folder([string]$Description, [string]$Start) {
+    Add-Type -AssemblyName System.Windows.Forms
+    $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+    $dialog.Description = $Description
+    $dialog.ShowNewFolderButton = $true
+    if ($Start -and (Test-Path $Start)) { $dialog.SelectedPath = $Start }
+    if ($dialog.ShowDialog() -ne 'OK') { return $null }
+    return $dialog.SelectedPath
+}
+
+function Set-Server {
+    Add-Type -AssemblyName Microsoft.VisualBasic
+    $typed = [Microsoft.VisualBasic.Interaction]::InputBox(
+        "Your team's Rowanholt server.`n`nIts address, e.g. rowanholt.example.org. If Edge warns about its certificate, ask the server's admin for its root certificate.",
+        'Set up Rowanholt', (Get-SavedServer))
+    if (-not $typed) { exit 1 }
+    $server = ConvertTo-ServerUrl $typed
+    if (-not $server) {
+        Show-Message "'$typed' isn't a server address, e.g. rowanholt.example.org (https only)." 'OK' 'Error' | Out-Null
+        exit 1
+    }
+    Set-Content -Path $ServerFile -Value $server -Encoding ASCII
+}
+
+function Test-DockerInstalled {
+    return (Test-Path (Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe')) -or
+           [bool](Get-Command docker -ErrorAction SilentlyContinue)
+}
+
+function Assert-DockerInstalled {
+    if (Test-DockerInstalled) { return }
+    $answer = Show-Message ("Rowanholt runs as a set of Docker containers, and Docker Desktop isn't installed.`n`n" +
+        "Install Docker Desktop (it needs WSL 2), start it once, then open Rowanholt from the Start menu.`n`n" +
+        "Docker Desktop is free for personal use and small businesses; larger organisations need a paid subscription.`n`n" +
+        'Open the Docker Desktop download page?') 'YesNo' 'Warning'
+    if ($answer -eq 'Yes') { Start-Process 'https://www.docker.com/products/docker-desktop/' }
+    exit 1
+}
+
+function Expand-Bundle([string]$Target) {
+    New-Item -ItemType Directory -Force -Path $Target | Out-Null
+    Write-Host "Copying Rowanholt $(Get-AppVersion) into $Target..."
+    # Windows 10 and 11 ship bsdtar; .env, docker-compose.local.yml and cases aren't in the tarball, so they're kept
+    & (Join-Path $env:SystemRoot 'System32\tar.exe') -xzf $Bundled -C $Target --strip-components 1
+    if ($LASTEXITCODE -ne 0) { throw "Couldn't unpack Rowanholt into $Target (tar exited with status $LASTEXITCODE)" }
+    Set-Content -Path (Join-Path $Target '.rowanholt-version') -Value (Get-AppVersion) -Encoding ASCII -NoNewline
+}
+
+function ConvertTo-ContainerPath([string]$Dir) {
+    # D:\Cases is /mnt/d/Cases inside the containers (Docker Desktop's WSL 2 paths)
+    $rest = $Dir.Substring(2).Replace('\', '/').TrimEnd('/')
+    return '/mnt/' + $Dir.Substring(0, 1).ToLower() + $rest
+}
+
+function Write-Evidence([string]$Dir, [string[]]$Folders) {
+    $file = Join-Path $Dir 'docker-compose.local.yml'
+    if (Test-Path $file) {
+        $first = Get-Content $file -TotalCount 1
+        if (-not ($first.StartsWith($LocalHeader) -or $first.StartsWith($OldLocalHeader))) {
+            Show-Message "$file was written by hand, so setup left its mounts alone." 'OK' 'Warning' | Out-Null
+            return
+        }
+    }
+    if (-not $Folders) { Remove-Item $file -ErrorAction SilentlyContinue; return }
+    $lines = @("${LocalHeader}: evidence folders, read-only in the backend.", 'services:')
+    foreach ($service in 'backend', 'celery-worker') {
+        $lines += "  ${service}:", '    volumes:'
+        foreach ($folder in $Folders) {
+            $lines += '      - type: bind', "        source: `"$($folder.Replace('\', '/'))`"",
+                      "        target: `"$(ConvertTo-ContainerPath $folder)`""
+            if ($service -eq 'backend') { $lines += '        read_only: true' }
+        }
+    }
+    # LF and no BOM: compose reads either, but the file matches the other platforms'
+    [IO.File]::WriteAllText($file, ($lines -join "`n") + "`n")
+}
+
+function Select-Evidence {
+    $folders = @()
+    $question = ("Mount a folder of evidence (disk images, memory dumps, Gandalf archives) into Rowanholt?`n`n" +
+        "Rowanholt sees it inside its containers under /mnt/<drive>/..., so D:\Cases becomes /mnt/d/Cases. " +
+        "External drives aren't visible otherwise. Optional: run Set Up Rowanholt again to change it.")
+    while ((Show-Message $question 'YesNo' 'Question') -eq 'Yes') {
+        $folder = Select-Folder 'Evidence folder' ''
+        if ($folder) {
+            if ($folder -notmatch '^[A-Za-z]:\\') {
+                Show-Message 'Choose a folder on a lettered drive (C:\..., D:\...).' 'OK' 'Error' | Out-Null
+            } elseif ($folders -notcontains $folder) {
+                $folders += $folder
+            }
+        }
+        $question = "Evidence so far:`n  $($folders -join "`n  ")`n`nAdd another folder?"
+    }
+    return $folders
+}
+
+function Invoke-Setup {
+    # Returns the copy to run, or $null when it's a server now
+    $mode = Select-Mode
+    if ($null -eq $mode) { exit 1 }
+    if ($mode -eq 2) { Set-Server; return $null }
+    Remove-Item $ServerFile -ErrorAction SilentlyContinue
+    Assert-DockerInstalled
+    if ($mode -eq 1) {
+        $dir = Select-Folder 'Choose your Rowanholt folder' $env:USERPROFILE
+        if (-not $dir) { exit 1 }
+        if (-not (Test-Copy $dir)) {
+            Show-Message "$dir doesn't look like Rowanholt: there's no rowanholt launcher and docker-compose.yml in it." 'OK' 'Error' | Out-Null
+            exit 1
+        }
+    } else {
+        $parent = Select-Folder 'Choose where to put the Rowanholt folder' $env:USERPROFILE
+        if (-not $parent) { exit 1 }
+        $dir = Join-Path $parent 'Rowanholt'
+    }
+    # Unpack into a new folder, or over a copy setup unpacked before (never a git clone)
+    $unpacked = (Test-Copy $dir) -and (Test-Path (Join-Path $dir '.rowanholt-version')) -and -not (Test-Path (Join-Path $dir '.git'))
+    if (-not (Test-Path $dir) -or $unpacked) {
+        Expand-Bundle $dir
+    } elseif (-not (Test-Copy $dir)) {
+        Show-Message "$dir already exists and isn't Rowanholt. Choose another folder." 'OK' 'Error' | Out-Null
+        exit 1
+    }
+    Write-Evidence $dir @(Select-Evidence)
+    Set-Content -Path $RootFile -Value $dir -Encoding UTF8
+    return $dir
+}
+
+function Resolve-Root([switch]$NoSetup) {
+    if ($env:ROWANHOLT_ROOT -and (Test-Copy $env:ROWANHOLT_ROOT)) { return $env:ROWANHOLT_ROOT }
+    # A checkout's own app\windows: run that checkout
+    if (-not $Packaged) { return $AppDir }
+    if (Test-Path $RootFile) {
+        $saved = (Get-Content $RootFile -Raw).Trim()
+        if (Test-Copy $saved) { return $saved }
+    }
+    if ($NoSetup) { return $null }
+    return Invoke-Setup
+}
+
+function Update-Copy {
+    # A newer MSI than the copy setup unpacked: offer to bring the copy up to it
+    $versionFile = Join-Path $Root '.rowanholt-version'
+    if (-not $Packaged -or -not (Test-Path $versionFile) -or (Test-Path (Join-Path $Root '.git'))) { return }
+    if ((Get-Content $versionFile -Raw).Trim() -eq (Get-AppVersion)) { return }
+    $answer = Show-Message ("Update Rowanholt in $Root to $(Get-AppVersion)?`n`n" +
+        'Your .env, evidence folders and cases are kept. The images are rebuilt on this start, which takes a while.') 'YesNo' 'Question'
+    if ($answer -eq 'Yes') { Expand-Bundle $Root }
+}
+
+# ── Running it ────────────────────────────────────────────────────────────────
 function Test-Frontend {
     try {
         Invoke-WebRequest -Uri $Url -Method Head -TimeoutSec 2 -UseBasicParsing | Out-Null
@@ -257,17 +488,35 @@ function Open-Window {
 }
 
 try {
+    if ($Setup) {
+        if (-not $Packaged) {
+            Show-Message "This is a checkout's launcher: it always runs $AppDir." | Out-Null
+            exit 0
+        }
+        Invoke-Setup | Out-Null
+        # A server opens now; a copy here starts from the Rowanholt shortcut
+        if (-not (Get-SavedServer)) { exit 0 }
+    }
+
+    $Server = Get-SavedServer
     if ($Server) {
         if ($Stop) {
             Write-Host "Rowanholt runs on $Server; its admins start and stop it."
             Start-Sleep -Seconds 4
             exit 0
         }
+        $Url = $Server
         Open-Window
         exit 0
     }
 
     if ($Stop) {
+        $Root = Resolve-Root -NoSetup
+        if (-not $Root) {
+            Write-Host "Rowanholt isn't set up on this PC yet: nothing to stop."
+            Start-Sleep -Seconds 4
+            exit 0
+        }
         Wait-Docker
         Write-Host 'Stopping Rowanholt...'
         Invoke-Compose @('down', '--remove-orphans')
@@ -275,6 +524,15 @@ try {
         Start-Sleep -Seconds 2
         exit 0
     }
+
+    $Root = Resolve-Root
+    # Setup may just have chosen a server
+    $Server = Get-SavedServer
+    if (-not $Root -or $Server) {
+        if ($Server) { $Url = $Server; Open-Window }
+        exit 0
+    }
+    Update-Copy
 
     if (-not (Test-Frontend)) {
         $script:Journey = New-Journey 'warm'

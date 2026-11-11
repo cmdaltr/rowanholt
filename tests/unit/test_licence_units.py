@@ -284,6 +284,10 @@ class TermsTest(unittest.TestCase):
         self.assertEqual(licence.TERMS.read_text(), (ROOT / "COMMERCIAL-LICENSE.md").read_text(),
                          "copy COMMERCIAL-LICENSE.md to src/web/backend/legal/")
 
+    def test_the_licence_the_web_ui_shows_is_the_licence_in_the_repo(self):
+        self.assertEqual((ROOT / "src/web/frontend/public/LICENSE.txt").read_text(), (ROOT / "LICENSE").read_text(),
+                         "copy LICENSE to src/web/frontend/public/LICENSE.txt")
+
     def test_the_terms_state_their_version(self):
         version, text = licence.terms()
         self.assertEqual(version, "1.1")
