@@ -71,7 +71,7 @@ def mac_users(
                         )
                     except:
                         pass
-            if os.path.exists(item + "/" + each + "/Library/keychains/"):
+            if os.path.exists(item + "/" + each + "/Library/Keychains/"):
                 (
                     entry,
                     prnt,
@@ -92,11 +92,11 @@ def mac_users(
                     entry,
                     prnt,
                 )
-                for keychain in os.listdir(item + "/" + each + "/Library/keychains/"):
+                for keychain in os.listdir(item + "/" + each + "/Library/Keychains/"):
                     if keychain.endswith(".keychain-db"):
                         try:
                             shutil.copy2(
-                                item + "/" + each + "/Library/keychains/" + keychain,
+                                item + "/" + each + "/Library/Keychains/" + keychain,
                                 dest + each + "+" + keychain,
                             )
                         except:

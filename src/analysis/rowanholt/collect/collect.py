@@ -286,6 +286,12 @@ def collect_artefacts(
                         and "memory" not in img.split("::")[1]
                     ):  # macOS Collection
                         item = mnt + "/root" + system_artefact
+                        # /etc, /tmp and /var are symlinks into /private on the System volume, and a
+                        # Data volume (apfs-fuse's, macOS 10.15 and later) has only /private
+                        if system_artefact.startswith(("/etc", "/tmp", "/var")) and os.path.exists(
+                            mnt + "/root/private" + system_artefact
+                        ):
+                            item = mnt + "/root/private" + system_artefact
                         if os.path.exists(item):
                             if not os.path.exists(dest):
                                 os.makedirs(dest)

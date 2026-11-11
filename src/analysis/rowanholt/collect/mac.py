@@ -159,11 +159,13 @@ def collect_mac_artefacts(
     vssimage,
     vsstext,
 ):
+    # the path as the lists below name it: /private/etc is /etc (collect.py takes /private's)
+    spot = mnt + item[len(mnt + "/private"):] if item.startswith(mnt + "/private/") else item
     if not os.path.isdir(item):  # files
         if (
-            item == mnt + "/etc/passwd"
-            or item == mnt + "/etc/shadow"
-            or item == mnt + "/etc/group"
+            spot == mnt + "/etc/passwd"
+            or spot == mnt + "/etc/shadow"
+            or spot == mnt + "/etc/group"
         ):
             entry, prnt = "{},{},{},'{}'\n".format(
                 datetime.now().isoformat(),
@@ -182,7 +184,7 @@ def collect_mac_artefacts(
             except:
                 pass
 
-        if item == mnt + "/etc/hosts":
+        if spot == mnt + "/etc/hosts":
             entry, prnt = "{},{},{},'/etc/hosts'\n".format(
                 datetime.now().isoformat(),
                 img.split("::")[0],
@@ -198,7 +200,7 @@ def collect_mac_artefacts(
             except:
                 pass
 
-        if item == mnt + "/etc/crontab":
+        if spot == mnt + "/etc/crontab":
             entry, prnt = "{},{},{},'{}'\n".format(
                 datetime.now().isoformat(),
                 img.split("::")[0],
@@ -219,9 +221,9 @@ def collect_mac_artefacts(
 
     elif len(os.listdir(item)) > 0:  # directories
         if (
-            item == mnt + "/Library/Logs"
-            or item == mnt + "/etc/security"
-            or item == mnt + "/var/log"
+            spot == mnt + "/Library/Logs"
+            or spot == mnt + "/etc/security"
+            or spot == mnt + "/var/log"
         ):
             try:
                 os.stat(dest + "logs/")
@@ -262,14 +264,14 @@ def collect_mac_artefacts(
                     pass
 
         if (
-            item == mnt + "/Library/Preferences"
-            or item == mnt + "/Library/LaunchAgents"
-            or item == mnt + "/Library/LaunchDaemons"
-            or item == mnt + "/Library/StartupItems"
-            or item == mnt + "/System/Library/Preferences"
-            or item == mnt + "/System/Library/LaunchAgents"
-            or item == mnt + "/System/Library/LaunchDaemons"
-            or item == mnt + "/System/Library/StartupItems"
+            spot == mnt + "/Library/Preferences"
+            or spot == mnt + "/Library/LaunchAgents"
+            or spot == mnt + "/Library/LaunchDaemons"
+            or spot == mnt + "/Library/StartupItems"
+            or spot == mnt + "/System/Library/Preferences"
+            or spot == mnt + "/System/Library/LaunchAgents"
+            or spot == mnt + "/System/Library/LaunchDaemons"
+            or spot == mnt + "/System/Library/StartupItems"
         ):
             try:
                 os.stat(dest + "plists/")
@@ -315,7 +317,7 @@ def collect_mac_artefacts(
                     except:
                         pass
 
-        if item == mnt + "/.Trashes":
+        if spot == mnt + "/.Trashes":
             dest = dest + "trash/"
             try:
                 os.stat(dest + "trash/")
@@ -349,7 +351,7 @@ def collect_mac_artefacts(
                 except:
                     pass
 
-        if item == mnt + "/tmp":
+        if spot == mnt + "/tmp":
             try:
                 os.stat(dest + "tmp/")
             except:
@@ -421,9 +423,9 @@ def collect_mac_artefacts(
                     except:
                         pass
 
-        if item == mnt + "/etc":
+        if spot == mnt + "/etc":
             collect_macos_extras(mnt, dest, img, output_directory, stage, verbosity)
-        if item == mnt + "/Users/":
+        if spot == mnt + "/Users/":
             dest = mac_users(
                 dest,
                 img,
@@ -437,13 +439,13 @@ def collect_mac_artefacts(
                 vssimage,
                 vsstext,
             )
-        if volatility and item == mnt + "/":
+        if volatility and spot == mnt + "/":
             item_list = os.listdir(item)
             if len(item_list) > 0:
                 for each in item_list:
                     if (
-                        item == mnt + "/var/vm/sleepimage"
-                        or item == mnt + "/var/vm/swapfile"
+                        spot == mnt + "/var/vm/sleepimage"
+                        or spot == mnt + "/var/vm/swapfile"
                     ):
                         if not os.path.exists(dest + each):
                             (
