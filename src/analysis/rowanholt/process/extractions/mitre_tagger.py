@@ -228,6 +228,19 @@ USER_WRITABLE_EXEC = re.compile(r"(?:^|[\s=;'\"])/(?:tmp|var/tmp|dev/shm|home|ro
 APPLE_PROGRAM = re.compile(r"^/(?:System|usr/libexec|usr/bin|usr/sbin|bin|sbin|Library/Apple)/")
 
 
+# Emptying or switching off the shell's history (T1070.003), in a history or an rc file. HISTCONTROL
+# isn't here: Ubuntu's default .bashrc sets ignoreboth.
+HISTORY_OFF = re.compile(
+    r"(?i)\bset\s+\+o\s+history\b|\bunset\s+(?:histfile|savehist)\b|\b(?:histsize|histfilesize|savehist)=0\b"
+    r"|\bhistfile=/dev/null\b|\bhistory\s+-[cw]\b|\bln\s+-\w*s\w*\s+/dev/null\s+\S*_history\b"
+    r"|\b(?:rm|shred|unlink|truncate)\b[^\n;|&]*\.(?:bash|zsh|sh)_history\b|>\s*\S*\.(?:bash|zsh|sh)_history\b")
+
+
+def history_off(commands: Iterable[str]) -> bool:
+    """Whether a history or rc file clears the history or stops it being kept."""
+    return any(HISTORY_OFF.search(str(c)) for c in commands)
+
+
 def suspicious_shell(commands: Iterable[str]) -> bool:
     """Whether a shell history holds a download, decode, reverse shell, inline code or history clearing."""
     return any(SUSPICIOUS_SHELL.search(str(c)) for c in commands)
@@ -247,8 +260,11 @@ def unusual_unit(unit_text: str) -> bool:
 
 
 def launchd_technique(path: str, plist: dict) -> Optional[str]:
-    """T1543.001 or T1543.004 for a launch agent or daemon that isn't Apple's, else None."""
+    """T1543.001 or T1543.004 for a launch agent or daemon that isn't Apple's, T1037.005 for any
+    StartupItem (Apple has shipped none since 10.10, so every one is someone's addition), else None."""
     where = path.replace("+", "/").lower()
+    if "startupitems" in where:
+        return "T1037.005"
     technique = "T1543.004" if "launchdaemons" in where else "T1543.001" if "launchagents" in where else None
     if not technique or not isinstance(plist, dict):
         return None

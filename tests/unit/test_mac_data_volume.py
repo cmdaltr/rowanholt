@@ -55,3 +55,16 @@ def test_the_crontabs_are_collected_with_the_extras(tmp_path):
     (root / "private" / "var" / "at" / "tabs" / "root").write_text("* * * * * /tmp/evil.sh\n")
     mac.collect_macos_extras(str(root), str(dest) + "/", "disk.img::macOS", str(out), "collecting", 0)
     assert (dest / "cron" / "root+crontab").read_text() == "* * * * * /tmp/evil.sh\n"
+
+
+def test_zsh_files_and_terminal_sessions_are_collected(tmp_path):
+    root, dest, out = data_volume(tmp_path)
+    home = root / "Users" / "admin"
+    (home / ".zsh_sessions").mkdir(parents=True)
+    (home / ".zshrc").write_text("set +o history\n")
+    (home / ".zsh_sessions" / "037A40EC.history").write_text("whoami\n")
+    (home / ".zsh_sessions" / "037A40EC.session").write_text("not history\n")
+    collect(root, dest, out, "/Users/")
+    assert (dest / "admin+zshrc").read_text() == "set +o history\n"
+    assert (dest / "admin+zsh_sessions+037A40EC_history+zsh_history").read_text() == "whoami\n"
+    assert not list(dest.glob("*session+*"))

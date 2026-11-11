@@ -6,7 +6,7 @@ from rowanholt.process.browser import process_browser_index
 from rowanholt.process.browser import process_browser
 from rowanholt.process.mac import process_plist
 from rowanholt.process.linux import process_journal
-from rowanholt.process.nix import process_bash_history
+from rowanholt.process.nix import is_shell_rc, process_bash_history, process_shell_rc
 from rowanholt.process.nix import process_zsh_history
 from rowanholt.process.nix import process_email
 from rowanholt.process.nix import process_group
@@ -274,6 +274,16 @@ def process_artefacts(
             )
         elif artefact.endswith("zsh_history"):
             process_zsh_history(
+                verbosity,
+                vssimage,
+                output_directory,
+                img,
+                vss_path_insert,
+                stage,
+                artefact,
+            )
+        elif is_shell_rc(artefact):
+            process_shell_rc(
                 verbosity,
                 vssimage,
                 output_directory,

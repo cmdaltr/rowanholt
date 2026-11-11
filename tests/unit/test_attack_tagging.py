@@ -127,3 +127,5 @@ def test_linux_and_macos_tag_what_isnt_the_os_own() -> None:
     fake = {"Label": "com.apple.updater", "ProgramArguments": ["/Users/Shared/.u/updater"]}
     assert launchd_technique("Library+LaunchDaemons+com.apple.updater.plist", fake) == "T1543.004"
     assert launchd_technique("Library+Preferences+com.example.app.plist", lab) is None
+    # Apple ships no StartupItems, so any is someone's
+    assert launchd_technique("startupitems+EvilStartup.plist", {}) == "T1037.005"

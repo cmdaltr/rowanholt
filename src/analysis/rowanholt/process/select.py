@@ -12,6 +12,7 @@ from rowanholt.process.process import process_artefacts
 from rowanholt.process.extra_artefacts import is_extra_artefact
 from rowanholt.process.linux_artefacts import is_linux_artefact
 from rowanholt.process.mac_artefacts import is_mac_artefact
+from rowanholt.process.nix import is_shell_rc
 from rowanholt.utils import safe_listdir, safe_iterdir
 
 # Gandalf's Windows collections beyond the core set (process/windows_artefacts.py)
@@ -68,6 +69,7 @@ def select_artefacts_to_process(img, process_list, artefacts_list, processed_art
                         or f.endswith("+zsh_history")
                         or f.endswith("+bash_logout")
                         or f.endswith("+bashrc")
+                        or is_shell_rc(f)
                         or f.endswith("crontab")
                         or f.endswith("group")
                         or f.endswith("hosts")

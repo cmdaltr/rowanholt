@@ -9,7 +9,7 @@ from rowanholt.core.records import SUFFIX, write_records
 from rowanholt.process.extractions.mail import (
     extract_email_artefacts,
 )
-from rowanholt.process.extractions.mitre_tagger import suspicious_shell, tag_mitre_technique, unusual_unit
+from rowanholt.process.extractions.mitre_tagger import history_off, suspicious_shell, tag_mitre_technique, unusual_unit
 
 
 def _table(output_directory, img, vss_path_insert, name):
@@ -31,6 +31,51 @@ def _write(table, rows, img, artefact, time_field=None, techniques=None):
                          techniques=techniques)
 
 
+# A user's shell startup files, as Gandalf and Elrond name them (<user>+<file>, the dot dropped)
+SHELL_RC = ("bashrc", "bash_profile", "bash_login", "bash_logout", "bash_aliases", "profile", "zshrc", "zprofile",
+            "zshenv", "zlogin", "zlogout")
+
+
+def command_techniques(command: str) -> list:
+    """A shell command's techniques: T1059.004 when suspicious, T1070.003 when it clears the history."""
+    return (["T1059.004"] if suspicious_shell([command]) else []) + (["T1070.003"] if history_off([command]) else [])
+
+
+def is_shell_rc(artefact: str) -> bool:
+    name = artefact.rsplit("/", 1)[-1]
+    return "+" in name and name.rsplit("+", 1)[1] in SHELL_RC
+
+
+def process_shell_rc(verbosity, vssimage, output_directory, img, vss_path_insert, stage, artefact):
+    """A user's rc file: its lines that switch the history off (T1070.003) or run something suspicious
+    (T1546.004). Everyone has a .bashrc, so only those lines are kept."""
+    user, kind = artefact.rsplit("/", 1)[-1].rsplit("+", 1)
+    with open(artefact, encoding="utf-8", errors="ignore") as rc:
+        lines = [line.rstrip("\n") for line in rc]
+    rows = []
+    for number, line in enumerate(lines, 1):
+        if line.strip().startswith("#"):
+            continue
+        if history_off([line]):
+            rows.append({"User": user, "File": "." + kind, "LineNumber": number, "Line": line,
+                         "Flag": "disables shell history", "Technique": "T1070.003"})
+        elif suspicious_shell([line]):
+            rows.append({"User": user, "File": "." + kind, "LineNumber": number, "Line": line,
+                         "Flag": "suspicious command", "Technique": "T1546.004"})
+    if not rows:
+        return
+    entry, prnt = "{},{},{},{} ({}) file\n".format(
+        datetime.now().isoformat(), vssimage.replace("'", ""), stage, kind, user
+    ), " -> {} -> {} {} ({}) file from {}".format(
+        datetime.now().isoformat().replace("T", " "), stage, kind, user, vssimage
+    )
+    write_audit_log_entry(verbosity, output_directory, entry, prnt)
+    _write(_table(output_directory, img, vss_path_insert, "shell_rc"), rows, img, artefact,
+           techniques=lambda r: [r["Technique"]])
+    for technique in sorted({r["Technique"] for r in rows}):
+        tag_mitre_technique(output_directory, img, "bash_history", technique)
+
+
 def process_bash_history(
     verbosity, vssimage, output_directory, img, vss_path_insert, stage, artefact
 ):
@@ -50,11 +95,12 @@ def process_bash_history(
         commands = [line.rstrip("\n") for line in bashcontent]
     _write(_table(output_directory, img, vss_path_insert, artefact.split("/")[-1].split("+")[0] + "+bash_history"),
            ({"Command": c} for c in commands), img, artefact,
-           techniques=lambda r: ["T1059.004"] if suspicious_shell([r["Command"]]) else [])
+           techniques=lambda r: command_techniques(r["Command"]))
     # Every host has a shell history: only what it holds tags T1059.004
-    with open(artefact, encoding="utf-8", errors="ignore") as history:
-        if suspicious_shell(history):
-            tag_mitre_technique(output_directory, img, "bash_history")
+    if suspicious_shell(commands):
+        tag_mitre_technique(output_directory, img, "bash_history")
+    if history_off(commands):
+        tag_mitre_technique(output_directory, img, "bash_history", "T1070.003")
 
 
 ZSH_EXTENDED = re.compile(r"^: (\d+):\d+;(.*)$", re.S)
@@ -106,10 +152,12 @@ def process_zsh_history(
         entries = parse_zsh_history(zshcontent.read())
     _write(_table(output_directory, img, vss_path_insert, user + "+zsh_history"),
            ({"LastWriteTime": when, "Command": command} for when, command in entries), img, artefact, "LastWriteTime",
-           lambda r: ["T1059.004"] if suspicious_shell([r["Command"]]) else [])
+           lambda r: command_techniques(r["Command"]))
     # Shell history is the same technique whichever shell wrote it, when it holds something to see
     if suspicious_shell(command for _, command in entries):
         tag_mitre_technique(output_directory, img, "bash_history")
+    if history_off(command for _, command in entries):
+        tag_mitre_technique(output_directory, img, "bash_history", "T1070.003")
 
 
 def process_email(

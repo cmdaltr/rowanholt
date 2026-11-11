@@ -47,7 +47,11 @@ def process_plist(
         with open(artefact, "rb") as plist:
             plistdata = plistlib.load(plist)
     except (plistlib.InvalidFileException, ValueError, OSError):
-        return  # not a parseable plist
+        # A StartupItem's being there is the evidence: an empty file, or the old NeXTSTEP text plists
+        # StartupParameters.plist is written in, which plistlib can't read
+        if "startupitems+" not in artefact.lower():
+            return  # not a parseable plist
+        plistdata = {}
     entry, prnt = "{},{},{},'{}' plist file\n".format(
         datetime.now().isoformat(),
         vssimage.replace("'", ""),

@@ -24,23 +24,36 @@ def mac_users(
         os.listdir(item),
         dest + "browsers/",
         dest + "user_profiles",
+        # zsh's too: it has been macOS's default shell since 10.15
         [
             "bash_aliases",
             "bash_history",
             "bash_logout",
             "bashrc",
             "bash_session",
+            "bash_profile",
+            "profile",
+            "zsh_history",
+            "zshrc",
+            "zprofile",
+            "zshenv",
+            "zlogin",
+            "zlogout",
         ],
     )
     for each in item_list:
         if os.path.isdir(item + "/" + each):
-            if (
-                os.path.exists(item + "/" + each + "/.bash_aliases")
-                or os.path.exists(item + "/" + each + "/.bash_history")
-                or os.path.exists(item + "/" + each + "/.bash_logout")
-                or os.path.exists(item + "/" + each + "/.bashrc")
-                or os.path.exists(item + "/" + each + "/.bash_session")
-            ):
+            sessions = item + "/" + each + "/.zsh_sessions"
+            if os.path.isdir(sessions):
+                # Terminal's per-window histories, read as zsh history (<user>+zsh_sessions+<id>+zsh_history)
+                for session in sorted(os.listdir(sessions)):
+                    if session.endswith((".history", ".historynew")) and os.path.isfile(sessions + "/" + session):
+                        try:
+                            shutil.copy2(sessions + "/" + session,
+                                         dest + each + "+zsh_sessions+" + session.replace(".", "_") + "+zsh_history")
+                        except OSError:
+                            pass
+            if any(os.path.exists(item + "/" + each + "/." + eachbash) for eachbash in bashfiles):
                 for eachbash in bashfiles:
                     try:
                         shutil.copy2(
