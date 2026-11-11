@@ -12,26 +12,29 @@ beside the rows, keyed by Indicator.key(), for the backend's threat_intel_validi
 (parse_stix_bundle_with_validity); the ten columns don't carry them.
 """
 
-import base64
 import json
-import urllib.request
 from datetime import datetime
 from itertools import groupby
 from typing import Dict, List, Optional, Tuple, Union
-from urllib.parse import urlencode
 
 from samarkand import stix as shared
+from samarkand import taxii
 
 from rowanholt.threat_intel.schema import Indicator, unique
 from rowanholt.threat_intel.validity import Validity
 
 # The cyber observables a row can come from; an indicator's pattern may name any of these and software
 OBSERVABLES = ("ipv4-addr", "ipv6-addr", "domain-name", "url", "file", "process", "windows-registry-key")
-TAXII_ACCEPT = "application/taxii+json;version=2.1"
+TAXII_USER_AGENT = "Rowanholt (TAXII 2.1 client)"
 
 
 class IntelFormatError(ValueError):
     """The document isn't the format it was read as."""
+
+
+class TaxiiError(OSError):
+    """The TAXII server refused or couldn't be reached (samarkand's TaxiiProblem, with its message),
+    as the OSError the routes answer 502 to."""
 
 
 def _load(data: Union[str, bytes, dict, list]):
@@ -125,28 +128,15 @@ def parse_stix_bundle_with_validity(data: Union[str, bytes, dict, list],
 
 def fetch_taxii(collection_url: str, username: str = "", password: str = "", added_after: str = "",
                 limit: int = 5000, timeout: int = 60) -> List[Dict]:
-    """Every STIX object in a TAXII 2.1 collection, following its pagination. collection_url is the
-    collection's base (.../collections/<id>/); added_after (ISO 8601) fetches only what's new."""
-    base = collection_url if collection_url.endswith("/") else collection_url + "/"
-    headers = {"Accept": TAXII_ACCEPT, "User-Agent": "Rowanholt (TAXII 2.1 client)"}
-    if username:
-        headers["Authorization"] = "Basic " + base64.b64encode(f"{username}:{password}".encode()).decode()
-    params: Dict[str, object] = {"limit": min(limit, 1000)}
-    if added_after:
-        params["added_after"] = added_after
-    objects: List[Dict] = []
-    seen = set()
-    while len(objects) < limit:
-        request = urllib.request.Request(f"{base}objects/?{urlencode(params)}", headers=headers)
-        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 (an analyst-given URL)
-            envelope = json.load(response)
-        objects.extend(envelope.get("objects") or [])
-        following = envelope.get("next")
-        if not envelope.get("more") or not following or following in seen:
-            break
-        seen.add(following)
-        params["next"] = following
-    return objects[:limit]
+    """Every STIX object in a TAXII 2.1 collection, following its pagination (samarkand.taxii).
+    collection_url is the collection's base (.../collections/<id>/); added_after (ISO 8601) fetches
+    only what's new. Redirects aren't followed, so the credentials go only to the URL given. Raises
+    TaxiiError."""
+    try:
+        return taxii.fetch_objects(collection_url, username=username, password=password, added_after=added_after,
+                                   limit=limit, timeout=timeout, user_agent=TAXII_USER_AGENT)
+    except taxii.TaxiiProblem as exc:
+        raise TaxiiError(str(exc)) from exc
 
 
 def import_taxii(collection_url: str, username: str = "", password: str = "", added_after: str = "",
