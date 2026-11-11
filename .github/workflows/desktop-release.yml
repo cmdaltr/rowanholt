@@ -36,11 +36,16 @@ jobs:
       # A release file itself (as Shikari's and Ostraka's), and what every package carries inside as
       # rowanholt-src.tar.gz; its top folder is rowanholt-<version>/
       - name: Source tarball
-        run: desktop/source-tarball.sh "rowanholt-${{ steps.version.outputs.version }}-source.tar.gz" "${{ steps.version.outputs.version }}"
-      - uses: actions/upload-artifact@v4
+        run: desktop/source-tarball.sh "handoff/rowanholt-${{ steps.version.outputs.version }}-source.tar.gz" "${{ steps.version.outputs.version }}"
+      # Jobs hand files to each other through the Actions cache, not artifacts: artifacts share the
+      # account's 500 MB storage with every other repository (a busy sibling fills it and blocks every
+      # upload here); the cache has 10 GB per repository that nothing else can fill. Shikari does the same
+      - uses: actions/cache/save@v4
         with:
-          name: rowanholt-source
-          path: rowanholt-*-source.tar.gz
+          path: handoff
+          key: source-${{ github.run_id }}
+          # Windows caches are partitioned from Unix ones; the Windows job restores this too
+          enableCrossOsArchive: true
 
   macos:
     needs: source
@@ -50,9 +55,12 @@ jobs:
       HAS_CERT: ${{ secrets.MACOS_CERTIFICATE_P12 != '' }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/cache/restore@v4
         with:
-          name: rowanholt-source
+          path: handoff
+          key: source-${{ github.run_id }}
+          enableCrossOsArchive: true
+          fail-on-cache-miss: true
       - name: Import the signing certificate
         if: env.HAS_CERT == 'true'
         env:
@@ -75,7 +83,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-        run: desktop/macos/package.sh --version "$VERSION" --source "rowanholt-$VERSION-source.tar.gz" dist
+        run: desktop/macos/package.sh --version "$VERSION" --source "handoff/rowanholt-$VERSION-source.tar.gz" dist
       # Installed and removed with the scripts a user runs, as Shikari's smoke job does. The stack
       # can't start here (GitHub's macOS runners have no Docker), so this checks what the DMG puts
       # down and takes away
@@ -107,10 +115,11 @@ jobs:
             [ ! -e "$left" ] || { echo "Left behind: $left"; exit 1; }
           done
           ! defaults read io.github.cmdaltr.rowanholt >/dev/null 2>&1 || { echo "Preferences left behind"; exit 1; }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/cache/save@v4
         with:
-          name: rowanholt-macos
-          path: dist/*.dmg
+          path: dist
+          key: pkg-${{ github.run_id }}-macos
+          enableCrossOsArchive: true
 
   linux:
     needs: source
@@ -119,11 +128,14 @@ jobs:
       VERSION: ${{ needs.source.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/cache/restore@v4
         with:
-          name: rowanholt-source
+          path: handoff
+          key: source-${{ github.run_id }}
+          enableCrossOsArchive: true
+          fail-on-cache-miss: true
       - name: Package
-        run: desktop/linux/package-deb.sh --version "$VERSION" --source "rowanholt-$VERSION-source.tar.gz" dist
+        run: desktop/linux/package-deb.sh --version "$VERSION" --source "handoff/rowanholt-$VERSION-source.tar.gz" dist
       - name: Check the package
         run: |
           dpkg-deb --info dist/*.deb
@@ -155,10 +167,11 @@ jobs:
           ! dpkg -s rowanholt >/dev/null 2>&1 || { echo "rowanholt is still installed"; exit 1; }
           [ ! -e /opt/rowanholt ] || { echo "Left behind: /opt/rowanholt"; ls -la /opt/rowanholt; exit 1; }
           [ ! -e /usr/share/applications/rowanholt.desktop ] || { echo "Left behind: the menu entry"; exit 1; }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/cache/save@v4
         with:
-          name: rowanholt-linux
-          path: dist/*.deb
+          path: dist
+          key: pkg-${{ github.run_id }}-linux
+          enableCrossOsArchive: true
 
   windows:
     needs: source
@@ -168,9 +181,12 @@ jobs:
       HAS_CERT: ${{ secrets.WINDOWS_CERTIFICATE_PFX != '' }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/cache/restore@v4
         with:
-          name: rowanholt-source
+          path: handoff
+          key: source-${{ github.run_id }}
+          enableCrossOsArchive: true
+          fail-on-cache-miss: true
       # WiX pinned, so a release builds with the toolset it was tested with
       - name: WiX Toolset
         shell: pwsh
@@ -179,7 +195,7 @@ jobs:
           wix extension add --global WixToolset.UI.wixext/5.0.2
       - name: Build the MSI
         shell: pwsh
-        run: desktop\windows\build-msi.ps1 -Version $env:VERSION -Tarball "rowanholt-$($env:VERSION)-source.tar.gz" -OutDir dist
+        run: desktop\windows\build-msi.ps1 -Version $env:VERSION -Tarball "handoff\rowanholt-$($env:VERSION)-source.tar.gz" -OutDir dist
       - name: Sign the MSI
         if: env.HAS_CERT == 'true'
         shell: pwsh
@@ -225,10 +241,11 @@ jobs:
           $left = @($expected | Where-Object { Test-Path $_ })
           if ($left) { throw "Left behind: $($left -join ', ')" }
           if (@($installer.RelatedProducts('{2960092C-3402-4618-A64F-289055BDD7C2}')).Count) { throw 'Still registered with Windows Installer' }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/cache/save@v4
         with:
-          name: rowanholt-windows
-          path: dist/*.msi
+          path: dist
+          key: pkg-${{ github.run_id }}-windows
+          enableCrossOsArchive: true
 
   release:
     if: github.ref_type == 'tag'
@@ -240,11 +257,30 @@ jobs:
       VERSION: ${{ needs.source.outputs.version }}
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/download-artifact@v4
+      # One restore per package, all into dist/ so they accumulate; no fail-on-cache-miss, so a
+      # missing package shows as a missing release file rather than a failed restore
+      - uses: actions/cache/restore@v4
         with:
-          pattern: rowanholt-*
-          merge-multiple: true
           path: dist
+          key: pkg-${{ github.run_id }}-macos
+          enableCrossOsArchive: true
+      - uses: actions/cache/restore@v4
+        with:
+          path: dist
+          key: pkg-${{ github.run_id }}-linux
+          enableCrossOsArchive: true
+      - uses: actions/cache/restore@v4
+        with:
+          path: dist
+          key: pkg-${{ github.run_id }}-windows
+          enableCrossOsArchive: true
+      - uses: actions/cache/restore@v4
+        with:
+          path: handoff
+          key: source-${{ github.run_id }}
+          enableCrossOsArchive: true
+      - name: The source tarball beside the packages
+        run: cp handoff/rowanholt-*-source.tar.gz dist/
       - name: Checksums
         run: cd dist && sha256sum * > SHA256SUMS
       - name: Attach to a draft release
