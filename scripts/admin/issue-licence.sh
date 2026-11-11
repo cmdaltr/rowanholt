@@ -21,8 +21,8 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$here/../.." && pwd)"
 py="$root/.venv/bin/python"
-# The venv must have cryptography (requirements/web.txt); else whichever python3 is on PATH
-"$py" -c "import cryptography" 2>/dev/null || py="$(command -v python3)"
+# The venv must have samarkand and cryptography (requirements/web.txt); else whichever python3 is on PATH
+"$py" -c "import samarkand" 2>/dev/null || py="$(command -v python3)"
 
 email="${4:--}"
 [[ "$email" == "-" ]] && email=""

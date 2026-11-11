@@ -32,7 +32,7 @@ from cryptography.hazmat.primitives.serialization import (
     load_pem_private_key,
 )
 
-# licence.py needs only the standard library and cryptography, so it imports without the backend's settings
+# licence.py needs only the standard library, cryptography and samarkand, so it imports without the backend's settings
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "web" / "backend"))
 import licence  # noqa: E402
 
@@ -155,7 +155,9 @@ def main() -> int:
         not_before=args.not_before,
         expires=expires,
     )
-    line = licence.sign(key, lic)
+    # samarkand reads licences but never signs: it gives the text to sign and puts the line together
+    head = licence.head_of(lic)
+    line = licence.line_of(head, key.sign(head.encode()))
     licence.parse(line)  # signed by the key Rowanholt trusts, or this stops here
     seats = lic.seats or "unlimited"
     summary = f"{lic.edition.value} for {lic.licensee}, {seats} seats, to {lic.expires or 'no end date'}"

@@ -2,7 +2,8 @@
 
 ostraka, Shikari and Rowanholt share one licensing model (Ben, 11 November 2026). The first part of
 this file is that shared specification, kept identical in each product's `docs/LICENSING_MODEL.md`;
-the second is Rowanholt's own split. ostraka is the reference implementation. The canonical copy of
+the second is Rowanholt's own split. The reference implementation of the licence line is
+`samarkand.licence`, in the samarkand package all three products depend on. The canonical copy of
 the shared part, the issued licences and the prompts for applying it are in the private
 `cmdaltr/licensing` repo.
 
@@ -150,9 +151,10 @@ Single sign-on stays free because gating it would sign people out, which the sha
   analyst (the admin there, `access.LOCAL_USER`) can install a Pro or Services licence for branding
   and webhooks, from the Licence page or `rowanholt server licence`, accepting the terms as on a
   server. Seats apply only in server mode (`rowanholt_server_mode`).
-- **Mechanism.** `src/web/backend/licence.py`: the `rowanholt-licence-1` line, `PUBLIC_KEYS`
-  (Rowanholt's own key), standing (pending, active, grace, lapsed), `EDITION_FEATURES`
-  (`report-branding`, `brand-library`, `automation`, `managed-service`) and `has()`.
+- **Mechanism.** `src/web/backend/licence.py` binds Rowanholt's own (its id, `PUBLIC_KEYS`, four
+  free seats) to `samarkand.licence`, which reads the `rowanholt-licence-1` line and gives the
+  standing (pending, active, grace, lapsed), `EDITION_FEATURES` (`report-branding`, `brand-library`,
+  `automation`, `managed-service`) and `has()`. Where the licence is kept and the seat rule stay here.
 - **Storage.** Rowanholt keeps its accounts in a JSON file, not the database, so everything the
   licence governs sits beside it in `/app/data` (on the host `src/web/backend/data/`): `licence.json`
   (the licence line and the acceptance of the terms: `{"licence", "terms_version", "accepted_by",
@@ -203,7 +205,8 @@ Single sign-on stays free because gating it would sign people out, which the sha
   table (`storage.AuditLogModel`, migration `d5a2e8f1c693`), the licence's with the terms version.
   `models/database.py`'s AuditLog is the dormant schema's (its foreign key points at a users table
   Rowanholt doesn't use), so it isn't the one written.
-- **Tooling and tests.** `scripts/admin/sign_licence.py` and `issue-licence.sh` (key in
+- **Tooling and tests.** `scripts/admin/sign_licence.py` (it signs `samarkand.licence.head_of`'s
+  text and joins the line with `line_of`; samarkand itself never signs) and `issue-licence.sh` (key in
   `ROWANHOLT_LICENCE_KEY`, ledger with `LICENCE_LEDGER_DIR`); `tests/unit/test_licence_units.py`,
   `tests/unit/test_licence.py`, `tests/unit/test_branding.py`, `tests/unit/test_webhooks.py`, and the
   frontend's `Licence.test.js`, `Webhooks.test.js` and `Branding.test.js`.
