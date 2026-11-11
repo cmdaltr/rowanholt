@@ -41,7 +41,9 @@ Unsigned builds work, but warn. On macOS, a downloaded ad-hoc-signed app won't o
 | `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_PASSWORD` | Notarisation; the password is an app-specific one from account.apple.com |
 | `WINDOWS_CERTIFICATE_PFX`, `WINDOWS_CERTIFICATE_PASSWORD` | A code-signing certificate, base64-encoded `.pfx` |
 
-The packages build locally too, from a source tarball:
+To test the release files before a tag, `rowanholt release` (`scripts/release.sh`, as Ostraka's) builds them on this machine into `dist/<version>/` with `SHA256SUMS`, from the committed tree: the source tarball, the DMG on a Mac, and the `.deb` (in an Ubuntu container when there's no `dpkg-deb`). The MSI builds on Windows only, and the script prints the command for it. Nothing goes to GitHub. Without `--version` it's a dev build, `<pyproject version>-dev.<commits>`; try one with `sh desktop/install.sh --file dist/<version>/<file>`.
+
+Each package also builds on its own, from a source tarball:
 
 ```bash
 desktop/source-tarball.sh /tmp/rowanholt-src.tar.gz
