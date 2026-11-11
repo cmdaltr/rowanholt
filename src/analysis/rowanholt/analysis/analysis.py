@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List
 
 from rowanholt.audit import write_audit_log_entry
-from rowanholt.analysis.iocs import compare_iocs
+from rowanholt.analysis.iocs import compare_iocs, macos_system_dirs, macos_system_volume_included
 from rowanholt.core.records import SUFFIX, iter_json as iter_json_records, write_records
 from rowanholt.analysis.ntfs_ads import known_stream_note, mft_alternate_data_streams
 from rowanholt.process.extractions.artemis import _record_techniques
@@ -453,12 +453,26 @@ def analyse_artefacts(
             )
         # This volume only: its mount plus its own collected artefacts. Walking the
         # whole artefacts/ tree rescanned every shadow copy on every copy's pass.
+        # A macOS image's sealed system volume is left out unless asked for (macos_system_volume_included
+        # gives the reasoning); collected artefacts are always read, wherever they came from
+        system_tops = None
+        if img_type == "macOS":
+            if macos_system_volume_included():
+                print(" -> {} -> IOC extraction reads the macOS system volume too (--iocsSystemVolume) for '{}'".format(
+                    datetime.now().isoformat().replace("T", " "), img_name), flush=True)
+            else:
+                system_tops = [mnt, os.path.join(mnt, "root")]
+                print(" -> {} -> IOC extraction leaves out the macOS sealed system volume (/System, /bin, /sbin, /usr "
+                      "apart from /usr/local) for '{}'; --iocsSystemVolume reads it too".format(
+                          datetime.now().isoformat().replace("T", " "), img_name), flush=True)
         for scan_root, skip_vss in [(mnt, False)] + volume_artefact_dirs(
             os.path.join(output_directory, img_name, "artefacts"), mnt, vssimage
         ):
             for root, dirs, files in os.walk(scan_root):
                 if skip_vss:
                     dirs[:] = [d for d in dirs if not VSS_DIR.match(d)]
+                if system_tops and scan_root == mnt:
+                    macos_system_dirs(root, dirs, system_tops)
                 for f in files:
                     try:
                         # lstat: an image's absolute symlinks resolve to the analysis host's own files

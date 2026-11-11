@@ -217,6 +217,7 @@ function JobDetails() {
       'userprofiles': 'User Profiles',
       'nsrl': 'NSRL',
       'extract_iocs': 'Extract IOCs',
+      'ioc_system_volume': 'IOCs: macOS system volume',
       'threat_intel': 'Threat Intelligence',
       'splunk': 'Splunk',
       'elastic': 'Elastic',

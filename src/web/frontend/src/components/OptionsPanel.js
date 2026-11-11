@@ -78,6 +78,8 @@ function OptionsPanel({ options, onChange, disabled = false, hasImages = false, 
       options: [
         { key: 'analysis', label: 'Automated Analysis', description: 'Conduct automated forensic analysis (includes magic-byte checks)', time: 30 },
         { key: 'extract_iocs', label: 'Extract IOCs', description: 'Extract Indicators of Compromise', time: 20 },
+        // Off by default: the sealed system volume is read-only and Apple's, and where most of a macOS pass's time and noise come from (analysis/iocs.py)
+        { key: 'ioc_system_volume', label: 'IOCs: macOS system volume', description: 'Also read /System, /bin, /sbin and /usr on a macOS\nimage, for when tampering below the OS is suspected', time: 60, slow: true },
         { key: 'threat_intel', label: 'Threat Intelligence', description: 'Match artefacts and IOCs against\nthe indicators in Pippin', time: 10 },
         { key: 'memory', label: 'Memory Collection & Analysis', description: 'Analyze memory using Volatility', time: 45, slow: true },
         { key: 'timeline', label: 'Disk Image Timeline', description: 'Create timeline using plaso', time: 180, slow: true, disabledForGandalf: true },
@@ -638,7 +640,7 @@ function OptionsPanel({ options, onChange, disabled = false, hasImages = false, 
               const isCollectionStep = currentStepData.key === 'collection';
               const filteredOptions = getFilteredOptions();
 
-              const analysisOrder = ['analysis', 'extract_iocs', 'threat_intel', 'memory', 'timeline', 'memory_timeline', 'keywords', 'yara', 'collectFiles'];
+              const analysisOrder = ['analysis', 'extract_iocs', 'ioc_system_volume', 'threat_intel', 'memory', 'timeline', 'memory_timeline', 'keywords', 'yara', 'collectFiles'];
 
               const orderedOptions = (isAnalysisStep ? analysisOrder : [])
                 .map(key => filteredOptions.find(opt => opt.key === key))

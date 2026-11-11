@@ -794,6 +794,8 @@ def build_elrond_command(job):
         cmd.append("--magicBytes")
     if opts.extract_iocs:
         cmd.append("--extractIocs")
+        if getattr(opts, "ioc_system_volume", False):
+            cmd.append("--iocsSystemVolume")
     if opts.keywords_file:
         cmd.extend(["--Keywords", opts.keywords_file])
     if opts.yara_dir:

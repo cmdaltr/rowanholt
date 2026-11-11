@@ -1336,6 +1336,8 @@ def build_elrond_command(job):
         cmd.append("--magicBytes")
     if opts.extract_iocs:
         cmd.append("--extractIocs")
+        if getattr(opts, "ioc_system_volume", False):
+            cmd.append("--iocsSystemVolume")
     if opts.iocs_file:
         cmd.extend(["--iocsFile", opts.iocs_file])
     if getattr(opts, "threat_intel", False):

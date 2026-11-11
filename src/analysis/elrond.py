@@ -154,6 +154,13 @@ parser.add_argument(
     default=False,
 )
 parser.add_argument(
+    "--iocsSystemVolume",
+    help="With --extractIocs on a macOS image, read the sealed system volume too (/System, /bin, /sbin, /usr apart from /usr/local), which is left out by default: see rowanholt/analysis/iocs.py, macos_system_volume_included",
+    action="store_const",
+    const=True,
+    default=False,
+)
+parser.add_argument(
     "--iocsFile",
     nargs=1,
     help="IOC watchlist file to match against extracted IOCs; Example syntax: --iocsFile /path/to/iocs.txt",
@@ -328,6 +335,9 @@ elastic = args.Elastic
 gandalf = args.Gandalf
 collectfiles = args.collectFiles
 extractiocs = args.extractIocs
+if args.iocsSystemVolume:
+    # Read where the walk happens (analysis/iocs.py), as ROWANHOLT_ONLINE_LOOKUPS is
+    os.environ["ROWANHOLT_MACOS_SYSTEM_IOCS"] = "1"
 iocsfile = args.iocsFile
 threatintel = args.threatIntel or []
 stackbaseline = args.stackBaseline[0] if args.stackBaseline else ""

@@ -191,6 +191,45 @@ def extract_line_iocs(line):
     return result
 
 
+# The macOS Signed System Volume: what IOC extraction leaves out by default (macos_system_dirs):
+# these at the system root, and /usr apart from /usr/local
+MACOS_SEALED = ("System", "bin", "sbin")
+
+
+def macos_system_volume_included():
+    """Whether IOC extraction reads a macOS image's sealed system volume too: ROWANHOLT_MACOS_SYSTEM_IOCS=1,
+    which `elrond.py --iocsSystemVolume` sets (a job's ioc_system_volume option). Off by default.
+
+    Why off: from macOS 11 the system lives on the Signed System Volume, a read-only snapshot sealed by
+    a hash tree that the Mac checks at boot, which even root can't change while the system runs, and
+    which Apple alone writes. An attacker's files go where they can be written: /Library,
+    ~/Library, /Applications, /private (/etc, /var, /tmp), /usr/local and /opt, all still read. The
+    sealed volume, meanwhile, is where nearly all of a full pass's time and noise come from: the lab's
+    macOS 15 sample spent over an hour there and turned up 291,536 "IOCs", nearly all Apple's own
+    domains, addresses and version strings in Perl, Ruby and translation files.
+
+    What it costs: files planted on the system volume by someone who disabled SIP and the seal from
+    Recovery (physical access, or control of the boot), or on a Mac before macOS 11, which has SIP but
+    no sealed volume, are missed. Turn it on when tampering below the OS is suspected. The job log says
+    which way each run went."""
+    return os.environ.get("ROWANHOLT_MACOS_SYSTEM_IOCS", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def macos_system_dirs(root, dirs, tops):
+    """Prune os.walk's dirs in place to leave out the sealed system volume of a macOS image. tops are
+    where the system root can be: the mount, and its root/ (apfs-fuse puts the system volume there).
+    /usr/local is kept: Homebrew and whatever an admin installs live there, on the data volume.
+    Returns whether anything was left out."""
+    before = len(dirs)
+    for top in tops:
+        rel = os.path.relpath(root, top)
+        if rel == ".":
+            dirs[:] = [d for d in dirs if d not in MACOS_SEALED]
+        elif rel == "usr":
+            dirs[:] = [d for d in dirs if d == "local"]
+    return len(dirs) != before
+
+
 def dns_lookups_enabled():
     """Whether Elrond may ask DNS about the IOCs it extracts: ROWANHOLT_ONLINE_LOOKUPS includes "dns".
     Off by default: each lookup tells whoever runs the domain's nameserver that someone is looking."""

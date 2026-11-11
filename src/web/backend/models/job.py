@@ -36,6 +36,9 @@ class AnalysisOptions(BaseModel):
     # Analysis options
     analysis: bool = False
     extract_iocs: bool = False
+    # With extract_iocs on a macOS image, read the sealed system volume too (--iocsSystemVolume): left out
+    # by default, as analysis/iocs.py macos_system_volume_included explains
+    ioc_system_volume: bool = False
     iocs_file: Optional[str] = None  # Optional IOC watchlist file
     misplaced_binaries: bool = False  # Find system binaries in unexpected locations (T1036.005)
     masquerading: bool = False  # Detect masquerading: RLO, double ext, spaces, renamed utils (T1036)
