@@ -2,7 +2,8 @@
 STIX 2.1 bundles, TAXII 2.1 collections, MITRESaw's procedures or a text watchlist,
 and matched against a case (Elrond's --threatIntel) or a single value (enrich_artefact, for Aulë).
 
-Stdlib only, apart from openpyxl for the workbook, so the web backend can import it too.
+Stdlib only, apart from openpyxl for the workbook and samarkand for STIX and TAXII (both in the backend
+and worker images), so the web backend can import it too.
 """
 
 from rowanholt.threat_intel.index import ThreatIntelIndex, enrich_artefact
