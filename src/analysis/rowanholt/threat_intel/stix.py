@@ -1,13 +1,11 @@
 """STIX 2.1 bundles and TAXII 2.1 collections as indicator rows.
 
-Ported from Archer (archer/parsers/stix_import.py and taxii_client.py, MIT,
-the same author): parsed from the raw JSON rather than through python-stix2's loaders, because
-vendor exports carry custom properties the strict loaders reject.
-
-Archer flattens a bundle into one list of IOCs and one group, which suits generating detections.
-Matching evidence needs each indicator's own group and technique, so here an indicator takes them
-from its STIX 'indicates' relationships, falling back to the bundle's only intrusion set when it
-has exactly one, and never to every technique in the bundle.
+Bundles are read by samarkand.stix, the suite's shared reader (hand-written JSON rather than
+python-stix2's loaders, because vendor exports carry custom properties the strict loaders reject).
+It gives each value with the groups and techniques its own STIX relationships ('indicates',
+'related-to', 'uses') link it to; here those become the ten columns, an indicator falling back to the
+bundle's only intrusion set when it has exactly one, and never to every technique in the bundle. Only
+objects with an id are read: one without can't be referred to, so it gives no row and links nothing.
 
 An indicator's valid_until and confidence (and valid_from or created, as first seen) come back
 beside the rows, keyed by Indicator.key(), for the backend's threat_intel_validity
@@ -16,19 +14,19 @@ beside the rows, keyed by Indicator.key(), for the backend's threat_intel_validi
 
 import base64
 import json
-import re
 import urllib.request
-from typing import Dict, List, Tuple, Union
+from datetime import datetime
+from itertools import groupby
+from typing import Dict, List, Optional, Tuple, Union
 from urllib.parse import urlencode
 
-from rowanholt.threat_intel.schema import Indicator, unique
-from rowanholt.threat_intel.validity import Validity, parse_time
+from samarkand import stix as shared
 
-TECHNIQUE = re.compile(r"\bT\d{4}(?:\.\d{3})?\b")
-# objtype(:path)? = 'value': the comparisons inside a STIX pattern
-PATTERN_COMPARISON = re.compile(r"([a-z0-9][a-z0-9-]*)(?::([^\s=<>!]+))?\s*(?:=|LIKE|MATCHES)\s*'((?:[^'\\]|\\.)*)'",
-                                re.IGNORECASE)
-GROUP_TYPES = ("intrusion-set", "threat-actor")
+from rowanholt.threat_intel.schema import Indicator, unique
+from rowanholt.threat_intel.validity import Validity
+
+# The cyber observables a row can come from; an indicator's pattern may name any of these and software
+OBSERVABLES = ("ipv4-addr", "ipv6-addr", "domain-name", "url", "file", "process", "windows-registry-key")
 TAXII_ACCEPT = "application/taxii+json;version=2.1"
 
 
@@ -45,76 +43,37 @@ def _load(data: Union[str, bytes, dict, list]):
     return data
 
 
-def _pattern_values(pattern: str) -> List[Tuple[str, str]]:
-    """(kind, value) for each comparison in a STIX pattern."""
-    out = []
-    for objtype, path, value in PATTERN_COMPARISON.findall(pattern or ""):
-        value = value.replace("\\'", "'").replace("\\\\", "\\").strip()
-        objtype, path = objtype.lower(), (path or "").lower()
-        if not value:
-            continue
-        if objtype in ("ipv4-addr", "ipv6-addr"):
-            out.append(("ip", value))
-        elif objtype == "domain-name":
-            out.append(("domain", value))
-        elif objtype == "url":
-            out.append(("url", value))
-        elif objtype == "file":
-            out.append(("hash" if "hashes" in path else "file", value))
-        elif objtype == "process":
-            out.append(("cmd" if "command_line" in path else "software", value))
-        elif objtype == "windows-registry-key":
-            out.append(("reg", value))
-        elif objtype == "software":
-            out.append(("software", value))
-    return out
-
-
-def _observable_values(obj: Dict) -> List[Tuple[str, str]]:
-    kind = obj.get("type")
-    if kind in ("ipv4-addr", "ipv6-addr", "domain-name", "url") and obj.get("value"):
-        return [({"domain-name": "domain", "url": "url"}.get(kind, "ip"), obj["value"])]
-    if kind == "file":
-        values = [("hash", h) for h in (obj.get("hashes") or {}).values() if h]
-        return values + ([("file", obj["name"])] if obj.get("name") else [])
-    if kind == "process" and obj.get("command_line"):
-        return [("cmd", obj["command_line"])]
-    if kind == "windows-registry-key" and obj.get("key"):
-        return [("reg", obj["key"])]
-    return []
-
-
-def _attack_id(obj: Dict) -> str:
-    for ref in obj.get("external_references") or []:
-        if str(ref.get("source_name", "")).lower() in ("mitre-attack", "mitre attack"):
-            if TECHNIQUE.fullmatch(str(ref.get("external_id") or "")):
-                return ref["external_id"]
-    found = TECHNIQUE.findall(f"{obj.get('name', '')} {obj.get('description') or ''}")
-    return found[0] if found else ""
-
-
-def _reference(obj: Dict) -> str:
-    for ref in obj.get("external_references") or []:
-        if ref.get("url"):
-            return ref["url"]
+def _kind(item: shared.Indicator) -> str:
+    """The value's kind as Rowanholt names it (ip, domain, url, hash, file, cmd, software, reg), or ""
+    for one it doesn't read."""
+    stix_type, path = item.stix_type, item.stix_path.lower()
+    if stix_type in ("ipv4-addr", "ipv6-addr"):
+        return "ip"
+    if stix_type in ("domain-name", "url"):
+        return "domain" if stix_type == "domain-name" else "url"
+    if stix_type == "file":
+        return "hash" if "hashes" in path else "file"
+    if stix_type == "process":
+        return "cmd" if "command_line" in path else "software"
+    if stix_type == "windows-registry-key":
+        return "reg"
+    if stix_type == "software" and item.object_type == "indicator":
+        return "software"
     return ""
 
 
-def _tactics(obj: Dict) -> str:
-    return ", ".join(p.get("phase_name", "").replace("-", " ").title()
-                     for p in obj.get("kill_chain_phases") or [] if p.get("phase_name"))
+def _naive(at: Optional[datetime]) -> Optional[datetime]:
+    """samarkand's aware UTC as the naive UTC the database stores."""
+    return at.replace(tzinfo=None) if at else None
+
+
+def _tactics(phases: Tuple[str, ...]) -> str:
+    return ", ".join(p.replace("-", " ").title() for p in phases)
 
 
 def parse_stix_bundle(data: Union[str, bytes, dict, list], source: str = "") -> List[Indicator]:
     """A STIX 2.1 bundle (or a bare list of objects) as indicators."""
     return parse_stix_bundle_with_validity(data, source)[0]
-
-
-def _validity(obj: Dict) -> Validity:
-    confidence = obj.get("confidence")
-    return Validity(valid_until=parse_time(obj.get("valid_until")),
-                    confidence=confidence if isinstance(confidence, int) and 0 <= confidence <= 100 else None,
-                    first_seen=parse_time(obj.get("valid_from")) or parse_time(obj.get("created")))
 
 
 def parse_stix_bundle_with_validity(data: Union[str, bytes, dict, list],
@@ -124,43 +83,39 @@ def parse_stix_bundle_with_validity(data: Union[str, bytes, dict, list],
     objects = data.get("objects") if isinstance(data, dict) else data
     if not isinstance(objects, list):
         raise IntelFormatError("not a STIX bundle: no 'objects' list")
-    by_id = {o.get("id"): o for o in objects if isinstance(o, dict) and o.get("id")}
-    groups = [o for o in by_id.values() if o.get("type") in GROUP_TYPES]
-    only_group = groups[0].get("name", "") if len(groups) == 1 else ""
-    report = next((o for o in by_id.values() if o.get("type") == "report"), {})
-    source = source or ("STIX: " + (report.get("name") or only_group or (data.get("id", "bundle") if isinstance(data, dict) else "bundle")))
-    targets: Dict[str, List[Dict]] = {}
-    for rel in by_id.values():
-        if rel.get("type") == "relationship" and rel.get("relationship_type") in ("indicates", "related-to", "uses"):
-            target = by_id.get(rel.get("target_ref"))
-            if target:
-                targets.setdefault(rel.get("source_ref"), []).append(target)
+    try:
+        parsed = shared.parse([o for o in objects if isinstance(o, dict) and isinstance(o.get("id"), str) and o["id"]])
+    except shared.NotABundle as exc:
+        raise IntelFormatError(str(exc)) from exc
+    report = parsed.reports[0] if parsed.reports else None
+    bundle_id = data.get("id", "bundle") if isinstance(data, dict) else "bundle"
+    source = source or ("STIX: " + ((report.name if report else "") or parsed.only_group or bundle_id))
+    report_url = report.references[0] if report and report.references else ""
 
     indicators = []
     validity: Dict[tuple, Validity] = {}
-    for obj in by_id.values():
-        kind = obj.get("type")
-        if kind == "indicator":
-            values = _pattern_values(obj.get("pattern", ""))
-        elif kind in ("ipv4-addr", "ipv6-addr", "domain-name", "url", "file", "process", "windows-registry-key"):
-            values = _observable_values(obj)
-        else:
+    # One STIX object's values are consecutive: each object is a run, as Rowanholt has always read it
+    for _, run in groupby(parsed.indicators, key=lambda item: item.object_id):
+        values = [(item, _kind(item)) for item in run
+                  if item.object_type == "indicator" or item.object_type in OBSERVABLES]
+        values = [(item, kind) for item, kind in values if kind]
+        if not values:
             continue
-        linked = targets.get(obj.get("id"), [])
-        group = next((t.get("name", "") for t in linked if t.get("type") in GROUP_TYPES), only_group)
-        patterns = [t for t in linked if t.get("type") == "attack-pattern"] or [None]
-        own = _validity(obj)
+        obj = values[0][0]  # what the object says is the same for each of its values
+        group = obj.groups[0] if obj.groups else parsed.only_group
+        own = Validity(valid_until=_naive(obj.valid_until), confidence=obj.confidence,
+                       first_seen=_naive(obj.valid_from or obj.created))
         timed = own.valid_until is not None or own.confidence is not None
-        for pattern in patterns:
-            technique = _attack_id(pattern) if pattern else (TECHNIQUE.findall(obj.get("name", "")) or [""])[0]
-            for value_kind, value in values:
+        for technique in obj.techniques or (None,):
+            technique_id = technique.id if technique else (obj.named_techniques or ("",))[0]
+            for item, kind in values:
                 indicators.append(Indicator(
-                    evidential_element=value, threat_group=group,
-                    procedure_example=(obj.get("description") or obj.get("name") or "")[:1000],
-                    technique_id=technique, technique_name=(pattern or {}).get("name", ""),
-                    tactic=_tactics(pattern or obj),
-                    contextual_evidence=f"{value_kind}: {obj.get('name') or kind}"[:500],
-                    reference_url=_reference(obj) or _reference(report), source_type=source,
+                    evidential_element=item.value, threat_group=group,
+                    procedure_example=(obj.description or obj.name or "")[:1000],
+                    technique_id=technique_id, technique_name=technique.name if technique else "",
+                    tactic=_tactics(technique.tactics if technique else obj.tactics),
+                    contextual_evidence=f"{kind}: {obj.name or obj.object_type}"[:500],
+                    reference_url=(obj.references or (report_url,))[0], source_type=source,
                 ))
                 if timed:
                     key = indicators[-1].key()
