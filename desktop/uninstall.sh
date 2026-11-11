@@ -67,9 +67,11 @@ command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1 && docker_ok=1
 stack_dirs=
 [ -n "$docker_ok" ] && stack_dirs=$(docker ps -a --filter label=com.docker.compose.project=rowanholt \
     --format '{{.Label "com.docker.compose.project.working_dir"}}' 2>/dev/null | sort -u || true)
+# || true: with no stack, the loop's last test fails, and under set -e that status would end the
+# script here, before it said anything
 checkout_stack=$(printf '%s\n' "$stack_dirs" | while IFS= read -r dir; do
     [ -n "$dir" ] && [ -d "$dir/.git" ] && { printf '%s\n' "$dir"; break; }
-done)
+done || true)
 
 printf '\n  Rowanholt: desktop app uninstaller\n'
 
