@@ -574,7 +574,7 @@ There is no MFA step in the mounted auth router.
 | Modes | `brisk`, `mordor` |
 | Phases | `analysis`, `memory`, `memory_timeline`, `timeline` |
 | Collection | `vss`, `userprofiles`, `collectFiles` + `collectFiles_filter`, `collect_files_all`, `collect_files_archive`, `collect_files_bin`, `collect_files_docs`, `collect_files_hidden`, `collect_files_lnk`, `collect_files_mail`, `collect_files_scripts`, `collect_files_unalloc` (carving), `collect_files_virtual`, `collect_files_web` |
-| Detection | `extract_iocs` + `iocs_file`, `keywords` + `keywords_file`, `yara` + `yara_dir`, `misplaced_binaries`, `masquerading`, `clamav` |
+| Detection | `extract_iocs` + `iocs_file` and `ioc_system_volume` (a macOS image's sealed system volume too: `--iocsSystemVolume` in [CLI.md](CLI.md)), `keywords` + `keywords_file`, `yara` + `yara_dir`, `misplaced_binaries`, `masquerading`, `clamav` |
 | Hashing | `hash_collected`, `hash_all`, `nsrl` |
 | Output | `splunk`, `elastic`, `navigator`, `archive`, `delete`, `save_template` |
 | Job control | `force_overwrite` (remove an existing `destination_path`), `debug` (verbose job log) |
