@@ -10,12 +10,16 @@ Bodies carry ids, the case number, a host and counts, never artefact contents: a
 installation, the case's evidence doesn't. The one free text, a failed job's error, has its file paths
 taken out (they name evidence and where it's kept).
 
-Each delivery is {"event", "sent_at", "data"}, with X-Rowanholt-Event and, when the webhook has a
-secret, X-Rowanholt-Signature: sha256=<hex HMAC-SHA256 of the raw body>, so the receiver can check it
-came from this server (Shikari's design, shikari/webhooks.py). Deliveries run on a background thread,
-three tries with backoff; the last 20 are kept per webhook for the admin page. Webhooks (with their
-secrets) live in webhooks.json beside users.json (or the path in ROWANHOLT_WEBHOOKS), which the
-backend and the worker both see, and which `rowanholt server backup` keeps.
+The wire format is the suite's, sent by samarkand.webhooks: each delivery is {"event", "sent_at",
+"data"} (sent_at ISO 8601 in UTC), with X-Rowanholt-Event and, when the webhook has a secret,
+X-Rowanholt-Signature: sha256=<hex HMAC-SHA256 of the raw body>, so the receiver can check it came
+from this server. Three tries with backoff, redirects not followed; a URL must be https, or http to
+localhost, loopback or an RFC 1918 address, never link-local and never with credentials in it, and
+one that isn't is not sent. What's Rowanholt's is here: the events and their data, the store and the
+edition gate. Deliveries run on a background thread; the last 20 are kept per webhook for the admin
+page. Webhooks (with their secrets) live in webhooks.json beside users.json (or the path in
+ROWANHOLT_WEBHOOKS), which the backend and the worker both see, and which `rowanholt server backup`
+keeps.
 
 Sending is the automation feature (Pro and Services), checked at delivery: registering, listing and
 editing stay open on every edition, so a Free installation keeps its webhooks and the admin page says
@@ -24,9 +28,6 @@ they aren't sending and why.
 
 from __future__ import annotations
 
-import hashlib
-import hmac
-import ipaddress
 import json
 import logging
 import os
@@ -36,7 +37,8 @@ import threading
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-from urllib.parse import urlparse
+
+from samarkand import webhooks as shared
 
 try:
     from . import licence
@@ -45,12 +47,13 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+PREFIX = "X-Rowanholt"  # X-Rowanholt-Event, X-Rowanholt-Signature, User-Agent Rowanholt-Webhook/1
 EVENTS = ("job.completed", "job.failed", "finding.confirmed", "report.ready")
 # an absolute path (/mnt/..., C:\cases\...), not a slash inside a word ("and/or", "3/4")
 PATH = re.compile(r"(?<![\w/\\])(?:[A-Za-z]:[\\/]|/)[^\s'\"]+")
-KEEP_DELIVERIES = 20
-TRIES = 3
-TIMEOUT = 10
+KEEP_DELIVERIES = shared.KEEP_DELIVERIES
+TRIES = shared.TRIES
+TIMEOUT = shared.TIMEOUT
 BACKGROUND = True  # deliver on a thread; tests deliver inline
 _lock = threading.Lock()
 
@@ -93,33 +96,9 @@ def hooks() -> List[Dict]:
     return _load()
 
 
-def _private_host(host: str) -> bool:
-    """localhost, or a loopback or RFC 1918 address: a homelab SOAR may not have a certificate."""
-    if host in ("localhost", "localhost.localdomain") or host.endswith(".localhost"):
-        return True
-    try:
-        address = ipaddress.ip_address(host.strip("[]"))
-    except ValueError:
-        return False
-    if address.is_loopback:
-        return True
-    return address.version == 4 and any(address in ipaddress.ip_network(n)
-                                        for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"))
-
-
 def validate(url: str, events: List[str]) -> Optional[str]:
     """Why a webhook can't be saved, or None."""
-    parsed = urlparse(url or "")
-    if parsed.scheme not in ("http", "https") or not parsed.hostname:
-        return "The URL must be https://"
-    if parsed.username or parsed.password:
-        return "Put credentials in the webhook's secret, not the URL"
-    if parsed.scheme == "http" and not _private_host(parsed.hostname):
-        return "The URL must be https:// (http:// is allowed only for localhost and private 10/172.16/192.168 addresses)"
-    unknown = set(events or []) - set(EVENTS)
-    if not events or unknown:
-        return f"Choose events from {', '.join(EVENTS)}"
-    return None
+    return shared.url_problem(url) or shared.events_problem(events or [], EVENTS)
 
 
 def add(url: str, events: List[str], secret: Optional[str] = None, description: str = "") -> Dict:
@@ -153,10 +132,6 @@ def remove(hook_id: str) -> bool:
     return len(kept) != len(stored)
 
 
-def sign(secret: str, body: bytes) -> str:
-    return "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
-
-
 def sending(standing: Optional[licence.Standing] = None) -> Tuple[bool, str]:
     """Whether webhooks are delivered now, and why not when they aren't."""
     st = standing or licence.current()
@@ -181,34 +156,20 @@ def _record(hook_id: str, delivery: Dict) -> None:
 
 
 def _post(url: str, body: bytes, headers: Dict) -> int:
-    import httpx  # in the backend and the worker images; only needed once something is sent
+    """One POST, redirects not followed: the admin registered this URL, not wherever it points next.
+    The tests replace it."""
+    return shared.post_sync(url, body, headers, TIMEOUT)
 
-    # Redirects aren't followed: the admin registered this URL, not wherever it points next
-    return httpx.post(url, content=body, headers=headers, timeout=TIMEOUT, follow_redirects=False).status_code
 
-
-def deliver(hook: Dict, event: str, data: Dict, tries: int = TRIES, backoff: float = 2.0) -> Dict:
+def deliver(hook: Dict, event: str, data: Dict, tries: int = TRIES, backoff: float = shared.BACKOFF) -> Dict:
     """POST one event to one webhook; returns the delivery record (also kept on the webhook)."""
-    body = json.dumps({"event": event, "sent_at": time.time(), "data": data}, default=str).encode()
-    headers = {"Content-Type": "application/json", "User-Agent": "Rowanholt-Webhook/1", "X-Rowanholt-Event": event}
-    if hook.get("secret"):
-        headers["X-Rowanholt-Signature"] = sign(hook["secret"], body)
-    result = {"event": event, "at": time.time(), "ok": False, "status": None, "error": None, "tries": 0}
-    for attempt in range(tries):
-        result["tries"] = attempt + 1
-        try:
-            code = _post(hook["url"], body, headers)
-            result["status"] = code
-            if code < 300:
-                result.update(ok=True, error=None)
-                break
-            result["error"] = f"HTTP {code}"
-            if code < 500 and code != 429:
-                break  # the receiver refused it; trying again won't change that
-        except Exception as exc:  # noqa: BLE001 - any transport failure is a failed try, recorded
-            result["error"] = str(exc)[:200]
-        if attempt < tries - 1:
-            time.sleep(backoff * (attempt + 1))
+    outgoing = shared.prepare(hook["url"], event, data, prefix=PREFIX, secret=hook.get("secret") or None)
+    sent = shared.send(outgoing, tries=tries, backoff=backoff, timeout=TIMEOUT,
+                       post=lambda url, body, headers, timeout: _post(url, body, headers),
+                       sleep=lambda seconds: time.sleep(seconds))
+    # The record keeps the shape the admin page reads: epoch seconds, and no error as None
+    result = {"event": event, "at": sent.at.timestamp(), "ok": sent.ok, "status": sent.status,
+              "error": sent.error or None, "tries": sent.tries}
     _record(hook["id"], result)
     return result
 

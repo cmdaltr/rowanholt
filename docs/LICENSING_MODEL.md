@@ -41,9 +41,9 @@ differs:
 | `automation` | Pro | Signed webhooks: the product calls the customer's systems when something happens. Checked when a webhook is sent, so one configured on Free is kept but doesn't fire |
 | `managed-service` | Services | The right in `COMMERCIAL-LICENSE.md` section 3 to run the product for clients. Not a switch |
 
-Webhooks work the same everywhere, as Shikari's (`shikari/webhooks.py`, the reference for them): an
+Webhooks work the same everywhere, sent by `samarkand.webhooks` (the reference for them): an
 admin registers a URL and the events it wants; each delivery is a POST of
-`{"event", "sent_at", "data"}` with `X-<Product>-Event` and, when the webhook has a secret,
+`{"event", "sent_at", "data"}` (`sent_at` ISO 8601 in UTC) with `X-<Product>-Event` and, when the webhook has a secret,
 `X-<Product>-Signature: sha256=<hex HMAC-SHA256 of the raw body>`; three tries with backoff; the last
 20 deliveries kept per webhook for the admin page. Webhook bodies pass the same masking as the
 product's other outward messages.
@@ -183,9 +183,12 @@ Single sign-on stays free because gating it would sign people out, which the sha
   aren't branded.
 - **A client's brand** attaches to a case number (every job of the case; a case is a client
   engagement), chosen by an admin from the case browser (`/api/jobs/{job_id}/case/brand`).
-- **Webhooks** (`webhooks.py`, `webhook_routes.py`), Shikari's design: `X-Rowanholt-Event`,
-  `X-Rowanholt-Signature: sha256=<HMAC>`, three tries with backoff, the last 20 deliveries kept. URLs
-  are https, or http for localhost, loopback and RFC 1918 addresses (a homelab SOAR). Events:
+- **Webhooks** (`webhooks.py`, `webhook_routes.py`), sent by `samarkand.webhooks` with the prefix
+  `X-Rowanholt`: `X-Rowanholt-Event`, `X-Rowanholt-Signature: sha256=<HMAC>`, three tries with
+  backoff, redirects not followed, the last 20 deliveries kept. URLs are https, or http for
+  localhost, loopback and RFC 1918 addresses (a homelab SOAR); never a link-local address (cloud
+  metadata) whatever the scheme, nor credentials in the URL, and one that breaks these rules (say,
+  edited by hand in `webhooks.json`) isn't sent. Events:
   `job.completed` and `job.failed` (sent from `JobStorage.save_job` when a job's status becomes one
   of them, whichever path ended it), `finding.confirmed` and `report.ready` (the case routes). Bodies
   carry ids, the case number, a host and counts, never artefact contents; a failed job's error has its
