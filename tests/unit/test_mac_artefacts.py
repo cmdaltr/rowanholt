@@ -223,6 +223,35 @@ def test_an_applescript_run_is_tagged_from_osascript_or_loginwindows_check_in(tm
     assert "T1059.002" in Path(out, "HOST", "artefacts", "cooked", "unified_log.jsonl").read_text()
 
 
+def test_the_file_listing_flags_keychain_copies_hidden_entries_and_history_links(tmp_path):
+    out, macos = host(tmp_path)
+    listing = ("Path,Type,Size,Mode,UID,MTime,Target,Kind,FinderHidden\n"
+               "/private/tmp/keychain,file,125536,0o644,0,1793000000,,keychain,\n"
+               "/Users/admin/Library/Keychains/login.keychain-db,file,125536,0o600,501,1793000000,,keychain,\n"
+               "/private/tmp/certs.pem,file,2380,0o644,0,1793000000,,pem-certificate,\n"
+               "/private/var/tmp/.hidden-directory,directory,1,0o755,0,1793000000,,,\n"
+               "/Users/Shared/.localized,file,0,0o644,0,1793000000,,,\n"
+               "/Users/admin/.bash_history,symlink,0,0o755,0,1793000000,/dev/null,,\n"
+               "/Users/admin/notes.txt,file,10,0o644,501,1793000000,,,yes\n"
+               "/Users/admin/Library,directory,83,0o700,501,1793000000,,,yes\n"
+               "/private/tmp/stage.sh,file,10,0o755,0,1793000000,,script,\n"
+               "/Users/admin/T1082.txt,file,10,0o644,0,1793000000,,,\n")
+    (macos / "gandalf+file_listing.csv").write_text(listing)
+    run(out, macos / "gandalf+file_listing.csv")
+    found = {r["Path"]: (r["Flag"], r["Technique"]) for r in rows(out, "file_listing")}
+    assert found["/private/tmp/keychain"][1] == "T1555.001"
+    assert found["/Users/admin/Library/Keychains/login.keychain-db"] == ("", "")
+    assert found["/private/tmp/certs.pem"][1] == "T1555.001"
+    assert found["/private/var/tmp/.hidden-directory"][1] == "T1564.001"
+    assert found["/Users/Shared/.localized"] == ("", "")
+    assert found["/Users/admin/.bash_history"] == ("shell history linked to /dev/null", "T1070.003")
+    assert found["/Users/admin/notes.txt"] == ("hidden from the Finder", "T1564.001")
+    assert found["/Users/admin/Library"] == ("", "")  # macOS hides it itself
+    assert found["/private/tmp/stage.sh"] == ("executable staged in a temp or shared folder", "")
+    assert found["/Users/admin/T1082.txt"] == ("", "")
+    assert techniques(out) == ["T1070.003", "T1555.001", "T1564.001"]
+
+
 def test_a_log_erase_is_found_in_logds_own_log(tmp_path):
     out, _ = host(tmp_path)
     diagnostics = Path(out) / "HOST" / "artefacts" / "raw" / "unified_log_store" / "diagnostics"
@@ -262,4 +291,6 @@ def test_image_collection(tmp_path):
         (mnt / rel).write_bytes(data)
     dest = str(tmp_path / "out" / "HOST" / "artefacts" / "raw") + "/"
     collect_mac.collect_macos_extras(str(mnt), dest, "HOST::macOS", str(tmp_path / "out") + "/", "collecting", "")
-    assert sorted(p.name for p in Path(dest, "macos").iterdir()) == sorted(r.replace("/", "+") for r in files)
+    # and the listing of the temp folders and homes (here, /Users/bob)
+    assert sorted(p.name for p in Path(dest, "macos").iterdir()) == sorted(
+        [r.replace("/", "+") for r in files] + ["gandalf+file_listing.csv"])

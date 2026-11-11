@@ -68,3 +68,28 @@ def test_zsh_files_and_terminal_sessions_are_collected(tmp_path):
     assert (dest / "admin+zshrc").read_text() == "set +o history\n"
     assert (dest / "admin+zsh_sessions+037A40EC_history+zsh_history").read_text() == "whoami\n"
     assert not list(dest.glob("*session+*"))
+
+
+def test_the_file_listing_covers_staging_folders_and_homes_without_following_links(tmp_path):
+    root, dest, out = data_volume(tmp_path)
+    (root / "private" / "tmp").mkdir(parents=True)
+    (root / "private" / "tmp" / "keychain").write_bytes(b"kych" + b"\0" * 60)
+    (root / "private" / "tmp" / "certs.pem").write_text("-----BEGIN CERTIFICATE-----\nMIID\n")
+    hidden = root / "private" / "var" / "tmp" / ".hidden-directory"
+    hidden.mkdir(parents=True)
+    (hidden / ".hidden-file").write_text("x")
+    home = root / "Users" / "admin"
+    (home / "Library" / "Caches").mkdir(parents=True)
+    (home / "Library" / "Caches" / "big").write_text("not listed: a home's Library is collected on its own")
+    (home / ".bash_history").symlink_to("/dev/null")
+    (dest / "macos").mkdir()
+    assert mac.collect_macos_file_listing(str(root), str(dest) + "/") > 0
+    import csv
+    with open(dest / "macos" / "gandalf+file_listing.csv", newline="") as fh:
+        rows = {r["Path"]: r for r in csv.DictReader(fh)}
+    assert rows["/private/tmp/keychain"]["Kind"] == "keychain"
+    assert rows["/private/tmp/certs.pem"]["Kind"] == "pem-certificate"
+    assert rows["/private/var/tmp/.hidden-directory/.hidden-file"]["Type"] == "file"
+    assert rows["/Users/admin/.bash_history"]["Type"] == "symlink"
+    assert rows["/Users/admin/.bash_history"]["Target"] == "/dev/null"
+    assert "/Users/admin/Library" in rows and not any("Caches" in p for p in rows)

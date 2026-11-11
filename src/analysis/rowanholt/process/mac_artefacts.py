@@ -22,7 +22,7 @@ from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from typing import Dict, Iterable, List, Optional, Tuple
 
-from rowanholt.process.extractions import spotlight, tracev3
+from rowanholt.process.extractions import macos_files, spotlight, tracev3
 from rowanholt.process.linux_artefacts import SUSPICIOUS_COMMAND, _append_rows, _audit, _cooked, _techniques, epoch
 
 logger = logging.getLogger(__name__)
@@ -56,6 +56,7 @@ HEADERS = {
     "unified_log_store": ["LastWriteTime", "Process", "PID", "Subsystem", "Category", "Type", "Message", "Technique"],
     "spotlight": spotlight.COLUMNS,
     "logd_log": ["LastWriteTime", "Process", "PID", "Message", "Flag"],
+    "file_listing": macos_files.COLUMNS,
 }
 
 
@@ -406,6 +407,8 @@ def _route(artefact: str):
         if name.endswith("+store.db"):
             return "spotlight", spotlight_rows(artefact), "Spotlight index", []
         return "", [], "", []  # .store.db, the dbStr maps, VolumeConfiguration.plist: read with store.db
+    if name == "gandalf+file_listing.csv":
+        return "file_listing", macos_files.listing_rows(artefact), "file listing", []
     path = host_path(name)
     lower = path.lower()
     if name.endswith(SQLITE_SIDECARS):
@@ -465,7 +468,10 @@ def process_mac_artefact(verbosity, vssimage, output_directory, img, vss_path_in
             written = _append_rows(os.path.join(cooked, out), HEADERS[out], rows, img, artefact, techniques)
         if written:
             _audit(verbosity, output_directory, img, stage, vssimage, what, artefact)
-            _techniques(output_directory, techniques)
+            # a row's own Technique counts for the case as well as the route's
+            own = [r.get("Technique") for r in rows if isinstance(r, dict) and r.get("Technique")] \
+                if isinstance(rows, list) else []
+            _techniques(output_directory, sorted(set(techniques) | set(own)))
     except Exception as e:
         logger.warning("could not process '%s' for %s: %s", os.path.basename(artefact), vssimage, e)
     return True

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3 -tt
+import csv
 import glob
 import os
 import re
 import shutil
+import stat
 from datetime import datetime
 
 from rowanholt.audit import write_audit_log_entry
@@ -43,6 +45,13 @@ MACOS_LOG_STORE_MAX = 2 << 30
 MACOS_SPOTLIGHT_ROOTS = ("/System/Volumes/Data/.Spotlight-V100", "/.Spotlight-V100")
 MACOS_SPOTLIGHT_FILES = re.compile(r"^(?:\.?store\.db|dbStr-\d+\.map\..+|VolumeConfiguration\.plist)$")
 MACOS_SPOTLIGHT_MAX = 1 << 30
+# A listing of where an attacker stages and hides things, into raw/macos/gandalf+file_listing.csv:
+# (folder, depth). Homes only near the top: their Library is collected artefact by artefact.
+MACOS_LISTING_ROOTS = (("/private/tmp", 8), ("/private/var/tmp", 8), ("/Users/Shared", 8), ("/Users", 3))
+MACOS_LISTING_SKIP = frozenset({"Library", ".Trash", "node_modules", ".git"})
+MACOS_LISTING_MAX = 100000
+MACOS_LISTING_FIELDS = ("Path", "Type", "Size", "Mode", "UID", "MTime", "Target", "Kind", "FinderHidden")
+FINDER_INVISIBLE = 0x4000  # kIsInvisible in the Finder flags, bytes 8-9 of com.apple.FinderInfo
 
 
 def collect_macos_log_store(mnt, dest):
@@ -92,11 +101,92 @@ def collect_macos_spotlight(mnt, dest):
     return count
 
 
+def _content_kind(path):
+    """What a file holds, from its first bytes: a keychain database, PEM certificates or keys,
+    a Mach-O binary or a script; '' otherwise."""
+    try:
+        with open(path, "rb") as fh:
+            head = fh.read(64)
+    except OSError:
+        return ""
+    if head[:4] == b"kych":
+        return "keychain"
+    if head.startswith(b"-----BEGIN"):
+        return "pem-key" if b"PRIVATE KEY" in head else "pem-certificate"
+    if head[:4] in (b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xca\xfe\xba\xbe"):
+        return "macho"
+    return "script" if head[:2] == b"#!" else ""
+
+
+def _finder_hidden(path):
+    """Whether the Finder flags make it invisible (SetFile -a V, or a written FinderInfo). Only where
+    the mount exposes extended attributes; chflags hidden is an inode flag apfs-fuse doesn't show."""
+    try:
+        info = os.getxattr(path, "com.apple.FinderInfo", follow_symlinks=False)
+    except (AttributeError, OSError):
+        return ""
+    return "yes" if len(info) >= 10 and int.from_bytes(info[8:10], "big") & FINDER_INVISIBLE else ""
+
+
+def macos_file_listing(mnt):
+    """Every entry in the temp folders, /Users/Shared and the top of each home, without following
+    symlinks: what it is, who owns it, when it changed, and what it holds."""
+    rows, seen = [], set()
+    for folder, depth in MACOS_LISTING_ROOTS:
+        top = mnt + folder
+        stack = [(top, 0)]
+        while stack and len(rows) < MACOS_LISTING_MAX:
+            current, level = stack.pop()
+            try:
+                entries = sorted(os.scandir(current), key=lambda e: e.name)
+            except OSError:
+                continue
+            for entry in entries:
+                if entry.path in seen or len(rows) >= MACOS_LISTING_MAX:
+                    continue
+                seen.add(entry.path)
+                try:
+                    info = entry.stat(follow_symlinks=False)
+                except OSError:
+                    continue
+                kind, target = "", ""
+                if stat.S_ISLNK(info.st_mode):
+                    entry_type = "symlink"
+                    try:
+                        target = os.readlink(entry.path)
+                    except OSError:
+                        pass
+                elif stat.S_ISDIR(info.st_mode):
+                    entry_type = "directory"
+                    if level + 1 < depth and entry.name not in MACOS_LISTING_SKIP:
+                        stack.append((entry.path, level + 1))
+                elif stat.S_ISREG(info.st_mode):
+                    entry_type, kind = "file", _content_kind(entry.path)
+                else:
+                    continue
+                rows.append({"Path": entry.path[len(mnt):], "Type": entry_type, "Size": info.st_size,
+                             "Mode": oct(info.st_mode & 0o7777), "UID": info.st_uid, "MTime": int(info.st_mtime),
+                             "Target": target, "Kind": kind, "FinderHidden": _finder_hidden(entry.path)})
+    return rows
+
+
+def collect_macos_file_listing(mnt, dest):
+    """The listing as raw/macos/gandalf+file_listing.csv; how many entries it holds."""
+    rows = macos_file_listing(mnt)
+    if rows:
+        with open(dest + "macos/gandalf+file_listing.csv", "w", newline="") as out:
+            writer = csv.DictWriter(out, fieldnames=MACOS_LISTING_FIELDS)
+            writer.writeheader()
+            writer.writerows(rows)
+    return len(rows)
+
+
 def collect_macos_extras(mnt, dest, img, output_directory, stage, verbosity):
     """
     BTM items, shared file lists, Notification Center, ExecPolicy, KextPolicy,
     XProtect, emond, periodic, InstallHistory, PowerLog and Biome from a mounted
-    macOS image, into raw/macos/; per-user crontabs into raw/cron/; the unified-log store into raw/unified_log_store/, Spotlight's
+    macOS image, into raw/macos/, with a listing of the temp folders and homes; per-user crontabs
+    into raw/cron/; the unified-log store into raw/unified_log_store/, Spotlight's
     index into raw/spotlight/.
     """
     macos = dest + "macos/"
@@ -146,6 +236,7 @@ def collect_macos_extras(mnt, dest, img, output_directory, stage, verbosity):
                     pass
     count += collect_macos_log_store(mnt, dest)
     count += collect_macos_spotlight(mnt, dest)
+    count += collect_macos_file_listing(mnt, dest)
     entry, prnt = "{},{},{},macos background items and policy databases\n".format(
         datetime.now().isoformat(), img.split("::")[0], stage
     ), " -> {} -> {} {} macOS background-item, policy-database, Biome, unified-log and Spotlight artefacts from '{}'".format(
