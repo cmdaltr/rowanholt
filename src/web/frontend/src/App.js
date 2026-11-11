@@ -20,7 +20,9 @@ import Aragorn from './components/Aragorn';
 import ThreatIntel from './components/ThreatIntel';
 import CaseBrowser from './components/CaseBrowser';
 import StartOffer from './components/StartOffer';
-import Licence, { LicenceNotice } from './components/Licence';
+import Licence, { LicenceNotice, managesLicence } from './components/Licence';
+import Webhooks from './components/Webhooks';
+import Branding from './components/Branding';
 import { getAuthConfig } from './api';
 import './App.css';
 
@@ -40,8 +42,12 @@ function Navigation({ onGuide, serverMode }) {
         <Link to="/elrond">Elrond</Link>
         <Link to="/pippin">Pippin</Link>
         <Link to="/aragorn">Aragorn</Link>
-        {/* A team server's licence; local mode needs none */}
-        {serverMode && user?.role === 'admin' && <Link to="/licence">Licence</Link>}
+        {/* The licence and what it turns on: a team server's admins, or the analyst in local mode */}
+        {serverMode != null && managesLicence(user, serverMode) && <>
+          <Link to="/licence">Licence</Link>
+          <Link to="/branding">Branding</Link>
+          <Link to="/webhooks">Webhooks</Link>
+        </>}
         <Link to="/ai">Aulë</Link>
       </div>
       {/* Mordor opens the right: the datasets sit beside the jobs they feed */}
@@ -89,9 +95,10 @@ function AppContent() {
   const [scrollProgress, setScrollProgress] = useState(0);
   const [offerRequested, setOfferRequested] = useState(false);
   const closeOfferRequest = useCallback(() => setOfferRequested(false), []);
-  const [serverMode, setServerMode] = useState(false);
+  // null until the auth config answers, so admin-only links and pages aren't guessed at
+  const [serverMode, setServerMode] = useState(null);
   useEffect(() => {
-    getAuthConfig().then((config) => setServerMode(!!config.server_mode)).catch(() => {});
+    getAuthConfig().then((config) => setServerMode(!!config.server_mode)).catch(() => setServerMode(true));
   }, []);
   const mapBackground = `${process.env.PUBLIC_URL}/images/middle_earth.png`;
 
@@ -139,7 +146,9 @@ function AppContent() {
             <Route path="/archive" element={<Archive />} />
             <Route path="/account" element={<AccountPage />} />
             <Route path="/aragorn" element={<Aragorn />} />
-            <Route path="/licence" element={<Licence />} />
+            <Route path="/licence" element={<Licence serverMode={serverMode} />} />
+            <Route path="/branding" element={<Branding serverMode={serverMode} />} />
+            <Route path="/webhooks" element={<Webhooks serverMode={serverMode} />} />
             <Route path="/lab" element={<Navigate to="/aragorn#lab" replace />} />
           </Routes>
         </main>

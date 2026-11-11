@@ -26,11 +26,26 @@ the shared part, the issued licences and the prompts for applying it are in the 
 
 | Edition | For | Seats | Always includes |
 |---|---|---|---|
-| **Free** | Individuals and small teams | The product's own free number | The whole core product, unbranded |
-| **Pro** | Organisations using it for themselves | As the licence states, or unlimited | The product's Pro features |
-| **Services** | MSSPs and consultancies working for clients | As the licence states, or unlimited | Pro's features, the product's Services features, and the `managed-service` right |
+| **Free** | Individuals and small teams | The product's own free number | The whole core product: reports in the product's own style, no automation |
+| **Pro** | Organisations using it for themselves | As the licence states, or unlimited | Free, plus `report-branding` and `automation` |
+| **Services** | MSSPs and consultancies working for clients | As the licence states, or unlimited | Pro, plus `brand-library` and the `managed-service` right |
 
-What each edition unlocks is decided per product (below, for ostraka).
+The features are the same in every product (Ben, 11 November 2026); only the free seat number
+differs:
+
+| Feature | Edition | What it is |
+|---|---|---|
+| `report-branding` | Pro | One brand (colours and logos) for the installation's reports, in place of the product's own style |
+| `brand-library` | Services | A brand per client, chosen for each piece of work the report comes from |
+| `automation` | Pro | Signed webhooks: the product calls the customer's systems when something happens. Checked when a webhook is sent, so one configured on Free is kept but doesn't fire |
+| `managed-service` | Services | The right in `COMMERCIAL-LICENSE.md` section 3 to run the product for clients. Not a switch |
+
+Webhooks work the same everywhere, as Shikari's (`shikari/webhooks.py`, the reference for them): an
+admin registers a URL and the events it wants; each delivery is a POST of
+`{"event", "sent_at", "data"}` with `X-<Product>-Event` and, when the webhook has a secret,
+`X-<Product>-Signature: sha256=<hex HMAC-SHA256 of the raw body>`; three tries with backoff; the last
+20 deliveries kept per webhook for the admin page. Webhook bodies pass the same masking as the
+product's other outward messages.
 
 ### The licence
 
@@ -108,35 +123,43 @@ One line: `<product>-licence-1.<payload>.<signature>`.
 ### Individual to each product
 
 Where the licence is stored (ostraka: its database; a product without one: a file); the free seat
-number; feature ids and what each edition unlocks; how "an admin" is spotted for the seat rule.
+number; what a client's brand attaches to (ostraka: an incident); which events send webhooks; how
+"an admin" is spotted for the seat rule.
 
 ## Rowanholt's split
 
-Decided by Ben, 11 November 2026. Ben also confirmed that nobody else contributed code to the
-original Elrond and Gandalf repositories, so Rowanholt moves from MIT to ELv2 from the next release.
+Decided by Ben, 11 November 2026: the features are the shared table's, the same in every product.
+Ben also confirmed that nobody else contributed code to the original Elrond and Gandalf repositories,
+so Rowanholt moves from MIT to ELv2 from the next release.
 
 | | Free | Pro | Services |
 |---|---|---|---|
-| Local mode (one analyst, no sign-in) | Everything, no licence | Everything | Everything |
+| Local mode (one analyst, no sign-in) | The Free edition: needs no licence | With a Pro licence installed | With a Services licence installed |
 | Accounts that can sign in to a team server | 4 (`FREE_SEATS`) | The licence's `seats` | The licence's `seats` |
-| Features | The whole product, single sign-on included | The same | The same |
+| The product | All of it: acquisition, analysis, the case browser, single sign-on, Aulë | The same | The same |
+| The Word case report | Rowanholt's own style | The installation's brand (`report-branding`) | The case's brand, else the installation's (`brand-library`) |
+| The Markdown report and the Navigator layer | Rowanholt's own | The same | The same |
+| Webhooks (`automation`) | Kept, not sent | Sent | Sent |
 | `managed-service` | — | — | Yes: a right in COMMERCIAL-LICENSE.md section 3, not a switch |
 
-No feature is gated: the editions differ in seats only. Single sign-on stays free because gating it
-would sign people out, which the shared model never does.
+Single sign-on stays free because gating it would sign people out, which the shared model never does.
 
 ### How it's built
 
-- **Modes.** The licence and seats apply only in server mode (`rowanholt_server_mode`). Local mode
-  needs no licence, shows no Licence page or terms, and behaves exactly as before.
+- **Modes.** Local mode is the Free edition: it runs with no licence and behaves as before, but its
+  analyst (the admin there, `access.LOCAL_USER`) can install a Pro or Services licence for branding
+  and webhooks, from the Licence page or `rowanholt server licence`, accepting the terms as on a
+  server. Seats apply only in server mode (`rowanholt_server_mode`).
 - **Mechanism.** `src/web/backend/licence.py`: the `rowanholt-licence-1` line, `PUBLIC_KEYS`
-  (Rowanholt's own key), standing (pending, active, grace, lapsed), `EDITION_FEATURES` and `has()`.
-- **Storage.** Rowanholt keeps its accounts in a JSON file, not the database, so the installed
-  licence sits beside it: `licence.json` next to `USERS_FILE` (`/app/data/licence.json`, on the host
-  `src/web/backend/data/licence.json`), or the path in `ROWANHOLT_LICENCE`. It holds
-  `{"licence", "terms_version", "accepted_by", "accepted_by_name", "accepted_at"}`: the licence line
-  and the acceptance of the terms together. Read through an mtime cache; gitignored, kept out of the
-  image, and in `rowanholt server backup`.
+  (Rowanholt's own key), standing (pending, active, grace, lapsed), `EDITION_FEATURES`
+  (`report-branding`, `brand-library`, `automation`, `managed-service`) and `has()`.
+- **Storage.** Rowanholt keeps its accounts in a JSON file, not the database, so everything the
+  licence governs sits beside it in `/app/data` (on the host `src/web/backend/data/`): `licence.json`
+  (the licence line and the acceptance of the terms: `{"licence", "terms_version", "accepted_by",
+  "accepted_by_name", "accepted_at"}`, or `ROWANHOLT_LICENCE`), `brands.json` with each brand's
+  cleaned logos in `brands/<id>/` (or `ROWANHOLT_BRANDS`), and `webhooks.json` with their secrets (or
+  `ROWANHOLT_WEBHOOKS`). The backend and the worker both mount it. All gitignored, kept out of the
+  image, written mode 600, and in `rowanholt server backup`.
 - **Terms.** The server reads `src/web/backend/legal/COMMERCIAL-LICENSE.md` (the Docker build
   context is the backend folder, so it can't see the repository root); a test keeps it identical to
   the root file.
@@ -145,16 +168,42 @@ would sign people out, which the shared model never does.
   on a server), re-enabled (`PATCH /api/auth/users/{id}`), provisioned on a first single sign-on
   (`auth/oidc.py`), or added or enabled with `rowanholt server users`. A refusal is 402 with the
   reason; nobody already in is ever disabled.
-- **Admins.** An account with the `admin` role. The API is `/api/licence` (GET; POST `/check`; GET
-  `/terms`; PUT with `accept_terms` and `terms_version`, 422 / 409; DELETE), admin-only and 404 in
-  local mode. The Licence page (`/licence`, linked beside Aragorn for admins on a server) checks a
-  licence, shows the terms, installs once the acceptance is ticked, and shows "Commercial licence vX
+- **Report branding.** A brand is a name, a primary and optional secondary colour, "Prepared for",
+  and up to three logos (cover, header, client), managed by admins on the Branding page
+  (`/api/brands`, `branding_routes.py`). Uploads are cleaned as ostraka's: PNG or JPEG only, refused
+  past 4096 × 4096 pixels before decoding, redrawn as a fresh PNG (`branding.clean_logo`, Pillow).
+  The palette is derived as ostraka's: headings darkened to 4.5:1 on the page, the rest from the
+  primary's hue (`src/analysis/rowanholt/report/theme.py`, stdlib, as the report package must be).
+  Which brand a report gets is decided when the Word report is built (`case_routes.full_report`,
+  `branding.brand_for`): the case's brand under `has("brand-library")`, else the installation's under
+  `has("report-branding")`, else Rowanholt's own. Saving a brand or a choice is open on every edition
+  and kept when the licence changes; only what's rendered changes. Markdown and the Navigator layer
+  aren't branded.
+- **A client's brand** attaches to a case number (every job of the case; a case is a client
+  engagement), chosen by an admin from the case browser (`/api/jobs/{job_id}/case/brand`).
+- **Webhooks** (`webhooks.py`, `webhook_routes.py`), Shikari's design: `X-Rowanholt-Event`,
+  `X-Rowanholt-Signature: sha256=<HMAC>`, three tries with backoff, the last 20 deliveries kept. URLs
+  are https, or http for localhost, loopback and RFC 1918 addresses (a homelab SOAR). Events:
+  `job.completed` and `job.failed` (sent from `JobStorage.save_job` when a job's status becomes one
+  of them, whichever path ended it), `finding.confirmed` and `report.ready` (the case routes). Bodies
+  carry ids, the case number, a host and counts, never artefact contents; a failed job's error has its
+  file paths removed. Rowanholt has no other outward messages to share a masking step with, so that
+  is the masking. Sending is checked with `has("automation")` when an event is sent: registering,
+  listing and editing stay open, a Free installation keeps its webhooks, and the Webhooks page says
+  they aren't sending and why. The test button is a delivery, so it's refused (402) when they aren't.
+- **Admins.** An account with the `admin` role, or the analyst in local mode. The API is
+  `/api/licence` (GET; POST `/check`; GET `/terms`; PUT with `accept_terms` and `terms_version`,
+  422 / 409; DELETE), `/api/brands` and `/api/webhooks`, all admin-only. The Licence, Branding and
+  Webhooks pages are linked for admins beside Aragorn; the Licence page shows "Commercial licence vX
   accepted by NAME on DATE"; during grace every page warns admins.
 - **Command line.** `rowanholt server licence show|install FILE --accept-terms "Name <email>"|remove`
-  (`scripts/server/server-licence.sh`, running `manage_licence.py` in the backend container).
-- **Audit.** Installs and removals go in the `audit_logs` table (`storage.AuditLogModel`, migration
-  `d5a2e8f1c693`), with the terms version. `models/database.py`'s AuditLog is the dormant schema's
-  (its foreign key points at a users table Rowanholt doesn't use), so it isn't the one written.
+  (`scripts/server/server-licence.sh`, running `manage_licence.py` in the backend container), in
+  either mode.
+- **Audit.** Licence installs and removals, brand changes and webhook changes go in the `audit_logs`
+  table (`storage.AuditLogModel`, migration `d5a2e8f1c693`), the licence's with the terms version.
+  `models/database.py`'s AuditLog is the dormant schema's (its foreign key points at a users table
+  Rowanholt doesn't use), so it isn't the one written.
 - **Tooling and tests.** `scripts/admin/sign_licence.py` and `issue-licence.sh` (key in
   `ROWANHOLT_LICENCE_KEY`, ledger with `LICENCE_LEDGER_DIR`); `tests/unit/test_licence_units.py`,
-  `tests/unit/test_licence.py` and `src/web/frontend/src/components/Licence.test.js`.
+  `tests/unit/test_licence.py`, `tests/unit/test_branding.py`, `tests/unit/test_webhooks.py`, and the
+  frontend's `Licence.test.js`, `Webhooks.test.js` and `Branding.test.js`.

@@ -188,13 +188,43 @@ export const getAuthConfig = async () => {
   return response.data;
 };
 
-// A team server's licence (admins). Local mode needs none, and these answer 404 there.
+// The licence (admins; in local mode the one analyst is the admin, and the edition is Free until
+// a licence is installed)
 export const getLicence = async () => (await api.get('/api/licence')).data;
 export const getLicenceTerms = async () => (await api.get('/api/licence/terms')).data;
 export const checkLicence = async (text) => (await api.post('/api/licence/check', { text })).data;
 export const installLicence = async (text, termsVersion) =>
   (await api.put('/api/licence', { text, accept_terms: true, terms_version: termsVersion })).data;
 export const removeLicence = async () => (await api.delete('/api/licence')).data;
+
+// Webhooks (admins): kept on every edition, sent on Pro and Services
+export const getWebhooks = async () => (await api.get('/api/webhooks')).data;
+export const addWebhook = async (hook) => (await api.post('/api/webhooks', hook)).data;
+export const editWebhook = async (id, fields) => (await api.patch(`/api/webhooks/${id}`, fields)).data;
+export const deleteWebhook = async (id) => (await api.delete(`/api/webhooks/${id}`)).data;
+export const testWebhook = async (id) => (await api.post(`/api/webhooks/${id}/test`)).data;
+
+// Report brands (admins): the library, logos, the installation's brand and a case's
+export const getBrands = async () => (await api.get('/api/brands')).data;
+export const addBrand = async (brand) => (await api.post('/api/brands', brand)).data;
+export const editBrand = async (id, fields) => (await api.patch(`/api/brands/${id}`, fields)).data;
+export const deleteBrand = async (id) => (await api.delete(`/api/brands/${id}`)).data;
+export const chooseInstallationBrand = async (brandId) =>
+  (await api.put('/api/brands/installation', { brand_id: brandId })).data;
+export const uploadBrandLogo = async (id, slot, file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return (await api.put(`/api/brands/${id}/logos/${slot}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })).data;
+};
+export const clearBrandLogo = async (id, slot) => (await api.delete(`/api/brands/${id}/logos/${slot}`)).data;
+// A blob: the logo endpoint needs the bearer token, so an <img src> can't fetch it itself
+export const getBrandLogo = async (id, slot) =>
+  (await api.get(`/api/brands/${id}/logos/${slot}`, { responseType: 'blob' })).data;
+export const getCaseBrand = async (jobId) => (await api.get(`/api/jobs/${jobId}/case/brand`)).data;
+export const chooseCaseBrand = async (jobId, brandId) =>
+  (await api.put(`/api/jobs/${jobId}/case/brand`, { brand_id: brandId })).data;
 
 // After single sign-on the session is a cookie; trade it for the bearer token the rest
 // of the app keeps

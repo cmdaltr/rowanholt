@@ -126,6 +126,18 @@ class StandingTest(unittest.TestCase):
         self.assertEqual(licence.standing(later, at(date(2026, 12, 1), 0)).state, "active")
         self.assertEqual(licence.standing(lic(expires=None), at(date(2099, 1, 1))).state, "active")
 
+    def test_the_editions_features_are_the_shared_table(self):
+        L = licence
+        self.assertEqual(L.EDITION_FEATURES[L.Edition.FREE], frozenset())
+        self.assertEqual(L.EDITION_FEATURES[L.Edition.PRO], {L.REPORT_BRANDING, L.AUTOMATION})
+        self.assertEqual(L.EDITION_FEATURES[L.Edition.SERVICES],
+                         {L.REPORT_BRANDING, L.AUTOMATION, L.BRAND_LIBRARY, L.MANAGED_SERVICE})
+        free, pro, services = (L.standing(None), L.standing(lic("pro"), at(TODAY)),
+                               L.standing(lic("services"), at(TODAY)))
+        self.assertFalse(any(free.has(f) for f in L.FEATURES))
+        self.assertTrue(pro.has(L.REPORT_BRANDING) and pro.has(L.AUTOMATION) and not pro.has(L.BRAND_LIBRARY))
+        self.assertTrue(all(services.has(f) for f in L.FEATURES))
+
     def test_an_edition_grants_its_features_and_a_licence_can_add_more(self):
         self.assertFalse(licence.standing(lic("pro"), at(TODAY)).has(licence.MANAGED_SERVICE))
         self.assertTrue(licence.standing(lic("services"), at(TODAY)).has(licence.MANAGED_SERVICE))
@@ -160,6 +172,15 @@ class InstalledTest(unittest.TestCase):
         self.assertIsNone(licence.seat_refusal(users(3, disabled=5), server_mode=True))
 
     def test_local_mode_is_never_limited(self):
+        self.assertIsNone(licence.seat_refusal(users(50), server_mode=False))
+
+    def test_local_mode_reads_as_free_with_no_licence_and_as_pro_with_one(self):
+        # One analyst, no sign-in: the same standing as a server's, with no seat check
+        self.assertEqual(licence.current().edition, licence.Edition.FREE)
+        self.assertFalse(licence.current().has(licence.REPORT_BRANDING))
+        self.install(lic("pro"))
+        self.assertEqual(licence.current().edition, licence.Edition.PRO)
+        self.assertTrue(licence.current().has(licence.REPORT_BRANDING) and licence.current().has(licence.AUTOMATION))
         self.assertIsNone(licence.seat_refusal(users(50), server_mode=False))
 
     def test_seats_come_from_the_licence_and_unlimited_never_refuses(self):
@@ -246,7 +267,7 @@ class SignerTest(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual((rows[0]["licence_id"], rows[0]["product"], rows[0]["seats"], rows[0]["terms_version"],
                           rows[0]["file"]),
-                         (parsed.licence_id, "rowanholt", "25", "1.0", f"issued/rowanholt/{parsed.licence_id}.licence"))
+                         (parsed.licence_id, "rowanholt", "25", "1.1", f"issued/rowanholt/{parsed.licence_id}.licence"))
 
     def test_keygen_refuses_to_overwrite_a_key(self):
         path = self.ledger / "key.pem"
@@ -265,8 +286,8 @@ class TermsTest(unittest.TestCase):
 
     def test_the_terms_state_their_version(self):
         version, text = licence.terms()
-        self.assertEqual(version, "1.0")
-        self.assertIn("**Version 1.0**", text.splitlines()[2])
+        self.assertEqual(version, "1.1")
+        self.assertIn("**Version 1.1**", text.splitlines()[2])
 
 
 if __name__ == "__main__":

@@ -136,6 +136,9 @@ src/web/backend/data/users.json
 src/web/backend/data/.jwt_secret
 # The installed licence and who accepted its terms (licence.py), beside users.json
 src/web/backend/data/licence.json
+src/web/backend/data/webhooks.json
+src/web/backend/data/brands.json
+src/web/backend/data/brands/
 
 # SIEM credentials
 splunk_credentials.txt

@@ -1,6 +1,6 @@
 # Rowanholt Commercial Licence
 
-**Version 1.0**, 11 November 2026
+**Version 1.1**, 11 November 2026
 
 > **Draft for legal review.** Plain-language terms written to be checked by a solicitor before any
 > sale. Governing law: England and Wales.
@@ -21,14 +21,15 @@ the Licensee, edition, seats, any extra features and the term.
 | | Free | Pro | Services |
 |---|---|---|---|
 | Who it's for | Individuals and small teams | Organisations using Rowanholt for themselves | MSSPs and consultancies working for clients |
-| One analyst on their own machine (local mode, no sign-in) | Yes | Yes | Yes |
+| One analyst on their own machine (local mode, no sign-in) | Yes, as the Free edition unless a licence is installed | Yes | Yes |
 | People who can sign in to a team server | 4 | As the licence key states | As the licence key states |
+| Report branding (`report-branding`) | Rowanholt's own style | One brand for the installation | Yes |
+| A brand per client (`brand-library`) | — | — | Chosen per case |
+| Webhooks (`automation`) | — | Yes | Yes |
 | Run Rowanholt for clients (`managed-service`) | — | — | Yes, under section 3 |
 
 A licence key grants its edition's features and any others it names. The Licensor may add features
-in later versions; a key grants only what its edition and its own list include. Every edition has
-the whole of Rowanholt, single sign-on included; the paid editions differ from Free in seats, and
-Services in the right in section 3.
+in later versions; a key grants only what its edition and its own list include.
 
 ## 2. Grant
 

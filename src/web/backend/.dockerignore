@@ -58,3 +58,6 @@ Dockerfile
 data/users.json
 data/.jwt_secret
 data/licence.json
+data/webhooks.json
+data/brands.json
+data/brands/

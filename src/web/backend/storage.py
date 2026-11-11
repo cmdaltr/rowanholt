@@ -261,11 +261,13 @@ class JobStorage:
             job: Job to save
         """
         session = self.Session()
+        previous = None
         try:
             # Check if job exists
             existing = session.query(JobModel).filter_by(id=job.id).first()
 
             if existing:
+                previous = existing.status
                 # Update existing job
                 existing.case_number = job.case_number
                 existing.source_paths = job.source_paths
@@ -308,6 +310,18 @@ class JobStorage:
             raise
         finally:
             session.close()
+        # Every way a job ends is a save (the worker's, a cancel, a failed start): the webhook
+        # follows the change of status, once, whichever path got there
+        status = job.status.value
+        if status in (JobStatus.COMPLETED.value, JobStatus.FAILED.value) and previous != status:
+            try:
+                try:
+                    from . import webhooks
+                except ImportError:
+                    import webhooks
+                webhooks.emit_job(job)
+            except Exception:  # noqa: BLE001 - a webhook mustn't fail the job's save
+                logger.exception("Webhook for job %s not sent", job.id)
 
     def set_status(self, job_id: str, status: JobStatus) -> None:
         """

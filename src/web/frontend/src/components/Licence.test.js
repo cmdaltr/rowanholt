@@ -18,7 +18,7 @@ jest.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: mockUser })
 
 const FREE = {
   edition: 'free', state: 'free', licensee: '', licence_id: '', seats: 4, free_seats: 4, features: [],
-  places_held: 3, not_before: null, expires: null, grace_ends: null, terms_version: '1.0', accepted: null,
+  places_held: 3, not_before: null, expires: null, grace_ends: null, terms_version: '1.0', accepted: null, server_mode: true,
 };
 const INSTALLED = {
   ...FREE, edition: 'pro', state: 'active', licensee: 'Northwind Ltd', licence_id: 'lic_1', seats: 25,
@@ -79,11 +79,27 @@ test('when the terms changed since they were shown, the new version must be tick
   expect(screen.getByText('Install')).toBeDisabled();
 });
 
-test('local mode needs no licence and shows no terms', async () => {
-  api.getLicence.mockRejectedValue({ response: { status: 404 } });
-  render(<Licence />);
-  expect(await screen.findByText(/Local mode is one analyst and needs no licence/)).toBeInTheDocument();
-  expect(screen.queryByText('Check')).not.toBeInTheDocument();
+test('local mode is the Free edition, its analyst installs a licence, and no places are counted', async () => {
+  mockUser = null; // local mode: nobody signs in, and the backend treats the analyst as the admin
+  api.getLicence.mockResolvedValue({ ...FREE, server_mode: false });
+  api.checkLicence.mockResolvedValue(PREVIEW);
+  api.getLicenceTerms.mockResolvedValue({ version: '1.1', text: 'terms' });
+  api.installLicence.mockResolvedValue({ ...INSTALLED, server_mode: false });
+  render(<Licence serverMode={false} />);
+  expect(await screen.findByText('Free edition')).toBeInTheDocument();
+  expect(screen.getByText(/Local mode: one analyst, so seats don't apply/)).toBeInTheDocument();
+  expect(screen.queryByText(/Places taken/)).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Licence'), { target: { value: 'line' } });
+  fireEvent.click(screen.getByText('Check'));
+  fireEvent.click(await screen.findByLabelText(/version 1\.1, on behalf of Northwind Ltd/));
+  await act(async () => { fireEvent.click(screen.getByText('Install')); });
+  expect(await screen.findByText('Pro edition')).toBeInTheDocument();
+  expect(api.installLicence).toHaveBeenCalledWith('line', '1.1');
+});
+
+test('nothing is asked before the server mode is known', () => {
+  render(<Licence serverMode={null} />);
+  expect(api.getLicence).not.toHaveBeenCalled();
 });
 
 test('only admins manage the licence', () => {
@@ -105,7 +121,16 @@ test('admins see a warning on every page during grace, and nothing otherwise', a
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
-test('the notice asks nothing in local mode', () => {
-  render(<LicenceNotice serverMode={false} />);
+test('the notice warns the analyst in local mode too, but not an analyst on a team server', async () => {
+  mockUser = null;
+  api.getLicence.mockResolvedValue({ ...INSTALLED, state: 'grace', expires: '2026-11-01', grace_ends: '2026-12-01' });
+  const { unmount } = render(<LicenceNotice serverMode={false} />);
+  expect(await screen.findByRole('alert')).toBeInTheDocument();
+  unmount();
+
+  api.getLicence.mockClear();
+  mockUser = { role: 'user' };
+  render(<LicenceNotice serverMode />);
+  render(<LicenceNotice serverMode={null} />);
   expect(api.getLicence).not.toHaveBeenCalled();
 });

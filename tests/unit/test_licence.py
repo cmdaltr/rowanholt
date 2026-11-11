@@ -121,21 +121,21 @@ class LicenceApiTest(BackendCase):
         self.assertIn("Accept the commercial licence terms for Northwind Ltd", unaccepted.json()["detail"])
         stale = self.install(text, terms_version="0.9")
         self.assertEqual(stale.status_code, 409)
-        self.assertIn("now version 1.0", stale.json()["detail"])
+        self.assertIn("now version 1.1", stale.json()["detail"])
         self.assertFalse(self.path.exists())
 
         resp = self.install(text)
         self.assertEqual(resp.status_code, 200, resp.text)
         body = resp.json()
         self.assertEqual((body["edition"], body["state"], body["seats"], body["licensee"]), ("pro", "active", 25, "Northwind Ltd"))
-        self.assertEqual(body["accepted"]["terms_version"], "1.0")
+        self.assertEqual(body["accepted"]["terms_version"], "1.1")
         self.assertIn("<admin@", body["accepted"]["by"])
         stored = json.loads(self.path.read_text())
         self.assertEqual(stored["licence"], text)
-        self.assertEqual(stored["terms_version"], "1.0")
+        self.assertEqual(stored["terms_version"], "1.1")
         self.assertTrue(stored["accepted_by"] and stored["accepted_at"])
         action, username, details = self.audit_rows()[-1]
-        self.assertEqual((action, username, details["terms_version"], details["seats"]), ("licence_installed", "admin", "1.0", 25))
+        self.assertEqual((action, username, details["terms_version"], details["seats"]), ("licence_installed", "admin", "1.1", 25))
 
         removed = self.client.delete("/api/licence", headers=self.admin)
         self.assertEqual((removed.json()["edition"], removed.json()["accepted"]), ("free", None))
@@ -196,13 +196,25 @@ class LicenceApiTest(BackendCase):
             with self.assertRaisesRegex(SystemExit, "All 4 places"):
                 manage_users.main(["add", "ivan", "ivan@example.org"])
 
-    def test_local_mode_needs_no_licence_and_is_never_limited(self):
+    def test_local_mode_is_free_with_no_licence_and_its_analyst_can_install_one(self):
         self.settings.rowanholt_server_mode = False
         try:
-            self.assertEqual(self.client.get("/api/licence", headers=self.admin).status_code, 404)
+            # Local mode has no sign-in: the analyst is the admin, with no token
+            local = self.client.get("/api/licence")
+            self.assertEqual(local.status_code, 200, local.text)
+            self.assertEqual((local.json()["edition"], local.json()["server_mode"]), ("free", False))
+            self.assertEqual(self.install_local(self.line("pro")).status_code, 200)
+            now = self.client.get("/api/licence").json()
+            self.assertEqual(now["edition"], "pro")
+            self.assertIn("report-branding", now["features"])
+            self.assertEqual(now["accepted"]["by"], "Local analyst <local>")
             self.assertIsNone(self.licence.seat_refusal({str(i): {} for i in range(50)}, self.settings.rowanholt_server_mode))
         finally:
             self.settings.rowanholt_server_mode = True
+
+    def install_local(self, text):
+        version = self.client.get("/api/licence/terms").json()["version"]
+        return self.client.put("/api/licence", json={"text": text, "accept_terms": True, "terms_version": version})
 
     def test_the_server_command_needs_the_terms_accepted_then_installs_and_removes(self):
         line = Path(tempfile.mkdtemp()) / "northwind.licence"
@@ -218,12 +230,12 @@ class LicenceApiTest(BackendCase):
             self.assertEqual(self.cli.main(["install", str(line), "--accept-terms", "Ben Smith <ben@example.org>"]), 0)
             self.assertEqual(self.cli.main(["show"]), 0)
         self.assertIn("Installed services for Northwind Ltd", out.getvalue())
-        self.assertIn("Commercial licence v1.0 accepted by Ben Smith <ben@example.org>", out.getvalue())
+        self.assertIn("Commercial licence v1.1 accepted by Ben Smith <ben@example.org>", out.getvalue())
         stored = json.loads(self.path.read_text())
         self.assertEqual((stored["accepted_by"], stored["accepted_by_name"]), (None, "Ben Smith <ben@example.org>"))
         action, username, details = self.audit_rows()[-1]
         self.assertEqual((action, details["via"], details["accepted_by"], details["terms_version"]),
-                         ("licence_installed", "cli", "Ben Smith <ben@example.org>", "1.0"))
+                         ("licence_installed", "cli", "Ben Smith <ben@example.org>", "1.1"))
         with redirect_stdout(io.StringIO()):
             self.assertEqual(self.cli.main(["remove"]), 0)
         self.assertFalse(self.path.exists())

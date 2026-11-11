@@ -21,12 +21,14 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
 try:
-    from . import case_files
+    from . import branding, case_files, webhooks
     from .auth import access
     from .auth.users import find_user, load_users
     from .storage import CaseActivityModel, CaseFindingModel, CaseHostModel, CaseNoteModel
 except ImportError:
+    import branding
     import case_files
+    import webhooks
     from auth import access
     from auth.users import find_user, load_users
     from storage import CaseActivityModel, CaseFindingModel, CaseHostModel, CaseNoteModel
@@ -393,11 +395,22 @@ async def flag(job_id: str, finding: FindingIn, request: Request):
         raise _flagged_already(already)
     excerpt = "; ".join(f"{k}: {v}" for k, v in row.items() if v)[:EXCERPT]
     try:
-        return store().add_finding(job_id, _actor(request), host=finding.host, artefact=finding.artefact,
-                                   row_ref=finding.row_ref, row_hash=case_files.row_hash(row), excerpt=excerpt,
-                                   title=finding.title.strip(), technique=technique or None, status=finding.status)
+        added = store().add_finding(job_id, _actor(request), host=finding.host, artefact=finding.artefact,
+                                    row_ref=finding.row_ref, row_hash=case_files.row_hash(row), excerpt=excerpt,
+                                    title=finding.title.strip(), technique=technique or None, status=finding.status)
     except AlreadyFlagged as exc:
         raise _flagged_already(exc.finding)
+    if added["status"] == "confirmed":
+        _confirmed(job_id, added)
+    return added
+
+
+def _confirmed(job_id: str, finding: Dict) -> None:
+    """finding.confirmed: which finding, on which host, under which technique; never the row itself."""
+    job = _jobs.get_job(job_id) if _jobs else None
+    webhooks.emit("finding.confirmed", {"job_id": job_id, "case_number": job.case_number if job else "",
+                                        "finding_id": finding["id"], "host": finding["host"],
+                                        "technique": finding.get("technique") or ""})
 
 
 def _flagged_already(already: Dict) -> HTTPException:
@@ -410,6 +423,7 @@ async def update_finding(job_id: str, finding_id: int, update: FindingUpdate, re
     if _by_aule(request):
         raise HTTPException(status_code=403, detail="Aulë doesn't change findings: an analyst does")
     technique = _check(update.status, update.technique)
+    before = next((f["status"] for f in store().findings(job_id) if f["id"] == finding_id), None)
     try:
         changed = store().update_finding(job_id, finding_id, _actor(request), expected=update.updated_at,
                                          title=update.title,
@@ -420,6 +434,8 @@ async def update_finding(job_id: str, finding_id: int, update: FindingUpdate, re
                             f"(now {exc.current['status']}); reload and try again")
     if not changed:
         raise HTTPException(status_code=404, detail="Finding not found")
+    if changed["status"] == "confirmed" and before != "confirmed":
+        _confirmed(job_id, changed)
     return changed
 
 
@@ -629,16 +645,23 @@ async def full_report(job_id: str, request: Request,
     findings, notes = store().findings(job_id), store().notes(job_id)
     try:
         package = case_files.report_package()
+        # The brand is chosen now, under the licence in force now (report-branding, brand-library),
+        # never when it was saved; Markdown has no styling to brand
+        theme = branding.theme_for(job.case_number, package) if fmt == "docx" else None
         report = await asyncio.to_thread(gathered_case, root, job.case_number)
         await asyncio.to_thread(_verify, root, findings)
-        body = await asyncio.to_thread(package.curated_report, report, findings, notes, fmt)
+        body = await asyncio.to_thread(package.curated_report, report, findings, notes, fmt, theme)
     except ImportError as exc:
         logger.error(f"Case report unavailable: {exc}")
         raise HTTPException(status_code=503, detail=str(exc))
     except (OSError, ValueError) as exc:
         logger.warning(f"Case report for job {job_id} failed: {exc}")
         raise HTTPException(status_code=500, detail=f"The report couldn't be built: {exc}")
-    store().record(job_id, _actor(request), "exported", f"the case report ({fmt})")
+    store().record(job_id, _actor(request), "exported",
+                   f"the case report ({fmt}{', ' + theme.brand + ' brand' if theme else ''})")
+    webhooks.emit("report.ready", {"job_id": job_id, "case_number": job.case_number, "format": fmt,
+                                   "findings": len(findings),
+                                   "confirmed": sum(f["status"] == "confirmed" for f in findings)})
     name = re.sub(r"[^\w.+-]", "_", f"{job.case_number}_report") + (".docx" if fmt == "docx" else ".md")
     return Response(content=body, media_type=REPORT_TYPES[fmt],
                     headers={"Content-Disposition": f'attachment; filename="{name}"'})

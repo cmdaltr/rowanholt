@@ -13,4 +13,5 @@ sqlalchemy==2.0.23
 alembic==1.13.1  # JobStorage migrates the schema on start (requirements/web.txt)
 psycopg2-binary==2.9.9
 httpx==0.25.2
+pillow==11.0.0  # report logos: an upload is read (PNG or JPEG only) and redrawn before it's kept (branding.py)
 openpyxl>=3.0.0,<4.0.0  # the Iran APT threat intelligence workbook (requirements/base.txt has it for Elrond)

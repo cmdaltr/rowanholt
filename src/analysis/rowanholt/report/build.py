@@ -8,6 +8,7 @@ from typing import Dict, Iterable, List, Optional
 
 from . import document
 from .document import Block, Bullets, Heading, Para, Quote, Table
+from .theme import Theme
 from .gather import CASE_HOST, METHOD_FILE, TECHNIQUES_FILE, AUDIT_LOG, CaseReport, Cite, HostReport, gather
 
 logger = logging.getLogger(__name__)
@@ -407,20 +408,22 @@ def curated_blocks(report: CaseReport, findings: List[Dict], notes: List[Dict]) 
 
 # ---- output ----
 
-def render(blocks: List[Block], fmt: str, title: str) -> bytes:
+def render(blocks: List[Block], fmt: str, title: str, theme: Optional[Theme] = None) -> bytes:
+    """The report in a format. A theme (a brand) dresses the Word report; Markdown has no styling."""
     if fmt == "markdown":
         return document.markdown(blocks).encode("utf-8")
     if fmt == "docx":
-        return document.docx(blocks, title)
+        return document.docx(blocks, title, theme)
     raise ValueError(f"format is one of {', '.join(FORMATS)}")
 
 
-def uncurated_report(report: CaseReport, fmt: str) -> bytes:
-    return render(uncurated_blocks(report), fmt, f"{report.case}: case report")
+def uncurated_report(report: CaseReport, fmt: str, theme: Optional[Theme] = None) -> bytes:
+    return render(uncurated_blocks(report), fmt, f"{report.case}: case report", theme)
 
 
-def curated_report(report: CaseReport, findings: List[Dict], notes: List[Dict], fmt: str) -> bytes:
-    return render(curated_blocks(report, findings, notes), fmt, f"{report.case}: case report")
+def curated_report(report: CaseReport, findings: List[Dict], notes: List[Dict], fmt: str,
+                   theme: Optional[Theme] = None) -> bytes:
+    return render(curated_blocks(report, findings, notes), fmt, f"{report.case}: case report", theme)
 
 
 def report_name(case: str, fmt: str) -> str:

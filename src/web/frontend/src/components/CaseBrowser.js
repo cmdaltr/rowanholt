@@ -19,6 +19,8 @@ import {
   getConfirmedLayer,
   getAuthConfig,
   getUserDirectory,
+  getCaseBrand,
+  chooseCaseBrand,
 } from '../api';
 import PageHero from './PageHero';
 
@@ -97,6 +99,7 @@ function CaseBrowser() {
   const [people, setPeople] = useState([]);
   const [building, setBuilding] = useState(''); // the case report's format while it's being built
   const [expanded, setExpanded] = useState(null); // the row ref opened to show its whole record
+  const [caseBrand, setCaseBrand] = useState(null); // admins only: the brand the case names, and what's used
 
   const loadOverview = useCallback(async () => {
     try {
@@ -119,6 +122,7 @@ function CaseBrowser() {
 
   useEffect(() => {
     getJob(jobId).then(setJob).catch(() => {});
+    getCaseBrand(jobId).then(setCaseBrand).catch(() => {}); // 403 for analysts: no picker
     loadOverview();
     loadShared();
     getAuthConfig()
@@ -236,6 +240,18 @@ function CaseBrowser() {
             onClick={() => caseReport('docx')}>Report (DOCX)</button>
           <button type="button" disabled={!!building} onClick={() => caseReport('markdown')}>Report (Markdown)</button>
         </span>
+        {caseBrand && caseBrand.brands.length > 0 && (
+          <label title={caseBrand.brand_library ? 'The Word report uses this brand'
+            : 'Kept for the case; a brand per case is used on the Services edition'}>
+            Brand{' '}
+            <select aria-label="The case's brand" value={caseBrand.brand_id || ''}
+              onChange={(e) => act(async () => setCaseBrand(await chooseCaseBrand(jobId, e.target.value || null)))}>
+              <option value="">The installation's</option>
+              {caseBrand.brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+            {!caseBrand.brand_library && <span style={{ color: '#888' }}> (not used on this edition)</span>}
+          </label>
+        )}
         <button type="button" onClick={() => act(async () => download(`${job?.case_number || jobId}-confirmed-layer.json`,
           JSON.stringify(await getConfirmedLayer(jobId), null, 2), 'application/json'))}>Navigator layer</button>
       </div>

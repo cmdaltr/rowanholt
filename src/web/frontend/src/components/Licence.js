@@ -2,9 +2,10 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { checkLicence, getLicence, getLicenceTerms, installLicence, removeLicence } from '../api';
 
-// A team server's licence (docs/LICENSING_MODEL.md): admins see the edition and places taken, and
-// install a licence only after checking it and accepting the commercial terms for the licensee.
-// Local mode is one analyst and needs no licence: the API answers 404 and nothing here shows.
+// The licence (docs/LICENSING_MODEL.md): admins see the edition and, on a team server, the places
+// taken, and install a licence only after checking it and accepting the commercial terms for the
+// licensee. Local mode is the Free edition until a licence is installed, and its one analyst is the
+// admin; places only count on a team server.
 
 const errorText = (err) => {
   const detail = err.response?.data?.detail;
@@ -21,7 +22,9 @@ function Standing({ licence }) {
     <div className="card" data-testid="licence-standing">
       <h2>{EDITIONS[licence.edition]} edition</h2>
       {licence.licensee && <p>Licensed to <strong>{licence.licensee}</strong> ({licence.licence_id}), runs to {licence.expires ? day(licence.expires) : 'no end date'}.</p>}
-      <p>Places taken: <strong>{licence.places_held}</strong> of {seats}. Only adding someone past that is refused; nobody already here is ever signed out.</p>
+      {licence.server_mode
+        ? <p>Places taken: <strong>{licence.places_held}</strong> of {seats}. Only adding someone past that is refused; nobody already here is ever signed out.</p>
+        : <p>Local mode: one analyst, so seats don't apply. {licence.licensee ? '' : 'Install a Pro or Services licence for report branding and webhooks.'}</p>}
       {licence.state === 'pending' && <p className="licence-notice">This licence starts on {day(licence.not_before)}. Until then the server runs as the Free edition.</p>}
       {licence.state === 'grace' && <p className="licence-notice">This licence ran out on {day(licence.expires)}. It keeps working until {day(licence.grace_ends)}, then the server is Free again. Install a renewed licence before then.</p>}
       {licence.state === 'lapsed' && <p className="licence-notice">The licence ran out on {day(licence.expires)}: the server is on the Free edition.</p>}
@@ -107,30 +110,30 @@ function Install({ onInstalled }) {
   );
 }
 
-export default function Licence() {
+// Who may manage the licence: a team server's admins, or the one analyst in local mode (who signs in
+// as nobody, and whom the backend treats as the admin)
+export const managesLicence = (user, serverMode) => serverMode === false || user?.role === 'admin';
+
+export default function Licence({ serverMode = true }) {
   const { user } = useAuth();
   const [licence, setLicence] = useState(null);
   const [error, setError] = useState(null);
-  const [local, setLocal] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = managesLicence(user, serverMode);
 
   const load = useCallback(async () => {
     try {
       setLicence(await getLicence());
     } catch (err) {
-      if (err.response?.status === 404) setLocal(true);
-      else setError(errorText(err));
+      setError(errorText(err));
     }
   }, []);
 
-  useEffect(() => { if (isAdmin) load(); }, [isAdmin, load]);
+  useEffect(() => { if (isAdmin && serverMode != null) load(); }, [isAdmin, serverMode, load]);
 
+  if (serverMode == null) return <div className="loading">Checking the licence…</div>;
   if (!isAdmin) {
     return <div className="card"><h2>Licence</h2><p>The licence is managed by Rowanholt administrators.</p></div>;
-  }
-  if (local) {
-    return <div className="card"><h2>Licence</h2><p>Local mode is one analyst and needs no licence. Licences are for a team server.</p></div>;
   }
   if (error) return <div className="card"><div className="error">{error}</div></div>;
   if (!licence) return <div className="loading">Checking the licence…</div>;
@@ -151,7 +154,9 @@ export default function Licence() {
       {licence.licensee && (
         <div className="card">
           <h2>Remove the licence</h2>
-          <p>The server goes back to the Free edition. Nobody is deactivated; past the free edition's {licence.free_seats} accounts, nobody new can be added.</p>
+          {licence.server_mode
+            ? <p>The server goes back to the Free edition. Nobody is deactivated; past the free edition's {licence.free_seats} accounts, nobody new can be added.</p>
+            : <p>Rowanholt goes back to the Free edition: reports in Rowanholt's own style, and webhooks kept but not sent.</p>}
           {confirming
             ? <><button onClick={remove}>Remove it</button> <button className="secondary" onClick={() => setConfirming(false)}>Keep it</button></>
             : <button className="secondary" onClick={() => setConfirming(true)}>Remove…</button>}
@@ -161,18 +166,19 @@ export default function Licence() {
   );
 }
 
-// Shown to admins on every page while a licence is in its grace period
+// Shown to admins (the analyst, in local mode) on every page while a licence is in its grace period.
+// serverMode is null until the auth config has answered: nothing is asked before then.
 export function LicenceNotice({ serverMode }) {
   const { user } = useAuth();
   const [licence, setLicence] = useState(null);
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = serverMode != null && managesLicence(user, serverMode);
 
   useEffect(() => {
-    if (!serverMode || !isAdmin) return undefined;
+    if (!isAdmin) return undefined;
     let cancelled = false;
     getLicence().then((found) => { if (!cancelled) setLicence(found); }).catch(() => {});
     return () => { cancelled = true; };
-  }, [serverMode, isAdmin]);
+  }, [isAdmin]);
 
   if (!licence || licence.state !== 'grace') return null;
   return (

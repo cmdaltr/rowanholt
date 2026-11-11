@@ -1,10 +1,11 @@
 """
 Licence Routes
 
-A team server's licence, for admins: what's installed and how many places are taken, checking a
-licence before installing it, the commercial terms installing it accepts, and removing it. Every
-install and removal goes in the audit log with the terms version. Local mode is one analyst and
-needs no licence, so there's nothing here for it.
+The licence, for admins: what's installed and how many places are taken, checking a licence
+before installing it, the commercial terms installing it accepts, and removing it. Every install and
+removal goes in the audit log with the terms version. Local mode is the Free edition and needs no
+licence, but its analyst (the admin there) can install one for branding and webhooks; places only
+apply to a team server.
 """
 
 from datetime import date, datetime
@@ -73,12 +74,7 @@ class LicenceOut(BaseModel):
     grace_ends: Optional[date]
     terms_version: str  # the version an install accepts now
     accepted: Optional[Acceptance]  # for the installed licence
-
-
-def _server_only() -> None:
-    if not settings.rowanholt_server_mode:
-        raise HTTPException(status.HTTP_404_NOT_FOUND,
-                            "Local mode is one analyst and needs no licence; licences are for a team server.")
+    server_mode: bool  # places only count on a team server
 
 
 def _licence_out() -> LicenceOut:
@@ -102,6 +98,7 @@ def _licence_out() -> LicenceOut:
         grace_ends=licence.grace_ends(lic) if lic else None,
         terms_version=licence.terms()[0],
         accepted=accepted,
+        server_mode=settings.rowanholt_server_mode,
     )
 
 
@@ -121,14 +118,12 @@ def _ip(request: Request) -> Optional[str]:
 
 @router.get("", response_model=LicenceOut)
 async def get_licence(admin: dict = Depends(access.require_admin)) -> LicenceOut:
-    _server_only()
     return _licence_out()
 
 
 @router.get("/terms", response_model=TermsOut)
 async def get_terms(admin: dict = Depends(access.require_admin)) -> TermsOut:
     """The commercial terms an admin accepts when installing a licence."""
-    _server_only()
     version, text = licence.terms()
     return TermsOut(version=version, text=text)
 
@@ -136,7 +131,6 @@ async def get_terms(admin: dict = Depends(access.require_admin)) -> TermsOut:
 @router.post("/check", response_model=LicencePreview)
 async def check_licence(body: LicenceText, admin: dict = Depends(access.require_admin)) -> LicencePreview:
     """What a licence says, so the admin knows whom they're accepting the terms for. Installs nothing."""
-    _server_only()
     lic = _parsed(body.text)
     return LicencePreview(
         licence_id=lic.licence_id,
@@ -155,7 +149,6 @@ async def install_licence(body: LicenceIn, request: Request,
                           admin: dict = Depends(access.require_admin)) -> LicenceOut:
     """Install a licence. The admin must have accepted the current commercial terms on the
     licensee's behalf; who, when and which version are kept with it."""
-    _server_only()
     lic = _parsed(body.text)
     version = licence.terms()[0]
     if not body.accept_terms:
@@ -176,7 +169,6 @@ async def install_licence(body: LicenceIn, request: Request,
 @router.delete("", response_model=LicenceOut)
 async def remove_licence(request: Request, admin: dict = Depends(access.require_admin)) -> LicenceOut:
     """Back to the free edition. Nobody is deactivated; past the free limit, nobody new can be added."""
-    _server_only()
     had = licence.current().licence
     if licence.remove():
         licence.audit("licence_removed", admin, _ip(request), licence=had.licence_id if had else None)

@@ -1,10 +1,16 @@
-"""Which edition a Rowanholt team server runs, from a licence signed with Rowanholt's private key.
+"""Which edition Rowanholt runs, from a licence signed with Rowanholt's private key.
 
-    Local      one analyst, no sign-in: needs no licence and is never limited
-    Free       a team server with up to FREE_SEATS accounts that can sign in
-    Pro        a team server with the licence's seats
-    Services   as Pro, and the right to run Rowanholt for clients as a managed service, which the
-               Elastic License 2.0 otherwise forbids (COMMERCIAL-LICENSE.md)
+    Free       the whole product, reports in Rowanholt's own style, no webhooks. Local mode (one
+               analyst, no sign-in) is the Free edition and needs no licence; a team server allows
+               up to FREE_SEATS accounts that can sign in
+    Pro        the licence's seats, `report-branding` (one brand for the installation's reports) and
+               `automation` (signed webhooks)
+    Services   Pro, plus `brand-library` (a brand per client, chosen for each case) and the right to
+               run Rowanholt for clients as a managed service, which the Elastic License 2.0 otherwise
+               forbids (COMMERCIAL-LICENSE.md)
+
+A solo analyst in local mode can install a Pro or Services licence for branding and webhooks; seats
+only ever apply to a team server.
 
 This follows the licence format shared by ostraka, Shikari and Rowanholt (docs/LICENSING_MODEL.md).
 A licence is one line, `rowanholt-licence-1.<payload>.<signature>`: the payload is base64url of
@@ -15,8 +21,10 @@ or edited. Each product has its own key; the private half stays with the licenso
 (`scripts/admin/sign_licence.py`). Rotating it means adding the new public half to PUBLIC_KEYS.
 
 What a licence grants is its edition's features (EDITION_FEATURES) plus any it names; "*" grants
-every feature. Rowanholt gates no feature today: the editions differ in seats only, and Services
-carries the managed-service right, which is in the terms rather than the code.
+every feature. A feature is checked with has() where it's used (when a report is built, when a
+webhook is sent), never when it's configured, so a brand or webhook saved under one licence is kept
+when the licence changes and only what happens next differs. managed-service is a right in the
+terms, not a switch in the code.
 
 Rowanholt keeps users in a JSON file, not a database, so the installed licence lives beside it
 (licence.json next to USERS_FILE, or ROWANHOLT_LICENCE), with the admin's acceptance of the
@@ -64,13 +72,16 @@ class Edition(str, Enum):
 
 
 # Feature ids: short, kebab-case, stable. docs/LICENSING_MODEL.md says what each gates.
+REPORT_BRANDING = "report-branding"  # one brand for the installation's case reports
+BRAND_LIBRARY = "brand-library"  # a brand per client, chosen for each case
+AUTOMATION = "automation"  # signed webhooks
 MANAGED_SERVICE = "managed-service"  # a right in COMMERCIAL-LICENSE.md, not a switch in the code
-FEATURES = (MANAGED_SERVICE,)
+FEATURES = (REPORT_BRANDING, BRAND_LIBRARY, AUTOMATION, MANAGED_SERVICE)
 WILDCARD = "*"
 EDITION_FEATURES: Dict[Edition, frozenset] = {
     Edition.FREE: frozenset(),
-    Edition.PRO: frozenset(),
-    Edition.SERVICES: frozenset({MANAGED_SERVICE}),
+    Edition.PRO: frozenset({REPORT_BRANDING, AUTOMATION}),
+    Edition.SERVICES: frozenset({REPORT_BRANDING, AUTOMATION, BRAND_LIBRARY, MANAGED_SERVICE}),
 }
 
 
@@ -345,9 +356,10 @@ def configure(storage) -> None:
     _storage = storage
 
 
-def audit(action: str, actor: Optional[dict], ip: Optional[str] = None, **details) -> None:
-    """An install or removal into the audit_logs table. The licence file is already written: a
-    database that's down is logged loudly rather than undoing it."""
+def audit(action: str, actor: Optional[dict], ip: Optional[str] = None, resource_type: str = "licence",
+          resource_id: Optional[str] = None, **details) -> None:
+    """An install or removal (or a brand's change: branding.py) into the audit_logs table. The file
+    is already written: a database that's down is logged loudly rather than undoing it."""
     if _storage is None:
         logger.warning("Licence %s not audited (no storage configured): %s", action, details)
         return
@@ -363,8 +375,8 @@ def audit(action: str, actor: Optional[dict], ip: Optional[str] = None, **detail
             user_id=actor.get("id"),
             username=actor.get("username") or "server",
             action=action,
-            resource_type="licence",
-            resource_id=details.get("licence"),
+            resource_type=resource_type,
+            resource_id=resource_id or details.get("licence"),
             details=details,
             ip_address=ip,
             timestamp=datetime.utcnow(),
