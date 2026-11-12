@@ -94,8 +94,8 @@ function Get-SavedServer {
 
 # ── Windows' own look ─────────────────────────────────────────────────────────
 # Without visual styles WinForms draws Windows 95's buttons, and without DPI awareness Windows
-# stretches the dialogs into blurred text on a scaled display. The console is hidden while
-# setup's dialogs are up: it has nothing to show until the stack starts or files are copied
+# stretches the dialogs into blurred text on a scaled display. The console stays hidden: setup,
+# installing components and starting the stack all happen in the Rowanholt window below
 Add-Type -Namespace Rowanholt -Name Native -MemberDefinition @'
 [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();
 [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
@@ -117,67 +117,172 @@ function Hide-Console {
     if ([Rowanholt.Native]::GetConsoleProcessList((New-Object UInt32[] 4), 4) -ne 1) { return }
     [Rowanholt.Native]::ShowWindow([Rowanholt.Native]::GetConsoleWindow(), 0) | Out-Null
 }
-function Show-Console { [Rowanholt.Native]::ShowWindow([Rowanholt.Native]::GetConsoleWindow(), 5) | Out-Null }
 
 function Show-Message([string]$Text, [string]$Buttons = 'OK', [string]$Icon = 'Information') {
     Initialize-Gui
     return [string][System.Windows.Forms.MessageBox]::Show($Text, 'Rowanholt', $Buttons, $Icon)
 }
 
-function New-SetupForm([string]$Heading, [string]$Subheading, [int]$BodyHeight) {
-    # A wizard page as the MSI's are: white header with the icon, the body, Next and Cancel.
-    # Laid out at 96 DPI; AutoScaleMode Dpi scales it to the display's
+# ── The Rowanholt window ──────────────────────────────────────────────────────
+# Everything the launcher asks or shows happens in one window, as an installer's pages do: a
+# white header with the icon, the page, then Back, Next and Cancel along the bottom. It's shown
+# without blocking (Show, not ShowDialog), and the launcher pumps its messages (Step-Gui) while it
+# waits for a click or works, so one window carries setup, downloads and the road to Rowanholt.
+# Laid out at 96 DPI; AutoScaleMode Dpi scales it to the display's
+$script:Wizard = $null
+
+function Get-Wizard {
+    if ($script:Wizard) { return $script:Wizard }
     Initialize-Gui
     $form = New-Object System.Windows.Forms.Form
     $form.AutoScaleDimensions = New-Object System.Drawing.SizeF(96, 96)
     $form.AutoScaleMode = 'Dpi'
     $form.Font = New-Object System.Drawing.Font('Segoe UI', 9)
-    $form.Text = 'Set up Rowanholt'
-    $form.FormBorderStyle = 'FixedDialog'; $form.MaximizeBox = $false; $form.MinimizeBox = $false
-    $form.StartPosition = 'CenterScreen'; $form.ShowInTaskbar = $true
-    $form.ClientSize = New-Object System.Drawing.Size(520, (64 + 1 + $BodyHeight + 1 + 52))
-    $form.Add_Shown({ $this.Activate() })
+    $form.Text = 'Rowanholt'
+    $form.FormBorderStyle = 'FixedDialog'; $form.MaximizeBox = $false
+    $form.StartPosition = 'CenterScreen'
+    $form.ClientSize = New-Object System.Drawing.Size(560, 460)
     $iconFile = Join-Path $AppDir 'desktop\icons\rowanholt.ico'
     # The PNG, not the .ico: Icon.ToBitmap garbles an .ico's PNG-compressed sizes into noise
     $pngFile = Join-Path $AppDir 'desktop\icons\rowanholt.png'
+    if (Test-Path $iconFile) { $form.Icon = New-Object System.Drawing.Icon($iconFile) }
 
     $header = New-Object System.Windows.Forms.Panel
-    $header.SetBounds(0, 0, 520, 64); $header.BackColor = [System.Drawing.Color]::White
+    $header.SetBounds(0, 0, 560, 64); $header.BackColor = [System.Drawing.Color]::White
     $title = New-Object System.Windows.Forms.Label
-    $title.Text = $Heading; $title.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 11)
-    $title.SetBounds(20, 12, 420, 22)
+    $title.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 11); $title.SetBounds(20, 12, 470, 22)
     $sub = New-Object System.Windows.Forms.Label
-    $sub.Text = $Subheading; $sub.ForeColor = [System.Drawing.Color]::FromArgb(90, 90, 90)
-    $sub.SetBounds(20, 36, 420, 20)
+    $sub.ForeColor = [System.Drawing.Color]::FromArgb(90, 90, 90); $sub.SetBounds(20, 36, 470, 22)
     $header.Controls.AddRange(@($title, $sub))
-    if (Test-Path $iconFile) { $form.Icon = New-Object System.Drawing.Icon($iconFile) }
     if (Test-Path $pngFile) {
         $picture = New-Object System.Windows.Forms.PictureBox
         $picture.Image = [System.Drawing.Image]::FromFile($pngFile)
-        $picture.SizeMode = 'Zoom'; $picture.SetBounds(460, 10, 44, 44)
+        $picture.SizeMode = 'Zoom'; $picture.SetBounds(502, 10, 44, 44)
         $header.Controls.Add($picture)
     }
-    $form.Controls.Add($header)
-    foreach ($y in 64, (65 + $BodyHeight)) {
+    $body = New-Object System.Windows.Forms.Panel
+    $body.SetBounds(0, 65, 560, 340)
+    $form.Controls.AddRange(@($header, $body))
+    foreach ($y in 64, 405) {
         $line = New-Object System.Windows.Forms.Panel
-        $line.SetBounds(0, $y, 520, 1); $line.BackColor = [System.Drawing.Color]::FromArgb(218, 218, 218)
+        $line.SetBounds(0, $y, 560, 1); $line.BackColor = [System.Drawing.Color]::FromArgb(218, 218, 218)
         $form.Controls.Add($line)
     }
+    $back = New-Object System.Windows.Forms.Button; $back.SetBounds(268, 418, 88, 28)
+    $next = New-Object System.Windows.Forms.Button; $next.SetBounds(364, 418, 88, 28)
+    $cancel = New-Object System.Windows.Forms.Button; $cancel.SetBounds(460, 418, 88, 28)
+    $form.Controls.AddRange(@($back, $next, $cancel)); $form.AcceptButton = $next
 
-    $buttonsY = 66 + $BodyHeight + 13
-    $ok = New-Object System.Windows.Forms.Button
-    $ok.Text = 'Next'; $ok.DialogResult = 'OK'; $ok.SetBounds(316, $buttonsY, 92, 28)
-    $cancel = New-Object System.Windows.Forms.Button
-    $cancel.Text = 'Cancel'; $cancel.DialogResult = 'Cancel'; $cancel.SetBounds(416, $buttonsY, 92, 28)
-    $form.Controls.AddRange(@($ok, $cancel)); $form.AcceptButton = $ok; $form.CancelButton = $cancel
-    return $form
+    $script:Wizard = [pscustomobject]@{ Form = $form; Title = $title; Sub = $sub; Body = $body
+                                        Back = $back; Next = $next; Cancel = $cancel; Action = $null; Closing = $false }
+    $back.Add_Click({ $script:Wizard.Action = 'back' })
+    $next.Add_Click({ $script:Wizard.Action = 'next' })
+    $cancel.Add_Click({ $script:Wizard.Action = 'cancel' })
+    # The window's own close button is Cancel; only Close-Wizard really closes it
+    $form.Add_FormClosing({ param($s, $e) if (-not $script:Wizard.Closing) { $e.Cancel = $true; $script:Wizard.Action = 'cancel' } })
+    $form.Add_Shown({ $this.Activate() })
+    $form.Show(); Step-Gui
+    return $script:Wizard
 }
 
-function Add-FormText($Form, [string]$Text, [int]$X, [int]$Y, [int]$Width, [int]$Height, [switch]$Muted) {
+function Show-Page([string]$Title, [string]$Subtitle, [string]$Next = 'Next', [string]$Back = '', [string]$Cancel = 'Cancel') {
+    # A fresh page: the header's text, the buttons it has ('' hides one), an empty body to fill
+    $w = Get-Wizard
+    if ($script:GuideTimer) { $script:GuideTimer.Stop() }
+    $w.Body.Controls.Clear()
+    $w.Title.Text = $Title; $w.Sub.Text = $Subtitle
+    foreach ($b in @(@($w.Next, $Next), @($w.Back, $Back), @($w.Cancel, $Cancel))) {
+        $b[0].Text = $b[1]; $b[0].Visible = [bool]$b[1]; $b[0].Enabled = $true
+    }
+    $w.Action = $null
+    Step-Gui
+    return $w.Body
+}
+
+function Wait-Page {
+    # 'next', 'back' or 'cancel', once one is clicked
+    $w = Get-Wizard
+    $w.Action = $null
+    while (-not $w.Action) { Start-Sleep -Milliseconds 40; Step-Gui }
+    $action = $w.Action
+    $w.Action = $null
+    return $action
+}
+
+function Close-Wizard {
+    if (-not $script:Wizard) { return }
+    if ($script:GuideTimer) { $script:GuideTimer.Stop() }
+    $script:Wizard.Closing = $true
+    $script:Wizard.Form.Close()
+    $script:Wizard = $null
+    Step-Gui
+}
+
+function Add-Text($Body, [string]$Text, [int]$Y, [int]$Height = 20, [int]$X = 24, [int]$Width = 512, [switch]$Muted, [switch]$Bold) {
     $label = New-Object System.Windows.Forms.Label
     $label.Text = $Text; $label.SetBounds($X, $Y, $Width, $Height)
     if ($Muted) { $label.ForeColor = [System.Drawing.Color]::FromArgb(96, 96, 96) }
-    $Form.Controls.Add($label)
+    if ($Bold) { $label.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 9) }
+    $Body.Controls.Add($label)
+}
+
+function New-ErrorLabel($Body, [int]$Y, [int]$Height = 36) {
+    $label = New-Object System.Windows.Forms.Label
+    $label.ForeColor = [System.Drawing.Color]::FromArgb(176, 32, 32); $label.SetBounds(24, $Y, 512, $Height)
+    $Body.Controls.Add($label)
+    return $label
+}
+
+function Show-Problem([string]$Title, [string]$Text) {
+    # The end of the road, said in the window; the text can be selected and copied
+    $body = Show-Page $Title 'Rowanholt stopped here.' -Next 'Close' -Cancel ''
+    $box = New-Object System.Windows.Forms.TextBox
+    $box.Multiline = $true; $box.ReadOnly = $true; $box.BorderStyle = 'None'; $box.ScrollBars = 'Vertical'
+    $box.BackColor = $script:Wizard.Form.BackColor; $box.SetBounds(24, 20, 512, 290); $box.Text = $Text
+    $body.Controls.Add($box)
+    Wait-Page | Out-Null
+    Close-Wizard
+}
+
+function Show-ProgressPage([string]$Title, [string]$Subtitle, $Rows) {
+    # Rows: an ordered key => name for each thing being installed, or none. Then a progress bar,
+    # what's happening now, and the guide to read meanwhile. Cancel stays
+    $body = Show-Page $Title $Subtitle -Next '' -Cancel 'Cancel'
+    $ui = @{ Rows = @{}; Status = @{}; Problems = @() }
+    $y = 18
+    if ($Rows) {
+        foreach ($key in $Rows.Keys) {
+            Add-Text $body $Rows[$key] $y -Width 200 -Bold
+            $status = New-Object System.Windows.Forms.Label
+            $status.Text = 'Waiting'; $status.ForeColor = [System.Drawing.Color]::FromArgb(96, 96, 96)
+            $status.SetBounds(230, $y, 306, 20); $body.Controls.Add($status)
+            $ui.Rows[$key] = $status
+            $y += 26
+        }
+        $y += 6
+    }
+    $ui.Bar = New-Object System.Windows.Forms.ProgressBar
+    $ui.Bar.SetBounds(24, $y, 512, 18); $ui.Bar.Maximum = 1000; $ui.Bar.MarqueeAnimationSpeed = 30; $ui.Bar.Style = 'Marquee'
+    $ui.Detail = New-Object System.Windows.Forms.Label
+    $ui.Detail.SetBounds(24, $y + 24, 512, 36); $ui.Detail.ForeColor = [System.Drawing.Color]::FromArgb(96, 96, 96)
+    $body.Controls.AddRange(@($ui.Bar, $ui.Detail))
+    Add-GuideCard $body ($y + 68)
+    Step-Gui
+    return $ui
+}
+
+function Set-Progress($Ui, [string]$Text, [double]$Fraction = -1) {
+    $Ui.Detail.Text = $Text
+    if ($Fraction -lt 0) { $Ui.Bar.Style = 'Marquee' } else {
+        $Ui.Bar.Style = 'Continuous'; $Ui.Bar.Value = [int][math]::Min(1000, 1000 * $Fraction)
+    }
+    Step-Gui
+    Assert-NotCancelled
+}
+
+function Write-Step([string]$Text) {
+    # A line of what's happening: in the window when it's open, else the console (-Stop)
+    if ($script:Progress) { $script:Progress.Detail.Text = $Text; Step-Gui } else { Write-Host $Text }
 }
 
 function Test-Copy([string]$Dir) {
@@ -204,57 +309,93 @@ function ConvertTo-ServerUrl([string]$Text, [switch]$AllowHttp) {
 # The databases are Docker volumes named after the compose project, wherever this folder is
 $AppCopy = Join-Path $env:USERPROFILE 'Rowanholt'
 
-function Select-Mode {
+function Select-Mode([int]$Current = 0) {
     # Where Rowanholt runs: 0 here (unpacked), 1 a copy already here, 2 a team server; $null cancelled
-    $form = New-SetupForm 'Where should Rowanholt run?' 'You can change this later with Set Up Rowanholt in the Start menu.' 210
+    $body = Show-Page 'Where should Rowanholt run?' 'You can change this later with Set Up Rowanholt in the Start menu.'
     $options = @(
         @('On this PC', "Rowanholt $(Get-AppVersion) runs here in Docker Desktop. Its files go in $AppCopy; your evidence stays where it is."),
-        @('From a copy I already have', 'A Rowanholt folder that is already on this PC, such as a git clone.'),
-        @("On my team's server", "Opens your team's Rowanholt in a window. Nothing else is installed or run here.")
+        @('From a copy I already have', 'A Rowanholt folder that is already on this PC, such as a git clone. It runs as it is and is never overwritten.'),
+        @("On my team's server", "Opens your team's Rowanholt in a window. Nothing else is installed or run on this PC.")
     )
     $bold = New-Object System.Drawing.Font('Segoe UI Semibold', 9)
-    $radios = for ($i = 0; $i -lt $options.Count; $i++) {
-        $y = 82 + 64 * $i
+    $radios = @()
+    for ($i = 0; $i -lt $options.Count; $i++) {
+        $y = 22 + 76 * $i
         $radio = New-Object System.Windows.Forms.RadioButton
         $radio.Text = $options[$i][0]; $radio.Font = $bold
-        $radio.SetBounds(28, $y, 460, 24); $radio.Checked = ($i -eq 0)
-        $form.Controls.Add($radio)
-        Add-FormText $form $options[$i][1] 46 ($y + 24) 450 34 -Muted
-        $radio
+        $radio.SetBounds(24, $y, 500, 24); $radio.Checked = ($i -eq $Current)
+        $body.Controls.Add($radio)
+        Add-Text $body $options[$i][1] ($y + 24) -X 44 -Width 492 -Height 40 -Muted
+        $radios += $radio
     }
-    if ($form.ShowDialog() -ne 'OK') { return $null }
+    if ((Wait-Page) -ne 'next') { return $null }
     for ($i = 0; $i -lt $radios.Count; $i++) { if ($radios[$i].Checked) { return $i } }
     return 0
 }
 
 function Select-Folder([string]$Description, [string]$Start) {
+    # Explorer's own picker, through OpenFileDialog: .NET Framework's FolderBrowserDialog is
+    # Windows XP's tree. The file name is a placeholder; the folder it's in is the answer
     Initialize-Gui
-    $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-    $dialog.Description = $Description
-    $dialog.ShowNewFolderButton = $true
-    if ($Start -and (Test-Path $Start)) { $dialog.SelectedPath = $Start }
-    if ($dialog.ShowDialog() -ne 'OK') { return $null }
-    return $dialog.SelectedPath
+    $dialog = New-Object System.Windows.Forms.OpenFileDialog
+    $dialog.Title = $Description
+    $dialog.ValidateNames = $false; $dialog.CheckFileExists = $false; $dialog.CheckPathExists = $true
+    $dialog.Filter = 'Folders|*.folder'
+    $dialog.FileName = 'Select this folder'
+    if ($Start -and (Test-Path $Start)) { $dialog.InitialDirectory = $Start }
+    $owner = if ($script:Wizard) { $script:Wizard.Form } else { $null }
+    if ($dialog.ShowDialog($owner) -ne 'OK') { return $null }
+    return Split-Path $dialog.FileName
 }
 
 function Set-Server {
-    $form = New-SetupForm "Your team's Rowanholt server" 'Rowanholt opens it in its own window.' 150
-    Add-FormText $form 'Server address:' 28 84 460 20
+    # 'done' once the address is saved, 'back' for the previous page
+    $body = Show-Page "Your team's Rowanholt server" 'Rowanholt opens it in its own window.' -Back 'Back'
+    Add-Text $body 'Server address' 20 -Bold
     $box = New-Object System.Windows.Forms.TextBox
-    $box.SetBounds(28, 106, 464, 24); $box.Text = (Get-SavedServer)
-    $form.Controls.Add($box)
-    Add-FormText $form ("For example rowanholt.example.org. If Edge warns about the server's certificate, " +
-        "ask its admin for the root certificate.") 28 142 464 40 -Muted
-    $form.Add_Shown({ $box.Focus() })
-    if ($form.ShowDialog() -ne 'OK') { exit 1 }
-    $typed = $box.Text
-    if (-not $typed) { exit 1 }
-    $server = ConvertTo-ServerUrl $typed
-    if (-not $server) {
-        Show-Message "'$typed' isn't a server address, e.g. rowanholt.example.org (https only)." 'OK' 'Error' | Out-Null
-        exit 1
+    $box.SetBounds(24, 44, 512, 24); $box.Text = (Get-SavedServer)
+    $body.Controls.Add($box)
+    Add-Text $body ("For example rowanholt.example.org; https is assumed. If Edge warns about the server's " +
+        "certificate, ask its admin for the root certificate.") 80 -Height 40 -Muted
+    $problem = New-ErrorLabel $body 128
+    $box.Focus() | Out-Null
+    while ($true) {
+        $action = Wait-Page
+        if ($action -eq 'back') { return 'back' }
+        if ($action -ne 'next') { exit 1 }
+        $server = ConvertTo-ServerUrl $box.Text
+        if ($server) {
+            Set-Content -Path $ServerFile -Value $server -Encoding ASCII
+            return 'done'
+        }
+        $problem.Text = "'$($box.Text)' isn't a server address: for example rowanholt.example.org (https only)."
     }
-    Set-Content -Path $ServerFile -Value $server -Encoding ASCII
+}
+
+function Select-ExistingCopy([string]$Start) {
+    # The folder of a copy already here, or $null for the previous page
+    $body = Show-Page 'Your Rowanholt folder' 'A copy of Rowanholt already on this PC, such as a git clone.' -Back 'Back'
+    Add-Text $body 'Folder' 20 -Bold
+    $script:CopyBox = New-Object System.Windows.Forms.TextBox
+    $script:CopyBox.SetBounds(24, 44, 420, 24); $script:CopyBox.Text = $Start
+    $browse = New-Object System.Windows.Forms.Button
+    $browse.Text = 'Browse...'; $browse.SetBounds(452, 42, 84, 28)
+    $browse.Add_Click({
+        $folder = Select-Folder 'Choose your Rowanholt folder' $(if ($script:CopyBox.Text) { $script:CopyBox.Text } else { $env:USERPROFILE })
+        if ($folder) { $script:CopyBox.Text = $folder }
+    })
+    $body.Controls.AddRange(@($script:CopyBox, $browse))
+    Add-Text $body ("Rowanholt runs that folder as it is and never overwrites it, so a git clone stays yours to " +
+        'update with git pull.') 80 -Height 40 -Muted
+    $problem = New-ErrorLabel $body 128
+    while ($true) {
+        $action = Wait-Page
+        if ($action -eq 'back') { return $null }
+        if ($action -ne 'next') { exit 1 }
+        $dir = $script:CopyBox.Text.Trim()
+        if (Test-Copy $dir) { return $dir }
+        $problem.Text = "That folder doesn't look like Rowanholt: there's no rowanholt launcher and docker-compose.yml in it."
+    }
 }
 
 function Get-DockerDesktop {
@@ -276,14 +417,15 @@ function Test-DockerInstalled {
 
 function Assert-DockerInstalled {
     if (Test-DockerInstalled) { Add-DockerToPath; return }
-    $answer = Show-Message ("Rowanholt runs as a set of Docker containers, and Docker Desktop isn't installed.`n`n" +
-        "Install it now? Rowanholt downloads it from docker.com, checks it's signed by Docker and installs it " +
-        "for you alone (no administrator rights; turning on WSL 2, if it's off, asks for them).`n`n" +
-        "Installing it accepts Docker's Subscription Service Agreement: free for personal use, education and " +
-        'small businesses; larger organisations need a paid subscription.') 'YesNo' 'Question'
-    if ($answer -ne 'Yes') { exit 1 }
+    $body = Show-Page 'Docker Desktop is needed' 'Rowanholt runs as a set of containers in Docker Desktop.' -Next 'Install it'
+    Add-Text $body ("Docker Desktop isn't installed. Rowanholt can install it now: downloaded from docker.com, " +
+        "checked against Docker's signature and installed for you alone, without administrator rights. If " +
+        'WSL 2 is off, turning it on asks for administrator rights and a restart.') 20 -Height 64
+    Add-Text $body ("Installing it accepts Docker's Subscription Service Agreement: free for personal use, education " +
+        'and small businesses; larger organisations need a paid subscription.') 96 -Height 44 -Muted
+    if ((Wait-Page) -ne 'next') { exit 1 }
     $result = Install-Dependencies @('docker')
-    if ($result.Restart -or -not (Test-DockerInstalled)) { exit 1 }
+    if ($result.Restart -or -not (Test-DockerInstalled)) { Close-Wizard; exit 1 }
     Add-DockerToPath
 }
 
@@ -318,6 +460,37 @@ $GuideCards = @(
     @('Mordor Recordings', 'Recorded attack telemetry: which logs record each ATT&CK technique, from public labs and your own. Look here before writing a detection.'),
     @('Your evidence stays put', "Evidence folders are mounted read-only for the web app: D:\Cases appears inside Rowanholt as /mnt/d/Cases. Set Up Rowanholt in the Start menu changes them later.")
 )
+
+function Add-GuideCard($Body, [int]$Y) {
+    # ‹ › to flick through, and it moves on by itself every 12 seconds; a click restarts the 12
+    # seconds, so a card being read isn't swapped out under the reader
+    $ui = @{}
+    $card = New-Object System.Windows.Forms.Panel
+    $card.SetBounds(24, $Y, 512, [math]::Min(136, 330 - $Y)); $card.BackColor = [System.Drawing.Color]::White
+    $card.BorderStyle = 'FixedSingle'
+    $ui.CardTitle = New-Object System.Windows.Forms.Label
+    $ui.CardTitle.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 10); $ui.CardTitle.SetBounds(14, 10, 480, 22)
+    $ui.CardText = New-Object System.Windows.Forms.Label
+    $ui.CardText.SetBounds(14, 36, 482, 62)
+    $ui.CardCount = New-Object System.Windows.Forms.Label
+    $ui.CardCount.ForeColor = [System.Drawing.Color]::FromArgb(96, 96, 96); $ui.CardCount.SetBounds(14, 104, 200, 20)
+    $back = New-Object System.Windows.Forms.Button
+    $back.Text = [string][char]0x2039; $back.SetBounds(420, 100, 34, 26)
+    $next = New-Object System.Windows.Forms.Button
+    $next.Text = [string][char]0x203A; $next.SetBounds(460, 100, 34, 26)
+    $card.Controls.AddRange(@($ui.CardTitle, $ui.CardText, $ui.CardCount, $back, $next))
+    $Body.Controls.Add($card)
+    $script:GuideUi = $ui
+    if (-not $script:GuideTimer) {
+        $script:GuideTimer = New-Object System.Windows.Forms.Timer
+        $script:GuideTimer.Interval = 12000
+        $script:GuideTimer.Add_Tick({ Show-GuideCard $script:GuideUi ($script:GuideUi.Card + 1) })
+    }
+    $back.Add_Click({ Show-GuideCard $script:GuideUi ($script:GuideUi.Card - 1); $script:GuideTimer.Stop(); $script:GuideTimer.Start() })
+    $next.Add_Click({ Show-GuideCard $script:GuideUi ($script:GuideUi.Card + 1); $script:GuideTimer.Stop(); $script:GuideTimer.Start() })
+    Show-GuideCard $ui (Get-Random -Maximum $GuideCards.Count)
+    $script:GuideTimer.Stop(); $script:GuideTimer.Start()
+}
 
 function Show-GuideCard($Ui, [int]$Index) {
     $Ui.Card = ($Index + $GuideCards.Count) % $GuideCards.Count
@@ -358,7 +531,7 @@ function Test-Ollama {
 
 function Step-Gui { [System.Windows.Forms.Application]::DoEvents() }
 
-function Assert-NotCancelled { if ($script:DependenciesCancelled) { throw 'Cancelled' } }
+function Assert-NotCancelled { if ($script:Wizard -and $script:Wizard.Action -eq 'cancel') { throw 'Cancelled' } }
 
 function Write-ComponentLog([string]$Line) {
     # What happened, for after the window has gone: %LOCALAPPDATA%\Rowanholt\components.log
@@ -366,15 +539,11 @@ function Write-ComponentLog([string]$Line) {
 }
 
 function Set-Status($Ui, [string]$Item, [string]$Text, [double]$Fraction = -1) {
-    # Kept beside the label: the summary is written after the window, and its labels, have closed
+    # Kept beside the label, for the summary page and the log
     if ($Ui.Status[$Item] -ne $Text -and $Text -notlike 'Downloading *') { Write-ComponentLog "$Item`: $Text" }
     $Ui.Status[$Item] = $Text
     $Ui.Rows[$Item].Text = $Text
-    $Ui.Detail.Text = "$($Dependencies[$Item].Name): $Text"
-    if ($Fraction -lt 0) { $Ui.Bar.Style = 'Marquee' } else {
-        $Ui.Bar.Style = 'Continuous'; $Ui.Bar.Value = [int][math]::Min(1000, 1000 * $Fraction)
-    }
-    Step-Gui
+    Set-Progress $Ui "$($Dependencies[$Item].Name): $Text" $Fraction
 }
 
 function Save-Download($Ui, [string]$Item, [string]$Url, [string]$Path) {
@@ -503,65 +672,16 @@ function Install-Model($Ui) {
 }
 
 function Install-Dependencies([string[]]$Items) {
-    # One window for all of them, in order; one failing doesn't stop the rest. Returns
+    # On one page, in order; one failing doesn't stop the rest. Then a summary page. Returns
     # @{ Failed; Restart }, Restart when WSL 2 was just turned on
     $result = @{ Failed = @(); Restart = $false }
-    $height = 40 + 30 * $Items.Count + 70 + 150
-    $form = New-SetupForm 'Finishing the install' 'Installing what you chose in the installer, straight from Docker and Ollama.' $height
-    $form.AcceptButton.Visible = $false
-    $script:DependenciesCancelled = $false
-    $form.CancelButton.DialogResult = 'None'
-    $form.CancelButton.Add_Click({ $script:DependenciesCancelled = $true })
-    $form.Add_FormClosing({ param($s, $e) if (-not $script:DependenciesDone) { $script:DependenciesCancelled = $true; $e.Cancel = $true } })
-    $script:DependenciesDone = $false
-    $ui = @{ Rows = @{}; Status = @{}; Problems = @() }
+    $rows = [ordered]@{}
+    foreach ($item in $Items) { $rows[$item] = $Dependencies[$item].Name }
+    $ui = Show-ProgressPage 'Finishing the install' 'Installing what you chose, straight from Docker and Ollama.' $rows
     Write-ComponentLog "Installing: $($Items -join ', ')"
-    $y = 84
+    $cancelled = $false
     foreach ($item in $Items) {
-        $name = New-Object System.Windows.Forms.Label
-        $name.Text = $Dependencies[$item].Name; $name.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 9)
-        $name.SetBounds(28, $y, 190, 22); $form.Controls.Add($name)
-        $status = New-Object System.Windows.Forms.Label
-        $status.Text = 'Waiting'; $status.ForeColor = [System.Drawing.Color]::FromArgb(96, 96, 96)
-        $status.SetBounds(220, $y, 280, 22); $form.Controls.Add($status)
-        $ui.Rows[$item] = $status
-        $y += 30
-    }
-    $ui.Bar = New-Object System.Windows.Forms.ProgressBar
-    $ui.Bar.SetBounds(28, $y + 12, 464, 18); $ui.Bar.Maximum = 1000; $ui.Bar.MarqueeAnimationSpeed = 30
-    $ui.Detail = New-Object System.Windows.Forms.Label
-    $ui.Detail.SetBounds(28, $y + 36, 464, 36); $ui.Detail.ForeColor = [System.Drawing.Color]::FromArgb(96, 96, 96)
-    $form.Controls.AddRange(@($ui.Bar, $ui.Detail))
-
-    # The guide: ‹ › to flick through, and it moves on by itself every 12 seconds
-    $card = New-Object System.Windows.Forms.Panel
-    $card.SetBounds(28, $y + 84, 464, 136); $card.BackColor = [System.Drawing.Color]::White
-    $card.BorderStyle = 'FixedSingle'
-    $ui.CardTitle = New-Object System.Windows.Forms.Label
-    $ui.CardTitle.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 10); $ui.CardTitle.SetBounds(14, 10, 430, 22)
-    $ui.CardText = New-Object System.Windows.Forms.Label
-    $ui.CardText.SetBounds(14, 36, 434, 64)
-    $ui.CardCount = New-Object System.Windows.Forms.Label
-    $ui.CardCount.ForeColor = [System.Drawing.Color]::FromArgb(96, 96, 96); $ui.CardCount.SetBounds(14, 106, 200, 20)
-    $back = New-Object System.Windows.Forms.Button
-    $back.Text = [string][char]0x2039; $back.SetBounds(372, 102, 34, 26)
-    $next = New-Object System.Windows.Forms.Button
-    $next.Text = [string][char]0x203A; $next.SetBounds(412, 102, 34, 26)
-    $card.Controls.AddRange(@($ui.CardTitle, $ui.CardText, $ui.CardCount, $back, $next))
-    $form.Controls.Add($card)
-    $script:GuideUi = $ui
-    $script:GuideTimer = New-Object System.Windows.Forms.Timer
-    $script:GuideTimer.Interval = 12000
-    $script:GuideTimer.Add_Tick({ Show-GuideCard $script:GuideUi ($script:GuideUi.Card + 1) })
-    # A click restarts the 12 seconds, so a card being read isn't swapped out under the reader
-    $back.Add_Click({ Show-GuideCard $script:GuideUi ($script:GuideUi.Card - 1); $script:GuideTimer.Stop(); $script:GuideTimer.Start() })
-    $next.Add_Click({ Show-GuideCard $script:GuideUi ($script:GuideUi.Card + 1); $script:GuideTimer.Stop(); $script:GuideTimer.Start() })
-    Show-GuideCard $ui 0
-    $script:GuideTimer.Start()
-    $form.Show(); Step-Gui
-
-    foreach ($item in $Items) {
-        if ($script:DependenciesCancelled) { $ui.Status[$item] = 'Cancelled'; $ui.Rows[$item].Text = 'Cancelled'; $result.Failed += $item; continue }
+        if ($cancelled) { $ui.Status[$item] = 'Cancelled'; $ui.Rows[$item].Text = 'Cancelled'; $result.Failed += $item; continue }
         try {
             switch ($item) {
                 'docker' { Install-Docker $ui $result }
@@ -570,38 +690,46 @@ function Install-Dependencies([string[]]$Items) {
             }
         } catch {
             $result.Failed += $item
-            $ui.Status[$item] = 'Not installed'
-            $ui.Rows[$item].Text = 'Not installed'
-            $ui.Detail.Text = "$($Dependencies[$item].Name): $($_.Exception.Message)"
-            if ($_.Exception.Message -ne 'Cancelled') { $ui.Problems += "$($Dependencies[$item].Name): $($_.Exception.Message)" }
-            Write-ComponentLog "$item`: not installed: $($_.Exception.Message)"
-            $ui.Bar.Style = 'Continuous'; $ui.Bar.Value = 0
-            Step-Gui
-            if ($_.Exception.Message -ne 'Cancelled') { Start-Sleep -Seconds 3 }
+            $message = $_.Exception.Message
+            $cancelled = $message -eq 'Cancelled'
+            $ui.Status[$item] = if ($cancelled) { 'Cancelled' } else { 'Not installed' }
+            $ui.Rows[$item].Text = $ui.Status[$item]
+            if (-not $cancelled) { $ui.Problems += "$($Dependencies[$item].Name): $message" }
+            Write-ComponentLog "$item`: not installed: $message"
+            $script:Wizard.Action = $null
         }
     }
     Clear-PendingDependencies $Items
-    $script:GuideTimer.Stop()
-    $script:DependenciesDone = $true
-    $form.Close()
 
-    $lines = @()
-    foreach ($item in $Items) { $lines += "$($Dependencies[$item].Name): $($ui.Status[$item])" }
-    if ($ui.Problems) { $lines += '', 'What went wrong:'; $lines += $ui.Problems }
-    if ($result.Failed -contains 'docker') { $lines += '', 'Set Up Rowanholt in the Start menu offers Docker Desktop again.' }
-    if ($result.Restart) { $lines += '', 'Restart Windows to finish turning on WSL 2, then open Rowanholt from the Start menu.' }
-    $icon = if ($result.Failed) { 'Warning' } else { 'Information' }
-    Show-Message ($lines -join "`n") 'OK' $icon | Out-Null
+    $title = if ($result.Failed) { 'Not everything was installed' } else { 'Installed' }
+    $subtitle = if ($result.Restart) { 'Restart Windows to finish turning on WSL 2.' } else { 'Rowanholt carries on from here.' }
+    $body = Show-Page $title $subtitle -Next $(if ($result.Restart) { 'Close' } else { 'Continue' }) -Cancel ''
+    $y = 20
+    foreach ($item in $Items) {
+        Add-Text $body $Dependencies[$item].Name $y -Width 200 -Bold
+        Add-Text $body $ui.Status[$item] $y -X 230 -Width 306
+        $y += 26
+    }
+    $notes = @()
+    if ($ui.Problems) { $notes += 'What went wrong:'; $notes += $ui.Problems; $notes += '' }
+    if ($result.Failed -contains 'docker') { $notes += 'Set Up Rowanholt in the Start menu offers Docker Desktop again.' }
+    if ($result.Restart) { $notes += 'Then open Rowanholt from the Start menu: it carries on with setup.' }
+    $notes += "A record of what happened is in $(Join-Path $State 'components.log')."
+    Add-Text $body ($notes -join "`n") ($y + 12) -Height (300 - $y) -Muted
+    Wait-Page | Out-Null
+    if ($result.Restart) { Close-Wizard }
     return $result
 }
 
 function Expand-Bundle([string]$Target) {
     New-Item -ItemType Directory -Force -Path $Target | Out-Null
-    Show-Console
-    Write-Host "Copying Rowanholt $(Get-AppVersion) into $Target..."
+    $script:Progress = Show-ProgressPage 'Setting up Rowanholt' "Copying Rowanholt $(Get-AppVersion) into $Target." $null
+    Set-Progress $script:Progress 'Unpacking the files'
     # Windows 10 and 11 ship bsdtar; .env, docker-compose.local.yml and cases aren't in the tarball, so they're kept
-    & (Join-Path $env:SystemRoot 'System32\tar.exe') -xzf $Bundled -C $Target --strip-components 1
-    if ($LASTEXITCODE -ne 0) { throw "Couldn't unpack Rowanholt into $Target (tar exited with status $LASTEXITCODE)" }
+    $tar = Start-Process (Join-Path $env:SystemRoot 'System32\tar.exe') -WindowStyle Hidden -PassThru `
+        -ArgumentList '-xzf', "`"$Bundled`"", '-C', "`"$Target`"", '--strip-components', '1'
+    $code = Wait-Exit $tar
+    if (-not (Test-Copy $Target)) { throw "Couldn't unpack Rowanholt into $Target (tar exited with status $code)" }
     Set-Content -Path (Join-Path $Target '.rowanholt-version') -Value (Get-AppVersion) -Encoding ASCII -NoNewline
 }
 
@@ -634,53 +762,78 @@ function Write-Evidence([string]$Dir, [string[]]$Folders) {
     [IO.File]::WriteAllText($file, ($lines -join "`n") + "`n")
 }
 
-function Select-Evidence {
-    $folders = @()
-    $question = ("Mount a folder of evidence (disk images, memory dumps, Gandalf archives) into Rowanholt?`n`n" +
-        "Rowanholt sees it inside its containers under /mnt/<drive>/..., so D:\Cases becomes /mnt/d/Cases. " +
-        "External drives aren't visible otherwise. Optional: run Set Up Rowanholt again to change it.")
-    while ((Show-Message $question 'YesNo' 'Question') -eq 'Yes') {
-        $folder = Select-Folder 'Evidence folder' ''
-        if ($folder) {
-            if ($folder -notmatch '^[A-Za-z]:\\') {
-                Show-Message 'Choose a folder on a lettered drive (C:\..., D:\...).' 'OK' 'Error' | Out-Null
-            } elseif ($folders -notcontains $folder) {
-                $folders += $folder
-            }
+function Read-Evidence([string]$Dir) {
+    # The folders setup mounted last time, to start the list from
+    $file = Join-Path $Dir 'docker-compose.local.yml'
+    if (-not (Test-Path $file)) { return @() }
+    return @(Get-Content $file | Where-Object { $_ -match '^\s+source: "(.+)"$' } | ForEach-Object { $Matches[1].Replace('/', '\') } | Select-Object -Unique)
+}
+
+function Select-Evidence([string[]]$Current) {
+    # @{ Action = 'next' or 'back'; Folders }
+    $body = Show-Page 'Evidence folders' 'Optional: folders of disk images, memory dumps and Gandalf archives.' -Back 'Back'
+    Add-Text $body ("Docker Desktop runs Rowanholt's containers inside WSL 2, a small Linux virtual machine, and " +
+        'they see only the folders listed here. Each appears inside under /mnt: D:\Cases is /mnt/d/Cases, the ' +
+        "path to give Elrond. The web app can only read them; Elrond's worker can also write there.") 14 -Height 64
+    $script:EvidenceList = New-Object System.Windows.Forms.ListBox
+    $script:EvidenceList.SetBounds(24, 86, 420, 140); $script:EvidenceList.IntegralHeight = $false
+    foreach ($folder in $Current) { [void]$script:EvidenceList.Items.Add($folder) }
+    $add = New-Object System.Windows.Forms.Button
+    $add.Text = 'Add...'; $add.SetBounds(452, 86, 84, 28)
+    $remove = New-Object System.Windows.Forms.Button
+    $remove.Text = 'Remove'; $remove.SetBounds(452, 120, 84, 28)
+    $body.Controls.AddRange(@($script:EvidenceList, $add, $remove))
+    $script:EvidenceProblem = New-ErrorLabel $body 286 40
+    $add.Add_Click({
+        $folder = Select-Folder 'Choose a folder of evidence' ''
+        if (-not $folder) { return }
+        if ($folder -notmatch '^[A-Za-z]:\\') {
+            $script:EvidenceProblem.Text = 'Choose a folder on a lettered drive (C:\..., D:\...): Docker Desktop shares drives, not network paths.'
+        } elseif (-not $script:EvidenceList.Items.Contains($folder)) {
+            [void]$script:EvidenceList.Items.Add($folder); $script:EvidenceProblem.Text = ''
         }
-        $question = "Evidence so far:`n  $($folders -join "`n  ")`n`nAdd another folder?"
-    }
-    return $folders
+    })
+    $remove.Add_Click({ if ($script:EvidenceList.SelectedIndex -ge 0) { $script:EvidenceList.Items.RemoveAt($script:EvidenceList.SelectedIndex) } })
+    Add-Text $body ('Anything not listed, other drives and external disks included, is invisible to Rowanholt. ' +
+        'Change the list any time with Set Up Rowanholt in the Start menu.') 236 -Height 40 -Muted
+    $action = Wait-Page
+    if ($action -ne 'next' -and $action -ne 'back') { exit 1 }
+    return @{ Action = $action; Folders = @($script:EvidenceList.Items | ForEach-Object { "$_" }) }
 }
 
 function Invoke-Setup {
-    # Returns the copy to run, or $null when it's a server now
-    $mode = Select-Mode
-    if ($null -eq $mode) { exit 1 }
-    if ($mode -eq 2) { Set-Server; return $null }
-    Remove-Item $ServerFile -ErrorAction SilentlyContinue
-    Assert-DockerInstalled
-    if ($mode -eq 1) {
-        $dir = Select-Folder 'Choose your Rowanholt folder' $env:USERPROFILE
-        if (-not $dir) { exit 1 }
-        if (-not (Test-Copy $dir)) {
-            Show-Message "$dir doesn't look like Rowanholt: there's no rowanholt launcher and docker-compose.yml in it." 'OK' 'Error' | Out-Null
-            exit 1
+    # Returns the copy to run, or $null when it's a server now. Back goes to the previous page
+    $saved = if (Test-Path $RootFile) { (Get-Content $RootFile -Raw).Trim() } else { '' }
+    $current = if (Get-SavedServer) { 2 } elseif ($saved -and $saved -ne $AppCopy) { 1 } else { 0 }
+    while ($true) {
+        $mode = Select-Mode $current
+        if ($null -eq $mode) { exit 1 }
+        $current = $mode
+        if ($mode -eq 2) {
+            if ((Set-Server) -eq 'back') { continue }
+            return $null
         }
-    } else {
-        $dir = $AppCopy
+        if ($mode -eq 1) {
+            $dir = Select-ExistingCopy $(if ($saved -ne $AppCopy) { $saved } else { '' })
+            if (-not $dir) { continue }
+        } else {
+            $dir = $AppCopy
+            if ((Test-Path $dir) -and -not (Test-Copy $dir)) {
+                Show-Problem "Rowanholt can't use its folder" "$dir already exists and isn't Rowanholt. Rename or move that folder, then open Rowanholt again."
+                exit 1
+            }
+        }
+        Assert-DockerInstalled
+        $evidence = Select-Evidence (Read-Evidence $dir)
+        if ($evidence.Action -eq 'back') { continue }
+        Remove-Item $ServerFile -ErrorAction SilentlyContinue
+        # Unpack into a new folder, or over a copy setup unpacked before (never a git clone)
+        $unpacked = (Test-Copy $dir) -and (Test-Path (Join-Path $dir '.rowanholt-version')) -and -not (Test-Path (Join-Path $dir '.git'))
+        if ($mode -eq 0 -and (-not (Test-Path $dir) -or $unpacked)) { Expand-Bundle $dir }
+        Write-Evidence $dir $evidence.Folders
+        Set-Content -Path $RootFile -Value $dir -Encoding UTF8
+        return $dir
     }
-    # Unpack into a new folder, or over a copy setup unpacked before (never a git clone)
-    $unpacked = (Test-Copy $dir) -and (Test-Path (Join-Path $dir '.rowanholt-version')) -and -not (Test-Path (Join-Path $dir '.git'))
-    if (-not (Test-Path $dir) -or $unpacked) {
-        Expand-Bundle $dir
-    } elseif (-not (Test-Copy $dir)) {
-        Show-Message "$dir already exists and isn't Rowanholt. Rename or move that folder, then open Rowanholt again." 'OK' 'Error' | Out-Null
-        exit 1
-    }
-    Write-Evidence $dir @(Select-Evidence)
-    Set-Content -Path $RootFile -Value $dir -Encoding UTF8
-    return $dir
 }
 
 function Resolve-Root([switch]$NoSetup) {
@@ -699,10 +852,12 @@ function Update-Copy {
     # A newer MSI than the copy setup unpacked: offer to bring the copy up to it
     $versionFile = Join-Path $Root '.rowanholt-version'
     if (-not $Packaged -or -not (Test-Path $versionFile) -or (Test-Path (Join-Path $Root '.git'))) { return }
-    if ((Get-Content $versionFile -Raw).Trim() -eq (Get-AppVersion)) { return }
-    $answer = Show-Message ("Update Rowanholt in $Root to $(Get-AppVersion)?`n`n" +
-        'Your .env, evidence folders and cases are kept. The images are rebuilt on this start, which takes a while.') 'YesNo' 'Question'
-    if ($answer -eq 'Yes') { Expand-Bundle $Root }
+    $old = (Get-Content $versionFile -Raw).Trim()
+    if ($old -eq (Get-AppVersion)) { return }
+    $body = Show-Page 'Update Rowanholt' "Rowanholt $(Get-AppVersion) is installed; the copy in $Root is $old." -Next 'Update' -Back 'Not now' -Cancel ''
+    Add-Text $body ("Updating replaces Rowanholt's files in that folder. Your .env, evidence folders and cases are " +
+        'kept. The images are rebuilt on this start, which takes a while.') 20 -Height 44
+    if ((Wait-Page) -eq 'next') { Expand-Bundle $Root }
 }
 
 # ── Running it ────────────────────────────────────────────────────────────────
@@ -734,7 +889,7 @@ function Wait-Docker {
     if (-not $desktop) {
         throw "Docker isn't running and Docker Desktop isn't installed in $(Split-Path $DockerUserExe) or $(Split-Path $DockerMachineExe). Start Docker and retry."
     }
-    Write-Host 'Starting Docker Desktop...'
+    Write-Step 'Starting Docker Desktop'
     # Its own CLI starts the engine without the dashboard; older versions don't have it
     $ErrorActionPreference = 'Continue'
     docker desktop start --detach *> $null
@@ -743,7 +898,7 @@ function Wait-Docker {
     for ($i = 0; $i -lt 120; $i++) {
         Start-Sleep -Seconds 2
         if ($script:Journey) { Show-Journey $script:Journey }
-        if (Test-Docker) { Write-Host 'Docker started.'; return }
+        if (Test-Docker) { Write-Step 'Docker started'; return }
     }
     throw 'Docker did not start in time. Start it manually and retry.'
 }
@@ -777,12 +932,12 @@ function Initialize-AppCopy {
         [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
         $key = ($bytes | ForEach-Object { $_.ToString('x2') }) -join ''
         (Get-Content $example) -replace '^SECRET_KEY=.*', "SECRET_KEY=$key" | Set-Content -Path $envFile -Encoding ASCII
-        Write-Host 'Created .env with a new SECRET_KEY.'
+        Write-Step 'Created .env with a new SECRET_KEY'
     }
     $built = Join-Path $Root '.rowanholt-built'
     $version = (Get-Content $versionFile -Raw).Trim()
     if ((Test-Path $built) -and (Get-Content $built -Raw).Trim() -eq $version) { return @() }
-    Write-Host 'New Rowanholt version: rebuilding the images (this takes a while)...'
+    Write-Step 'A new Rowanholt version: rebuilding the images, which takes a while'
     return @('--build')
 }
 
@@ -809,7 +964,11 @@ function Get-Median([double[]]$Values) {
 }
 
 function New-Journey([string]$Kind) {
-    Show-Console
+    # The road is drawn in the window (Show-Journey); a second call (warm found to be cold) keeps the page
+    if (-not $script:Progress -or $script:ProgressKind -ne 'journey') {
+        $script:Progress = Show-ProgressPage 'Starting Rowanholt' 'Gandalf sets out from the Shire.' $null
+        $script:ProgressKind = 'journey'
+    }
     $base = if ($Kind -like 'cold*') { $Defaults.cold } else { $Defaults.warm }
     $history = @()
     if (Test-Path $HistoryFile) {
@@ -853,8 +1012,14 @@ function Show-Journey($J) {
     $where = if ($place -eq 'the Shire') { 'Gandalf sets out from the Shire' } else { "Gandalf has passed $place" }
     $eta = if ($remaining -lt 45) { 'less than a minute' } elseif ($remaining -lt 90) { 'about a minute' } else { "about $([math]::Round($remaining / 60)) minutes" }
     $guess = if ($J.Learning) { ' (a first guess: no timings on this PC yet)' } else { '' }
-    Write-Progress -Activity 'The road to Rowanholt' -Status "$where - $eta to Rowanholt$guess" `
-        -CurrentOperation ($Messages[$J.Phase] + $(if ($J.Detail) { " ($($J.Detail))" } else { '' })) -PercentComplete ([int]($fraction * 100))
+    $script:Wizard.Sub.Text = "$where; $eta to Rowanholt$guess"
+    $script:Progress.Bar.Style = 'Continuous'; $script:Progress.Bar.Value = [int](1000 * $fraction)
+    if ($J.Phase -ne $script:ShownPhase -or $J.Detail) {
+        $script:ShownPhase = $J.Phase
+        $script:Progress.Detail.Text = $Messages[$J.Phase] + $(if ($J.Detail) { " ($($J.Detail))" } else { '' })
+    }
+    Step-Gui
+    Assert-NotCancelled
 }
 
 function Complete-Journey($J) {
@@ -866,7 +1031,6 @@ function Complete-Journey($J) {
                           total = [math]::Round(((Get-Date) - $J.Started).TotalSeconds, 1) }
     New-Item -ItemType Directory -Force -Path (Split-Path $HistoryFile) | Out-Null
     Add-Content -Path $HistoryFile -Value ($record | ConvertTo-Json -Compress)
-    Write-Progress -Activity 'The road to Rowanholt' -Completed
 }
 
 function Get-MissingImages {
@@ -901,11 +1065,11 @@ function Invoke-ComposeUp($J, [string[]]$Extra, [int]$Builds) {
                 $J.BuildFraction = [math]::Min(1.0, $done / $of)
                 $J.Detail = "$($steps.Count) of $of images under way"
             }
-            if ($line.StartsWith('#')) { Show-Journey $J; return }  # BuildKit chatter stays out of the console
+            if ($line.StartsWith('#')) { Show-Journey $J; return }  # BuildKit's chatter isn't shown
             if ($J.Phase -eq 'images' -and $line -match '\b(Creating|Created|Starting|Started|Recreate|Running)\b') {
                 Enter-Phase $J 'containers'
             }
-            Write-Host $line
+            Write-Step $line.Trim()
             Show-Journey $J
         }
         $code = $LASTEXITCODE
@@ -1039,7 +1203,7 @@ function Open-Window {
 }
 
 try {
-    # -Stop and -Update only write to the console; everything else starts with setup's dialogs or nothing
+    # -Stop and -Update only write to the console; everything else happens in the Rowanholt window
     if (-not ($Stop -or $Update)) { Hide-Console }
     if ($Update) {
         if (-not $Packaged) { Write-Host "This is a checkout's launcher: update it with git pull."; exit 0 }
@@ -1065,8 +1229,15 @@ try {
             exit 0
         }
         Invoke-Setup | Out-Null
-        # A server opens now; a copy here starts from the Rowanholt shortcut
-        if (-not (Get-SavedServer)) { exit 0 }
+        # A server opens now; a copy here takes the settings when it next starts
+        if (-not (Get-SavedServer)) {
+            $body = Show-Page 'Rowanholt is set up' 'Your choices are saved.' -Next 'Close' -Cancel ''
+            Add-Text $body ("Rowanholt uses them the next time it starts. If it's running now, stop it with Stop " +
+                'Rowanholt in the Start menu, then open Rowanholt.') 20 -Height 44
+            Wait-Page | Out-Null
+            Close-Wizard
+            exit 0
+        }
     }
 
     $Server = Get-SavedServer
@@ -1077,6 +1248,7 @@ try {
             exit 0
         }
         $Url = $Server
+        Close-Wizard
         Open-Window
         Invoke-UpdateCheck
         exit 0
@@ -1101,7 +1273,7 @@ try {
     # Setup may just have chosen a server
     $Server = Get-SavedServer
     if (-not $Root -or $Server) {
-        if ($Server) { $Url = $Server; Open-Window; Invoke-UpdateCheck }
+        if ($Server) { $Url = $Server; Close-Wizard; Open-Window; Invoke-UpdateCheck }
         exit 0
     }
     Update-Copy
@@ -1119,8 +1291,8 @@ try {
             $fresh.PhaseStarted = $script:Journey.PhaseStarted
             $script:Journey = $fresh
         }
-        if ($missing.Count) { Write-Host "$($missing.Count) image(s) to fetch or build: the first start takes a while." }
-        Write-Host 'Starting Rowanholt...'
+        if ($missing.Count) { Write-Step "$($missing.Count) images to fetch or build: the first start takes a while" }
+        else { Write-Step 'Starting the containers' }
         Enter-Phase $script:Journey 'images'
         Invoke-ComposeUp $script:Journey $extra $missing.Count
         if ($script:Journey.Phase -eq 'images') { Enter-Phase $script:Journey 'containers' }
@@ -1133,17 +1305,22 @@ try {
             if ((Get-Date) -gt $deadline) {
                 throw "The stack started but nothing answered on $Url. Try 'docker compose ps' in $Root."
             }
-            Show-Journey $script:Journey
-            Start-Sleep -Seconds 2
+            for ($i = 0; $i -lt 10; $i++) { Show-Journey $script:Journey; Start-Sleep -Milliseconds 200 }
         }
         Complete-Journey $script:Journey
     }
+    Close-Wizard
     Open-Window
     Invoke-UpdateCheck
 } catch {
-    Show-Console
-    Write-Host ''
-    Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
-    Read-Host 'Press Enter to close'
+    $message = $_.Exception.Message
+    if ($message -eq 'Cancelled') { Close-Wizard; exit 1 }
+    if ($Stop -or $Update) {
+        Write-Host ''
+        Write-Host "Error: $message" -ForegroundColor Red
+        Read-Host 'Press Enter to close'
+    } else {
+        Show-Problem "Rowanholt couldn't start" $message
+    }
     exit 1
 }
