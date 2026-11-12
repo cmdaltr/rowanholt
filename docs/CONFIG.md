@@ -46,8 +46,9 @@ REDIS_HOST=redis
 REDIS_PORT=6379
 
 # Security
-SECRET_KEY=your-secret-key-change-in-production
+SECRET_KEY=your-secret-key-change-in-production  # also keys MFA's stored secrets: changing it means MFA resets
 ENABLE_HTTPS_ONLY=false  # Set true in production
+ROWANHOLT_REQUIRE_MFA=false  # team server: password accounts must set up MFA before anything else
 
 # File Paths
 UPLOAD_DIR=/tmp/elrond/uploads
@@ -227,7 +228,7 @@ redis:
 
 #### Important (Should Do)
 
-- [ ] **Require MFA at the identity provider**: Rowanholt has no MFA of its own; sign people in through single sign-on ([SERVER.md](SERVER.md#single-sign-on)) and set `ROWANHOLT_LOCAL_LOGIN=false`
+- [ ] **Require MFA**: `ROWANHOLT_REQUIRE_MFA=true` holds a team server's password accounts to Rowanholt's own MFA ([SERVER.md](SERVER.md#multi-factor-authentication)); single sign-on accounts get it from the identity provider, so require it there ([SERVER.md](SERVER.md#single-sign-on))
 - [ ] **Configure allowed_paths**: Limit file system access
 - [ ] **Set up backups**: Regular database backups
 - [ ] **Configure logging**: Centralized log collection

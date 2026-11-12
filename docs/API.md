@@ -37,7 +37,7 @@ What a caller may do depends on the mode the backend runs in. Every request goes
 
 **Local mode** (the default: a stack on an analyst's own machine). Nothing needs a sign-in. A request without a token acts as the local analyst (`local`, role `admin`) and sees every job and case. The stack publishes the API on `127.0.0.1:5688` only, as it does every other port (Postgres, Redis, the web app, Splunk, Elastic, Kibana, the Navigator), so the open API is the machine's own. Signing in still works (login, guest and register are open), and a signed-in caller is that account: a non-admin one gets `403` from the admin-only routes (licence, brands, webhooks, users, symbol tables, sample data), which an anonymous request passes. A guest's token names no account, so a guest acts as the local analyst. Two areas want a signed-in admin even locally, since they drive the host: the lab (`/api/lab`, the Mordor lab and the Mordor telemetry Update) and Andúril (`/api/anduril`). Both are off (`503`) while the backend uses the default `SECRET_KEY`.
 
-**Server mode** (`ROWANHOLT_SERVER_MODE`, set by `deploy/server/docker-compose.server.yml`; see [SERVER.md](SERVER.md)). Every `/api` route needs a signed-in user (`401 Sign in required`) except `/api/health`, `/api/busy`, `/api/auth/config`, `/api/auth/login`, `/api/auth/logout`, `/api/auth/oidc/login`, `/api/auth/oidc/callback` and `/api/auth/verify`. There are no guests and no open sign-up. On top of that:
+**Server mode** (`ROWANHOLT_SERVER_MODE`, set by `deploy/server/docker-compose.server.yml`; see [SERVER.md](SERVER.md)). Every `/api` route needs a signed-in user (`401 Sign in required`) except `/api/health`, `/api/busy`, `/api/auth/config`, `/api/auth/login`, `/api/auth/login/mfa` (the sign-in's second step, whose challenge is its credential), `/api/auth/logout`, `/api/auth/oidc/login`, `/api/auth/oidc/callback` and `/api/auth/verify`. There are no guests and no open sign-up. With `ROWANHOLT_REQUIRE_MFA=true`, a password user's sign-in without MFA reaches only `/api/auth/me`, `/api/auth/session` and `/api/auth/mfa`, `/mfa/setup` and `/mfa/enable` until MFA is on: anything else, `/api/auth/verify` included, is `403` (with `"mfa_enrolment_required": true`; [Multi-Factor Authentication](#multi-factor-authentication)). On top of that:
 
 | Who | What |
 |---|---|
@@ -61,7 +61,7 @@ The lab and Andúril check a sign-in's JWT against the user store themselves, so
 
 The routes under `/api/auth` (`src/web/backend/auth/routes_simple.py`). Accounts are kept in a JSON file (`USERS_FILE`, default `/app/data/users.json`; on a team server `src/web/backend/data/users.json` through the backend's bind mount), not the database. The first sign-in on an empty store creates `admin`: locally with the built-in password, on a server with `ROWANHOLT_ADMIN_PASSWORD` (`503` without it).
 
-There is no MFA, no password reset by email and no `/auth/admin/*` route in this build: those endpoints, which this reference used to list, are in `auth/routes.py`, which the backend doesn't mount. Admins manage accounts through [Users](#users) or `rowanholt server users`.
+Password accounts on a team server can add TOTP multi-factor authentication ([Multi-Factor Authentication](#multi-factor-authentication), `auth/mfa.py`). There is no password reset by email and no `/auth/admin/*` route in this build: those endpoints, which this reference used to list, are in `auth/routes.py`, which the backend doesn't mount (its `/auth/mfa/*` routes too: the ones below replace them). Admins manage accounts through [Users](#users) or `rowanholt server users`.
 
 #### Cross-site requests: the `X-Rowanholt` header
 
@@ -133,7 +133,7 @@ A state-changing request (anything but GET, HEAD and OPTIONS) under `/api` that 
 
 **Endpoint:** `POST /auth/login`
 
-**Description:** Sign in with a password: returns a JWT and sets it as the session cookie.
+**Description:** Sign in with a password: returns a JWT and sets it as the session cookie. For an account with MFA on, it returns a challenge for the [second step](#second-factor) instead, and no session.
 
 **Request Body:** OAuth2 form data (`application/x-www-form-urlencoded`), not JSON. `username` accepts the username or the email address.
 
@@ -155,18 +155,50 @@ curl -X POST http://127.0.0.1:5688/api/auth/login \
     "role": "user",
     "is_active": true,
     "auth": "password",
+    "mfa_enabled": false,
     "last_login": "2026-11-12T10:00:00"
   }
 }
 ```
 
-`auth` is `password` or `sso`. There is no MFA step.
+`auth` is `password` or `sso`. With `ROWANHOLT_REQUIRE_MFA=true` and no MFA yet, the response also has `"mfa_enrolment_required": true`: the session reaches only MFA's own routes until it's set up.
+
+**Response with MFA on:** `200 OK`, no token and no cookie
+```json
+{
+  "mfa_required": true,
+  "challenge": "mfa_eyJ1Ijoi....Xq3v...",
+  "expires_in": 300,
+  "methods": ["totp", "backup_code"]
+}
+```
+
+A right password for an account with MFA doesn't clear its failed sign-ins: only a right second factor does.
 
 **Errors:**
 - `401 Unauthorized`: wrong username or password
 - `403 Forbidden`: account disabled, or single sign-on is the only way in and the account isn't an admin's (admins keep a password, to break glass)
 - `429 Too Many Requests`: locked out. Five failures from one address lock that username from that address for 15 minutes; fifty across all addresses lock it everywhere (`max_login_attempts`, `lockout_duration_minutes`; [SERVER.md](SERVER.md#how-sign-in-lockouts-work))
 - `503 Service Unavailable`: no accounts yet and no `ROWANHOLT_ADMIN_PASSWORD`
+
+---
+
+### Second Factor
+
+**Endpoint:** `POST /auth/login/mfa`
+
+**Description:** The second step of a sign-in with MFA: the challenge from [Login](#login) and a code from the authenticator app, or a backup code (`XXXXX-XXXXX`, case and dash optional). Answers exactly as Login does without MFA: the JWT, the session cookie and the user. No sign-in needed (the challenge is the credential).
+
+```bash
+curl -X POST http://127.0.0.1:5688/api/auth/login/mfa \
+  -H "Content-Type: application/json" -d '{"challenge": "mfa_…", "code": "123456"}'
+```
+
+The challenge lasts five minutes and signs in once; it's not a JWT or an API token, and no other route takes it. A wrong code leaves it usable, so a typo doesn't mean the password again. A TOTP code is good for one step either side of now, and once only: a step already used (at sign-in or on the Account page) is refused.
+
+**Errors:**
+- `401 Unauthorized`: `Incorrect code` (counted towards the lockout, and audited as `mfa_failed`); or the challenge is forged, expired, already used, or stale because the password has changed since (start again at Login)
+- `429 Too Many Requests`: locked out, as Login; wrong codes and wrong passwords share the count
 
 ---
 
@@ -268,6 +300,22 @@ curl -X POST http://127.0.0.1:5688/api/auth/login \
 
 ---
 
+### Multi-Factor Authentication
+
+TOTP (RFC 6238: SHA-1, 30-second steps, 6 digits) and ten single-use backup codes, for a team server's password accounts. The caller manages their own, from a sign-in: an API token gets `403` on all but the `GET`, a single sign-on account `400` (its MFA is the identity provider's), and a local stack `400` (MFA applies to a team server's sign-in). A wrong code on any of these counts towards the sign-in lockout (`429` once locked) and is audited as `mfa_failed`.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/auth/mfa` | The caller's MFA. `{"available": true, "required", "enabled", "setup_started", "backup_codes_left", "backup_codes_total": 10, "enabled_at"}`; or `{"available": false, "reason": "local"\|"sso", "message"}`. Never the secret |
+| `POST` | `/auth/mfa/setup` | `{"code": ""}`: start enrolment. Returns `{"secret", "otpauth_uri", "qr_svg"}` (`qr_svg` a `data:image/svg+xml` URI for an `<img>`). Nothing changes until `/enable`. With MFA already on (a new authenticator), `code` must be a current code or a backup code (`400` otherwise) |
+| `POST` | `/auth/mfa/enable` | `{"code"}`: a code from the secret `/setup` gave. MFA goes on, or the new secret replaces the old. Returns the status plus `backup_codes`: ten, shown this once, the first time (`null` on a re-enrolment, which keeps the codes there are). `400` for a wrong code or no setup started |
+| `POST` | `/auth/mfa/disable` | `{"password", "code"}` (a TOTP or backup code): MFA off, its secret and codes removed. `400` for a wrong password or code, MFA not on, or `ROWANHOLT_REQUIRE_MFA=true` |
+| `POST` | `/auth/mfa/backup-codes` | `{"code"}`, a current TOTP code (not a backup code): ten new backup codes in place of the rest, returned this once with the status |
+
+Audited in `audit_logs` (resource type `user`, the account's id): `mfa_enabled`, `mfa_reenrolled`, `mfa_disabled`, `mfa_backup_code_used` (with how many are left), `mfa_backup_codes_regenerated`, `mfa_failed` (with the stage) and `mfa_admin_reset` ([Users](#users)).
+
+---
+
 ### Single Sign-On
 
 **Endpoints:** `GET /auth/oidc/login`, `GET /auth/oidc/callback`
@@ -302,8 +350,9 @@ A caller that sends `X-Rowanholt-Agent: smith-mcp` (or `aule-mcp`, `eru-mcp`, or
 | `GET` | `/api/auth/users` | Admins | Every account, with the fields in [Login](#login) |
 | `POST` | `/api/auth/users` | Admins | `{"username", "email", "password", "full_name", "role"}`, validated as [Register](#register-new-user). `400` when the username or email is taken, `402` when the licence has no free place |
 | `PATCH` | `/api/auth/users/{user_id}` | Admins | Any of `role` (`admin` or `user`), `is_active`, `password`, `full_name`. The last active admin can't be demoted or disabled (`400`); re-enabling an account needs a free place (`402`); `404` for no such user |
+| `DELETE` | `/api/auth/users/{user_id}/mfa` | Admins | Turn someone's MFA off (a lost authenticator and backup codes): its secret and codes are removed and they sign in with their password, then set it up again. Returns the user; `400` if MFA isn't on, `404` for no such user. Audited as `mfa_admin_reset` |
 
-The same can be done from the host with `rowanholt server users` ([SERVER.md](SERVER.md#users)), which works when nobody can sign in.
+The same can be done from the host with `rowanholt server users` ([SERVER.md](SERVER.md#users)), which works when nobody can sign in; `rowanholt server users mfa-reset <username>` is the MFA reset.
 
 ---
 

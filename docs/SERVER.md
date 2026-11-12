@@ -159,9 +159,22 @@ rowanholt server users add bob bob@example.org --admin
 rowanholt server users role alice admin
 rowanholt server users disable bob
 rowanholt server users password admin                          # a locked-out admin
+rowanholt server users mfa-reset alice                         # lost her phone and backup codes
 ```
 
 These work inside the backend container, so they work when nobody can sign in. Admins can do the same through the API (`/api/auth/users`). Passwords on a server need at least 12 characters, and repeated failures lock the username (`max_login_attempts`, `lockout_duration_minutes`; see below).
+
+### Multi-factor authentication
+
+Password accounts can turn on MFA under Account → Security: a code from an authenticator app (TOTP) after the password, with ten single-use backup codes ([USAGE.md](USAGE.md#multi-factor-authentication), [SECURITY.md](SECURITY.md#multi-factor-authentication)). To require it, set this in `.env` and `rowanholt start` again:
+
+```
+ROWANHOLT_REQUIRE_MFA=true
+```
+
+A password account without MFA is then signed in only to set it up: every other route, the proxy's check in front of Splunk, Kibana and the Navigator included, answers 403 until it has, and turning MFA off isn't offered. Single sign-on accounts aren't affected (their MFA is the identity provider's), nor are API tokens. Someone who has lost their authenticator and backup codes gets `rowanholt server users mfa-reset <username>` (or `DELETE /api/auth/users/{id}/mfa` from an admin) and sets it up again; every reset is in the audit log. `rowanholt server users list` shows who has MFA on.
+
+The TOTP secrets are encrypted with a key derived from `SECRET_KEY` and kept in `users.json`: a backup holds both, and restoring one with another `SECRET_KEY` leaves those accounts needing a reset.
 
 ### Single sign-on
 
@@ -188,7 +201,7 @@ ROWANHOLT_LOCAL_LOGIN=false          # optional: SSO only; admins keep a passwor
 
 The ID token is verified against the issuer's published keys, its audience and the sign-in's nonce. Users are matched on issuer and subject, so a renamed account stays the same Rowanholt user; the first sign-in creates them. With `OIDC_ADMIN_GROUP` set, the role follows the group at every sign-in. Entra ID puts group object IDs in the `groups` claim (enable it under Token configuration); Okta and Keycloak need a groups claim mapper.
 
-Rowanholt has no MFA of its own, so require it at the identity provider (Entra ID Conditional Access, Okta's sign-on policies, Keycloak's OTP): with `ROWANHOLT_LOCAL_LOGIN=false`, only admins' break-glass passwords sign in without it.
+Single sign-on accounts get MFA from the identity provider, so require it there (Entra ID Conditional Access, Okta's sign-on policies, Keycloak's OTP); Rowanholt's own MFA is for password accounts. With `ROWANHOLT_LOCAL_LOGIN=false`, only admins keep a password, as break-glass: give them MFA (or set `ROWANHOLT_REQUIRE_MFA=true`) so that way in has a second factor too.
 
 ## Licence
 
@@ -242,7 +255,7 @@ docker restart rowanholt-backend
 
 ## How sign-in lockouts work
 
-Failed password sign-ins are counted in Redis, so restarts don't reset them. Five failures from one address lock that username for 15 minutes from that address only: someone guessing at a colleague's account locks themselves out, not the colleague. Fifty failures across all addresses lock the username everywhere, to catch guessing spread over many machines. If Redis is down, the counts are held in the backend process until it's back.
+Failed password sign-ins are counted in Redis, so restarts don't reset them. Five failures from one address lock that username for 15 minutes from that address only: someone guessing at a colleague's account locks themselves out, not the colleague. Fifty failures across all addresses lock the username everywhere, to catch guessing spread over many machines. If Redis is down, the counts are held in the backend process until it's back. A wrong MFA code (at sign-in, or on the Account page) counts as a failure, and for an account with MFA a right password doesn't clear the count: only a right code does.
 
 ## The schema
 

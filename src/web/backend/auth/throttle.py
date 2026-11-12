@@ -95,6 +95,22 @@ class SignInThrottle:
     def _clear(self, key: str) -> None:
         self._call(lambda client: client.delete(PREFIX + key), lambda: self._memory.pop(key, None))
 
+    def first_use(self, key: str, seconds: int) -> bool:
+        """True the first time `key` is claimed in `seconds`, False after: a TOTP step or a sign-in
+        challenge used once (auth/mfa.py). SET NX in Redis, so two processes can't both win."""
+        def redis_op(client):
+            return bool(client.set(f"{PREFIX}once:{key}", 1, nx=True, ex=seconds))
+
+        def memory_op():
+            now = time.time()
+            for stale in [k for k, (_, expires) in self._memory.items() if k.startswith("once:") and expires <= now]:
+                del self._memory[stale]
+            if f"once:{key}" in self._memory:
+                return False
+            self._memory[f"once:{key}"] = (1, now + seconds)
+            return True
+        return self._call(redis_op, memory_op)
+
     # ── policy ───────────────────────────────────────────────────────────────
 
     @staticmethod

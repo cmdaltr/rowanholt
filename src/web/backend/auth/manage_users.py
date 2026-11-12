@@ -7,6 +7,7 @@ Run inside the backend container (`rowanholt server users ...` does this):
     python -m auth.manage_users password <username>                (prompted)
     python -m auth.manage_users role <username> admin|user
     python -m auth.manage_users disable|enable <username>
+    python -m auth.manage_users mfa-reset <username>               (lost authenticator; audited)
 """
 
 import argparse
@@ -17,11 +18,13 @@ try:
     from ..config import settings
     from .security import hash_password
     from .users import find_user, init_default_admin, load_users, new_user, save_users
+    from . import mfa
     from .. import licence
 except ImportError:
     from config import settings
     from auth.security import hash_password
     from auth.users import find_user, init_default_admin, load_users, new_user, save_users
+    from auth import mfa
     import licence
 
 MIN_PASSWORD = 12
@@ -50,6 +53,27 @@ def _user(users: dict, name: str) -> dict:
     return user
 
 
+def _audit_storage():
+    """The audit log is the jobs database; from the CLI it's reached as main.py reaches it."""
+    try:
+        from ..storage import JobStorage
+    except ImportError:
+        from storage import JobStorage
+    try:
+        return JobStorage()
+    except Exception as exc:  # noqa: BLE001 - say so, but a down database mustn't block the reset
+        print(f"Warning: the audit log is unavailable ({exc}); this reset won't be in it.", file=sys.stderr)
+        return None
+
+
+def _mfa_reset(users: dict, user: dict) -> None:
+    if not mfa.is_enabled(user) and not user.get("mfa_pending_secret"):
+        raise SystemExit(f"MFA isn't on for {user['username']}")
+    mfa.disable(user)
+    save_users(users)
+    mfa.audit("mfa_admin_reset", {"username": "server-cli"}, user, storage=_audit_storage(), via="cli")
+
+
 def main(argv: list) -> int:
     """Entry point; returns the exit status."""
     parser = argparse.ArgumentParser(prog="rowanholt server users", description="Administer Rowanholt's users")
@@ -61,6 +85,7 @@ def main(argv: list) -> int:
     add.add_argument("--admin", action="store_true")
     for name in ("password", "disable", "enable"):
         sub.add_parser(name).add_argument("username")
+    sub.add_parser("mfa-reset", help="Turn a user's MFA off (a lost authenticator)").add_argument("username")
     role = sub.add_parser("role")
     role.add_argument("username")
     role.add_argument("role", choices=["admin", "user"])
@@ -68,10 +93,15 @@ def main(argv: list) -> int:
 
     users = init_default_admin() if args.command != "list" else load_users()
     if args.command == "list":
-        print(f"{'USERNAME':<28} {'ROLE':<6} {'SIGN-IN':<9} {'ACTIVE':<7} LAST SIGN-IN")
+        print(f"{'USERNAME':<28} {'ROLE':<6} {'SIGN-IN':<9} {'ACTIVE':<7} {'MFA':<4} LAST SIGN-IN")
         for u in sorted(users.values(), key=lambda u: u["username"]):
             print(f"{u['username']:<28} {u['role']:<6} {'sso' if u.get('oidc_subject') else 'password':<9} "
-                  f"{'yes' if u.get('is_active', True) else 'no':<7} {u.get('last_login') or '-'}")
+                  f"{'yes' if u.get('is_active', True) else 'no':<7} {'on' if mfa.is_enabled(u) else '-':<4} "
+                  f"{u.get('last_login') or '-'}")
+        return 0
+    if args.command == "mfa-reset":
+        _mfa_reset(users, _user(users, args.username))
+        print(f"Done: MFA is off for {args.username}; they set it up again from Account")
         return 0
     if args.command == "add":
         if find_user(users, args.username) or find_user(users, args.email):

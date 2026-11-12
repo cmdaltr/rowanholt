@@ -104,6 +104,10 @@ class Settings(BaseSettings):
 
     # Password sign-in alongside single sign-on; turn off to make the IdP the only way in
     rowanholt_local_login: bool = True
+    # A server's password accounts must use MFA (auth/mfa.py): one without it is signed in only to
+    # set it up, and every other route answers 403 until they have. Single sign-on accounts (their
+    # IdP's MFA) and API tokens aren't affected. Off by default
+    rowanholt_require_mfa: bool = False
 
     # Single sign-on (OpenID Connect): on when issuer, client ID and secret are all set
     oidc_issuer: str = ""

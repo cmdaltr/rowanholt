@@ -142,7 +142,17 @@ curl -X POST http://localhost:5688/api/auth/register \
 
 ### Multi-Factor Authentication
 
-Rowanholt has no built-in MFA: no authenticator codes, no backup codes and no second step at sign-in. It signs people in with a password, with single sign-on (OIDC), or with an API token, and nothing else. On a team server, get MFA from your identity provider: set up [single sign-on](SERVER.md#single-sign-on), require MFA at the provider, and set `ROWANHOLT_LOCAL_LOGIN=false` so that only admins keep a password, for break-glass use. The Account page's MFA panel doesn't work: there's nothing behind it. See [SECURITY.md](SECURITY.md#signing-in).
+On a team server, a password account can add a code from an authenticator app (Microsoft Authenticator, Google Authenticator, 1Password, Authy: any TOTP app) to its sign-in. Under **Account → Security**:
+
+1. **Enable MFA** shows a QR code, and the key to type in if you can't scan it
+2. Scan it with the app and enter the code it shows: MFA goes on only once that code is right
+3. Save the ten **backup codes** shown next: they aren't shown again. Each signs in once in place of a code, if you lose your phone
+
+From then on, signing in asks for the app's code (or a backup code) after the password. The Backup Codes panel shows how many are left, and **Generate** makes ten new ones in place of the rest, for a code from the app. **New authenticator** moves MFA to another phone (a current code first, then the new QR code), and **Disable MFA** needs your password and a code.
+
+If you've lost the phone and the backup codes, an admin turns MFA off for you (`rowanholt server users mfa-reset <username>`, or `DELETE /api/auth/users/{id}/mfa`) and you set it up again. A server with `ROWANHOLT_REQUIRE_MFA=true` lets a password account without MFA in only to set it up, and doesn't offer turning it off.
+
+Accounts that sign in with single sign-on get MFA from the identity provider (require it there: Entra ID Conditional Access, Okta's sign-on policies, Keycloak's OTP), and the panel says so; with `ROWANHOLT_LOCAL_LOGIN=false` only admins keep a password, for break-glass use. API tokens need no second factor. On your own machine there's no sign-in for MFA to protect: the panels say it applies to a team server's sign-in. See [SECURITY.md](SECURITY.md#multi-factor-authentication).
 
 ### Reset User Password (Admin)
 
@@ -355,7 +365,7 @@ curl http://localhost:5688/api/jobs \
 
 ### Sign-in and MFA
 
-`/api/auth/login` takes a password and answers with a token; there's no MFA step. Users who sign in with single sign-on get their MFA from the identity provider, and scripts use an API token (Account → API tokens) instead of a password.
+`/api/auth/login` takes a password and answers with a token, unless the account has MFA: then it answers `{"mfa_required": true, "challenge": "mfa_…"}`, and `POST /api/auth/login/mfa` with that challenge and a code gives the token ([API.md](API.md#authentication)). Scripts should use an API token (Account → API tokens) instead: it needs no second factor. Users who sign in with single sign-on get their MFA from the identity provider.
 
 ---
 
@@ -381,7 +391,7 @@ curl http://localhost:5688/api/jobs \
 ### Security
 
 1. **Change default password** immediately
-2. **Require MFA at your identity provider** and sign in through SSO: Rowanholt has none of its own
+2. **Use MFA**: set it up under Account (and `ROWANHOLT_REQUIRE_MFA=true` on a team server), or require it at your identity provider for single sign-on
 3. **Use HTTPS** in production (configure reverse proxy)
 4. **Limit allowed_paths** to necessary directories only
 5. **Regular backups** of database and configuration

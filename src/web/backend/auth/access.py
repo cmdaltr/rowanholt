@@ -53,6 +53,7 @@ PUBLIC_PATHS = {
     "/api/busy",  # the homelab asks before a rebuild, with no account (busy.py)
     "/api/auth/config",
     "/api/auth/login",
+    "/api/auth/login/mfa",  # the second step: the challenge from the first is its credential
     "/api/auth/logout",
     "/api/auth/oidc/login",
     "/api/auth/oidc/callback",
@@ -72,6 +73,11 @@ JOB_PATH = re.compile(r"^/api/jobs/([0-9a-fA-F-]{36})(?:/|$)")
 CSRF_HEADER = "X-Rowanholt"
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 CASE_PATH = re.compile(r"^/api/ai/cases/([^/]+)/")
+# What a password user may reach while ROWANHOLT_REQUIRE_MFA waits for them to set MFA up
+ENROLMENT_PATHS = {"/api/auth/me", "/api/auth/mfa", "/api/auth/mfa/setup", "/api/auth/mfa/enable",
+                   "/api/auth/session"}
+ENROLMENT_REFUSAL = ("This server requires multi-factor authentication: set it up on your Account page "
+                     "(Security) before using Rowanholt")
 
 _storage = None
 
@@ -136,6 +142,13 @@ def is_admin(user: dict) -> bool:
     return user.get("role") == "admin"
 
 
+def enrolment_pending(user: Optional[dict]) -> bool:
+    """Whether ROWANHOLT_REQUIRE_MFA holds this caller to setting MFA up first: a password user's
+    sign-in on a server, without it. API tokens are the non-interactive way in and aren't held."""
+    return bool(server_mode() and settings.rowanholt_require_mfa and user and not user.get("token")
+                and user.get("auth") == "password" and not user.get("mfa_enabled"))
+
+
 def _bearer_user(request: HTTPConnection) -> Optional[dict]:
     header = request.headers.get("authorization", "")
     return user_from_token(header[7:].strip()) if header.lower().startswith("bearer ") else None
@@ -170,6 +183,8 @@ async def middleware(request: Request, call_next):
     if server_mode() and path.startswith("/api") and path not in PUBLIC_PATHS and request.method != "OPTIONS":
         if not user:
             return JSONResponse({"detail": "Sign in required"}, status_code=401, headers={"WWW-Authenticate": "Bearer"})
+        if enrolment_pending(user) and path not in ENROLMENT_PATHS:
+            return JSONResponse({"detail": ENROLMENT_REFUSAL, "mfa_enrolment_required": True}, status_code=403)
         admin_only = path.startswith(ADMIN_PREFIXES) or (
             path.startswith(("/api/mordor", "/api/threat-intel")) and request.method != "GET"
             and path != LOOKUP_PATH)
@@ -200,7 +215,7 @@ def websocket_user(websocket: HTTPConnection) -> Optional[dict]:
         return None
     if not server_mode():
         return user or LOCAL_USER
-    if not user:
+    if not user or enrolment_pending(user):
         return None
     if path.startswith(ADMIN_PREFIXES) and not is_admin(user):
         return None  # as the middleware's admin areas (the lab's consoles are a websocket)

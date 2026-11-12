@@ -23,7 +23,10 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // A wrong password or code at sign-in is a 401 too: the sign-in page shows it, rather than reloading
+    // itself and losing the second step's challenge
+    const signingIn = (error.config?.url || '').startsWith('/api/auth/login');
+    if (error.response?.status === 401 && !signingIn) {
       // Clear auth data and redirect to login
       localStorage.removeItem('access_token');
       localStorage.removeItem('user');
@@ -170,6 +173,22 @@ export const login = async (username, password) => {
 
   return response.data;
 };
+
+// The sign-in's second step, after login() answered mfa_required: the challenge it gave and a code
+// from the authenticator app (or a backup code). Signs in as login() does without MFA
+export const completeMfaSignIn = async (challenge, code) => {
+  const response = await api.post('/api/auth/login/mfa', { challenge, code });
+  localStorage.setItem('access_token', response.data.access_token);
+  localStorage.setItem('user', JSON.stringify(response.data.user));
+  return response.data;
+};
+
+// The Account page's MFA and Backup Codes panels (auth/mfa.py)
+export const getMfaStatus = async () => (await api.get('/api/auth/mfa')).data;
+export const startMfaSetup = async (code = '') => (await api.post('/api/auth/mfa/setup', { code })).data;
+export const enableMfa = async (code) => (await api.post('/api/auth/mfa/enable', { code })).data;
+export const disableMfa = async (password, code) => (await api.post('/api/auth/mfa/disable', { password, code })).data;
+export const regenerateBackupCodes = async (code) => (await api.post('/api/auth/mfa/backup-codes', { code })).data;
 
 export const loginAsGuest = async () => {
   const response = await api.post('/api/auth/guest');

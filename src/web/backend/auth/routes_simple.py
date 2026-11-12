@@ -2,8 +2,9 @@
 Simple File-Based Authentication Routes
 
 Lightweight authentication without database dependencies: users live in a JSON file
-(auth/users.py). Password sign-in, single sign-on (auth/oidc.py) when configured, and,
-in server mode, user administration for admins in place of open sign-up.
+(auth/users.py). Password sign-in with an optional second factor (auth/mfa.py), single
+sign-on (auth/oidc.py) when configured, and, in server mode, user administration for
+admins in place of open sign-up.
 """
 
 import logging
@@ -21,7 +22,7 @@ try:
     from .security import hash_password, verify_password, create_access_token
     from .users import (AdminPasswordMissing, find_user, init_default_admin, load_users,  # noqa: F401
                         new_user, public, save_users)
-    from . import access, oidc, tokens
+    from . import access, mfa, oidc, tokens
     from .throttle import throttle
     from .. import licence
 except ImportError:
@@ -29,7 +30,7 @@ except ImportError:
     from auth.security import hash_password, verify_password, create_access_token
     from auth.users import (AdminPasswordMissing, find_user, init_default_admin, load_users,  # noqa: F401
                             new_user, public, save_users)
-    from auth import access, oidc, tokens
+    from auth import access, mfa, oidc, tokens
     from auth.throttle import throttle
     import licence
 
@@ -90,7 +91,24 @@ def _session(response: Response, user: dict) -> dict:
         samesite="lax",
         max_age=settings.access_token_expire_minutes * 60,
     )
-    return {"access_token": access_token, "token_type": "bearer", "user": public(user)}
+    body = {"access_token": access_token, "token_type": "bearer", "user": public(user)}
+    if access.enrolment_pending(body["user"]):
+        body["mfa_enrolment_required"] = True  # ROWANHOLT_REQUIRE_MFA: the web app goes to Account
+    return body
+
+
+def _address(request: Request) -> str:
+    # Behind the server's proxy, uvicorn's --proxy-headers makes this the browser's address
+    return request.client.host if request.client else "unknown"
+
+
+def _refuse_if_locked(name: str, address: str) -> None:
+    wait = throttle.locked_for(name, address)
+    if wait:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many failed sign-ins; try again in {wait // 60 + 1} minutes",
+        )
 
 
 def _check_password_strength(password: str) -> None:
@@ -126,25 +144,20 @@ async def auth_config():
     }
 
 
-@router.post("/login", response_model=LoginResponse)
+@router.post("/login")
 async def login(
     request: Request,
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends()
 ):
-    """Login with username/email and password (OAuth2 form data)."""
+    """Login with username/email and password (OAuth2 form data). With MFA on, the answer is a
+    challenge for the second step (POST /login/mfa), not a session."""
     users = _users_or_503()
     known = find_user(users, form_data.username)
     # One account, one count: its username and its email share a lockout
     name = known["username"] if known else form_data.username
-    # Behind the server's proxy, uvicorn's --proxy-headers makes this the browser's address
-    address = request.client.host if request.client else "unknown"
-    wait = throttle.locked_for(name, address)
-    if wait:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Too many failed sign-ins; try again in {wait // 60 + 1} minutes",
-        )
+    address = _address(request)
+    _refuse_if_locked(name, address)
 
     user = known
     if not user or not user.get("hashed_password") or not verify_password(form_data.password, user["hashed_password"]):
@@ -153,7 +166,6 @@ async def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
         )
-    throttle.succeeded(name, address)
 
     if not user.get("is_active", True):
         raise HTTPException(
@@ -164,9 +176,49 @@ async def login(
     if settings.oidc_enabled and not settings.rowanholt_local_login and user["role"] != "admin":
         raise HTTPException(status_code=403, detail=f"Sign in with {settings.oidc_display_name}")
 
+    if mfa.is_enabled(user):
+        # The failures so far stand until the second factor is right, so a known password doesn't
+        # reset the count against guessing codes
+        return {"mfa_required": True, "challenge": mfa.new_challenge(user),
+                "expires_in": mfa.CHALLENGE_SECONDS, "methods": ["totp", "backup_code"]}
+    throttle.succeeded(name, address)
     user["last_login"] = datetime.utcnow().isoformat()
     save_users(users)
     return _session(response, user)
+
+
+class SecondFactor(BaseModel):
+    challenge: str
+    code: str
+
+
+@router.post("/login/mfa", response_model=LoginResponse)
+async def login_second_factor(body: SecondFactor, request: Request, response: Response):
+    """The sign-in's second step: the challenge from /login and a TOTP or backup code. Signs in as
+    /login does without MFA. A wrong code counts towards the sign-in lockout; the challenge lasts
+    five minutes and signs in once."""
+    users = _users_or_503()
+    address = _address(request)
+    try:
+        record, nonce = mfa.read_challenge(body.challenge, users)
+    except mfa.MfaError as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+    name = record["username"]
+    _refuse_if_locked(name, address)
+    accepted, how = mfa.check_code(record, body.code)
+    if not accepted:
+        throttle.failed(name, address)
+        mfa.audit("mfa_failed", record, record, address, stage="sign-in")
+        raise HTTPException(status_code=401, detail="Incorrect code")
+    if not mfa.spend_challenge(nonce):
+        raise HTTPException(status_code=401, detail="That sign-in has been used; start again")
+    throttle.succeeded(name, address)
+    record["last_login"] = datetime.utcnow().isoformat()
+    save_users(users)
+    if how == "backup_code":
+        mfa.audit("mfa_backup_code_used", record, record, address, stage="sign-in",
+                  left=len(record.get("mfa_backup_codes") or []))
+    return _session(response, record)
 
 
 @router.post("/guest", response_model=LoginResponse)
@@ -288,6 +340,8 @@ async def verify(request: Request, response: Response, login_redirect: bool = Fa
         return RedirectResponse(_sign_in_url(request), status_code=302)
     if not user:
         raise HTTPException(status_code=401, detail="Sign in required")
+    if access.enrolment_pending(user):
+        raise HTTPException(status_code=403, detail=access.ENROLMENT_REFUSAL)
     if service == "navigator" and not access.layer_allowed(user, request.headers.get("X-Forwarded-Uri", "/")):
         raise HTTPException(status_code=403, detail="Not your case")
     response.headers["X-Rowanholt-User"] = user["username"]
@@ -307,6 +361,158 @@ async def change_password(body: PasswordChange, user: dict = Depends(access.curr
     record["hashed_password"] = hash_password(body.new_password)
     save_users(users)
     return {"message": "Password changed"}
+
+
+# ── Multi-factor authentication (auth/mfa.py) ────────────────────────────────
+
+LOCAL_MFA = ("MFA applies to a team server's sign-in: on your own machine Rowanholt has no sign-in "
+             "for it to protect")
+SSO_MFA = "This account signs in with single sign-on: its MFA is your identity provider's"
+
+
+class MfaCode(BaseModel):
+    code: str = ""
+
+
+class MfaDisable(BaseModel):
+    password: str
+    code: str
+
+
+def _mfa_account(user: dict) -> tuple:
+    """(users, the caller's record) for managing their own MFA, or the reason they can't."""
+    if not settings.rowanholt_server_mode:
+        raise HTTPException(status_code=400, detail=LOCAL_MFA)
+    if user.get("token"):
+        # A token already skips the second factor; it mustn't also be able to replace it
+        raise HTTPException(status_code=403, detail="Manage MFA from a sign-in, not an API token")
+    users = load_users()
+    record = users.get(user["id"])
+    if not record:
+        raise HTTPException(status_code=400, detail="This account has no MFA to manage")
+    if not mfa.offered_to(record):
+        raise HTTPException(status_code=400, detail=SSO_MFA)
+    return users, record
+
+
+def _second_factor(record: dict, code: str, request: Request, purpose: str, allow_backup: bool = True) -> str:
+    """Check the caller's current code (and use it up); a wrong one counts as a failed sign-in."""
+    address = _address(request)
+    _refuse_if_locked(record["username"], address)
+    accepted, how = mfa.check_code(record, code, allow_backup=allow_backup)
+    if not accepted:
+        throttle.failed(record["username"], address)
+        mfa.audit("mfa_failed", record, record, address, stage=purpose)
+        raise HTTPException(status_code=400, detail="Incorrect code")
+    if how == "backup_code":
+        mfa.audit("mfa_backup_code_used", record, record, address, stage=purpose,
+                  left=len(record.get("mfa_backup_codes") or []))
+    return how
+
+
+@router.get("/mfa")
+async def mfa_status(user: dict = Depends(access.current_user)):
+    """The caller's MFA: whether it's on, backup codes left, and whether this server requires it."""
+    if not settings.rowanholt_server_mode:
+        return {"available": False, "reason": "local", "message": LOCAL_MFA}
+    record = load_users().get(user["id"])
+    if not record:
+        return {"available": False, "reason": "none", "message": "This account has no MFA to manage"}
+    if not mfa.offered_to(record):
+        return {"available": False, "reason": "sso", "message": SSO_MFA}
+    return {"available": True, "required": settings.rowanholt_require_mfa,
+            "setup_started": bool(record.get("mfa_pending_secret")), **mfa.status(record)}
+
+
+@router.post("/mfa/setup")
+async def mfa_setup(body: MfaCode, request: Request, user: dict = Depends(access.current_user)):
+    """Start enrolment: a new secret, as an otpauth:// URI, a QR code and text to type in. Nothing
+    changes until /mfa/enable confirms a code from it. With MFA already on (a new phone), it needs a
+    current code first, so a session left open can't move the account to someone else's app."""
+    users, record = _mfa_account(user)
+    if mfa.is_enabled(record):
+        if not body.code:
+            raise HTTPException(status_code=400, detail="Enter a current code to set up a new authenticator")
+        _second_factor(record, body.code, request, "re-enrolment")
+    secret = mfa.new_secret()
+    record["mfa_pending_secret"] = mfa.encrypt_secret(secret)
+    record["mfa_pending_at"] = datetime.utcnow().isoformat()
+    save_users(users)
+    uri = mfa.provisioning_uri(secret, record["username"])
+    return {"secret": secret, "otpauth_uri": uri, "qr_svg": mfa.qr_svg_data_uri(uri)}
+
+
+@router.post("/mfa/enable")
+async def mfa_enable(body: MfaCode, request: Request, user: dict = Depends(access.current_user)):
+    """Confirm enrolment with a code from the new secret: MFA goes on (or the new secret replaces the
+    old). The first time, ten backup codes come back, shown this once."""
+    users, record = _mfa_account(user)
+    secret = mfa.decrypt_secret(record.get("mfa_pending_secret") or "") if record.get("mfa_pending_secret") else None
+    if not secret:
+        raise HTTPException(status_code=400, detail="Start setting MFA up first")
+    address = _address(request)
+    _refuse_if_locked(record["username"], address)
+    # The new secret's own codes: none has been used, whatever step the old secret last took
+    step = mfa.matching_step(secret, body.code)
+    if step is None:
+        throttle.failed(record["username"], address)
+        mfa.audit("mfa_failed", record, record, address, stage="enrolment")
+        raise HTTPException(status_code=400, detail="Incorrect code: check the app's clock and try the next one")
+    again = mfa.is_enabled(record)
+    codes = mfa.enable(record, secret, step)
+    save_users(users)
+    mfa.audit("mfa_reenrolled" if again else "mfa_enabled", record, record, address)
+    return {**mfa.status(record), "backup_codes": codes}
+
+
+@router.post("/mfa/disable")
+async def mfa_disable(body: MfaDisable, request: Request, user: dict = Depends(access.current_user)):
+    """Turn the caller's MFA off: their password and a current code (or a backup code)."""
+    users, record = _mfa_account(user)
+    if not mfa.is_enabled(record):
+        raise HTTPException(status_code=400, detail="MFA isn't on")
+    if settings.rowanholt_require_mfa:
+        raise HTTPException(status_code=400, detail="This server requires MFA: set up a new authenticator instead")
+    address = _address(request)
+    _refuse_if_locked(record["username"], address)
+    if not verify_password(body.password, record.get("hashed_password") or ""):
+        throttle.failed(record["username"], address)
+        raise HTTPException(status_code=400, detail="Password is incorrect")
+    _second_factor(record, body.code, request, "disable")
+    mfa.disable(record)
+    save_users(users)
+    mfa.audit("mfa_disabled", record, record, address)
+    return mfa.status(record)
+
+
+@router.post("/mfa/backup-codes")
+async def mfa_backup_codes(body: MfaCode, request: Request, user: dict = Depends(access.current_user)):
+    """Ten new backup codes in place of the old ones, for a current authenticator code (not a backup
+    code: losing the codes is why someone makes new ones). Shown this once."""
+    users, record = _mfa_account(user)
+    if not mfa.is_enabled(record):
+        raise HTTPException(status_code=400, detail="Turn MFA on first")
+    _second_factor(record, body.code, request, "backup codes", allow_backup=False)
+    codes = mfa.replace_backup_codes(record)
+    save_users(users)
+    mfa.audit("mfa_backup_codes_regenerated", record, record, _address(request))
+    return {**mfa.status(record), "backup_codes": codes}
+
+
+@router.delete("/users/{user_id}/mfa")
+async def mfa_admin_reset(user_id: str, request: Request, admin: dict = Depends(access.require_admin)):
+    """Turn MFA off for someone who's lost their authenticator and backup codes (admins). They sign
+    in with their password next, and set it up again (ROWANHOLT_REQUIRE_MFA holds them to it)."""
+    users = load_users()
+    record = users.get(user_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not mfa.is_enabled(record) and not record.get("mfa_pending_secret"):
+        raise HTTPException(status_code=400, detail=f"MFA isn't on for {record['username']}")
+    mfa.disable(record)
+    save_users(users)
+    mfa.audit("mfa_admin_reset", admin, record, _address(request))
+    return public(record)
 
 
 # ── API tokens (auth/tokens.py) ──────────────────────────────────────────────

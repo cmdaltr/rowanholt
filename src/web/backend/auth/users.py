@@ -117,5 +117,6 @@ def public(user: dict) -> dict:
         "role": user["role"],
         "is_active": user.get("is_active", True),
         "auth": "sso" if user.get("oidc_subject") else "password",
+        "mfa_enabled": bool(user.get("mfa_enabled") and user.get("mfa_secret")),
         "last_login": user.get("last_login"),
     }
