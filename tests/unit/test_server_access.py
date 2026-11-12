@@ -196,6 +196,55 @@ class ServerAccessTest(BackendCase):
         self.assertEqual(resp.status_code, 200, resp.text)
         self.assertEqual(self.main.job_storage.get_job(job).status, JobStatus.CANCELLED)
 
+    def worker_writes(self, job_id, **changes):
+        """What the worker does while a cancel is under way: a full save of its own copy, with a
+        new log line and progress (or a new status), between the route's read and its write."""
+        def write(_job_id):
+            job = self.main.job_storage.get_job(job_id)
+            job.log.append("[worker] -> Parsing $MFT")
+            for name, value in changes.items():
+                setattr(job, name, value)
+            self.main.job_storage.save_job(job)
+        return mock.patch.object(self.main, "_kill_job_process_group", side_effect=write)
+
+    def test_cancel_keeps_what_the_worker_wrote_meanwhile(self):
+        from models.job import JobStatus
+        for bulk in (False, True):
+            job = self.create_job(self.alice, f"CASE-CANCEL-RACE-{int(bulk)}")
+            self.main.job_storage.set_status(job, JobStatus.RUNNING)
+            with self.worker_writes(job, progress=70), mock.patch("celery.current_app"):
+                if bulk:
+                    resp = self.client.post("/api/jobs/bulk/cancel", headers=self.alice, json=[job])
+                    self.assertEqual(resp.json()["results"], [{"job_id": job, "success": True}])
+                else:
+                    resp = self.client.post(f"/api/jobs/{job}/cancel", headers=self.alice)
+                    self.assertEqual(resp.status_code, 200, resp.text)
+                    self.assertEqual(resp.json()["status"], "cancelled")
+            stored = self.main.job_storage.get_job(job)
+            self.assertEqual(stored.status, JobStatus.CANCELLED)
+            self.assertIsNotNone(stored.completed_at)
+            self.assertEqual(stored.progress, 70)
+            self.assertIn("[worker] -> Parsing $MFT", stored.log)
+            self.assertIn("Job cancelled by user", stored.log[-1])
+
+    def test_cancel_leaves_a_job_that_finished_meanwhile(self):
+        from models.job import JobStatus
+        for bulk in (False, True):
+            job = self.create_job(self.alice, f"CASE-CANCEL-DONE-{int(bulk)}")
+            self.main.job_storage.set_status(job, JobStatus.RUNNING)
+            with self.worker_writes(job, status=JobStatus.COMPLETED, progress=100), mock.patch("celery.current_app"):
+                if bulk:
+                    [result] = self.client.post("/api/jobs/bulk/cancel", headers=self.alice, json=[job]).json()["results"]
+                    self.assertFalse(result["success"])
+                    self.assertIn("became completed", result["error"])
+                else:
+                    resp = self.client.post(f"/api/jobs/{job}/cancel", headers=self.alice)
+                    self.assertEqual(resp.status_code, 409, resp.text)
+                    self.assertIn("became completed", resp.json()["detail"])
+            stored = self.main.job_storage.get_job(job)
+            self.assertEqual(stored.status, JobStatus.COMPLETED)
+            self.assertFalse(any("cancelled" in line for line in stored.log))
+
     def test_shared_users_cant_destroy_the_job(self):
         # Deleting, archiving and a fresh restart lose the owner's work: owner and admins only.
         # A plain restart, which re-runs into the output, the people it's shared with can do

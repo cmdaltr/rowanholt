@@ -742,6 +742,33 @@ async def delete_job(job_id: str, request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# A job these can be cancelled from (a removal can't: it runs to the end, or fails)
+CANCELLABLE_STATUSES = (JobStatus.PENDING, JobStatus.RUNNING, JobStatus.PAUSED)
+
+
+def _stop_job(job: Job) -> None:
+    """Stop a job's work: SIGKILL its Elrond process group, revoke its Celery task and release its
+    image locks, in that order."""
+    _kill_job_process_group(job.id)
+    if job.celery_task_id:
+        from celery import current_app
+        current_app.control.revoke(job.celery_task_id, terminate=True, signal='SIGKILL')
+    try:
+        from tasks_docker import release_image_locks_for_job
+        release_image_locks_for_job(job.id, job.source_paths)
+    except Exception as e:
+        logger.warning(f"Failed to release image locks for job {job.id}: {e}")
+
+
+def _mark_cancelled(job_id: str, log_line: str) -> Optional[Job]:
+    """Set a job cancelled, with its completion time and a log line, if it's still pending, running
+    or paused: the job as saved, or None when it moved on (finished or failed meanwhile). One
+    conditional UPDATE, not a save of the row the route read: the worker writes log lines and
+    progress until it's killed, and a full save would put back the stale ones."""
+    return job_storage.transition(job_id, CANCELLABLE_STATUSES, JobStatus.CANCELLED,
+                                  log_line=log_line, completed_at=datetime.now())
+
+
 # =====================================================
 # BULK OPERATIONS - Must be defined BEFORE {job_id} routes
 # to prevent FastAPI from matching "bulk" as a job_id
@@ -760,7 +787,6 @@ async def bulk_cancel_jobs(job_ids: list[str], request: Request):
     """
     try:
         results = []
-        from celery import current_app
 
         for job_id in job_ids:
             job = _job_for(request, job_id)
@@ -774,29 +800,16 @@ async def bulk_cancel_jobs(job_ids: list[str], request: Request):
                 results.append({"job_id": job_id, "success": False, "error": refusal})
                 continue
 
-            if job.status not in [JobStatus.PENDING, JobStatus.RUNNING, JobStatus.PAUSED]:
+            if job.status not in CANCELLABLE_STATUSES:
                 results.append({"job_id": job_id, "success": False, "error": f"Job already {job.status.value}"})
                 continue
 
-            _kill_job_process_group(job_id)
-
-            # Revoke Celery task if it exists
-            if job.celery_task_id:
-                current_app.control.revoke(job.celery_task_id, terminate=True, signal='SIGKILL')
-
-            # Release image locks for this job
-            try:
-                from tasks_docker import release_image_locks_for_job
-                release_image_locks_for_job(job_id, job.source_paths)
-            except Exception as e:
-                logger.warning(f"Failed to release image locks for job {job_id}: {e}")
-
-            # Update job status
-            job.status = JobStatus.CANCELLED
-            job.completed_at = datetime.now()
-            job.log.append(f"[{datetime.now().isoformat()}] Job cancelled by user (bulk operation)")
-
-            job_storage.save_job(job)
+            _stop_job(job)
+            if _mark_cancelled(job_id, "Job cancelled by user (bulk operation)") is None:
+                current = job_storage.get_job(job_id)
+                results.append({"job_id": job_id, "success": False, "error": (
+                    f"Job became {current.status.value if current else 'deleted'} while it was being cancelled")})
+                continue
             results.append({"job_id": job_id, "success": True})
 
         return {"results": results}
@@ -976,34 +989,19 @@ async def cancel_job(job_id: str, request: Request):
         if refusal:
             raise HTTPException(status_code=403, detail=refusal)
 
-        if job.status not in [JobStatus.PENDING, JobStatus.RUNNING, JobStatus.PAUSED]:
+        if job.status not in CANCELLABLE_STATUSES:
             raise HTTPException(
                 status_code=400,
                 detail=f"Job already {job.status.value} - can only cancel pending, running or paused jobs",
             )
 
-        _kill_job_process_group(job_id)
-
-        # Revoke Celery task if it exists
-        if job.celery_task_id:
-            from celery import current_app
-            current_app.control.revoke(job.celery_task_id, terminate=True, signal='SIGKILL')
-
-        # Release image locks for this job
-        try:
-            from tasks_docker import release_image_locks_for_job
-            release_image_locks_for_job(job_id, job.source_paths)
-        except Exception as e:
-            logger.warning(f"Failed to release image locks for job {job_id}: {e}")
-
-        # Update job status
-        job.status = JobStatus.CANCELLED
-        job.completed_at = datetime.now()
-        job.log.append(f"[{datetime.now().isoformat()}] Job cancelled by user")
-
-        job_storage.save_job(job)
-
-        return job
+        _stop_job(job)
+        cancelled = _mark_cancelled(job_id, "Job cancelled by user")
+        if cancelled is None:
+            current = job_storage.get_job(job_id)
+            raise HTTPException(status_code=409, detail=(
+                f"The job became {current.status.value if current else 'deleted'} while it was being cancelled"))
+        return _with_access([cancelled], request)[0]
 
     except HTTPException:
         raise

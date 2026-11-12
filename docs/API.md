@@ -765,10 +765,13 @@ Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, whic
 
 **Response:** `200 OK` with the updated job object (`"status": "cancelled"`).
 
+Only the status, `completed_at` and a log line are written, in one conditional update from pending, running or paused: the progress and log lines the worker wrote while the job was being stopped are kept, and a job that finished or failed meanwhile is left as it is.
+
 **Errors:**
 - `400 Bad Request`: Job is not pending, running or paused. A job in `awaiting_confirmation` is given up with `cancel-removal`; one that's `removing` can't be cancelled (the worker finishes or fails it).
 - `403 Forbidden`: Not the job's owner or an admin
 - `404 Not Found`: Job not found
+- `409 Conflict`: The job finished or failed while it was being cancelled; `detail` says what it became
 
 ---
 
@@ -968,14 +971,18 @@ A bare JSON array of job IDs:
 ["uuid1", "uuid2", "uuid3"]
 ```
 
-**Response:** `200 OK`
+**Response:** `200 OK`, a result per job:
 ```json
 {
-  "cancelled": 3,
-  "failed": 0,
-  "errors": []
+  "results": [
+    {"job_id": "uuid1", "success": true},
+    {"job_id": "uuid2", "success": false, "error": "Only the job's owner or an admin can cancel it"},
+    {"job_id": "uuid3", "success": false, "error": "Job became completed while it was being cancelled"}
+  ]
 }
 ```
+
+Each job is cancelled as with the single cancel: a job that finished or failed meanwhile is left as it is and reported with `success: false`.
 
 ---
 
