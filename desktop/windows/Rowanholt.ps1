@@ -114,7 +114,7 @@ function Initialize-Gui {
 
 function Hide-Console {
     # Only a console of its own (the shortcut's): run from someone's terminal, that terminal stays
-    if ([Rowanholt.Native]::GetConsoleProcessList((New-Object uint[] 4), 4) -ne 1) { return }
+    if ([Rowanholt.Native]::GetConsoleProcessList((New-Object UInt32[] 4), 4) -ne 1) { return }
     [Rowanholt.Native]::ShowWindow([Rowanholt.Native]::GetConsoleWindow(), 0) | Out-Null
 }
 function Show-Console { [Rowanholt.Native]::ShowWindow([Rowanholt.Native]::GetConsoleWindow(), 5) | Out-Null }
