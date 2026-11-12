@@ -1210,8 +1210,6 @@ $Defaults = @{
     cold = @{ docker = 20; images = 900; containers = 25; ui = 90 }
 }
 $Messages = @{ docker = 'Waking Docker'; images = 'Forging the images'; containers = 'Raising the halls'; ui = 'Opening the doors' }
-$Places = @(@(0.0, 'the Shire'), @(0.18, 'Bree'), @(0.38, 'Weathertop'), @(0.55, 'the Last Bridge'),
-            @(0.7, 'the Trollshaws'), @(0.86, 'the Ford of Bruinen'))
 $HistoryFile = Join-Path $State 'start-history.jsonl'
 # BuildKit's step lines with --progress plain: '#12 [worker 5/31] RUN ...' (startup_progress.py's STEP)
 $StepLine = '^#\d+ \[([\w.-]+)(?:\s+[\w.-]+)?\s+(\d+)/(\d+)\]'
@@ -1227,7 +1225,7 @@ function Get-Median([double[]]$Values) {
 function New-Journey([string]$Kind) {
     # The road is drawn in the window (Show-Journey); a second call (warm found to be cold) keeps the page
     if (-not $script:Progress -or $script:ProgressKind -ne 'journey') {
-        $script:Progress = Show-ProgressPage 'Starting Rowanholt' 'Gandalf sets out from the Shire.' $null
+        $script:Progress = Show-ProgressPage 'Starting Rowanholt' 'Working out how long it will take' $null
         $script:ProgressKind = 'journey'
     }
     $base = if ($Kind -like 'cold*') { $Defaults.cold } else { $Defaults.warm }
@@ -1269,11 +1267,8 @@ function Show-Journey($J) {
     $remaining = $current + $later
     $elapsed = ((Get-Date) - $J.Started).TotalSeconds
     $fraction = [math]::Min(0.99, $elapsed / [math]::Max(1, $elapsed + $remaining))
-    $place = ($Places | Where-Object { $fraction -ge $_[0] } | Select-Object -Last 1)[1]
-    $where = if ($place -eq 'the Shire') { 'Gandalf sets out from the Shire' } else { "Gandalf has passed $place" }
-    $eta = if ($remaining -lt 45) { 'less than a minute' } elseif ($remaining -lt 90) { 'about a minute' } else { "about $([math]::Round($remaining / 60)) minutes" }
-    $guess = if ($J.Learning) { ' (a first guess: no timings on this PC yet)' } else { '' }
-    $script:Wizard.Sub.Text = "$where; $eta to Rowanholt$guess"
+    # Just the time left in the header: where Gandalf has got to is the macOS app's picture, not this one's
+    $script:Wizard.Sub.Text = if ($remaining -lt 45) { 'Less than a minute left' } elseif ($remaining -lt 90) { 'About a minute left' } else { "About $([math]::Round($remaining / 60)) minutes left" }
     $script:Progress.Bar.Style = 'Continuous'; $script:Progress.Bar.Value = [int](1000 * $fraction)
     if ($J.Phase -ne $script:ShownPhase -or $J.Detail) {
         $script:ShownPhase = $J.Phase
