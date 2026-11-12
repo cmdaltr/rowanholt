@@ -52,6 +52,8 @@
     <Property Id="INSTALLDOCKER" Secure="yes" />
     <Property Id="INSTALLOLLAMA" Secure="yes" />
     <Property Id="INSTALLMODEL" Secure="yes" />
+    <!-- The options page's one checkbox for both: the model needs Ollama, and Ollama is only there for it -->
+    <Property Id="INSTALLAI" Secure="yes" />
     <SetProperty Id="INSTALLDOCKER" Value="1" After="SetDOCKERFOUND" Sequence="ui" Condition="NOT DOCKERFOUND AND NOT Installed" />
 
     <!-- Double-clicked, it's the wizard most Windows installers show (WixUI_Rowanholt below), with
@@ -150,10 +152,10 @@
       <Component Id="WantDocker" Directory="INSTALLFOLDER" Condition="INSTALLDOCKER = 1">
         <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="InstallDocker" Type="integer" Value="1" KeyPath="yes" />
       </Component>
-      <Component Id="WantOllama" Directory="INSTALLFOLDER" Condition="INSTALLOLLAMA = 1">
+      <Component Id="WantOllama" Directory="INSTALLFOLDER" Condition="INSTALLOLLAMA = 1 OR INSTALLAI = 1">
         <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="InstallOllama" Type="integer" Value="1" KeyPath="yes" />
       </Component>
-      <Component Id="WantModel" Directory="INSTALLFOLDER" Condition="INSTALLMODEL = 1">
+      <Component Id="WantModel" Directory="INSTALLFOLDER" Condition="INSTALLMODEL = 1 OR INSTALLAI = 1">
         <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="InstallModel" Type="integer" Value="1" KeyPath="yes" />
       </Component>
       <!-- Clears HKCU\Software\cmdaltr\Rowanholt on uninstall once its values are gone -->
@@ -195,31 +197,21 @@
         <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
         <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
         <Control Id="Title" Type="Text" X="15" Y="6" Width="220" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Choose what to install" />
-        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="Ticked items are downloaded and installed when Rowanholt first opens." />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="Ticked items are installed when Rowanholt first opens." />
 
         <Control Id="NeededText" Type="Text" X="20" Y="52" Width="330" Height="11" NoPrefix="yes" Text="{\WixUI_Font_Title}To run Rowanholt on this PC" />
         <Control Id="DockerCheckBox" Type="CheckBox" X="20" Y="64" Width="130" Height="14" Property="INSTALLDOCKER" CheckBoxValue="1"
                  Text="Docker Desktop and WSL 2" DisableCondition="DOCKERFOUND" EnableCondition="NOT DOCKERFOUND" />
         <Control Id="DockerFoundText" Type="Text" X="152" Y="66" Width="150" Height="11" NoPrefix="yes" Text="(already installed)"
                  ShowCondition="DOCKERFOUND" HideCondition="NOT DOCKERFOUND" />
-        <Control Id="DockerText" Type="Text" X="33" Y="79" Width="320" Height="33" NoPrefix="yes"
-                 Text="Runs Rowanholt's containers. From docker.com, for you alone; ticking it accepts Docker's Subscription Service Agreement (free for personal use, education and small businesses). Turning WSL 2 on asks for administrator rights and a restart." />
+        <Control Id="DockerText" Type="Text" X="33" Y="79" Width="320" Height="38" NoPrefix="yes"
+                 Text="Runs Rowanholt's containers; from docker.com, for you alone. Ticking it accepts Docker's Subscription Service Agreement (free for personal use, education and small businesses). Turning WSL 2 on needs administrator rights and a restart." />
 
-        <Control Id="OptionalText" Type="Text" X="20" Y="117" Width="330" Height="11" NoPrefix="yes" Text="{\WixUI_Font_Title}Optional, for Smith's AI answers" />
-        <!-- The model needs Ollama: ticking it ticks Ollama, unticking Ollama unticks it. Reopening the
-             page is how Windows Installer redraws the other checkbox -->
-        <Control Id="OllamaCheckBox" Type="CheckBox" X="20" Y="129" Width="330" Height="14" Property="INSTALLOLLAMA" CheckBoxValue="1" Text="Ollama">
-          <Publish Property="INSTALLMODEL" Value="{}" Condition="NOT INSTALLOLLAMA" />
-          <Publish Event="NewDialog" Value="OptionsDlg" Condition="NOT INSTALLOLLAMA" />
-        </Control>
-        <Control Id="OllamaText" Type="Text" X="33" Y="143" Width="320" Height="11" NoPrefix="yes"
-                 Text="Runs AI models on this PC, so nothing leaves it. About 1 GB, from ollama.com." />
-        <Control Id="ModelCheckBox" Type="CheckBox" X="20" Y="156" Width="330" Height="14" Property="INSTALLMODEL" CheckBoxValue="1" Text="Smith's model">
-          <Publish Property="INSTALLOLLAMA" Value="1" Condition="INSTALLMODEL AND NOT INSTALLOLLAMA" />
-          <Publish Event="NewDialog" Value="OptionsDlg" Condition="INSTALLMODEL" />
-        </Control>
-        <Control Id="ModelText" Type="Text" X="33" Y="170" Width="320" Height="22" NoPrefix="yes"
-                 Text="The language model Smith answers with: Meta's Llama 3.2 (3B), about 2 GB, through Ollama. Without these two, Smith answers fixed questions from the case files." />
+        <Control Id="OptionalText" Type="Text" X="20" Y="120" Width="330" Height="11" NoPrefix="yes" Text="{\WixUI_Font_Title}Optional" />
+        <Control Id="AiCheckBox" Type="CheckBox" X="20" Y="132" Width="330" Height="14" Property="INSTALLAI" CheckBoxValue="1"
+                 Text="Smith's AI answers: Ollama and Smith's model" />
+        <Control Id="AiText" Type="Text" X="33" Y="147" Width="320" Height="44" NoPrefix="yes"
+                 Text="Ollama (from ollama.com) runs AI models on this PC, so nothing leaves it; Smith's model, Meta's Llama 3.2 (3B), is the one Smith answers with. About 3 GB together. Without them, Smith answers fixed questions from the case files." />
 
         <Control Id="DesktopCheckBox" Type="CheckBox" X="20" Y="206" Width="330" Height="14" Property="DESKTOPSHORTCUT" CheckBoxValue="1"
                  Text="Add a Rowanholt shortcut to the &amp;desktop" />
@@ -237,9 +229,9 @@
 
       <Publish Dialog="OptionsDlg" Control="Back" Event="NewDialog" Value="LicenseAgreementDlg" />
       <Publish Dialog="OptionsDlg" Control="Next" Property="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT"
-               Value="Install what you chose, then open Rowanholt" Condition="INSTALLDOCKER = 1 OR INSTALLOLLAMA = 1 OR INSTALLMODEL = 1" />
+               Value="Install what you chose, then open Rowanholt" Condition="INSTALLDOCKER = 1 OR INSTALLAI = 1 OR INSTALLOLLAMA = 1 OR INSTALLMODEL = 1" />
       <Publish Dialog="OptionsDlg" Control="Next" Property="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT"
-               Value="Launch Rowanholt" Condition="NOT (INSTALLDOCKER = 1 OR INSTALLOLLAMA = 1 OR INSTALLMODEL = 1)" />
+               Value="Launch Rowanholt" Condition="NOT (INSTALLDOCKER = 1 OR INSTALLAI = 1 OR INSTALLOLLAMA = 1 OR INSTALLMODEL = 1)" />
       <Publish Dialog="OptionsDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" />
 
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="OptionsDlg" Order="1" Condition="NOT Installed" />
