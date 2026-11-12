@@ -32,11 +32,15 @@ export const jobPageActions = (job) => {
   };
 };
 
+// Waiting for its owner or an admin to retry or give up removing its old output: the backend
+// refuses to archive or delete it until that's settled (main._awaiting_refusal)
+const unsettled = (job) => job.status === 'awaiting_confirmation';
+
 const STATUS_RULES = {
   stop: (job) => STOPPABLE_STATUSES.includes(job.status),
   restart: (job) => RESTARTABLE.includes(job.status),
-  archive: (job) => !BUSY_STATUSES.includes(job.status) && job.status !== 'archived',
-  delete: (job) => !BUSY_STATUSES.includes(job.status),
+  archive: (job) => !BUSY_STATUSES.includes(job.status) && !unsettled(job) && job.status !== 'archived',
+  delete: (job) => !BUSY_STATUSES.includes(job.status) && !unsettled(job),
   restore: (job) => job.status === 'archived',
   export: () => true,
 };

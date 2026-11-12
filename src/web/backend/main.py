@@ -180,6 +180,17 @@ NOT_THEIRS = "Only the job's owner or an admin can {}"
 BUSY_JOB_STATUSES = (JobStatus.PENDING, JobStatus.RUNNING, JobStatus.PAUSED, JobStatus.REMOVING)
 
 
+def _awaiting_refusal(job: Job, action: str) -> Optional[str]:
+    """Why an awaiting_confirmation job mustn't be deleted or archived, or None. Removing its old
+    output failed part way and it waits on a decision: deleted, the pending removal would lose its
+    job; archived, it would hide from the page that offers the decision."""
+    if job.status != JobStatus.AWAITING_CONFIRMATION:
+        return None
+    return (f"Cannot {action} a job awaiting confirmation: removing its old output failed, and it's "
+            "waiting for its owner or an admin to try the removal again or give up (confirm-removal "
+            "or cancel-removal)")
+
+
 def _manager_refusal(request: Request, job_id: str, action: str) -> Optional[str]:
     """Why the caller may not do this to the job (they can see it but don't own it), or None."""
     if access.can_manage_job(access.current_user(request), job_id):
@@ -723,6 +734,9 @@ async def delete_job(job_id: str, request: Request):
                 status_code=400,
                 detail="Cannot delete running or pending job",
             )
+        refusal = _awaiting_refusal(job, "delete")
+        if refusal:
+            raise HTTPException(status_code=400, detail=refusal)
 
         _delete_job(request, job)
 
@@ -854,6 +868,10 @@ async def bulk_delete_jobs(job_ids: list[str], request: Request):
             if job.status in BUSY_JOB_STATUSES:
                 results.append({"job_id": job_id, "success": False, "error": "Cannot delete running job"})
                 continue
+            refusal = _awaiting_refusal(job, "delete")
+            if refusal:
+                results.append({"job_id": job_id, "success": False, "error": refusal})
+                continue
 
             _delete_job(request, job, bulk=True)
             results.append({"job_id": job_id, "success": True})
@@ -892,6 +910,10 @@ async def bulk_archive_jobs(job_ids: list[str], request: Request):
 
             if job.status in BUSY_JOB_STATUSES:
                 results.append({"job_id": job_id, "success": False, "error": "Cannot archive running job"})
+                continue
+            refusal = _awaiting_refusal(job, "archive")
+            if refusal:
+                results.append({"job_id": job_id, "success": False, "error": refusal})
                 continue
 
             if job.status == JobStatus.ARCHIVED:
@@ -1249,6 +1271,9 @@ async def archive_job(job_id: str, request: Request):
                 status_code=400,
                 detail="Cannot archive pending or running jobs",
             )
+        refusal = _awaiting_refusal(job, "archive")
+        if refusal:
+            raise HTTPException(status_code=400, detail=refusal)
 
         if job.status == JobStatus.ARCHIVED:
             raise HTTPException(

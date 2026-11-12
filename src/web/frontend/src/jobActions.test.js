@@ -70,3 +70,13 @@ test('an owner\'s bulk button is offered only when one of the selection is the u
   expect(bulkOffered(theirs, 'export')).toBe(true);
   expect(bulkOffered([], 'export')).toBe(false);
 });
+
+test('a job awaiting confirmation is never sent to archive or delete: the server refuses both', () => {
+  const plan = (action) => bulkPlan([job('waiting', 'awaiting_confirmation', true), job('done', 'failed', true)], action);
+  for (const action of ['archive', 'delete']) {
+    expect(plan(action).eligible.map((j) => j.id)).toEqual(['done']);
+    expect(plan(action).wrongStatus.map((j) => j.id)).toEqual(['waiting']);
+  }
+  expect(jobPageActions(job('waiting', 'awaiting_confirmation', true))).toMatchObject({
+    delete: false, settleRemoval: true });
+});

@@ -93,6 +93,27 @@ class JobArchiveTest(BackendCase):
             resp = self.client.post(f"/api/jobs/{job_id}/unarchive", headers=self.alice)
             self.assertEqual(resp.json()["status"], expected.value)
 
+    def test_a_job_awaiting_confirmation_cant_be_archived_or_deleted(self):
+        # Removing its old output failed and it waits on its owner or an admin (confirm-removal or
+        # cancel-removal): archived, it would hide from that decision; deleted, the removal loses its job
+        S = self.JobStatus
+        job_id = self.ended_job("CASE-ARC-WAIT", S.AWAITING_CONFIRMATION)
+        for method, path in (("POST", f"/api/jobs/{job_id}/archive"), ("DELETE", f"/api/jobs/{job_id}")):
+            resp = self.client.request(method, path, headers=self.alice)
+            self.assertEqual(resp.status_code, 400, f"{method} {path}: {resp.text}")
+            self.assertIn("awaiting confirmation", resp.json()["detail"])
+            self.assertIn("try the removal again or give up", resp.json()["detail"])
+        for path in ("/api/jobs/bulk/archive", "/api/jobs/bulk/delete"):
+            [result] = self.client.post(path, headers=self.alice, json=[job_id]).json()["results"]
+            self.assertFalse(result["success"], path)
+            self.assertIn("awaiting confirmation", result["error"])
+        job = self.stored(job_id)
+        self.assertEqual((job.status, job.archived_from), (S.AWAITING_CONFIRMATION, None))
+
+        # Settled (given up: failed), it can be archived again
+        self.assertEqual(self.client.post(f"/api/jobs/{job_id}/cancel-removal", headers=self.alice).status_code, 200)
+        self.assertEqual(self.client.post(f"/api/jobs/{job_id}/archive", headers=self.alice).status_code, 200)
+
 
 if __name__ == "__main__":
     unittest.main()

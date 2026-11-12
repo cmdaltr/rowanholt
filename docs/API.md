@@ -488,7 +488,7 @@ Each job has every field in [Get Job Details](#get-job-details) (shortened here)
 
 **Endpoint:** `DELETE /api/jobs/{job_id}`
 
-**Description:** Delete a job's record, with its owner and sharing and its case's findings, notes, host assignments and activity (`case_findings`, `case_notes`, `case_hosts`, `case_activity`), in one transaction. Nothing on disk is removed: its evidence and its output folder stay where they are. The audit log (`audit_logs`) is kept, and records the deletion: `job.deleted`, with the case number and how many rows went from each table. A pending, running, paused or removing job can't be deleted (cancel it first).
+**Description:** Delete a job's record, with its owner and sharing and its case's findings, notes, host assignments and activity (`case_findings`, `case_notes`, `case_hosts`, `case_activity`), in one transaction. Nothing on disk is removed: its evidence and its output folder stay where they are. The audit log (`audit_logs`) is kept, and records the deletion: `job.deleted`, with the case number and how many rows went from each table. A pending, running, paused or removing job can't be deleted (cancel it first), and nor can one `awaiting_confirmation`: removing its old output failed, and it waits for its owner or an admin to try the removal again or give up ([confirm-removal or cancel-removal](#removing-a-jobs-old-output)) first.
 
 **Authentication:** In server mode, the job's owner or an admin.
 
@@ -501,7 +501,7 @@ Each job has every field in [Get Job Details](#get-job-details) (shortened here)
 ```
 
 **Errors:**
-- `400 Bad Request`: the job is pending, running, paused or removing
+- `400 Bad Request`: the job is pending, running, paused or removing, or `awaiting_confirmation` (`Cannot delete a job awaiting confirmation: …`)
 - `403 Forbidden`: not the job's owner or an admin
 - `404 Not Found`: Job not found
 
@@ -634,7 +634,7 @@ It's deleted without following symbolic links or crossing onto another device, a
 **Response:** `200 OK` with the job, `"status": "archived"` and `archived_at` set.
 
 **Errors:**
-- `400 Bad Request`: the job is pending, running, paused or removing, or already archived
+- `400 Bad Request`: the job is pending, running, paused or removing, or already archived; or it's `awaiting_confirmation` (`Cannot archive a job awaiting confirmation: …`), waiting for its owner or an admin to try removing its old output again or give up first
 - `403 Forbidden`: Not the job's owner or an admin
 - `404 Not Found`: Job not found
 
@@ -752,8 +752,8 @@ It's deleted without following symbolic links or crossing onto another device, a
 A job the caller can't see comes back `Job not found`; one they see but don't manage, with the owner-or-admin refusal (for unarchive, `Only the job's owner or an admin can restore it from the archive`). Otherwise:
 
 - **cancel**: as the single cancel, marked first, then stopped; a job that had already finished or failed is left alone, not stopped, and reported with `success: false`
-- **delete**: as the single delete (the case's rows go with the job, nothing on disk is removed, the audit log records each); `Cannot delete running job` for a pending, running, paused or removing one
-- **archive**: `Cannot archive running job` for a pending, running, paused or removing one; `Already archived`
+- **delete**: as the single delete (the case's rows go with the job, nothing on disk is removed, the audit log records each); `Cannot delete running job` for a pending, running, paused or removing one, `Cannot delete a job awaiting confirmation: …` for one `awaiting_confirmation`
+- **archive**: `Cannot archive running job` for a pending, running, paused or removing one; `Cannot archive a job awaiting confirmation: …` for one `awaiting_confirmation`; `Already archived`
 - **unarchive**: `Job is not archived`; on success the result's `status` is the status restored, as the single unarchive restores it
 
 ---
