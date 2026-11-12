@@ -765,6 +765,11 @@ async def bulk_cancel_jobs(job_ids: list[str], request: Request):
                 results.append({"job_id": job_id, "success": False, "error": "Job not found"})
                 continue
 
+            refusal = _manager_refusal(request, job_id, "cancel it")
+            if refusal:
+                results.append({"job_id": job_id, "success": False, "error": refusal})
+                continue
+
             if job.status not in [JobStatus.PENDING, JobStatus.RUNNING, JobStatus.PAUSED]:
                 results.append({"job_id": job_id, "success": False, "error": f"Job already {job.status.value}"})
                 continue
@@ -947,7 +952,7 @@ async def bulk_restart_jobs(job_ids: list[str], request: Request, fresh: Optiona
 # =====================================================
 
 @app.post("/api/jobs/{job_id}/cancel")
-async def cancel_job(job_id: str):
+async def cancel_job(job_id: str, request: Request):
     """
     Cancel a running job.
 
@@ -962,6 +967,10 @@ async def cancel_job(job_id: str):
 
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
+
+        refusal = _manager_refusal(request, job_id, "cancel it")
+        if refusal:
+            raise HTTPException(status_code=403, detail=refusal)
 
         if job.status not in [JobStatus.PENDING, JobStatus.RUNNING, JobStatus.PAUSED]:
             raise HTTPException(
@@ -1011,10 +1020,15 @@ def _kill_job_process_group(job_id: str) -> None:
         logger.warning(f"Failed to kill process group for job {job_id}: {e}")
 
 
-def _signal_job(job_id: str, action: str, required: JobStatus, new_status: JobStatus):
+def _signal_job(request: Request, job_id: str, action: str, required: JobStatus, new_status: JobStatus):
     job = job_storage.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+    # Pausing or resuming someone else's job stalls or restarts their work without them: the
+    # people a job is shared with can watch it, its owner (or an admin) runs it
+    refusal = _manager_refusal(request, job_id, f"{action} it")
+    if refusal:
+        raise HTTPException(status_code=403, detail=refusal)
     if job.status != required:
         raise HTTPException(
             status_code=400,
@@ -1033,7 +1047,7 @@ def _signal_job(job_id: str, action: str, required: JobStatus, new_status: JobSt
 
 
 @app.post("/api/jobs/{job_id}/pause")
-async def pause_job(job_id: str):
+async def pause_job(job_id: str, request: Request):
     """
     Pause a running job by sending SIGSTOP to its Elrond process group.
 
@@ -1047,11 +1061,11 @@ async def pause_job(job_id: str):
     Returns:
         Updated job
     """
-    return _signal_job(job_id, "pause", JobStatus.RUNNING, JobStatus.PAUSED)
+    return _signal_job(request, job_id, "pause", JobStatus.RUNNING, JobStatus.PAUSED)
 
 
 @app.post("/api/jobs/{job_id}/resume")
-async def resume_job(job_id: str):
+async def resume_job(job_id: str, request: Request):
     """
     Resume a paused job by sending SIGCONT to its Elrond process group.
 
@@ -1061,7 +1075,7 @@ async def resume_job(job_id: str):
     Returns:
         Updated job
     """
-    return _signal_job(job_id, "resume", JobStatus.PAUSED, JobStatus.RUNNING)
+    return _signal_job(request, job_id, "resume", JobStatus.PAUSED, JobStatus.RUNNING)
 
 
 def _restarts_fresh(job, fresh: Optional[bool]) -> bool:

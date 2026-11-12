@@ -748,7 +748,7 @@ Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, whic
 
 **Description:** Cancel a pending or running job. Revokes the Celery task with `SIGKILL` and releases the job's image locks. Child processes started by Elrond (foremost, yara, log2timeline) are not killed and keep the image mounted; see `tests/docs/TEST_RUNNER_GUIDE.md` for clean-up.
 
-**Authentication:** Not enforced in the current build (see [Authentication Status](#authentication-status))
+**Authentication:** In server mode, the job's owner or an admin; not the people it's shared with. The same goes for `POST /api/jobs/{job_id}/pause` and `/resume`.
 
 **Path Parameters:**
 - `job_id`: UUID of the job
@@ -757,6 +757,7 @@ Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, whic
 
 **Errors:**
 - `400 Bad Request`: Job is not pending, running or paused. A job in `awaiting_confirmation` is given up with `cancel-removal`; one that's `removing` can't be cancelled (the worker finishes or fails it).
+- `403 Forbidden`: Not the job's owner or an admin
 - `404 Not Found`: Job not found
 
 ---
@@ -948,7 +949,7 @@ It's deleted without following symbolic links or crossing onto another device, a
 
 **Description:** Cancel multiple jobs at once.
 
-**Authentication:** Not enforced in the current build (see [Authentication Status](#authentication-status))
+**Authentication:** In server mode, each job is cancelled only for its owner or an admin; any other comes back with `success: false` and the reason.
 
 **Request Body:**
 A bare JSON array of job IDs:

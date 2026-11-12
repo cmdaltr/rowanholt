@@ -145,6 +145,31 @@ class ServerAccessTest(BackendCase):
         resp = self.client.put(f"/api/jobs/{job}/sharing", headers=self.bob, json={"usernames": []})
         self.assertEqual(resp.status_code, 403)
 
+    def test_shared_users_cant_stop_the_job(self):
+        # Cancelling, pausing and resuming change how the owner's work runs: owner and admins only.
+        # The people a job is shared with watch it
+        from models.job import JobStatus
+        job = self.create_job(self.alice, "CASE-SHARED-STOP")
+        self.client.put(f"/api/jobs/{job}/sharing", headers=self.alice, json={"usernames": ["bob"]})
+        for status, action in ((JobStatus.RUNNING, "cancel"), (JobStatus.RUNNING, "pause"),
+                               (JobStatus.PAUSED, "resume")):
+            self.main.job_storage.set_status(job, status)
+            resp = self.client.post(f"/api/jobs/{job}/{action}", headers=self.bob)
+            self.assertEqual(resp.status_code, 403, f"{action}: {resp.text}")
+            self.assertIn("owner or an admin", resp.json()["detail"])
+            self.assertEqual(self.main.job_storage.get_job(job).status, status)
+
+        self.main.job_storage.set_status(job, JobStatus.RUNNING)
+        [result] = self.client.post("/api/jobs/bulk/cancel", headers=self.bob, json=[job]).json()["results"]
+        self.assertFalse(result["success"])
+        self.assertIn("owner or an admin", result["error"])
+        self.assertEqual(self.main.job_storage.get_job(job).status, JobStatus.RUNNING)
+
+        with mock.patch("celery.current_app"):  # no broker here to revoke the task on
+            resp = self.client.post(f"/api/jobs/{job}/cancel", headers=self.alice)
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertEqual(self.main.job_storage.get_job(job).status, JobStatus.CANCELLED)
+
     def test_shared_users_cant_destroy_the_job(self):
         # Deleting, archiving and a fresh restart lose the owner's work: owner and admins only.
         # A plain restart, which re-runs into the output, the people it's shared with can do
