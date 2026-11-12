@@ -63,6 +63,14 @@ LOOKUP_PATH = "/api/threat-intel/lookup"
 ADMIN_PREFIXES = ("/api/lab", "/api/anduril", "/api/aragorn", "/api/auth/users", "/api/symbols", "/api/samples",
                   "/api/licence", "/api/brands", "/api/webhooks")
 JOB_PATH = re.compile(r"^/api/jobs/([0-9a-fA-F-]{36})(?:/|$)")
+# Every state-changing request a browser's session cookie authenticates must carry this header
+# (the web app's API client sends it). A page on another origin can't add one without CORS
+# allowing it first, and SameSite=Lax doesn't stop the rest: every app on the same tailnet
+# (*.<tailnet>.ts.net; ts.net is a public suffix, so the tailnet's name is the site) is the same
+# site, and its pages' requests carry the cookie. A bearer token is never sent by a browser on
+# its own, so token clients (the MCP server, scripts) don't need it.
+CSRF_HEADER = "X-Rowanholt"
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 CASE_PATH = re.compile(r"^/api/ai/cases/([^/]+)/")
 
 _storage = None
@@ -81,12 +89,7 @@ def server_mode() -> bool:
 def user_from_request(request: HTTPConnection) -> Optional[dict]:
     """The caller from the bearer token, else the session cookie (a stale or empty
     header mustn't hide a good cookie)."""
-    header = request.headers.get("authorization", "")
-    if header.lower().startswith("bearer "):
-        user = user_from_token(header[7:].strip())
-        if user:
-            return user
-    return user_from_token(request.cookies.get("session_token"))
+    return _bearer_user(request) or user_from_token(request.cookies.get("session_token"))
 
 
 def user_from_token(token: Optional[str]) -> Optional[dict]:
@@ -133,11 +136,32 @@ def is_admin(user: dict) -> bool:
     return user.get("role") == "admin"
 
 
+def _bearer_user(request: HTTPConnection) -> Optional[dict]:
+    header = request.headers.get("authorization", "")
+    return user_from_token(header[7:].strip()) if header.lower().startswith("bearer ") else None
+
+
+def csrf_refusal(request: Request, bearer: Optional[dict]) -> Optional[str]:
+    """Why a state-changing /api request authenticated by the session cookie is refused (it
+    lacks `X-Rowanholt: 1`), or None."""
+    if request.method in SAFE_METHODS or not request.url.path.startswith("/api"):
+        return None
+    if bearer is not None or not request.cookies.get("session_token"):
+        return None
+    if request.headers.get(CSRF_HEADER) == "1":
+        return None
+    return f"Refused: a request signed in by cookie must send the {CSRF_HEADER}: 1 header"
+
+
 async def middleware(request: Request, call_next):
     """Resolve the caller for every request; in server mode, turn away the ones not allowed."""
     path = request.url.path
-    user = user_from_request(request)
+    bearer = _bearer_user(request)
+    user = bearer or user_from_token(request.cookies.get("session_token"))
     request.state.user = user or (None if server_mode() else LOCAL_USER)
+    reason = csrf_refusal(request, bearer)
+    if reason:
+        return JSONResponse({"detail": reason}, status_code=403)
 
     if user and user.get("token") and path.startswith("/api"):
         reason = tokens.refusal(user["token"], request.method, path, ADMIN_PREFIXES)

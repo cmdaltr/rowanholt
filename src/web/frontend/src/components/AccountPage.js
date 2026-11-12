@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { listApiTokens, createApiToken, revokeApiToken } from '../api';
+import { CSRF_HEADERS } from '../apiBase';
 
 const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
 
@@ -84,7 +85,8 @@ const AccountPage = () => {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          ...CSRF_HEADERS
         },
         body: JSON.stringify({ display_name: displayName, email })
       });
@@ -120,7 +122,8 @@ const AccountPage = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          ...CSRF_HEADERS
         },
         body: JSON.stringify({
           current_password: currentPassword,
@@ -154,7 +157,8 @@ const AccountPage = () => {
         const response = await fetch('/api/auth/mfa/disable', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${token}`,
+            ...CSRF_HEADERS
           }
         });
 

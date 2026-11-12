@@ -1,5 +1,5 @@
-"""Removing a job's old output: the paths the API accepts, which folder the worker may remove, and
-who may confirm a retry (the 12 November 2026 review).
+"""Removing a job's old output: the paths the API accepts, which folder the worker may remove, who
+may confirm a retry, and the cross-site header (the 12 November 2026 review).
 
 Run: python3 -m unittest tests/unit/test_output_removal.py
 """
@@ -618,6 +618,20 @@ class RemovalApiTest(BackendCase):
         self.assertEqual(self.main.job_storage.get_job(dead).status, JobStatus.FAILED)
         self.assertIn("removing this job's old output", self.main.job_storage.get_job(dead).error)
         self.assertEqual(self.main.job_storage.get_job(live).status, JobStatus.REMOVING)
+
+    def test_a_cookie_needs_the_header_and_a_token_doesnt(self):
+        resp = self.client.post("/api/auth/login", data={"username": "bob", "password": "bob-password-123"})
+        cookie = {"Cookie": f"session_token={resp.cookies.get('session_token')}"}
+        self.client.cookies.clear()
+        refused = self.client.post("/api/jobs/bulk/cancel", headers=cookie, json=[])
+        self.assertEqual(refused.status_code, 403, refused.text)
+        self.assertIn("X-Rowanholt", refused.json()["detail"])
+        allowed = self.client.post("/api/jobs/bulk/cancel", headers={**cookie, "X-Rowanholt": "1"}, json=[])
+        self.assertEqual(allowed.status_code, 200, allowed.text)
+        self.assertEqual(self.client.get("/api/jobs", headers=cookie).status_code, 200)  # reads aren't refused
+        self.assertEqual(self.client.post("/api/jobs/bulk/cancel", headers=self.bob, json=[]).status_code, 200)
+        both = {**cookie, **self.bob}  # a bearer token decides, whatever cookie comes with it
+        self.assertEqual(self.client.post("/api/jobs/bulk/cancel", headers=both, json=[]).status_code, 200)
 
 
 if __name__ == "__main__":

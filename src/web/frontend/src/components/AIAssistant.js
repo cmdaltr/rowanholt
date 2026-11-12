@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { API_BASE_URL } from '../apiBase';
+import { API_BASE_URL, CSRF_HEADERS } from '../apiBase';
 import { flagFinding } from '../api';
 
 const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
@@ -116,7 +116,7 @@ function AIAssistant() {
     try {
       const response = await fetch(`${API_BASE}/api/ai/offline/answer`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...CSRF_HEADERS },
         body: JSON.stringify({ question_id: q.id, case_id: current ? current.case_id : null,
                                job_id: current ? current.job_id || null : null }),
       });
@@ -168,6 +168,7 @@ function AIAssistant() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            ...CSRF_HEADERS,
           },
           body: JSON.stringify({ question: currentQuestion }),
         });
@@ -193,6 +194,7 @@ function AIAssistant() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            ...CSRF_HEADERS,
           },
           body: JSON.stringify({
             message: currentQuestion,
@@ -230,6 +232,7 @@ function AIAssistant() {
     try {
       const response = await fetch(caseUrl(current, 'suggestions'), {
         method: 'POST',
+        headers: CSRF_HEADERS,
       });
 
       if (response.ok) {
@@ -258,6 +261,7 @@ function AIAssistant() {
     try {
       const response = await fetch(caseUrl(current, 'summary'), {
         method: 'POST',
+        headers: CSRF_HEADERS,
       });
 
       if (response.ok) {

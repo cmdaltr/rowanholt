@@ -54,7 +54,7 @@ Rowanholt implements comprehensive security measures to protect sensitive forens
 #### Session Cookies
 - **httpOnly**: True (prevents XSS access)
 - **secure**: Should be True in production (HTTPS only)
-- **sameSite**: Lax (prevents CSRF)
+- **sameSite**: Lax (stops other sites, not the same site: every app on a tailnet is one site, since `ts.net` is a public suffix; see CSRF below)
 - **Expiration**: Synchronized with token expiration
 
 #### Session Storage
@@ -226,8 +226,8 @@ allowed_origins = [
 
 ### Cross-Site Request Forgery (CSRF)
 - ✅ SameSite cookie attribute
-- ⚠️ TODO: CSRF tokens for state-changing operations
-- ✅ Origin validation via CORS
+- ✅ A state-changing `/api` request signed in by the session cookie must send `X-Rowanholt: 1` (`auth/access.py`); the web app's API client sends it, and a page on another origin can't without CORS allowing it. Bearer tokens don't need it ([API.md](API.md#cross-site-requests-the-x-rowanholt-header))
+- ✅ Origin validation via CORS (and an origin check on the case browser's websocket)
 
 ### SQL Injection
 - ✅ SQLAlchemy ORM parameterized queries
@@ -270,7 +270,7 @@ allowed_origins = [
 - [ ] Set up centralized logging
 
 ### Important (Should Do)
-- [ ] Implement CSRF protection
+- [x] Implement CSRF protection (the `X-Rowanholt` header, 12 November 2026)
 - [ ] Add session IP/User-Agent validation
 - [ ] Configure key rotation policy
 - [ ] Set up automated security scanning

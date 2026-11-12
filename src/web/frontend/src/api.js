@@ -1,10 +1,11 @@
 import axios from 'axios';
-import { API_BASE_URL } from './apiBase';
+import { API_BASE_URL, CSRF_HEADERS } from './apiBase';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
+    ...CSRF_HEADERS,
   },
   withCredentials: true, // Enable cookies for session management
 });

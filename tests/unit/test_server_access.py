@@ -377,8 +377,12 @@ class ServerAccessTest(BackendCase):
         self.assertEqual(resp.status_code, 200, resp.text)
         cookie = resp.cookies.get("session_token")
         self.client.cookies.clear()
-        # The cookie alone (Secure on a server, so the plain-HTTP test client won't send it by itself)
-        issued = self.client.post("/api/auth/session", headers={"Cookie": f"session_token={cookie}"})
+        # The cookie alone (Secure on a server, so the plain-HTTP test client won't send it by itself),
+        # with the web app's X-Rowanholt header: without it, a page on another site could ask
+        refused = self.client.post("/api/auth/session", headers={"Cookie": f"session_token={cookie}"})
+        self.assertEqual(refused.status_code, 403, refused.text)
+        issued = self.client.post("/api/auth/session", headers={"Cookie": f"session_token={cookie}",
+                                                                 "X-Rowanholt": "1"})
         self.assertEqual(issued.status_code, 200, issued.text)
         self.assertEqual(issued.json()["user"]["username"], "bob")
         bearer = {"Authorization": f"Bearer {issued.json()['access_token']}"}

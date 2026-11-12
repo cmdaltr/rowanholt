@@ -5,7 +5,7 @@ import GandalfJobBrowser from './GandalfJobBrowser';
 import OptionsPanel from './OptionsPanel';
 import { createJob, getLocalMordorDatasets } from '../api';
 import axios from 'axios';
-import { API_BASE_URL } from '../apiBase';
+import { API_BASE_URL, CSRF_HEADERS } from '../apiBase';
 
 // File requirements for certain options
 const FILE_REQUIREMENTS = {
@@ -226,7 +226,8 @@ function NewAnalysis() {
       try {
         const response = await axios.post(
           `${API_BASE_URL}/api/check-required-files`,
-          { options: requiredOptions }
+          { options: requiredOptions },
+          { headers: CSRF_HEADERS }
         );
 
         const missing = response.data.missing || [];
@@ -280,7 +281,7 @@ function NewAnalysis() {
       await axios.post(
         `${API_BASE_URL}/api/upload-required-files`,
         formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
+        { headers: { 'Content-Type': 'multipart/form-data', ...CSRF_HEADERS } }
       );
 
       setShowFileUploadModal(false);
