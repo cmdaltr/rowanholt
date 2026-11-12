@@ -17,78 +17,43 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-try:
-    from .config import settings
-    from . import busy  # GET /api/busy, the homelab's question before a rebuild
-    from . import job_liveness  # Whether a pending, running or paused job has a worker
-    from . import siem_export  # A completed job's manual SIEM export, run in the worker
-    from .auth import access
-    from .auth.users import load_users
-    from .auth.routes_simple import router as auth_router  # Simple file-based auth
-    from .ai_routes import router as ai_router  # AI assistant routes
-    from .mordor_routes import router as mordor_router  # Mordor dataset management
-    from .anduril_routes import router as anduril_router  # Anduril Docker administration
-    from .lab_routes import router as lab_router  # Test lab, via the host's lab agent
-    from .symbol_routes import router as symbol_router  # Volatility symbol tables (Aragorn)
-    from .sample_routes import router as sample_router  # Sample data as ready cases (Aragorn)
-    from .threat_intel_routes import router as threat_intel_router  # Threat intelligence indicators
-    from . import threat_intel_store
-    from . import case_routes  # The case browser, findings, notes and assignments
-    from . import smith_offline
-    from . import backup_secrets  # Phone backup passwords, job form to worker
-    from . import output_removal  # Where a job may write, and removing its old output
-    from . import removal_routes  # Confirming or giving up a failed removal
-    from . import licence  # The licence: edition, seats and features
-    from .licence_routes import router as licence_router
-    from . import branding_routes  # Report brands (report-branding, brand-library)
-    from .webhook_routes import router as webhook_router  # Signed webhooks (automation)
-    from .models.job import (
-        Job,
-        JobCreate,
-        JobListResponse,
-        JobStatus,
-        JobUpdate,
-        FileSystemItem,
-    )
-    from .storage import JobStorage
-    from .tasks_docker import start_analysis
-except ImportError:
-    # Fallback for standalone execution
-    from config import settings
-    import busy  # GET /api/busy, the homelab's question before a rebuild
-    import job_liveness  # Whether a pending, running or paused job has a worker
-    import siem_export  # A completed job's manual SIEM export, run in the worker
-    from auth import access
-    from auth.users import load_users
-    from auth.routes_simple import router as auth_router  # Simple file-based auth
-    from ai_routes import router as ai_router  # AI assistant routes
-    from mordor_routes import router as mordor_router  # Mordor dataset management
-    from anduril_routes import router as anduril_router  # Anduril Docker administration
-    from lab_routes import router as lab_router  # Test lab, via the host's lab agent
-    from symbol_routes import router as symbol_router  # Volatility symbol tables (Aragorn)
-    from sample_routes import router as sample_router  # Sample data as ready cases (Aragorn)
-    from threat_intel_routes import router as threat_intel_router  # Threat intelligence indicators
-    import threat_intel_store
-    import case_routes  # The case browser, findings, notes and assignments
-    import smith_offline
-    import backup_secrets  # Phone backup passwords, job form to worker
-    import output_removal  # Where a job may write, and removing its old output
-    import removal_routes  # Confirming or giving up a failed removal
-    import licence  # The licence: edition, seats and features
-    from licence_routes import router as licence_router
-    import branding_routes  # Report brands (report-branding, brand-library)
-    from webhook_routes import router as webhook_router  # Signed webhooks (automation)
-    from models.job import (
-        Job,
-        JobCreate,
-        JobListResponse,
-        JobStatus,
-        JobUpdate,
-        FileSystemItem,
-        FileSystemBrowseResponse,
-    )
-    from storage import JobStorage
-    from tasks_docker import start_analysis
+# Top-level imports: the backend runs as `uvicorn main:app` from its own folder, in the image and
+# from `rowanholt web`, and the tests import it the same way
+from config import settings
+import busy  # GET /api/busy, the homelab's question before a rebuild
+import job_liveness  # Whether a pending, running or paused job has a worker
+import siem_export  # A completed job's manual SIEM export, run in the worker
+from auth import access
+from auth.users import load_users
+from auth.routes_simple import router as auth_router  # Simple file-based auth
+from ai_routes import router as ai_router  # AI assistant routes
+from mordor_routes import router as mordor_router  # Mordor dataset management
+from anduril_routes import router as anduril_router  # Anduril Docker administration
+from lab_routes import router as lab_router  # Test lab, via the host's lab agent
+from symbol_routes import router as symbol_router  # Volatility symbol tables (Aragorn)
+from sample_routes import router as sample_router  # Sample data as ready cases (Aragorn)
+from threat_intel_routes import router as threat_intel_router  # Threat intelligence indicators
+import threat_intel_store
+import case_routes  # The case browser, findings, notes and assignments
+import smith_offline
+import backup_secrets  # Phone backup passwords, job form to worker
+import output_removal  # Where a job may write, and removing its old output
+import removal_routes  # Confirming or giving up a failed removal
+import licence  # The licence: edition, seats and features
+from licence_routes import router as licence_router
+import branding_routes  # Report brands (report-branding, brand-library)
+from webhook_routes import router as webhook_router  # Signed webhooks (automation)
+from models.job import (
+    Job,
+    JobCreate,
+    JobListResponse,
+    JobStatus,
+    JobUpdate,
+    FileSystemItem,
+    FileSystemBrowseResponse,
+)
+from storage import JobStorage
+from tasks_docker import start_analysis
 
 # Temporary replacement for security_utils (paths: output_removal.contained)
 def sanitize_case_number(case_number: str) -> str:
@@ -1394,12 +1359,8 @@ async def trigger_siem_export(job_id: str, request: Request) -> dict:
     Returns:
         The queued export's record
     """
-    # The house pattern: a package import under the tests' and tools' `backend.main`, a top-level
-    # one under `uvicorn main:app`, as the image runs it
-    try:
-        from .tasks_docker import export_siem
-    except ImportError:
-        from tasks_docker import export_siem
+    # Here rather than at the top, so a test's stand-in for tasks_docker is the one used
+    from tasks_docker import export_siem
 
     job = job_storage.get_job(job_id)
     if not job:

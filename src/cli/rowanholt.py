@@ -106,26 +106,29 @@ def cmd_web(args):
 
     try:
         import uvicorn
-        from web.backend.main import app
-
-        host = args.host or "0.0.0.0"
-        port = args.port or 8000
-
-        print(f"[+] Starting server on {host}:{port}")
-        print(f"[+] API documentation: http://{host}:{port}/docs")
-
-        uvicorn.run(
-            "web.backend.main:app",
-            host=host,
-            port=port,
-            reload=args.reload,
-            log_level="info"
-        )
-
     except ImportError as e:
         print(f"[ERROR] Failed to import web dependencies: {e}")
         print("[*] Install web dependencies: pip install -r requirements/web.txt")
         return 1
+
+    # The backend is a folder of top-level modules, run as `main:app` from that folder, as the
+    # image runs it; app_dir puts it on the path, in uvicorn's reload process too
+    backend = ROWANHOLT_ROOT / "web" / "backend"
+    host = args.host or "0.0.0.0"
+    port = args.port or 8000
+
+    print(f"[+] Starting server on {host}:{port}")
+    print(f"[+] API documentation: http://{host}:{port}/docs")
+
+    uvicorn.run(
+        "main:app",
+        app_dir=str(backend),
+        host=host,
+        port=port,
+        reload=args.reload,
+        reload_dirs=[str(backend)] if args.reload else None,
+        log_level="info"
+    )
 
     return 0
 
@@ -219,6 +222,12 @@ Examples:
     else:
         parser.print_help()
         return 0
+
+
+def web_main():
+    """The `rowanholt-web` entry point: `rowanholt web` and its options."""
+    sys.argv[1:1] = ["web"]
+    return main()
 
 
 if __name__ == '__main__':

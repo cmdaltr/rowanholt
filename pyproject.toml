@@ -78,7 +78,7 @@ rowanholt = "src.cli.rowanholt:main"
 rowanholt-acquire = "src.acquisition.python.gandalf:main"
 rowanholt-analyze = "src.analysis.cli:main"
 rowanholt-mordor = "src.cli.mordor:main"
-rowanholt-web = "src.web.backend.main:start_server"
+rowanholt-web = "src.cli.rowanholt:web_main"
 # Legacy compatibility
 elrond = "src.analysis.cli:main"
 gandalf = "src.acquisition.python.gandalf:main"
