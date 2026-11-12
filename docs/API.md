@@ -553,6 +553,7 @@ Each job has every field in [Get Job Details](#get-job-details) (shortened here)
 - `400 Bad Request`: the job is pending, running, paused or removing, or `awaiting_confirmation` (`Cannot delete a job awaiting confirmation: …`)
 - `403 Forbidden`: not the job's owner or an admin
 - `404 Not Found`: Job not found
+- `409 Conflict`: a [SIEM export](#export-job-to-siem) of the job is queued or running (`A SIEM export is running for this job; wait for it to finish`, or `queued`)
 
 ---
 
@@ -665,6 +666,7 @@ It's deleted without following symbolic links or crossing onto another device, a
 - `403 Forbidden`: a fresh restart by someone who isn't the job's owner or an admin, or a job whose recorded output folder is no longer inside the allowed folders
 - `404 Not Found`: Job not found
 - `409 Conflict`: The job has findings and `confirm` wasn't set; `detail` is `{"findings": 3, "message": "..."}`
+- `409 Conflict`: a [SIEM export](#export-job-to-siem) of the job is queued or running (`A SIEM export is running for this job; wait for it to finish`, or `queued`); `detail` is the message alone, with no `findings`
 - `500 Internal Server Error`: the task couldn't be queued (the job is failed with `Not queued: <error>`)
 
 ---
@@ -686,6 +688,7 @@ It's deleted without following symbolic links or crossing onto another device, a
 - `400 Bad Request`: the job is pending, running, paused or removing, or already archived; or it's `awaiting_confirmation` (`Cannot archive a job awaiting confirmation: …`), waiting for its owner or an admin to try removing its old output again or give up first
 - `403 Forbidden`: Not the job's owner or an admin
 - `404 Not Found`: Job not found
+- `409 Conflict`: a [SIEM export](#export-job-to-siem) of the job is queued or running (`A SIEM export is running for this job; wait for it to finish`, or `queued`)
 
 ---
 
@@ -718,6 +721,8 @@ It's deleted without following symbolic links or crossing onto another device, a
 **Query Parameters:**
 - `fresh` (bool, default `true` for completed jobs, `false` for failed or cancelled ones): remove each job's previous output before it runs again
 - `confirm` (bool, default `false`): restart jobs that have findings too
+
+A job whose [SIEM export](#export-job-to-siem) is queued or running is skipped, with `success: false` and `A SIEM export is running for this job; wait for it to finish` (or `queued`) in `error`.
 
 ---
 
@@ -816,8 +821,8 @@ The export's notable lines (each target's phase, warnings and errors, and the ou
 A job the caller can't see comes back `Job not found`; one they see but don't manage, with the owner-or-admin refusal (for unarchive, `Only the job's owner or an admin can restore it from the archive`). Otherwise:
 
 - **cancel**: as the single cancel, marked first, then stopped; a job that had already finished or failed is left alone, not stopped, and reported with `success: false`
-- **delete**: as the single delete (the case's rows go with the job, nothing on disk is removed, the audit log records each); `Cannot delete running job` for a pending, running, paused or removing one, `Cannot delete a job awaiting confirmation: …` for one `awaiting_confirmation`
-- **archive**: `Cannot archive running job` for a pending, running, paused or removing one; `Cannot archive a job awaiting confirmation: …` for one `awaiting_confirmation`; `Already archived`
+- **delete**: as the single delete (the case's rows go with the job, nothing on disk is removed, the audit log records each); `Cannot delete running job` for a pending, running, paused or removing one, `Cannot delete a job awaiting confirmation: …` for one `awaiting_confirmation`, `A SIEM export is running for this job; wait for it to finish` (or `queued`) while its [SIEM export](#export-job-to-siem) is queued or running
+- **archive**: `Cannot archive running job` for a pending, running, paused or removing one; `Cannot archive a job awaiting confirmation: …` for one `awaiting_confirmation`; `A SIEM export is running for this job; wait for it to finish` (or `queued`) while its [SIEM export](#export-job-to-siem) is queued or running; `Already archived`
 - **unarchive**: `Job is not archived`; on success the result's `status` is the status restored, as the single unarchive restores it
 
 ---
