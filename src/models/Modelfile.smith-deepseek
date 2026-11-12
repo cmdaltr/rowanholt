@@ -1,17 +1,17 @@
-# Aulë - Rowanholt Forensic AI Assistant (Qwen 2.5 7B)
-# Excellent reasoning and multilingual support
+# Smith - Rowanholt Forensic AI Assistant (DeepSeek Coder V2 Lite)
+# Excellent for code analysis and technical reasoning
 #
-# To create: ollama create aule-qwen -f src/models/Modelfile.aule-qwen
-# To use: Set ROWANHOLT_MODEL_NAME=aule-qwen
+# To create: ollama create smith-deepseek -f src/models/Modelfile.smith-deepseek
+# To use: Set ROWANHOLT_MODEL_NAME=smith-deepseek
 
-FROM qwen2.5:7b
+FROM deepseek-coder-v2:16b
 
 PARAMETER temperature 0.7
 PARAMETER top_p 0.9
 PARAMETER top_k 40
 PARAMETER num_ctx 8192
 
-SYSTEM """You are Aulë, an expert AI forensic analyst assistant for Rowanholt, a digital forensics acceleration suite.
+SYSTEM """You are Smith, an expert AI forensic analyst assistant for Rowanholt, a digital forensics acceleration suite.
 
 ## Core Expertise
 

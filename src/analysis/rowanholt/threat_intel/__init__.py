@@ -1,6 +1,6 @@
 """Threat intelligence: indicators in the fixed 10-column schema, loaded from the Iran APT workbook,
 STIX 2.1 bundles, TAXII 2.1 collections, MITRESaw's procedures or a text watchlist,
-and matched against a case (Elrond's --threatIntel) or a single value (enrich_artefact, for Aulë).
+and matched against a case (Elrond's --threatIntel) or a single value (enrich_artefact, for Smith).
 
 Stdlib only, apart from openpyxl for the workbook and samarkand for STIX and TAXII (both in the backend
 and worker images), so the web backend can import it too.

@@ -2,7 +2,7 @@
 
 Status: **approved, 6 November 2026** (decisions at the end); built on `feat/jsonl-output` (what changed from the plan while building it is in "As built", before the decisions).
 
-Elrond's output today is two formats chosen by whichever parser wrote the file: about 30 writers produce JSON (Artemis, registry, browsers, plists, journalctl, Linux logs and services, mail, clipboard, USB) and about 70 file names are CSV (the native parsers in `process/windows_artefacts.py`, `linux_artefacts.py`, `mac_artefacts.py`, `extra_artefacts.py`, plus bash and zsh history, `group` and UAL). No artefact gets both, and nothing converts between them. Readers cope unevenly: the case browser reads both, stacking mostly JSON, Aulë's context search CSV only, so Aulë never sees Artemis, registry, event log, browser or journal output.
+Elrond's output today is two formats chosen by whichever parser wrote the file: about 30 writers produce JSON (Artemis, registry, browsers, plists, journalctl, Linux logs and services, mail, clipboard, USB) and about 70 file names are CSV (the native parsers in `process/windows_artefacts.py`, `linux_artefacts.py`, `mac_artefacts.py`, `extra_artefacts.py`, plus bash and zsh history, `group` and UAL). No artefact gets both, and nothing converts between them. Readers cope unevenly: the case browser reads both, stacking mostly JSON, Smith's context search CSV only, so Smith never sees Artemis, registry, event log, browser or journal output.
 
 The goal: every record Rowanholt writes, in `cooked/`, `analysis/` and the case-level tables, is a JSON Lines file (`.jsonl`, one object per line) with the same envelope fields, so every reader treats every artefact the same way.
 
@@ -11,7 +11,7 @@ The goal: every record Rowanholt writes, in `cooked/`, `analysis/` and the case-
 - **Nested records survive.** Artemis's event logs (`data.Event.System…`), tasks and plists are nested. CSV would flatten them or pack JSON into a cell.
 - **Real escaping and types.** No more commas, quotes and newlines in command lines shifting columns. The Plaso timeline already has this bug (below), and the string-built JSON writers produce invalid JSON on awkward input.
 - **One record per line, not one array.** An MFT or event log export can be millions of records. JSONL streams, appends, survives a broken line, works with `grep` and `jq`, and Splunk and Elastic take it as it is (Elastic's step converts everything to NDJSON today, which is the same thing).
-- **Row references stay line numbers**, as CSV's are today, so the case browser, saved findings and Aulë's citations keep working the same way.
+- **Row references stay line numbers**, as CSV's are today, so the case browser, saved findings and Smith's citations keep working the same way.
 
 ## The record
 
@@ -68,22 +68,22 @@ A stdlib module, `src/analysis/rowanholt/core/records.py`, loaded by the backend
 - `write_records(path, rows, *, host, artefact, source_path, time_field, techniques)`: appends JSONL lines with the envelope, normalising the timestamp; returns the count.
 - `read_records(path)`: yields `(ref, record)` for `.jsonl` (ref = line number, streamed, no size cap), `.json` (array or object, ref `#n`, as now) and `.csv` (ref = line number, as now).
 
-It replaces the two copies of `_append_rows` (`windows_artefacts.py:49`, `linux_artefacts.py:118`) and the five separate readers: `case_files.records()`, stacking's `_json_records`/`_csv_rows`, threat intelligence's `_records()`, `aule_offline`'s `_rows`/`_json_records`, Artemis's `_records()`.
+It replaces the two copies of `_append_rows` (`windows_artefacts.py:49`, `linux_artefacts.py:118`) and the five separate readers: `case_files.records()`, stacking's `_json_records`/`_csv_rows`, threat intelligence's `_records()`, `smith_offline`'s `_rows`/`_json_records`, Artemis's `_records()`.
 
 ### 2. Readers accept JSONL
 
 | Reader | Change |
 |---|---|
 | Case browser (`case_files.py`) | `.jsonl` in `ROW_FILES` and the case-level glob; `read_records`; envelope fields shown as columns |
-| Aulë context (`aule_context.py:86`) | search `*.jsonl` as well as `*.csv`: this is the fix that lets Aulë see Windows evidence |
-| Aulë fixed answers (`aule_offline.py`) | about 30 named files: each looked up as `.jsonl`, then the old name; `stacking`'s `Sources` becomes a real list |
-| Aulë MCP (`aule_mcp/server.py:303`) | `rare_across_hosts` reads `stacking.jsonl`, then `stacking.csv` |
+| Smith context (`smith_context.py:86`) | search `*.jsonl` as well as `*.csv`: this is the fix that lets Smith see Windows evidence |
+| Smith fixed answers (`smith_offline.py`) | about 30 named files: each looked up as `.jsonl`, then the old name; `stacking`'s `Sources` becomes a real list |
+| Smith MCP (`smith_mcp/server.py:303`) | `rare_across_hosts` reads `stacking.jsonl`, then `stacking.csv` |
 | `ai_routes.py:323`, `tasks.py:189`, `:263` | count `.jsonl`; fix `ai_routes`' path (it misses `artefacts/`) |
 | Stacking (`analysis/stacking.py:304`) | sources matched by artefact name, any of the three formats |
 | `analysis/analysis.py:451` | its sniff for Artemis's UUID-named MFT files would open every `.jsonl`; match on the envelope's `artefact` instead |
 | Threat intelligence matching (`threat_intel/match.py`) | `.jsonl` in its walk; envelope fields not flattened into the match text; `_fill_watchlist` rewritten for JSONL |
 | `process_one.py:41` | a `.jsonl` preview |
-| Aulë CLI indexer (`ai/indexer.py`) | reads paths that no longer exist (`processed/*.csv`); point it at the real files with `read_records`, or remove it (your call) |
+| Smith CLI indexer (`ai/indexer.py`) | reads paths that no longer exist (`processed/*.csv`); point it at the real files with `read_records`, or remove it (your call) |
 
 ### 3. Writers produce JSONL
 
@@ -107,8 +107,8 @@ It replaces the two copies of `_append_rows` (`windows_artefacts.py:49`, `linux_
 
 - **Lab**: `verify-expected.py` reads `.jsonl` and matches against decoded values (JSON escaping of `\` would otherwise break substring matches on Windows paths); the Linux seed's 19 `"cooked": "<name>.csv"` entries are renamed; `stacking_eval.py` reads `stacking.jsonl`. Not touched while a lab run is going.
 - **A format check**: a test, and a step in `verify-expected`, that every `.jsonl` file in a case parses line by line and every record has the five envelope fields. That's the "consistent" part held in place.
-- **Tests**: about 30 test files build or assert on cooked CSV/JSON (the largest: `test_aule_offline` 33, `test_linux_artefacts` 21, `test_aule_mcp` 21, `test_stacking` 20, `test_containers` 18, `test_case_browser` 17, `test_threat_intel` 15); updated with the code they test, plus tests that old-format cases still read.
-- **Docs and help text**: `docs/CLI.md` (output structure), `USAGE.md`, `README.md`, `QUICKSTART.md`, `AULE.md` and the rest that name CSVs; `elrond.py`'s help; the About page (`HelpPage.js`), the guide and the architecture pages.
+- **Tests**: about 30 test files build or assert on cooked CSV/JSON (the largest: `test_smith_offline` 33, `test_linux_artefacts` 21, `test_smith_mcp` 21, `test_stacking` 20, `test_containers` 18, `test_case_browser` 17, `test_threat_intel` 15); updated with the code they test, plus tests that old-format cases still read.
+- **Docs and help text**: `docs/CLI.md` (output structure), `USAGE.md`, `README.md`, `QUICKSTART.md`, `SMITH.md` and the rest that name CSVs; `elrond.py`'s help; the About page (`HelpPage.js`), the guide and the architecture pages.
 
 ### 6. Bugs fixed on the way
 
@@ -125,7 +125,7 @@ It replaces the two copies of `_append_rows` (`windows_artefacts.py:49`, `linux_
 1. Unit tests after each step: the whole suite, as now (`tests/unit`).
 2. The Linux and Windows stacking evals and `verify-expected` on the branch, compared with step 0's baseline: the same planted items found, the same stacking ranks, every file passing the format check. A difference is a bug in this change, not a finding.
 3. One case each from Splunk and Elastic: every artefact indexed, with its time.
-4. Aulë asked about something only in Windows JSON (a service, a scheduled task, an event) to show the context search now finds it.
+4. Smith asked about something only in Windows JSON (a service, a scheduled task, an event) to show the context search now finds it.
 
 ## As built
 
@@ -143,7 +143,7 @@ It replaces the two copies of `_append_rows` (`windows_artefacts.py:49`, `linux_
 1. **Envelope names** as above: `host`, `artefact`, `source_path`, `timestamp`, `techniques`. `source_path` with an underscore: a hyphen would read as subtraction in SPL and need quoting in Kibana.
 2. **Old cases** are left as they are and read in their old format.
 3. **The dead extractors are removed**, in their own commit first: 13 modules in `process/extractions/` (`mft.py`, `usn.py`, `shimcache.py`, `wbem.py`, `sru.py`, `wmi_full.py`, `linux_enhanced.py`, `macos_enhanced.py`, `wmi.py`, `evtx.py`, `artifact_models.py`, `plist.py`, the empty `macos/`) that nothing imports since Artemis replaced them.
-4. **The Aulë CLI indexer** (`ai/indexer.py`) is fixed: pointed at the real files through `read_records`.
+4. **The Smith CLI indexer** (`ai/indexer.py`) is fixed: pointed at the real files through `read_records`.
 5. **Download as CSV**: the case browser gets a button that downloads the artefact being viewed as CSV (nested values as JSON text in their cell), for Excel and Timeline Explorer. Built with step 5.
 
 ## Decisions while building (Ben, 7 November 2026)

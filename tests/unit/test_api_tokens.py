@@ -1,5 +1,5 @@
 """Unit tests for long-lived API tokens (src/web/backend/auth/tokens.py): made from a sign-in,
-stored as a hash, revocable, expiring, and an aule-mcp scope that holds Aulë to reading, leads
+stored as a hash, revocable, expiring, and a smith-mcp scope that holds Smith to reading, leads
 and notes whatever headers it sends.
 
 Run from tests/unit: python3 -m unittest test_api_tokens.py
@@ -111,62 +111,64 @@ class ApiTokenTest(BackendCase):
         self.assertEqual(self.client.delete(f"/api/auth/tokens/{made['id']}", headers=self.admin).status_code, 200)
         self.assertEqual(self.client.get("/api/auth/me", headers=bearer(made["token"])).status_code, 401)
 
-    def test_an_aule_token_is_aule_without_the_header(self):
+    def test_an_smith_token_is_smith_without_the_header(self):
         job = self.case("CASE-TOKEN-1")
-        aule = bearer(self.make(self.alice, name="Aulë", scope="aule-mcp")["token"])
+        smith = bearer(self.make(self.alice, name="Smith", scope="smith-mcp")["token"])
         base = f"/api/jobs/{job}/case"
         row = {"host": "WS01", "artefact": "artefacts/cooked/prefetch.csv", "row_ref": "3", "title": "x"}
 
-        self.assertEqual(self.client.get(f"{base}/findings", headers=aule).status_code, 200)
-        lead = self.client.post(f"{base}/findings", headers=aule, json=row)
+        self.assertEqual(self.client.get(f"{base}/findings", headers=smith).status_code, 200)
+        lead = self.client.post(f"{base}/findings", headers=smith, json=row)
         self.assertEqual(lead.status_code, 200, lead.text)
-        self.assertEqual(lead.json()["author"], "Aulë (for alice)")
-        note = self.client.post(f"{base}/notes", headers=aule, json={"body": "worth a look"})
-        self.assertEqual(note.json()["author"], "Aulë (for alice)")
+        self.assertEqual(lead.json()["author"], "Smith (for alice)")
+        note = self.client.post(f"{base}/notes", headers=smith, json={"body": "worth a look"})
+        self.assertEqual(note.json()["author"], "Smith (for alice)")
 
-        self.assertEqual(self.client.post(f"{base}/findings", headers=aule, json={**row, "status": "confirmed"}).status_code, 403)
+        self.assertEqual(self.client.post(f"{base}/findings", headers=smith, json={**row, "status": "confirmed"}).status_code, 403)
         lead_id = lead.json()["id"]
-        self.assertEqual(self.client.patch(f"{base}/findings/{lead_id}", headers=aule, json={"status": "confirmed"}).status_code, 403)
-        self.assertEqual(self.client.delete(f"{base}/findings/{lead_id}", headers=aule).status_code, 403)
-        self.assertEqual(self.client.put(f"{base}/hosts/WS01", headers=aule, json={"status": "done"}).status_code, 403)
+        self.assertEqual(self.client.patch(f"{base}/findings/{lead_id}", headers=smith, json={"status": "confirmed"}).status_code, 403)
+        self.assertEqual(self.client.delete(f"{base}/findings/{lead_id}", headers=smith).status_code, 403)
+        self.assertEqual(self.client.put(f"{base}/hosts/WS01", headers=smith, json={"status": "done"}).status_code, 403)
         # Nothing else that writes: not starting or deleting jobs, not sharing them
         source = self.evidence / "CASE-TOKEN-2.E01"
         source.write_bytes(b"")
-        self.assertEqual(self.client.post("/api/jobs", headers=aule, json={
+        self.assertEqual(self.client.post("/api/jobs", headers=smith, json={
             "case_number": "CASE-TOKEN-2", "source_paths": [str(source)]}).status_code, 403)
-        self.assertEqual(self.client.delete(f"/api/jobs/{job}", headers=aule).status_code, 403)
+        self.assertEqual(self.client.delete(f"/api/jobs/{job}", headers=smith).status_code, 403)
 
-    def test_an_aule_token_can_ask_aule(self):
-        # The MCP server's ask_offline, ask_aule, case_summary and suggestions are POSTs that only read
+    def test_an_smith_token_can_ask_smith(self):
+        # The MCP server's ask_offline, ask_smith, case_summary and suggestions are POSTs that only read
         from auth import tokens
-        token = {"scope": "aule-mcp"}
+        token = {"scope": "smith-mcp"}
         for path in ("/api/ai/offline/answer", "/api/ai/cases/CASE-1/query", "/api/ai/cases/CASE-1/summary",
                      "/api/ai/cases/CASE-1/suggestions"):
             self.assertIsNone(tokens.refusal(token, "POST", path, ("/api/admin",)), path)
         for path in ("/api/ai/cases/CASE-1/query/x", "/api/ai/models/pull", "/api/ai/cases/CASE-1"):
             self.assertIsNotNone(tokens.refusal(token, "POST", path, ("/api/admin",)), path)
-        aule = bearer(self.make(self.alice, name="Aulë", scope="aule-mcp")["token"])
-        self.assertNotEqual(self.client.post("/api/ai/offline/answer", headers=aule,
+        smith = bearer(self.make(self.alice, name="Smith", scope="smith-mcp")["token"])
+        self.assertNotEqual(self.client.post("/api/ai/offline/answer", headers=smith,
                                              json={"question_id": "general"}).status_code, 403)
 
-    def test_the_scope_from_before_the_rename_is_still_aule(self):
-        # Aulë was Eru: an eru-mcp token asked for is made aule-mcp, and one stored before the
-        # migration (f2b7c9d4e816) is held to what an aule-mcp token may do
+    def test_the_scopes_from_before_the_renames_are_still_smith(self):
+        # Smith was Aulë, and Eru before that: an aule-mcp or eru-mcp token asked for is made smith-mcp,
+        # and one stored before the migrations (f2b7c9d4e816, e8c3a1f5b927) is held to what a smith-mcp
+        # token may do
         from auth import tokens
-        made = self.make(self.alice, name="old script", scope="eru-mcp")
-        self.assertEqual(made["scope"], "aule-mcp")
-        me = self.client.get("/api/auth/me", headers=bearer(made["token"])).json()
-        self.assertEqual(me["token"]["scope"], "aule-mcp")
-        old = {"scope": "eru-mcp"}
-        self.assertIsNone(tokens.refusal(old, "POST", "/api/ai/cases/CASE-1/query", ("/api/admin",)))
-        self.assertIsNotNone(tokens.refusal(old, "DELETE", "/api/jobs/x", ("/api/admin",)))
-        self.assertIsNotNone(tokens.refusal(old, "GET", "/api/admin/x", ("/api/admin",)))
+        for scope in ("aule-mcp", "eru-mcp"):
+            made = self.make(self.alice, name=f"old script ({scope})", scope=scope)
+            self.assertEqual(made["scope"], "smith-mcp", scope)
+            me = self.client.get("/api/auth/me", headers=bearer(made["token"])).json()
+            self.assertEqual(me["token"]["scope"], "smith-mcp", scope)
+            old = {"scope": scope}
+            self.assertIsNone(tokens.refusal(old, "POST", "/api/ai/cases/CASE-1/query", ("/api/admin",)), scope)
+            self.assertIsNotNone(tokens.refusal(old, "DELETE", "/api/jobs/x", ("/api/admin",)), scope)
+            self.assertIsNotNone(tokens.refusal(old, "GET", "/api/admin/x", ("/api/admin",)), scope)
 
-    def test_an_admins_aule_token_has_no_admin_areas(self):
-        aule = bearer(self.make(self.admin, name="Aulë", scope="aule-mcp")["token"])
-        self.assertEqual(self.client.get("/api/auth/me", headers=aule).status_code, 200)
+    def test_an_admins_smith_token_has_no_admin_areas(self):
+        smith = bearer(self.make(self.admin, name="Smith", scope="smith-mcp")["token"])
+        self.assertEqual(self.client.get("/api/auth/me", headers=smith).status_code, 200)
         for path in ("/api/auth/users", "/api/lab/status", "/api/aragorn/containers"):
-            self.assertEqual(self.client.get(path, headers=aule).status_code, 403, path)
+            self.assertEqual(self.client.get(path, headers=smith).status_code, 403, path)
 
 
 if __name__ == "__main__":

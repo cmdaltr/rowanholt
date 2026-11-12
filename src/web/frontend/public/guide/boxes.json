@@ -191,36 +191,36 @@
    ]
   }
  },
- "aule": {
-  "image": "aule.jpg",
+ "smith": {
+  "image": "smith.jpg",
   "width": 1440,
   "height": 880,
   "boxes": {
-   "aule.help": [
+   "smith.help": [
     54,
     24,
     1332,
     205
    ],
-   "aule.case": [
+   "smith.case": [
     54,
     244,
     1332,
     73
    ],
-   "aule.chat": [
+   "smith.chat": [
     54,
     340,
     1332,
     57
    ],
-   "aule.quick": [
+   "smith.quick": [
     54,
     413,
     1332,
     374
    ],
-   "aule.ask": [
+   "smith.ask": [
     54,
     810,
     1332,

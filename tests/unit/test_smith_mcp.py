@@ -1,4 +1,4 @@
-"""Aulë's MCP server (src/aule_mcp/server.py), driven through the MCP SDK's in-memory client against
+"""Smith's MCP server (src/smith_mcp/server.py), driven through the MCP SDK's in-memory client against
 the real backend in server mode (test_server_access.BackendCase). These are the threat model's
 checks before it goes near a live case: the tool list against what's never exposed, no reaching a
 job that isn't yours or shared with you, no reaching raw/, and no calls but Rowanholt's API.
@@ -19,11 +19,11 @@ from test_server_access import BackendCase, TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 try:
     from mcp import Client
-    from aule_mcp import server as aule_mcp
+    from smith_mcp import server as smith_mcp
 except ImportError:  # requirements/mcp.txt not installed
     Client = None
 
-PHASE_1 = {"list_cases", "case_overview", "read_rows", "ask_offline", "ask_aule", "case_summary", "suggestions",
+PHASE_1 = {"list_cases", "case_overview", "read_rows", "ask_offline", "ask_smith", "case_summary", "suggestions",
            "check_indicator", "rare_across_hosts", "findings", "report", "navigator_layer"}
 PHASE_2 = {"flag_lead", "add_note"}
 NEVER = ("start", "restart", "delete", "cancel", "acquire", "gandalf", "collect", "import", "upload", "share",
@@ -31,7 +31,7 @@ NEVER = ("start", "restart", "delete", "cancel", "acquire", "gandalf", "collect"
 
 
 @unittest.skipIf(TestClient is None or Client is None, "backend requirements or requirements/mcp.txt not installed")
-class AuleMcpTest(BackendCase):
+class SmithMcpTest(BackendCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -51,10 +51,10 @@ class AuleMcpTest(BackendCase):
             self.calls.append(path)
             # RowanholtAPI._urllib sends the agent header (test_the_agent_header_is_sent)
             resp = self.client.request(method, path, params=params, json=body,
-                                       headers={**headers, aule_mcp.AGENT_HEADER[0]: aule_mcp.AGENT_HEADER[1]})
+                                       headers={**headers, smith_mcp.AGENT_HEADER[0]: smith_mcp.AGENT_HEADER[1]})
             is_json = "json" in resp.headers.get("content-type", "")
             return resp.status_code, resp.json() if is_json else resp.text
-        return aule_mcp.build_server(aule_mcp.RowanholtAPI("http://testserver", transport=send), **options)
+        return smith_mcp.build_server(smith_mcp.RowanholtAPI("http://testserver", transport=send), **options)
 
     def call(self, headers, name, server=None, **arguments):
         """(is_error, result): the tool's structured result, or its error text."""
@@ -84,10 +84,12 @@ class AuleMcpTest(BackendCase):
             "1,2.0,process,x7kq.exe,1,4,WS01,\"rare, generated name\",prefetch.csv,X7KQ.EXE\n")
         return job
 
-    def test_the_old_package_name_is_the_same_server(self):
-        # MCP hosts configured before Aulë was renamed from Eru run python3 -m eru_mcp.server
+    def test_the_old_package_names_are_the_same_server(self):
+        # MCP hosts configured before the analyst was Smith run python3 -m aule_mcp.server (Aulë) or
+        # python3 -m eru_mcp.server (Eru)
         import importlib
-        self.assertIs(importlib.import_module("eru_mcp.server"), aule_mcp)
+        self.assertIs(importlib.import_module("aule_mcp.server"), smith_mcp)
+        self.assertIs(importlib.import_module("eru_mcp.server"), smith_mcp)
 
     def test_tools_are_phase_one_and_read_only(self):
         async def run():
@@ -122,7 +124,7 @@ class AuleMcpTest(BackendCase):
         error, lead = self.call(self.alice, "flag_lead", server=server, job_id=job, host="WS01",
                                 file="artefacts/cooked/prefetch.csv", row="3", title="Generated name", technique="t1036")
         self.assertFalse(error, lead)
-        self.assertEqual((lead["status"], lead["author"], lead["technique"]), ("lead", "Aulë (for alice)", "T1036"))
+        self.assertEqual((lead["status"], lead["author"], lead["technique"]), ("lead", "Smith (for alice)", "T1036"))
         # Already flagged: refused, with what to do instead
         error, text = self.call(self.alice, "flag_lead", server=server, job_id=job, host="WS01",
                                 file="artefacts/cooked/prefetch.csv", row="3", title="Again")
@@ -130,11 +132,11 @@ class AuleMcpTest(BackendCase):
         self.assertIn("409", text)
         error, note = self.call(self.alice, "add_note", server=server, job_id=job, body="Seen on WS01 only",
                                 finding_id=lead["id"])
-        self.assertEqual((note["author"], note["finding_id"]), ("Aulë (for alice)", lead["id"]))
+        self.assertEqual((note["author"], note["finding_id"]), ("Smith (for alice)", lead["id"]))
         error, note = self.call(self.alice, "add_note", server=server, job_id=job, body="Case-wide note")
         self.assertIsNone(note["finding_id"])
         activity = self.client.get(f"/api/jobs/{job}/case/activity", headers=self.alice).json()
-        self.assertEqual({a["actor"] for a in activity}, {"Aulë (for alice)"})
+        self.assertEqual({a["actor"] for a in activity}, {"Smith (for alice)"})
         # The analyst's own writes stay theirs
         flagged = self.client.post(f"/api/jobs/{job}/case/findings", headers=self.alice, json={
             "host": "WS01", "artefact": "artefacts/cooked/prefetch.csv", "row_ref": "2", "title": "cmd"})
@@ -144,33 +146,34 @@ class AuleMcpTest(BackendCase):
         self.assertTrue(error)
         self.assertIn("404", text)
 
-    def test_the_backend_holds_aule_to_leads(self):
+    def test_the_backend_holds_smith_to_leads(self):
         job = self.case_with_output("CASE-MCP-8")
-        aule = {**self.alice, aule_mcp.AGENT_HEADER[0]: aule_mcp.AGENT_HEADER[1]}
+        smith = {**self.alice, smith_mcp.AGENT_HEADER[0]: smith_mcp.AGENT_HEADER[1]}
         base = f"/api/jobs/{job}/case"
         row = {"host": "WS01", "artefact": "artefacts/cooked/prefetch.csv", "row_ref": "3", "title": "x"}
-        self.assertEqual(self.client.post(f"{base}/findings", headers=aule, json={**row, "status": "confirmed"}).status_code, 403)
-        lead = self.client.post(f"{base}/findings", headers=aule, json=row).json()
-        self.assertEqual(self.client.patch(f"{base}/findings/{lead['id']}", headers=aule,
+        self.assertEqual(self.client.post(f"{base}/findings", headers=smith, json={**row, "status": "confirmed"}).status_code, 403)
+        lead = self.client.post(f"{base}/findings", headers=smith, json=row).json()
+        self.assertEqual(self.client.patch(f"{base}/findings/{lead['id']}", headers=smith,
                                            json={"status": "confirmed"}).status_code, 403)
-        self.assertEqual(self.client.delete(f"{base}/findings/{lead['id']}", headers=aule).status_code, 403)
-        self.assertEqual(self.client.put(f"{base}/hosts/WS01", headers=aule, json={"status": "done"}).status_code, 403)
+        self.assertEqual(self.client.delete(f"{base}/findings/{lead['id']}", headers=smith).status_code, 403)
+        self.assertEqual(self.client.put(f"{base}/hosts/WS01", headers=smith, json={"status": "done"}).status_code, 403)
         # The analyst confirms it
         confirmed = self.client.patch(f"{base}/findings/{lead['id']}", headers=self.alice, json={"status": "confirmed"})
         self.assertEqual(confirmed.json()["status"], "confirmed")
 
-    def test_an_mcp_server_from_before_the_renames_is_still_aule(self):
+    def test_an_mcp_server_from_before_the_renames_is_still_smith(self):
         base_row = {"artefact": "artefacts/cooked/prefetch.csv", "title": "x"}
-        # Rivendell's header and Eru's value, and Rowanholt's header with Eru's value
-        for n, header in enumerate((("X-Rivendell-Agent", "eru-mcp"), ("X-Rowanholt-Agent", "eru-mcp"))):
+        # Rivendell's header and Eru's value, and Rowanholt's header with Eru's and Aulë's values
+        for n, header in enumerate((("X-Rivendell-Agent", "eru-mcp"), ("X-Rowanholt-Agent", "eru-mcp"),
+                                    ("X-Rowanholt-Agent", "aule-mcp"))):
             job = self.case_with_output(f"CASE-MCP-2{4 + n}")
-            aule = {**self.alice, header[0]: header[1]}
+            smith = {**self.alice, header[0]: header[1]}
             base = f"/api/jobs/{job}/case"
             row = {**base_row, "host": "WS01", "row_ref": "3"}
-            self.assertEqual(self.client.post(f"{base}/findings", headers=aule,
+            self.assertEqual(self.client.post(f"{base}/findings", headers=smith,
                                               json={**row, "status": "confirmed"}).status_code, 403, header)
-            self.assertEqual(self.client.post(f"{base}/findings", headers=aule, json=row).json()["author"],
-                             "Aulë (for alice)", header)
+            self.assertEqual(self.client.post(f"{base}/findings", headers=smith, json=row).json()["author"],
+                             "Smith (for alice)", header)
 
     def test_a_session_stops_at_its_write_limit(self):
         job = self.case_with_output("CASE-MCP-9")
@@ -182,33 +185,34 @@ class AuleMcpTest(BackendCase):
         self.assertIn("2 writes", text)
         self.assertEqual(len(self.client.get(f"/api/jobs/{job}/case/notes", headers=self.alice).json()), 2)
 
-    def test_writes_need_an_aule_token_on_a_server(self):
+    def test_writes_need_an_smith_token_on_a_server(self):
         def api(headers):
             def send(method, path, params, body, token):
                 resp = self.client.request(method, path, params=params, json=body, headers=headers)
                 return resp.status_code, resp.json()
-            return aule_mcp.RowanholtAPI("http://testserver", transport=send)
+            return smith_mcp.RowanholtAPI("http://testserver", transport=send)
 
         def token(scope):
             made = self.client.post("/api/auth/tokens", headers=self.alice, json={"name": "mcp", "scope": scope})
             return {"Authorization": f"Bearer {made.json()['token']}"}
 
-        self.assertIsNone(aule_mcp.write_refusal(api(token("aule-mcp"))))
-        # Asked for by its name from before Aulë was renamed from Eru: the same scope
-        self.assertIsNone(aule_mcp.write_refusal(api(token("eru-mcp"))))
-        self.assertIn("not a full token", aule_mcp.write_refusal(api(token("full"))))
-        self.assertIn("not a sign-in token", aule_mcp.write_refusal(api(self.alice)))
-        self.assertIn("can't check the token", aule_mcp.write_refusal(api({})))
+        self.assertIsNone(smith_mcp.write_refusal(api(token("smith-mcp"))))
+        # Asked for by its names from before the analyst was renamed (Aulë, then Eru): the same scope
+        self.assertIsNone(smith_mcp.write_refusal(api(token("aule-mcp"))))
+        self.assertIsNone(smith_mcp.write_refusal(api(token("eru-mcp"))))
+        self.assertIn("not a full token", smith_mcp.write_refusal(api(token("full"))))
+        self.assertIn("not a sign-in token", smith_mcp.write_refusal(api(self.alice)))
+        self.assertIn("can't check the token", smith_mcp.write_refusal(api({})))
         # On an analyst's own machine there's no token to check
         self.settings.rowanholt_server_mode = False
         try:
-            self.assertIsNone(aule_mcp.write_refusal(api({})))
+            self.assertIsNone(smith_mcp.write_refusal(api({})))
         finally:
             self.settings.rowanholt_server_mode = True
 
     def test_over_http_each_request_is_its_own_analyst(self):
         """Streamable HTTP (a team server's /mcp): no token of its own; each request's API token is checked
-        against Rowanholt and used for its calls; only aule-mcp tokens are taken, reads included."""
+        against Rowanholt and used for its calls; only smith-mcp tokens are taken, reads included."""
         import socket
         import threading
         import time
@@ -217,7 +221,7 @@ class AuleMcpTest(BackendCase):
         from mcp.client.streamable_http import streamable_http_client
 
         def send(method, path, params, body, token):
-            headers = {aule_mcp.AGENT_HEADER[0]: aule_mcp.AGENT_HEADER[1], **({"Authorization": f"Bearer {token}"} if token else {})}
+            headers = {smith_mcp.AGENT_HEADER[0]: smith_mcp.AGENT_HEADER[1], **({"Authorization": f"Bearer {token}"} if token else {})}
             resp = self.client.request(method, path, params=params, json=body, headers=headers)
             return resp.status_code, resp.json() if "json" in resp.headers.get("content-type", "") else resp.text
 
@@ -230,15 +234,15 @@ class AuleMcpTest(BackendCase):
             probe.bind(("127.0.0.1", 0))
             port = probe.getsockname()[1]
         url = f"http://127.0.0.1:{port}/mcp"
-        api = aule_mcp.RowanholtAPI("http://testserver", aule_mcp.request_token, transport=send)
-        self.assertIsNone(aule_mcp.http_refusal(api, "https://rowanholt.example.org"))
-        self.assertIn("https", aule_mcp.http_refusal(api, "http://rowanholt.example.org"))
+        api = smith_mcp.RowanholtAPI("http://testserver", smith_mcp.request_token, transport=send)
+        self.assertIsNone(smith_mcp.http_refusal(api, "https://rowanholt.example.org"))
+        self.assertIn("https", smith_mcp.http_refusal(api, "http://rowanholt.example.org"))
         self.settings.rowanholt_server_mode = False
         try:
-            self.assertIn("team server", aule_mcp.http_refusal(api, "https://rowanholt.example.org"))
+            self.assertIn("team server", smith_mcp.http_refusal(api, "https://rowanholt.example.org"))
         finally:
             self.settings.rowanholt_server_mode = True
-        server = aule_mcp.build_server(api, writes=True, max_writes=1, http_url=url)
+        server = smith_mcp.build_server(api, writes=True, max_writes=1, http_url=url)
         web = uvicorn.Server(uvicorn.Config(server.streamable_http_app(host="127.0.0.1"), host="127.0.0.1", port=port,
                                             log_level="warning"))
         thread = threading.Thread(target=web.run, daemon=True)
@@ -259,7 +263,7 @@ class AuleMcpTest(BackendCase):
             meta = httpx2.get(f"http://127.0.0.1:{port}/.well-known/oauth-protected-resource/mcp").json()
             self.assertEqual([s.rstrip("/") for s in meta["authorization_servers"]], [url[:-len("/mcp")]])
             job = self.create_job(self.alice, "CASE-MCP-HTTP-1")
-            alice, bob = token(self.alice, "aule-mcp"), token(self.bob, "aule-mcp")
+            alice, bob = token(self.alice, "smith-mcp"), token(self.bob, "smith-mcp")
             self.assertIn(job, asyncio.run(call(alice, "list_cases"))[1])
             self.assertNotIn(job, asyncio.run(call(bob, "list_cases"))[1])
             # A full token, a sign-in's JWT, or nothing Rowanholt knows: 401, before any tool
@@ -267,12 +271,12 @@ class AuleMcpTest(BackendCase):
                 with self.assertRaises(Exception):
                     asyncio.run(call(refused, "list_cases"))
             error, text = asyncio.run(call(bob, "add_note", job_id=job, body="from bob"))
-            self.assertTrue(error and "not found" in text.lower(), text)  # bob's aule-mcp token, alice's job
-            self.assertEqual(asyncio.run(call(alice, "add_note", job_id=job, body="from Aulë"))[0], False)
+            self.assertTrue(error and "not found" in text.lower(), text)  # bob's smith-mcp token, alice's job
+            self.assertEqual(asyncio.run(call(alice, "add_note", job_id=job, body="from Smith"))[0], False)
             error, text = asyncio.run(call(alice, "add_note", job_id=job, body="again"))
             self.assertTrue(error and "made its 1 writes" in text, text)
             notes = self.client.get(f"/api/jobs/{job}/case/notes", headers=self.alice).json()
-            self.assertEqual([(n["body"], n["author"]) for n in notes], [("from Aulë", "Aulë (for alice)")])
+            self.assertEqual([(n["body"], n["author"]) for n in notes], [("from Smith", "Smith (for alice)")])
         finally:
             web.should_exit = True
             thread.join(10)
@@ -297,9 +301,9 @@ class AuleMcpTest(BackendCase):
             sent.append(dict(request.header_items()))
             return Response()
 
-        with mock.patch.object(aule_mcp.urllib.request, "urlopen", urlopen):
-            aule_mcp.RowanholtAPI("http://testserver", "t0ken").get("/api/jobs")
-        self.assertEqual(sent[0].get("X-rowanholt-agent"), "aule-mcp")
+        with mock.patch.object(smith_mcp.urllib.request, "urlopen", urlopen):
+            smith_mcp.RowanholtAPI("http://testserver", "t0ken").get("/api/jobs")
+        self.assertEqual(sent[0].get("X-rowanholt-agent"), "smith-mcp")
         self.assertEqual(sent[0].get("Authorization"), "Bearer t0ken")
 
     def test_reading_a_case(self):
@@ -327,7 +331,7 @@ class AuleMcpTest(BackendCase):
         error, unknown = self.call(self.alice, "ask_offline", job_id=job, question="who did it")
         self.assertIn("hosts", {q["id"] for q in unknown["questions"]})
 
-        error, answer = self.call(self.alice, "ask_aule", job_id=job, question="What happened?")
+        error, answer = self.call(self.alice, "ask_smith", job_id=job, question="What happened?")
         self.assertEqual(answer["available"], "no")
         self.assertIn("ask_offline", answer["instead"])
         self.assertEqual(self.call(self.alice, "findings", job_id=job), (False, []))
@@ -377,7 +381,7 @@ class AuleMcpTest(BackendCase):
                                 json={"question_id": "analysis", "case_id": "CASE-MCP-6"})
         self.assertEqual(resp.status_code, 404)
 
-    def test_aule_reads_the_job_asked_for(self):
+    def test_smith_reads_the_job_asked_for(self):
         # Two of alice's jobs share a case number: each answers from its own output, not the first one's
         first = self.case_with_output("CASE-MCP-21")
         source = self.evidence / "CASE-MCP-21b.E01"
@@ -393,7 +397,7 @@ class AuleMcpTest(BackendCase):
             self.assertFalse(error, answer)
             self.assertIn(host, answer["answer"])
             self.assertNotIn(other, answer["answer"])
-        # Ask Aulë lists each (completed) job, not one per case number
+        # Ask Smith lists each (completed) job, not one per case number
         from models.job import JobStatus
         for job in (first, second):
             stored = self.main.job_storage.get_job(job)
@@ -409,10 +413,10 @@ class AuleMcpTest(BackendCase):
             self.assertEqual(resp.status_code, 404, (case, resp.text))
 
     def test_a_case_folder_is_for_admins(self):
-        # A folder in Aulë's data directory has no job, so no owner: a user whose job has the same case
+        # A folder in Smith's data directory has no job, so no owner: a user whose job has the same case
         # number gets their job's output, not the folder
         import ai_routes
-        data = self.evidence / "aule-data"
+        data = self.evidence / "smith-data"
         (data / "CASE-MCP-23" / "WS09" / "artefacts" / "cooked").mkdir(parents=True)
         bobs = self.create_job(self.bob, "CASE-MCP-23")
         (self.evidence / "out" / "CASE-MCP-23" / "WS01" / "artefacts" / "cooked").mkdir(parents=True)
@@ -452,7 +456,7 @@ class AuleMcpTest(BackendCase):
         self.assertTrue(error, text)
 
     def test_only_rowanholts_api(self):
-        api = aule_mcp.RowanholtAPI("http://testserver", transport=lambda *a: (200, {}))
+        api = smith_mcp.RowanholtAPI("http://testserver", transport=lambda *a: (200, {}))
         for path in ("http://198.51.100.23/api/jobs", "/api/jobs/../../etc", "/healthz", "//198.51.100.23/api/"):
             with self.assertRaises(ValueError, msg=path):
                 api.get(path)
@@ -470,13 +474,13 @@ class AuleMcpTest(BackendCase):
 class TransportSecurityTest(unittest.TestCase):
     def test_other_addresses_are_allowed_beside_the_public_one(self):
         # server init --service: the Tailscale Service name is public, the host-and-port address stays open
-        security = aule_mcp.transport_security("https://rowanholt.tail1234.ts.net/",
+        security = smith_mcp.transport_security("https://rowanholt.tail1234.ts.net/",
                                               "https://homelab.tail1234.ts.net:8443, ", "0.0.0.0:5690")
         self.assertEqual(security.allowed_hosts,
                          ["rowanholt.tail1234.ts.net", "homelab.tail1234.ts.net:8443", "0.0.0.0:5690"])
         self.assertEqual(security.allowed_origins,
                          ["https://rowanholt.tail1234.ts.net", "https://homelab.tail1234.ts.net:8443"])
-        alone = aule_mcp.transport_security("https://rowanholt.example.org", "", "0.0.0.0:5690")
+        alone = smith_mcp.transport_security("https://rowanholt.example.org", "", "0.0.0.0:5690")
         self.assertEqual(alone.allowed_hosts, ["rowanholt.example.org", "0.0.0.0:5690"])
 
 

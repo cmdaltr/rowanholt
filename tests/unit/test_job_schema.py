@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "web" / "ba
 
 import storage  # noqa: E402
 
-HEAD = "d5a2e8f1c693"  # the newest file in src/web/backend/alembic/versions
+HEAD = "e8c3a1f5b927"  # the newest file in src/web/backend/alembic/versions
 
 
 def heads(url: str) -> list:
@@ -65,8 +65,9 @@ class MigrationTest(unittest.TestCase):
         storage.JobStorage(url)
         self.assertEqual(heads(url), [HEAD])
 
-    def test_eru_mcp_tokens_become_aule_mcp_and_back(self):
-        """Aulë was Eru: stored eru-mcp scopes are renamed on the way up and named again on the way down."""
+    def test_eru_mcp_tokens_become_smith_mcp_and_back(self):
+        """Smith was Aulë and before that Eru: stored eru-mcp scopes are renamed through aule-mcp to
+        smith-mcp on the way up and named eru-mcp again on the way down."""
         from alembic import command
         from alembic.config import Config
         url = self.url("scopes")
@@ -85,7 +86,7 @@ class MigrationTest(unittest.TestCase):
                 return [row[0] for row in connection.execute(text("SELECT scope FROM api_tokens ORDER BY id"))]
 
         storage.JobStorage(url)
-        self.assertEqual((heads(url), scopes()), ([HEAD], ["aule-mcp", "full"]))
+        self.assertEqual((heads(url), scopes()), ([HEAD], ["smith-mcp", "full"]))
         config = Config()
         config.set_main_option("script_location", str(Path(storage.__file__).resolve().parent / "alembic"))
         with engine.begin() as connection:
@@ -93,6 +94,42 @@ class MigrationTest(unittest.TestCase):
             config.attributes["target_metadata"] = storage.Base.metadata
             command.downgrade(config, "c71d4e9a2b58")
         self.assertEqual(scopes(), ["eru-mcp", "full"])
+
+    def test_aule_mcp_tokens_become_smith_mcp_and_back_and_again(self):
+        """Smith was Aulë: stored aule-mcp scopes become smith-mcp, aule-mcp again on a downgrade, and
+        smith-mcp on the next upgrade."""
+        from alembic import command
+        from alembic.config import Config
+        url = self.url("aule-scopes")
+        storage.JobStorage(url)
+        engine = create_engine(url)
+        with engine.begin() as connection:
+            connection.execute(text("UPDATE alembic_version SET version_num = 'd5a2e8f1c693'"))
+            for n, scope in enumerate(("aule-mcp", "full")):
+                connection.execute(text(
+                    "INSERT INTO api_tokens (id, user_id, username, name, token_hash, prefix, scope, created_at, "
+                    "expires_at) VALUES (:id, 'u1', 'alice', 'mcp', :hash, 'rvt_ab', :scope, "
+                    "'2026-11-01 10:00:00', '2027-11-01 10:00:00')"), {"id": f"t{n}", "hash": f"h{n}", "scope": scope})
+
+        def scopes() -> list:
+            with engine.connect() as connection:
+                return [row[0] for row in connection.execute(text("SELECT scope FROM api_tokens ORDER BY id"))]
+
+        config = Config()
+        config.set_main_option("script_location", str(Path(storage.__file__).resolve().parent / "alembic"))
+        config.attributes["target_metadata"] = storage.Base.metadata
+
+        def migrate(step, revision: str) -> None:
+            with engine.begin() as connection:
+                config.attributes["connection"] = connection
+                step(config, revision)
+
+        storage.JobStorage(url)
+        self.assertEqual((heads(url), scopes()), ([HEAD], ["smith-mcp", "full"]))
+        migrate(command.downgrade, "d5a2e8f1c693")
+        self.assertEqual((heads(url), scopes()), (["d5a2e8f1c693"], ["aule-mcp", "full"]))
+        migrate(command.upgrade, "head")
+        self.assertEqual((heads(url), scopes()), ([HEAD], ["smith-mcp", "full"]))
 
     def test_models_match_the_migrations(self):
         from alembic.autogenerate import compare_metadata

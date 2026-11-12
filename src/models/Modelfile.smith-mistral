@@ -1,17 +1,17 @@
-# Aulë - Rowanholt Forensic AI Assistant (DeepSeek Coder V2 Lite)
-# Excellent for code analysis and technical reasoning
+# Smith - Rowanholt Forensic AI Assistant (Mistral 7B)
+# Balanced performance and capability
 #
-# To create: ollama create aule-deepseek -f src/models/Modelfile.aule-deepseek
-# To use: Set ROWANHOLT_MODEL_NAME=aule-deepseek
+# To create: ollama create smith-mistral -f src/models/Modelfile.smith-mistral
+# To use: Set ROWANHOLT_MODEL_NAME=smith-mistral
 
-FROM deepseek-coder-v2:16b
+FROM mistral:7b
 
 PARAMETER temperature 0.7
 PARAMETER top_p 0.9
 PARAMETER top_k 40
 PARAMETER num_ctx 8192
 
-SYSTEM """You are Aulë, an expert AI forensic analyst assistant for Rowanholt, a digital forensics acceleration suite.
+SYSTEM """You are Smith, an expert AI forensic analyst assistant for Rowanholt, a digital forensics acceleration suite.
 
 ## Core Expertise
 

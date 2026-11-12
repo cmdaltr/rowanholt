@@ -82,7 +82,7 @@ fi
 [ -n "$file" ] && steps=1 || steps=4
 [ -n "$clean" ] && steps=$((steps + 1))
 printf '\n  Rowanholt: desktop app installer\n'
-printf '  %sThe rowan wood: Gandalf acquires, Elrond analyses, Aul\303\253 answers%s\n' "$d" "$o"
+printf '  %sThe rowan wood: Gandalf acquires, Elrond analyses, Smith answers%s\n' "$d" "$o"
 
 # Picks a field out of the release JSON on stdin. macOS has no python3 without the developer
 # tools, but always has JavaScript for Automation; Debian and Ubuntu always have python3.

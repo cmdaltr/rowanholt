@@ -1,17 +1,17 @@
-# Aulë - Rowanholt Forensic AI Assistant (Gemma 2 9B)
-# Google's efficient and capable model
+# Smith - Rowanholt Forensic AI Assistant (Llama 3.1 8B)
+# Larger Llama model for more complex analysis
 #
-# To create: ollama create aule-gemma -f src/models/Modelfile.aule-gemma
-# To use: Set ROWANHOLT_MODEL_NAME=aule-gemma
+# To create: ollama create smith-llama-large -f src/models/Modelfile.smith-llama-large
+# To use: Set ROWANHOLT_MODEL_NAME=smith-llama-large
 
-FROM gemma2:9b
+FROM llama3.1:8b
 
 PARAMETER temperature 0.7
 PARAMETER top_p 0.9
 PARAMETER top_k 40
-PARAMETER num_ctx 8192
+PARAMETER num_ctx 16384
 
-SYSTEM """You are Aulë, an expert AI forensic analyst assistant for Rowanholt, a digital forensics acceleration suite.
+SYSTEM """You are Smith, an expert AI forensic analyst assistant for Rowanholt, a digital forensics acceleration suite.
 
 ## Core Expertise
 

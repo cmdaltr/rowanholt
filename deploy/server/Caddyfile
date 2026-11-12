@@ -39,7 +39,7 @@
 	import headers
 }
 
-# The web app, API and Aulë's MCP server. Every address people open is https, including a
+# The web app, API and Smith's MCP server. Every address people open is https, including a
 # Tailscale Service name (Caddyfile.service), which reaches here over plain HTTP from Tailscale
 # on the host's loopback: the backend is told so, or its redirects would point at http://
 (app) {
@@ -55,15 +55,15 @@
 			}
 		}
 	}
-	# Aulë's MCP server (the "mcp" profile; 502 when it isn't running) and the metadata MCP
+	# Smith's MCP server (the "mcp" profile; 502 when it isn't running) and the metadata MCP
 	# clients read when it answers 401
 	handle /mcp* {
-		reverse_proxy aule-mcp:5690 {
+		reverse_proxy smith-mcp:5690 {
 			header_up X-Forwarded-Proto https
 		}
 	}
 	handle /.well-known/oauth-protected-resource* {
-		reverse_proxy aule-mcp:5690 {
+		reverse_proxy smith-mcp:5690 {
 			header_up X-Forwarded-Proto https
 		}
 	}

@@ -93,7 +93,7 @@ class ThreatIntelValidityModel(Base):
 
 
 class ApiTokenModel(Base):
-    """A long-lived token for scripts and Aulë's MCP server (auth/tokens.py). Only the token's
+    """A long-lived token for scripts and Smith's MCP server (auth/tokens.py). Only the token's
     SHA-256 is kept; the token itself is shown once, when it's made. Revision a3f8c6e1d295."""
     __tablename__ = "api_tokens"
 

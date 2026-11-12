@@ -2,7 +2,7 @@
 
 Reading is open to every signed-in user; importing, TAXII pulls, deleting a source and changing
 an indicator's expiry are admin-only on a team server (auth/access.py), as Mordor's are. Online
-lookups (threat_intel_lookup.py) are for any analyst, never for Aulë.
+lookups (threat_intel_lookup.py) are for any analyst, never for Smith.
 """
 
 import logging
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 MAX_UPLOAD_BYTES = 200 << 20
 UPLOAD_SUFFIXES = (".xlsx", ".xlsm", ".csv", ".json", ".txt")
 
-# The value index Aulë and /enrich use, rebuilt when the stored indicators change
+# The value index Smith and /enrich use, rebuilt when the stored indicators change
 _index = {"version": None, "index": None}
 _index_lock = threading.Lock()
 
@@ -155,7 +155,7 @@ async def enrich(value: str = Query(..., min_length=3, max_length=20000)):
 
 
 def enrich_value(value: str) -> Optional[list]:
-    """For Aulë: the same as /enrich, or None when there's no threat intelligence."""
+    """For Smith: the same as /enrich, or None when there's no threat intelligence."""
     try:
         if not store().version()[0]:
             return None
@@ -174,9 +174,9 @@ async def lookup_status():
 @router.post("/lookup")
 async def lookup(request: LookupRequest, http: Request):
     """What the online provider says about one IP, domain or hash. Sends the value outside Rowanholt,
-    so it's an analyst's call only: refused to an aule-mcp token and to Aulë's MCP server."""
-    if access.token_scope(http) == "aule-mcp" or any(http.headers.get(h) for h in AGENT_HEADERS):
-        raise HTTPException(status_code=403, detail="Online lookups are an analyst's, not Aulë's")
+    so it's an analyst's call only: refused to a smith-mcp token and to Smith's MCP server."""
+    if access.token_scope(http) == "smith-mcp" or any(http.headers.get(h) for h in AGENT_HEADERS):
+        raise HTTPException(status_code=403, detail="Online lookups are an analyst's, not Smith's")
     user = getattr(http.state, "user", None) or {}
     try:
         return online.lookup(request.value, user.get("username", "unknown"))

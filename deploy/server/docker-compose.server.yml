@@ -56,19 +56,21 @@ services:
       - OIDC_ADMIN_GROUP=${OIDC_ADMIN_GROUP:-}
       - OIDC_ALLOWED_GROUP=${OIDC_ALLOWED_GROUP:-}
 
-  # Aulë's MCP server at https://<host>/mcp, for MCP hosts on analysts' machines. Off unless the
-  # "mcp" profile is on (COMPOSE_PROFILES=mcp); read-only unless AULE_MCP_ARGS=--allow-writes.
-  # Takes aule-mcp API tokens only (threat model review, 4 November 2026). Aulë was Eru: an .env's
-  # ERU_MCP_ARGS still counts, and the service still answers to eru-mcp on the network.
-  aule-mcp:
+  # Smith's MCP server at https://<host>/mcp, for MCP hosts on analysts' machines. Off unless the
+  # "mcp" profile is on (COMPOSE_PROFILES=mcp); read-only unless SMITH_MCP_ARGS=--allow-writes.
+  # Takes smith-mcp API tokens only (threat model review, 4 November 2026). Smith was Aulë until
+  # 12 November 2026 and Eru before that: an .env's AULE_MCP_ARGS or ERU_MCP_ARGS still counts, and
+  # the service still answers to aule-mcp and eru-mcp on the network, so a proxy still running with
+  # the old Caddyfile (it isn't reloaded until it restarts) keeps reaching it.
+  smith-mcp:
     profiles: ["mcp"]
     build:
       context: .
-      dockerfile: deploy/server/Dockerfile.aule-mcp
-    container_name: rowanholt-aule-mcp
+      dockerfile: deploy/server/Dockerfile.smith-mcp
+    container_name: rowanholt-smith-mcp
     restart: unless-stopped
     environment:
-      - AULE_MCP_ARGS=${AULE_MCP_ARGS:-${ERU_MCP_ARGS:-}}
+      - SMITH_MCP_ARGS=${SMITH_MCP_ARGS:-${AULE_MCP_ARGS:-${ERU_MCP_ARGS:-}}}
       - ROWANHOLT_API=http://backend:5688
       - ROWANHOLT_PUBLIC_URL=${ROWANHOLT_PUBLIC_URL:-https://${ROWANHOLT_HOSTNAME:?Run rowanholt server init first}}
       - ROWANHOLT_OTHER_URLS=${ROWANHOLT_OTHER_URLS:-}
@@ -77,6 +79,7 @@ services:
     networks:
       rowanholt-network:
         aliases:
+          - aule-mcp
           - eru-mcp
 
   frontend:

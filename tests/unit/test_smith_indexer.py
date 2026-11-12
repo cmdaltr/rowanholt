@@ -1,4 +1,4 @@
-"""The Aulë CLI's indexer (rowanholt/ai/indexer.py) reads the case as Elrond writes it: hosts'
+"""The Smith CLI's indexer (rowanholt/ai/indexer.py) reads the case as Elrond writes it: hosts'
 analysis and cooked tables, the Plaso timeline and the case's own tables, in any format."""
 import json
 import sys

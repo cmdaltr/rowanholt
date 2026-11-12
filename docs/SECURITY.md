@@ -45,10 +45,10 @@ Rowanholt implements comprehensive security measures to protect sensitive forens
 - **Refresh**: Not implemented (users must re-login)
 
 #### API Tokens (team server)
-- **Purpose**: scripts and Aulë's MCP server (`ROWANHOLT_TOKEN`), made under Account in the web app
+- **Purpose**: scripts and Smith's MCP server (`ROWANHOLT_TOKEN`), made under Account in the web app
 - **Format**: `rvt_` and 43 random characters; only the SHA-256 is stored (`api_tokens` table), the token is shown once
 - **Lifetime**: 1 to 365 days (90 by default); revocable by its user or an admin; stops when the user is deactivated
-- **Scopes**: `aule-mcp` (read, ask Aulë, flag leads, add notes, recorded as Aulë; no admin areas) or `full` (the user's rights)
+- **Scopes**: `smith-mcp` (read, ask Smith, flag leads, add notes, recorded as Smith; no admin areas) or `full` (the user's rights)
 - **Limits**: a token can't make or revoke tokens, be exchanged for a session (`/api/auth/session`), set a password or manage accounts (`/api/auth/users`, `/api/auth/change-password`): each would outlive the token, so revoking it ends the access
 
 #### Session Cookies

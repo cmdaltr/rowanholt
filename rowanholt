@@ -36,8 +36,8 @@ Forensics (run from the directory you're working in; relative paths stay relativ
   symbols fetch|what|add|list       Volatility symbol tables for memory images, in the worker
                                     (fetch <image>; what <image>; add --package|--kdk <.dmg>|--vmlinux|--table)
   web                               The web UI and API without Docker
-  mcp                               Aulë's MCP server over stdio, for Claude Desktop, Claude Code and the like
-                                    (ROWANHOLT_API, ROWANHOLT_TOKEN; needs requirements/mcp.txt; docs/AULE.md)
+  mcp                               Smith's MCP server over stdio, for Claude Desktop, Claude Code and the like
+                                    (ROWANHOLT_API, ROWANHOLT_TOKEN; needs requirements/mcp.txt; docs/SMITH.md)
 
 The lab and the scripts:
   lab <command>                     The test lab (lab/lab.sh: linux-targets, windows-vm, gandalf-collect, ...)
@@ -246,6 +246,7 @@ stack() {
             not_migrated && exit 1
             echo "Starting Rowanholt..."
             prepare_app_copy
+            $SERVER && remove_renamed_containers
             compose_cmd up -d $BUILD_FLAG || exit 1
             [ -n "$BUILD_FLAG" ] && printf '%s\n' "$BUILT_VERSION" > "$ROOT/.rowanholt-built"
             print_urls
@@ -363,6 +364,7 @@ start_with_progress() {
     not_migrated && exit 1
     $SERVER && url="https://localhost"
     prepare_app_copy
+    $SERVER && remove_renamed_containers
     local args=(--root "$ROOT" --url "$url")
     [ -n "$BUILD_FLAG" ] && args+=(--build)
     $SERVER && args+=(--server)
@@ -373,6 +375,17 @@ start_with_progress() {
     [ $status -eq 0 ] || exit $status
     [ -n "$BUILD_FLAG" ] && printf '%s\n' "$BUILT_VERSION" > "$ROOT/.rowanholt-built"
     [ "$PROGRESS" = zenity ] || print_urls
+}
+
+# The MCP server's containers under the analyst's old names (Aulë until 12 November 2026, Eru
+# before): `up` leaves a renamed service's container running as an orphan, and it would still
+# answer on the network beside rowanholt-smith-mcp, with the old code
+remove_renamed_containers() {
+    local name
+    for name in rowanholt-aule-mcp rowanholt-eru-mcp; do
+        docker rm -f "$name" >/dev/null 2>&1 && echo "Removed $name: it's rowanholt-smith-mcp now"
+    done
+    return 0
 }
 
 # The server profile resets the base file's published ports with !reset (Compose 2.24)
@@ -580,7 +593,7 @@ case "$COMMAND" in
     # must be at a path the worker mounts (/Volumes, /tmp/rowanholt, an evidence folder)
     symbols) symbols_command "$@" ;;
     # stdout is the MCP protocol: nothing else may print to it
-    mcp) PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}" exec "${ROWANHOLT_MCP_PYTHON:-$PYTHON}" -m aule_mcp.server "$@" ;;
+    mcp) PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}" exec "${ROWANHOLT_MCP_PYTHON:-$PYTHON}" -m smith_mcp.server "$@" ;;
     scripts) list_scripts ;;
     *)
         # The team-server installers live in deploy/linux/, at Shikari's and Ostraka's paths, not

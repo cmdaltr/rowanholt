@@ -10,7 +10,7 @@ const doc = (name) => `${REPO}/blob/main/docs/${name}`;
 const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
 const architectureMap = `${process.env.PUBLIC_URL}/architecture/rowanholt-architecture.html`;
 const architecturePages = [
-  { href: `${architectureMap}#realm`, preview: 'realm.jpg', title: 'The realm: Gandalf to Elrond to Aulë' },
+  { href: `${architectureMap}#realm`, preview: 'realm.jpg', title: 'The realm: Gandalf to Elrond to Smith' },
   { href: `${architectureMap}#elrond`, preview: 'elrond.jpg', title: "Elrond's roads: branching by evidence and OS" },
   {
     href: `${process.env.PUBLIC_URL}/architecture/gandalf-acquisition.html`,
@@ -105,7 +105,7 @@ const investigationStages = [
     ],
   },
   {
-    who: 'Aulë',
+    who: 'Smith',
     title: 'Ask questions',
     tone: 'copper',
     via: 'rows and findings',
@@ -269,7 +269,7 @@ const pippinStages = [
     steps: [
       ['Elrond', <><code>--threatIntel</code>: matches per host, groups ranked per case</>],
       ['Check a value', 'one value, the indicators and groups it hits'],
-      ['Aulë', 'the threat intelligence question; single values'],
+      ['Smith', 'the threat intelligence question; single values'],
     ],
   },
 ];
@@ -284,12 +284,12 @@ const findingStages = [
     ],
   },
   {
-    who: 'Analyst or Aulë',
+    who: 'Analyst or Smith',
     title: 'Lead',
     tone: 'copper',
     via: 'flag',
     steps: [
-      ['Worth a look', 'Aulë can only ever flag leads'],
+      ['Worth a look', 'Smith can only ever flag leads'],
     ],
   },
   {
@@ -346,7 +346,7 @@ const HelpPage = () => {
             <p>
               Rowanholt is a DFIR platform in three parts. Gandalf acquires from live hosts, in order of volatility,
               with a SHA-256 manifest. Elrond turns disk and memory images, Gandalf archives, captures and phone
-              backups into a case directory of tables, tagged with ATT&amp;CK techniques. Aulë answers questions
+              backups into a case directory of tables, tagged with ATT&amp;CK techniques. Smith answers questions
               about the case from those tables, with a local model through Ollama or fixed answers without one.
               Around them: Pippin holds threat intelligence, Mordor holds attack datasets and the lab's recordings,
               and Aragorn administers the stack.
@@ -383,7 +383,7 @@ const HelpPage = () => {
               <li><strong>Stacking:</strong> what few hosts of the same OS have, ranked with its reasons</li>
               <li><strong>Threat intelligence (Pippin):</strong> STIX, TAXII, MITRESaw, watchlists</li>
               <li><strong>Case browser:</strong> findings, notes and hosts shared by the team</li>
-              <li><strong>Aulë:</strong> questions answered from the case, every answer citing its rows</li>
+              <li><strong>Smith:</strong> questions answered from the case, every answer citing its rows</li>
               <li><strong>SIEMs:</strong> Splunk, Elastic, OpenSearch and Wazuh, Timesketch</li>
             </ul>
           </section>
@@ -452,7 +452,7 @@ rowanholt anduril rebuild celery-worker`}</Code>
           <section>
             <h4>What's optional</h4>
             <ul className="hp-cols hp-cols--2">
-              <li><strong>Ollama:</strong> Aulë's free-text answers, summaries and suggestions. Without it Aulë still answers fixed questions</li>
+              <li><strong>Ollama:</strong> Smith's free-text answers, summaries and suggestions. Without it Smith still answers fixed questions</li>
               <li><strong>Splunk and Elastic:</strong> <code>rowanholt start</code> without <code>--testing</code>; OpenSearch, Wazuh and Timesketch are your own, set in <code>.env</code></li>
               <li><strong>Online lookups:</strong> VirusTotal from Pippin and ClamAV's signature refresh, both off unless <code>.env</code> turns them on</li>
               <li><strong>A team server:</strong> <code>rowanholt server init</code> puts sign-in, TLS and per-user jobs in front</li>
@@ -465,7 +465,7 @@ rowanholt anduril rebuild celery-worker`}</Code>
               <li><ExternalLink href={doc('CLI.md')}>CLI.md</ExternalLink>: every command and option</li>
               <li><ExternalLink href={doc('USAGE.md')}>USAGE.md</ExternalLink>: the web app, page by page</li>
               <li><ExternalLink href={doc('API.md')}>API.md</ExternalLink>: the HTTP API</li>
-              <li><ExternalLink href={doc('AULE.md')}>AULE.md</ExternalLink>: Aulë and its MCP server</li>
+              <li><ExternalLink href={doc('SMITH.md')}>SMITH.md</ExternalLink>: Smith and its MCP server</li>
               <li><ExternalLink href={doc('OUTPUT_FORMAT.md')}>OUTPUT_FORMAT.md</ExternalLink>: the case directory</li>
               <li><ExternalLink href={doc('SERVER.md')}>SERVER.md</ExternalLink>: running it for a team</li>
             </ul>
@@ -500,7 +500,7 @@ rowanholt help`}</Code>
                 <tr><td><code>rowanholt analyse &lt;args&gt;</code></td><td>Elrond with the common phases (<code>-C</code>, <code>-P</code>, <code>-A</code>, <code>-B</code>, <code>-S</code>, <code>-E</code>); <code>elrond.py</code> takes the rest</td></tr>
                 <tr><td><code>rowanholt mordor &lt;command&gt;</code></td><td>Datasets: <code>list</code>, <code>download</code>, <code>info</code>, <code>local</code>, <code>verify</code>, <code>refresh</code></td></tr>
                 <tr><td><code>rowanholt anduril &lt;command&gt;</code></td><td>Rowanholt's containers and images</td></tr>
-                <tr><td><code>rowanholt mcp</code></td><td>Aulë's MCP server over stdio</td></tr>
+                <tr><td><code>rowanholt mcp</code></td><td>Smith's MCP server over stdio</td></tr>
                 <tr><td><code>rowanholt lab &lt;command&gt;</code></td><td>The test lab</td></tr>
                 <tr><td><code>rowanholt scripts</code></td><td>Every script under <code>scripts/</code>; run one as <code>rowanholt &lt;group&gt; &lt;name&gt;</code>, e.g. <code>rowanholt jobs status</code></td></tr>
                 <tr><td><code>rowanholt map [realm|elrond|gandalf|journey]</code></td><td>Opens an architecture page</td></tr>
@@ -700,13 +700,13 @@ sudo python3 python/gandalf.py Password Remote -O /evidence/CASE-001`}</Code>
           <section>
             <h3>Threat Intelligence</h3>
             <p>
-              Pippin holds the indicators Elrond matches cases against and Aulë checks single values with, in ten
+              Pippin holds the indicators Elrond matches cases against and Smith checks single values with, in ten
               columns: evidential element, threat group, procedure example, technique ID and name, tactic,
               contextual evidence, reference URL, Navigator layer URL and source type. Most of them come from
               MITRE ATT&amp;CK's procedures, through MITRESaw.
             </p>
             <Flow
-              label="Pippin imports XLSX, CSV, STIX, TAXII and watchlists, keeps them with their validity, and they are matched by Elrond, Check a value and Aulë"
+              label="Pippin imports XLSX, CSV, STIX, TAXII and watchlists, keeps them with their validity, and they are matched by Elrond, Check a value and Smith"
               stages={pippinStages}
             />
           </section>
@@ -772,15 +772,14 @@ rowanholt mordor verify <dataset-id>`}</Code>
         </>
       ),
     },
-    aule: {
-      title: 'Aulë',
+    smith: {
+      title: 'Smith',
       content: (
         <>
           <section>
-            <h3>Aulë, the AI Analyst</h3>
+            <h3>Smith, the AI Analyst</h3>
             <p>
-              Aulë answers questions about a case from Elrond's output. It's named after Aulë (OW-leh), the smith of
-              the Valar in Tolkien's legendarium, maker of the Dwarves.
+              Smith answers questions about a case from Elrond's output.
             </p>
             <ul className="hp-cols hp-cols--2">
               <li><strong>With Ollama:</strong> free-text answers, summaries and suggestions from a local model. The model is given the case's rows tagged <code>[R1]</code>, <code>[R2]</code>…, and an answer lists only the rows it cites that it was actually given</li>
@@ -818,10 +817,10 @@ python3 -m src.analysis.rowanholt.ai.cli summary CASE-001 \\
           <section>
             <h4>From an MCP host</h4>
             <p>
-              <code>rowanholt mcp</code> runs Aulë's MCP server over stdio for Claude Desktop, Claude Code and the like.
+              <code>rowanholt mcp</code> runs Smith's MCP server over stdio for Claude Desktop, Claude Code and the like.
               It's read-only and a client of Rowanholt's own API, so it never reaches <code>raw/</code>. With{' '}
-              <code>--allow-writes</code> it can flag leads and add notes, recorded as Aulë's, and nothing else. Setup
-              and the tool list: <ExternalLink href={doc('AULE.md')}>AULE.md</ExternalLink>.
+              <code>--allow-writes</code> it can flag leads and add notes, recorded as Smith's, and nothing else. Setup
+              and the tool list: <ExternalLink href={doc('SMITH.md')}>SMITH.md</ExternalLink>.
             </p>
           </section>
 
@@ -946,11 +945,11 @@ python3 -m src.analysis.rowanholt.cloud.cli gcp acquire-disk \\
             <h3>An Investigation, End to End</h3>
             <p>
               From a live host to a cited report. Gandalf's archive carries its own hashes; Elrond checks them before
-              it does anything else, and every row it writes can be cited from then on: by the case browser, by Aulë
+              it does anything else, and every row it writes can be cited from then on: by the case browser, by Smith
               and in the report.
             </p>
             <Flow
-              label="Gandalf collects, Elrond analyses, the case browser holds findings and notes, Aulë answers questions, and the report is written"
+              label="Gandalf collects, Elrond analyses, the case browser holds findings and notes, Smith answers questions, and the report is written"
               stages={investigationStages}
               caption="Disk and memory images, captures, phone backups and Mordor datasets go straight into Elrond; the rest is the same."
             />
@@ -974,7 +973,7 @@ sudo python3 python/gandalf.py Key Local -M \\
   --Navigator --Report`}</Code>
               </div>
               <div>
-                <h5>3. Ask Aulë</h5>
+                <h5>3. Ask Smith</h5>
                 <Code>{`python3 -m src.analysis.rowanholt.ai.cli index \\
   CASE-001 /cases/CASE-001
 python3 -m src.analysis.rowanholt.ai.cli query \\
@@ -1060,9 +1059,9 @@ rowanholt anduril stats celery-worker`}</Code>
               </div>
 
               <div className="hp-issue">
-                <h4>Aulë can't reach the model</h4>
+                <h4>Smith can't reach the model</h4>
                 <p>
-                  Ask Aulë says which: Ollama isn't running, or the model isn't pulled. The backend looks for Ollama
+                  Ask Smith says which: Ollama isn't running, or the model isn't pulled. The backend looks for Ollama
                   at <code>OLLAMA_HOST</code>, by default on the Docker host.
                 </p>
                 <Code>{`ollama list

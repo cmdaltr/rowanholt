@@ -6,11 +6,11 @@ const gandalfImage = `${process.env.PUBLIC_URL}/images/gandalf.png`;
 const pippinImage = `${process.env.PUBLIC_URL}/images/pippin.png`;
 const aragornImage = `${process.env.PUBLIC_URL}/images/aragorn.png`;
 const elrondImage = `${process.env.PUBLIC_URL}/images/elrond.png`;
-const auleImage = `${process.env.PUBLIC_URL}/images/aule.png`;
+const smithImage = `${process.env.PUBLIC_URL}/images/smith.png`;
 const mordorClosedImage = `${process.env.PUBLIC_URL}/images/mordor_closed.jpg`;
 const mordorOpenImage = `${process.env.PUBLIC_URL}/images/mordor_open.jpg`;
 
-// The banners, left to right (the Aragorn page itself is for admins). Insight is Aulë, the smith.
+// The banners, left to right (the Aragorn page itself is for admins). Insight is Smith.
 // drop lowers a figure in its frame; zoom closes in when it's open
 const JOURNEYS = [
   { to: '/gandalf', image: gandalfImage, name: 'Gandalf', role: 'Acquisition',
@@ -21,7 +21,7 @@ const JOURNEYS = [
     text: 'Import indicators, match cases against them and see whose tradecraft the evidence resembles.' },
   { to: '/aragorn', image: aragornImage, name: 'Aragorn', role: 'Administration',
     text: "Keep the realm: Rowanholt's containers, users, settings and the test lab." },
-  { to: '/ai', image: auleImage, name: 'Aulë', role: 'Insight',
+  { to: '/ai', image: smithImage, name: 'Smith', role: 'Insight',
     text: 'Ask about a case and get answers drawn from its own files, each citing the rows it came from.' },
 ];
 

@@ -43,7 +43,7 @@ function Tactics({ text }) {
 }
 
 // The indicators Elrond matches a case against (Threat intelligence on Elrond's page, or
-// --threatIntel) and Aulë enriches single values with. On a team server only admins add or
+// --threatIntel) and Smith enriches single values with. On a team server only admins add or
 // remove them (auth/access.py), so the import controls are hidden from everyone else.
 function ThreatIntel() {
   const { user } = useAuth();
@@ -193,7 +193,7 @@ function ThreatIntel() {
           </ul>
           {summary.expired > 0 && (
             <p className="pippin-muted pippin-expired-note">
-              {summary.expired.toLocaleString()} expired: still listed, but cases aren't matched against them and Aulë
+              {summary.expired.toLocaleString()} expired: still listed, but cases aren't matched against them and Smith
               doesn't check values with them until their source is imported again or an administrator extends them.
             </p>
           )}
@@ -263,7 +263,7 @@ function ThreatIntel() {
   return (
     <div className="job-list journey-detail pippin">
       <PageHero title="Pippin">
-        Threat intelligence: the indicators Elrond matches cases against and Aulë checks single values with,
+        Threat intelligence: the indicators Elrond matches cases against and Smith checks single values with,
         from STIX 2.1 bundles, TAXII 2.1 collections, MITRESaw procedures or a watchlist.
       </PageHero>
 

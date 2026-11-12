@@ -19,7 +19,7 @@
 8. [Mordor: Recorded Attack Telemetry](#mordor-recorded-attack-telemetry)
 9. [Threat Intelligence](#threat-intelligence)
 10. [Case Browser and Collaboration](#case-browser-and-collaboration)
-11. [Aulë (AI Analyst)](#aulë-ai-analyst)
+11. [Smith (AI Analyst)](#smith-ai-analyst)
 12. [Lab](#lab)
 13. [Health Check](#health-check) (and Busy)
 14. [Request/Response Formats](#requestresponse-formats)
@@ -1165,7 +1165,7 @@ The indicators in `threat_intel_indicators`, in the fixed ten-column schema (Evi
 | `PUT` | `/api/threat-intel/indicators/{id}/validity` | `{"valid_until": "2027-01-01"}` extends one indicator, `{"valid_until": null}` clears its expiry; admins only on a team server. `400` for a date that isn't ISO, `404` for no such indicator |
 | `DELETE` | `/api/threat-intel/sources/{source}` | Every indicator from one source |
 | `GET` | `/api/threat-intel/lookup` | `{"enabled", "provider"}`: whether online lookups are on (`ROWANHOLT_ONLINE_LOOKUPS=virustotal` and `VIRUSTOTAL_API_KEY` in `.env`) |
-| `POST` | `/api/threat-intel/lookup` | `{"value"}`: one IP, domain or MD5/SHA-1/SHA-256 sent to VirusTotal. Returns `kind`, `found`, `malicious`, `suspicious`, `harmless`, `undetected`, `reputation`, `last_analysis`, `tags`, `link` and `cached` (answers are kept an hour). Any signed-in analyst; `403` to an aule-mcp token or Aulë's agent header, `400` for anything else or a value that mustn't leave (a private, reserved or documentation address, an internal-looking name such as `.local` or `.corp`), `404` when lookups are off, `429` when VirusTotal's quota is spent, `502` when it can't be reached. Each lookup is logged with who asked |
+| `POST` | `/api/threat-intel/lookup` | `{"value"}`: one IP, domain or MD5/SHA-1/SHA-256 sent to VirusTotal. Returns `kind`, `found`, `malicious`, `suspicious`, `harmless`, `undetected`, `reputation`, `last_analysis`, `tags`, `link` and `cached` (answers are kept an hour). Any signed-in analyst; `403` to a smith-mcp token or Smith's agent header, `400` for anything else or a value that mustn't leave (a private, reserved or documentation address, an internal-looking name such as `.local` or `.corp`), `404` when lookups are off, `429` when VirusTotal's quota is spent, `502` when it can't be reached. Each lookup is logged with who asked |
 | `GET` | `/api/threat-intel/enrich?value=` | What the indicators say about one process name, command line, path, IP, domain or hash: per element, its `kind`, `breadth` (groups using it), `common` (more than 15), `groups`, `techniques` and `sources` |
 
 `503` means the package isn't mounted in the backend (`docker compose up -d backend` after pulling).
@@ -1196,18 +1196,18 @@ A job's output, read-only, and the team's findings, notes, host assignments and 
 
 ---
 
-## Aulë (AI Analyst)
+## Smith (AI Analyst)
 
 **Authentication:** none
 
-Ask Aulë's back end. Free-text answers come from Ollama at `OLLAMA_HOST` (default `http://host.docker.internal:11434`) with the model `ROWANHOLT_MODEL_NAME` (default `llama3.2:3b`) and a `ROWANHOLT_NUM_CTX`-token window (default 8192). Without them, `/status` says why and the offline endpoints answer fixed questions from Elrond's output.
+Ask Smith's back end. Free-text answers come from Ollama at `OLLAMA_HOST` (default `http://host.docker.internal:11434`) with the model `ROWANHOLT_MODEL_NAME` (default `llama3.2:3b`) and a `ROWANHOLT_NUM_CTX`-token window (default 8192). Without them, `/status` says why and the offline endpoints answer fixed questions from Elrond's output.
 
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/ai/status` | `llm_available`, `ollama_running`, `model_name`, `models`, `ollama_host`, `data_dir`, and `reason`: why free text won't work (empty when it will) |
 | `GET` | `/api/ai/offline/questions` | The fixed questions: `id`, `question`, `needs_case` (including `threat_intel` and `findings`) |
 | `POST` | `/api/ai/offline/answer` | `{"question_id": "techniques", "case_id": "CASE-001", "job_id": "..."}` (`case_id` only where `needs_case`; `job_id`, optional, reads that job's output, as for `/query`). Returns `{"answer", "rows", "job_id", "offline": true}`: `rows` are the rows the answer's shown lines came from (`host`, `file`, `row_ref`, `hash`, `line`), the reference a finding stores, so `POST /api/jobs/{job_id}/case/findings` can flag one; `job_id` is the job (one the caller can see) whose case was read, and `rows` is empty without one. Counts (hosts, IOCs, logins by user) cite nothing. `404` for an unknown question |
-| `GET` | `/api/ai/cases` | Cases Aulë can see: one entry per completed job (`job_id`; two jobs can share a case number), with `indexed` and `has_artifacts`, and, for admins only on a team server, case folders in Aulë's data directory, which have no job |
+| `GET` | `/api/ai/cases` | Cases Smith can see: one entry per completed job (`job_id`; two jobs can share a case number), with `indexed` and `has_artifacts`, and, for admins only on a team server, case folders in Smith's data directory, which have no job |
 | `POST` | `/api/ai/chat` | `{"message": "..."}` without case context. Returns `{"response", "model", "processing_time"}` |
 | `GET` | `/api/ai/cases/{case_id}/info` | What is indexed for a case (`?job_id=` as for `/query`) |
 | `POST` | `/api/ai/cases/{case_id}/query` | `{"question": "..."}` answered from the case's data. `?job_id=` reads that job's output (`404` if the caller can't see it or it isn't this case); without it, the first job with the case number the caller can see; `rows` are the rows the answer cites by tag (`host`, `file`, `row_ref`, `hash`, `line`, `tag`), only ones it was given, on `job_id` (empty without a job) |

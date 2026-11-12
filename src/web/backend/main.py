@@ -34,7 +34,7 @@ try:
     from .threat_intel_routes import router as threat_intel_router  # Threat intelligence indicators
     from . import threat_intel_store
     from . import case_routes  # The case browser, findings, notes and assignments
-    from . import aule_offline
+    from . import smith_offline
     from . import backup_secrets  # Phone backup passwords, job form to worker
     from . import output_removal  # Where a job may write, and removing its old output
     from . import removal_routes  # Confirming or giving up a failed removal
@@ -69,7 +69,7 @@ except ImportError:
     from threat_intel_routes import router as threat_intel_router  # Threat intelligence indicators
     import threat_intel_store
     import case_routes  # The case browser, findings, notes and assignments
-    import aule_offline
+    import smith_offline
     import backup_secrets  # Phone backup passwords, job form to worker
     import output_removal  # Where a job may write, and removing its old output
     import removal_routes  # Confirming or giving up a failed removal
@@ -129,7 +129,7 @@ case_routes.configure(job_storage)
 licence.configure(job_storage)
 branding_routes.configure(job_storage)
 removal_routes.configure(job_storage)
-aule_offline.FINDINGS = case_routes.findings_for_case
+smith_offline.FINDINGS = case_routes.findings_for_case
 
 # Jobs a rebuild would cut off: running, or paused (Elrond stopped with SIGSTOP in the worker,
 # killed with it). Pending jobs are checked too but aren't busy: Celery's queue lives in Redis,

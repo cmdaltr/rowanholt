@@ -19,7 +19,7 @@
 - **[API.md](API.md)** ⭐ - Complete REST API documentation with examples
 - **[CLI.md](CLI.md)** ⭐ - Command-line tools reference (gandalf, elrond, MITRE, cloud, AI, SIEM)
 - **[SECURITY.md](SECURITY.md)** - Security features, MFA, authentication, best practices
-- **[AULE.md](AULE.md)** - Aulë, the AI analyst: with Ollama, without it, and the Aulë models
+- **[SMITH.md](SMITH.md)** - Smith, the AI analyst: with Ollama, without it, and the Smith models
 
 ### 📐 Architecture
 
@@ -61,7 +61,7 @@
 - Elrond analysis (all modes)
 - MITRE ATT&CK tools
 - Cloud forensics (AWS, Azure, GCP)
-- Aulë (AI analyst) commands
+- Smith (AI analyst) commands
 - SIEM integration
 
 ### For Administrators
@@ -86,7 +86,7 @@ docs/
 │
 ├── ARCHITECTURE.md        # System architecture and design
 ├── REQUIREMENTS.md        # System requirements
-├── AULE.md                 # Aulë, the AI analyst
+├── SMITH.md                 # Smith, the AI analyst
 ├── ACCESSING-DATA.md      # Case output from the containers
 ├── FUNCTIONALITY.md       # Operational behaviour
 ├── PROGRESS_TRACKING.md   # Job progress

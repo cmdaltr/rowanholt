@@ -1,6 +1,6 @@
 """The case browser and collaboration (src/web/backend/case_files.py, case_routes.py): reading a
 case's tables without reaching raw/, findings pinned to rows, notes, assignments, activity, the
-report and layer from confirmed findings, and Aulë's question about them."""
+report and layer from confirmed findings, and Smith's question about them."""
 import json
 import sys
 from pathlib import Path
@@ -21,7 +21,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 import case_files  # noqa: E402
 import case_routes  # noqa: E402
-import aule_offline  # noqa: E402
+import smith_offline  # noqa: E402
 import storage  # noqa: E402
 
 JOB = "11111111-2222-3333-4444-555555555555"
@@ -63,7 +63,7 @@ def client(tmp_path):
 
     app.include_router(case_routes.router)
     yield TestClient(app), case
-    aule_offline.FINDINGS = None
+    smith_offline.FINDINGS = None
 
 
 def test_reading_never_reaches_raw(tmp_path):
@@ -190,8 +190,8 @@ def test_findings_notes_and_output(client):
     newest = api.get(f"{base}/activity").json()[0]["id"]
     assert api.get(f"{base}/activity", params={"since": newest}).json() == []
 
-    aule_offline.FINDINGS = case_routes.findings_for_case
-    answer = aule_offline.answer("findings", str(case))
+    smith_offline.FINDINGS = case_routes.findings_for_case
+    answer = smith_offline.answer("findings", str(case))
     assert "**Confirmed** (1)" in answer and "Cron pipes a download to sh (T1053.003)" in answer
     assert "**Open leads** (1)" in answer
 

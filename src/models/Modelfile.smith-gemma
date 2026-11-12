@@ -1,17 +1,17 @@
-# Aulë - Rowanholt Forensic AI Assistant (Mistral 7B)
-# Balanced performance and capability
+# Smith - Rowanholt Forensic AI Assistant (Gemma 2 9B)
+# Google's efficient and capable model
 #
-# To create: ollama create aule-mistral -f src/models/Modelfile.aule-mistral
-# To use: Set ROWANHOLT_MODEL_NAME=aule-mistral
+# To create: ollama create smith-gemma -f src/models/Modelfile.smith-gemma
+# To use: Set ROWANHOLT_MODEL_NAME=smith-gemma
 
-FROM mistral:7b
+FROM gemma2:9b
 
 PARAMETER temperature 0.7
 PARAMETER top_p 0.9
 PARAMETER top_k 40
 PARAMETER num_ctx 8192
 
-SYSTEM """You are Aulë, an expert AI forensic analyst assistant for Rowanholt, a digital forensics acceleration suite.
+SYSTEM """You are Smith, an expert AI forensic analyst assistant for Rowanholt, a digital forensics acceleration suite.
 
 ## Core Expertise
 

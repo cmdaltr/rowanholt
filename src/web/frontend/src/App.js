@@ -48,7 +48,7 @@ function Navigation({ onGuide, serverMode }) {
           <Link to="/branding">Branding</Link>
           <Link to="/webhooks">Webhooks</Link>
         </>}
-        <Link to="/ai">Aulë</Link>
+        <Link to="/ai">Smith</Link>
       </div>
       {/* Mordor opens the right: the datasets sit beside the jobs they feed */}
       <div className="nav-right">

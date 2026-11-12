@@ -23,7 +23,7 @@ full render takes about 25 minutes.
 Any other options are passed to `make_video.py`:
 
 ```bash
-scripts/docs/video/regenerate.sh --video-only --only aule         # just the Aulë section
+scripts/docs/video/regenerate.sh --video-only --only smith         # just the Smith section
 scripts/docs/video/regenerate.sh --video-only --preview          # silent, to check the filming
 ```
 
@@ -56,7 +56,7 @@ These are set as environment variables. The defaults are what the current video 
 | Variable | Default | What |
 |---|---|---|
 | `CASE_DIR` | `/Volumes/Portable6TB/Data/rivendell/claude_testing/threatintel_demo` | The finished Elrond case shown in the video |
-| `CASE_ID` | `THREATINTEL-DEMO-01` | Its case ID in the web UI. Aulë and the Job page use this case's newest job |
+| `CASE_ID` | `THREATINTEL-DEMO-01` | Its case ID in the web UI. Smith and the Job page use this case's newest job |
 | `INTEGRITY` | `…/volatility_order_win3/elrond_intake/LAB-WIN11/gandalf_integrity.csv` | A `gandalf_integrity.csv`, used when the case has none |
 | `OUT` | `scripts/docs/video/output` | Where the video goes (git-ignored with the rest of this folder) |
 
@@ -121,7 +121,7 @@ terminals come from the cache.
 - **The welcome covers the pages:** the render marks the welcome as already shown, using the
   key the app reads (`rowanholt.offeredAt` in localStorage, `OFFERED` in `make_video.py`). If
   the app's key changes, change `OFFERED` to match.
-- **Aulë's answers don't appear:** without Ollama, Aulë shows its offline questions, which are
+- **Smith's answers don't appear:** without Ollama, Smith shows its offline questions, which are
   the ones `scenes.py` clicks. With a model running, the buttons are different.
 - **The log stays empty until the end:** that's normal when the output isn't going to a
   terminal. Progress shows in `scenes/` as each scene is written.

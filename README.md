@@ -59,7 +59,7 @@ git pull
 ./rowanholt start                         # builds the images under the new name: slow the first time
 ```
 
-The old Docker volumes are left as they were; the script prints the command to remove them once the new stack looks right. The desktop app is a new app (new bundle ID): point its setup at your existing checkout. An Aulë MCP client set up before the rename needs re-adding with `rowanholt mcp` and `ROWANHOLT_*` variables.
+The old Docker volumes are left as they were; the script prints the command to remove them once the new stack looks right. The desktop app is a new app (new bundle ID): point its setup at your existing checkout. A Smith MCP client set up before the rename needs re-adding with `rowanholt mcp` and `ROWANHOLT_*` variables.
 
 **💡 Why OrbStack?** On macOS, OrbStack is 2-3x faster than Docker Desktop, uses ~4GB RAM instead of 8-12GB, and has no gVisor networking bugs that cause crashes with large forensic images. It's free for personal use.
 
@@ -162,20 +162,20 @@ _3. Additional optional features_
 - **Automated Analysis** - Process evidence with 30+ integrated forensic tools
 - **MITRE ATT&CK Integration** - Automatic technique mapping with comprehensive content-based detection and ATT&CK Navigator visualization
 - **Cloud Forensics** - AWS, Azure, and GCP investigation support
-- **Aulë, the AI analyst** - Natural-language questions over a case with a local model (Ollama); fixed questions answered from the case files when there's no model
+- **Smith, the AI analyst** - Natural-language questions over a case with a local model (Ollama); fixed questions answered from the case files when there's no model
 - **Memory Forensics** - Volatility 3 integration for memory analysis
 - **Timeline Generation** - Plaso/log2timeline for comprehensive timelines
 - **SIEM Integration** - Direct export to Splunk, Elasticsearch, OpenSearch (and Wazuh) and Timesketch
 
 ### 🎯 Architecture
 
-Gandalf acquires, Elrond analyses, Aulë answers. Four pictures show how. In the web app they're under **About**; from a shell, `rowanholt map realm|elrond|gandalf|journey` opens each one.
+Gandalf acquires, Elrond analyses, Smith answers. Four pictures show how. In the web app they're under **About**; from a shell, `rowanholt map realm|elrond|gandalf|journey` opens each one.
 
 <table>
   <tr>
     <td width="50%" valign="top">
-      <a href="./src/web/frontend/public/architecture/rowanholt-architecture.html"><img src="./src/web/frontend/public/architecture/realm.jpg" alt="The realm: Gandalf to Elrond to Aulë, drawn as a map of Middle-earth"/></a><br>
-      <b>The realm.</b> The whole platform as a map of Middle-earth: hosts, images and cloud in; Gandalf, the web UI, the Celery worker and Elrond; the case store, SIEM, Navigator, Aulë, Aragorn and Mordor.
+      <a href="./src/web/frontend/public/architecture/rowanholt-architecture.html"><img src="./src/web/frontend/public/architecture/realm.jpg" alt="The realm: Gandalf to Elrond to Smith, drawn as a map of Middle-earth"/></a><br>
+      <b>The realm.</b> The whole platform as a map of Middle-earth: hosts, images and cloud in; Gandalf, the web UI, the Celery worker and Elrond; the case store, SIEM, Navigator, Smith, Aragorn and Mordor.
     </td>
     <td width="50%" valign="top">
       <a href="./src/web/frontend/public/architecture/rowanholt-architecture.html"><img src="./src/web/frontend/public/architecture/elrond.jpg" alt="Elrond's roads: the directed graph branching by evidence type and OS"/></a><br>
@@ -189,7 +189,7 @@ Gandalf acquires, Elrond analyses, Aulë answers. Four pictures show how. In the
     </td>
     <td width="50%" valign="top">
       <a href="./src/web/frontend/public/architecture/rowanholt-journey.html"><img src="./src/web/frontend/public/architecture/journey.jpg" alt="The evidence's journey through Rowanholt, an interactive 3D map of Middle-earth"/></a><br>
-      <b>There and back again (3D).</b> The evidence's journey across Middle-earth: Gandalf walks his archives from the Shire, eagles carry images and datasets, through Bree, Amon Sûl and Rowanholt to the beacons and the palantír. Pick an evidence type to change the road; switch Ollama off to see Aulë fall back to fixed answers. Open it with <code>rowanholt map journey</code> or under About.
+      <b>There and back again (3D).</b> The evidence's journey across Middle-earth: Gandalf walks his archives from the Shire, eagles carry images and datasets, through Bree, Amon Sûl and Rowanholt to the beacons and the palantír. Pick an evidence type to change the road; switch Ollama off to see Smith fall back to fixed answers. Open it with <code>rowanholt map journey</code> or under About.
     </td>
   </tr>
 </table>
@@ -375,9 +375,9 @@ python3 -m src.analysis.rowanholt.cloud.cli aws analyze-logs \
 
 ---
 
-### Feature 5: Aulë, the AI Analyst
+### Feature 5: Smith, the AI Analyst
 
-Query investigation data using natural language with local AI. In the web app, **Ask Aulë** talks to Ollama; when Ollama isn't running or the model isn't pulled, Aulë says why and offers fixed questions (hosts, techniques, persistence, logins, IOCs, commands, threat intelligence, confirmed findings) answered straight from Elrond's output. See [docs/AULE.md](docs/AULE.md).
+Query investigation data using natural language with local AI. In the web app, **Ask Smith** talks to Ollama; when Ollama isn't running or the model isn't pulled, Smith says why and offers fixed questions (hosts, techniques, persistence, logins, IOCs, commands, threat intelligence, confirmed findings) answered straight from Elrond's output. See [docs/SMITH.md](docs/SMITH.md).
 
 **Features:**
 - Natural language queries of forensic data
@@ -413,7 +413,7 @@ python3 -m src.analysis.rowanholt.ai.web_interface
 - "Summarize the attack timeline"
 - "What persistence mechanisms were found?"
 
-[Full Documentation →](docs/AULE.md)
+[Full Documentation →](docs/SMITH.md)
 
 ---
 
@@ -441,7 +441,7 @@ Match a case against the Iran APT workbook, STIX 2.1 bundles, TAXII 2.1 collecti
 - Every cooked artefact and IOC matched, with the groups, techniques and reference behind each element (`threat_intel_matches.jsonl`)
 - Groups ranked by what matched (`threat_groups.jsonl`), each with the basis for its rank: atomic indicators, specific procedures, common tooling or technique overlap only
 - Elements dozens of groups share are marked common, and built-ins and ordinary words never match, so a shared PowerShell switch never reads like attribution
-- Single values checked in Pippin, and an offline Aulë question
+- Single values checked in Pippin, and an offline Smith question
 
 **Usage:**
 ```bash
@@ -460,7 +460,7 @@ Work a case together from **Browse Case** on a completed job, on one machine or 
 - Every host's cooked artefacts and analysis, read-only, in paged tables you can filter on any field
 - Rows flagged as findings (lead, confirmed, benign), pinned by file, row and hash so a re-run can't silently re-point them
 - Notes on the case and on findings, hosts assigned to analysts, and an activity feed
-- A report and an ATT&CK Navigator layer from confirmed findings only, and an Aulë question about them
+- A report and an ATT&CK Navigator layer from confirmed findings only, and a Smith question about them
 
 [Full Documentation →](docs/ROADMAP.md#collaborative-investigation)
 
@@ -500,7 +500,7 @@ Work a case together from **Browse Case** on a completed job, on one machine or 
 ### Component Documentation
 - **[Functionality](docs/FUNCTIONALITY.md)** - Supported artefact types and parsing
 - **[Cloud Forensics](docs/CLI.md#cloud-forensics)** - AWS, Azure, and GCP investigations
-- **[Aulë](docs/AULE.md)** - AI analyst
+- **[Smith](docs/SMITH.md)** - AI analyst
 - **[SIEM Integration](docs/CLI.md#siem-integration)** - Splunk, Elasticsearch, OpenSearch/Wazuh and Timesketch
 
 ### Technical Documentation

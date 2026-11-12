@@ -3,7 +3,7 @@
 user-writable folders of the image (or the whole of a Gandalf collection, which is small).
 Commodity malware and known tools; YARA, Defender's own detections and stacking cover the rest.
 
-Detections go to the host's analysis table as "ClamAV" rows, where the case browser and Aulë's
+Detections go to the host's analysis table as "ClamAV" rows, where the case browser and Smith's
 analysis answer read them. The signature database is the one built into the worker image:
 freshclam runs first only when ROWANHOLT_ONLINE_LOOKUPS lists "freshclam"."""
 import os

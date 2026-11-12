@@ -81,7 +81,7 @@ SYSTEM_PATH = re.compile(r"(?i)\\windows\\(?!temp\\)")
 MIN_HOSTS = 3  # hosts of an OS before a value on few of them counts as rare
 WEIGHTS = {"rare": 2.0, "user path": 1.5, "generated name": 1.0, "not in baseline": 1.0,
            "suspicious command": 1.5, "unsigned": 1.5, "no team ID": 1.0, "outside logon hours": 1.0}
-# Narrower than Aulë's SUSPICIOUS_COMMAND (aule_offline.py): vendors' tasks run powershell and curl every
+# Narrower than Smith's SUSPICIOUS_COMMAND (smith_offline.py): vendors' tasks run powershell and curl every
 # day, so only the forms that hide or fetch what runs count. cmd /c is how a service or WMI consumer
 # runs a one-liner (smbexec's %COMSPEC% /Q /c among them)
 SUSPICIOUS_COMMAND = re.compile(
@@ -527,7 +527,7 @@ def stack_case(output_directory: str, baseline_path: str = "") -> Optional[Dict[
 
 def precision_at_k(stacking_table: str, expected: Iterable[str], k: int = 20) -> float:
     """The share of the top k rows whose value contains one of the expected (seeded) values:
-    how the lab measures stacking before Aulë is given it."""
+    how the lab measures stacking before Smith is given it."""
     needles = [e.lower() for e in expected]
     top = [r for _, (_, r) in zip(range(k), read_records(stacking_table))]
     if not top:

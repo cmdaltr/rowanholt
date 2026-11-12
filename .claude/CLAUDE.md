@@ -2,14 +2,14 @@
 
 ## What this is
 
-Rowanholt is a unified DFIR platform — the merger of Elrond (analysis) and Gandalf (acquisition) into a single directed-graph execution model, with Aulë as the AI analyst. It is Ben's primary professional tool, not a side project. Treat it accordingly.
+Rowanholt is a unified DFIR platform — the merger of Elrond (analysis) and Gandalf (acquisition) into a single directed-graph execution model, with Smith as the AI analyst. It is Ben's primary professional tool, not a side project. Treat it accordingly.
 
 ## Architecture
 
 ```
-Gandalf (acquisition) → Elrond (analysis) → Aulë (AI analyst)
+Gandalf (acquisition) → Elrond (analysis) → Smith (AI analyst)
          ↓                      ↓                  ↓
-  bash, Python, PowerShell  30+ forensic tools   Ask Aulë (web) + ai CLI
+  bash, Python, PowerShell  30+ forensic tools   Ask Smith (web) + ai CLI
   local, SSH, PSRemoting    Volatility 3, Plaso  Ollama (local LLM)
   order of volatility,      Artemis, RegRipper,  fixed answers from the
   SHA-256 log.meta          YARA, Sleuth Kit     case files without one
@@ -26,7 +26,7 @@ Gandalf (acquisition) → Elrond (analysis) → Aulë (AI analyst)
 - The platform: **Rowanholt** (rowan + Old English *holt*, a wood: the rowan wood; formerly Rivendell). Don't bring the old name back: what's left of it is deliberate (`scripts/migrate/from-rivendell.sh`, the old Eru header and template key it still accepts, `rivendell` data folders on disk)
 - Acquisition module: **Gandalf**
 - Analysis module: **Elrond**
-- AI analyst: **Aulë** (the Tolkien smith, OW-leh; `aule` in identifiers; formerly Eru, renamed 9 November 2026). What's left of Eru is deliberate, aliases so nothing breaks, like the Rivendell leftovers: the `eru-mcp` token scope (read as `aule-mcp`, `auth/tokens.py` `OLD_SCOPES`; stored scopes renamed by migration `f2b7c9d4e816`) and `X-Rowanholt-Agent: eru-mcp` (`case_routes.OLD_AULE_MCP`), the `eru_mcp` package shim (`python -m eru_mcp.server`), the `eru-mcp` network alias and `ERU_MCP_ARGS` in `deploy/server/docker-compose.server.yml`, `eru-*` Ollama models used when the `aule-*` one isn't pulled (`ai_routes.old_model_name`), and "Eru (for <user>)" in cases' recorded history
+- AI analyst: **Smith** (`smith` in identifiers; formerly Eru, renamed Aulë on 9 November 2026 and Smith on 12 November 2026, Ben's decision). What's left of the old names is deliberate, aliases so nothing breaks, like the Rivendell leftovers: the `aule-mcp` and `eru-mcp` token scopes (read as `smith-mcp`, `auth/tokens.py` `OLD_SCOPES`; stored scopes renamed by migrations `f2b7c9d4e816` and `e8c3a1f5b927`) and `X-Rowanholt-Agent: aule-mcp` or `eru-mcp` (`case_routes.OLD_MCP_AGENTS`), the `aule_mcp` and `eru_mcp` package shims (`python -m aule_mcp.server`), the `aule-mcp` and `eru-mcp` network aliases and `AULE_MCP_ARGS` and `ERU_MCP_ARGS` in `deploy/server/docker-compose.server.yml`, `aule-*` then `eru-*` Ollama models used when the `smith-*` one isn't pulled (`ai_routes.old_model_names`), the launcher removing the old `rowanholt-aule-mcp` and `rowanholt-eru-mcp` containers on a server start (`remove_renamed_containers`), and "Aulë (for <user>)" and "Eru (for <user>)" in cases' recorded history. No `ask_aule` or `ask_eru` tool alias (Ben's call)
 - Administration: **Aragorn**; its Docker manager: **Andúril** (`anduril` in code)
 - Attack datasets and the lab's recordings: **Mordor**
 - Threat intelligence (the web app's page): **Pippin**, who looked into the palantír
@@ -38,28 +38,28 @@ Gandalf (acquisition) → Elrond (analysis) → Aulë (AI analyst)
 |---|---|
 | `rowanholt` | Root launcher (bash): the Docker stack, Gandalf, Elrond, the lab, every script, `map` |
 | `src/acquisition/` | Gandalf: `bash/gandalf.sh`, `python/gandalf.py` + `collect_artefacts-py`, `windows/Invoke-Gandalf.ps1` + `Set-ArtefactCollection` |
-| `src/analysis/elrond.py`, `src/analysis/rowanholt/` | Elrond: `core/` (incl. Gandalf ingest and manifest check, `mobile.py` for phones), `memory/` (incl. `symbols/`: Volatility symbol tables found or fetched by kernel banner, `rowanholt symbols`), `collect/`, `process/` (incl. `network.py`: Zeek, NetFlow; `mobile.py`: iLEAPP, ALEAPP), `analysis/`, `post/` (Splunk, Elastic, OpenSearch/Wazuh, Timesketch, ATT&CK), `report/` (the case report, shared with the backend), `cloud/`, `ai/` (Aulë's CLI) |
+| `src/analysis/elrond.py`, `src/analysis/rowanholt/` | Elrond: `core/` (incl. Gandalf ingest and manifest check, `mobile.py` for phones), `memory/` (incl. `symbols/`: Volatility symbol tables found or fetched by kernel banner, `rowanholt symbols`), `collect/`, `process/` (incl. `network.py`: Zeek, NetFlow; `mobile.py`: iLEAPP, ALEAPP), `analysis/`, `post/` (Splunk, Elastic, OpenSearch/Wazuh, Timesketch, ATT&CK), `report/` (the case report, shared with the backend), `cloud/`, `ai/` (Smith's CLI) |
 | `src/analysis/tools/definitions.py` | Forensic tool definitions (executables, paths, platforms) |
-| `src/web/backend/` | FastAPI (:5688): jobs, auth, `busy.py` (`GET /api/busy`, no sign-in: the homelab's check before a rebuild; register a check there for any new work a restart would interrupt), `job_liveness.py` (the worker's heartbeat per job and the queue, so a job left `running` or `pending` by a crash is failed with a reason; only `running` and `paused` jobs with a live heartbeat, or one lapsed under 90 s, are busy: a pending job waits out a rebuild in Redis's queue, Ben 12 November 2026), `output_removal.py` (where a job may write, and the only folder removal: a fresh run's old output, checked in the worker) and `removal_routes.py` (confirming or giving up a failed removal, owner or admin; `removing` counts for `/api/busy`), `ai_routes.py` + `aule_offline.py` (fixed answers) + `aule_context.py` (the model's numbered context) (Aulë), Mordor, lab, Andúril proxy |
+| `src/web/backend/` | FastAPI (:5688): jobs, auth, `busy.py` (`GET /api/busy`, no sign-in: the homelab's check before a rebuild; register a check there for any new work a restart would interrupt), `job_liveness.py` (the worker's heartbeat per job and the queue, so a job left `running` or `pending` by a crash is failed with a reason; only `running` and `paused` jobs with a live heartbeat, or one lapsed under 90 s, are busy: a pending job waits out a rebuild in Redis's queue, Ben 12 November 2026), `output_removal.py` (where a job may write, and the only folder removal: a fresh run's old output, checked in the worker) and `removal_routes.py` (confirming or giving up a failed removal, owner or admin; `removing` counts for `/api/busy`), `ai_routes.py` + `smith_offline.py` (fixed answers) + `smith_context.py` (the model's numbered context) (Smith), Mordor, lab, Andúril proxy |
 | `src/web/frontend/` | React (:5687); About is `components/HelpPage.js` |
 | `deploy/linux/`, `deploy/windows/`, `deploy/server/`, `scripts/server/` | Team server: `deploy/linux/install.sh` (`rowanholt server init`) and `deploy/linux/uninstall.sh` (`server uninstall`, keeps data; `--purge`), `deploy/windows/install-service.ps1` and `uninstall-service.ps1` (Windows Server through WSL 2), at Shikari's and Ostraka's paths; `deploy/server/`: the Compose override (Caddy in front, nothing else published, production frontend), Caddyfile, a Tailscale Service name (`server init --service`: `Caddyfile.service` and `docker-compose.service.yml`, loopback 5680–5683); Rocky/RHEL (`deploy/docker-compose.selinux.yml`); `scripts/server/`: the helpers (`server users/licence/ca/cert/backup`); guide in `docs/SERVER.md` |
-| `src/web/backend/auth/` | Sign-in: `users.py` (file store), `access.py` (the server-mode middleware: every route, job ownership and sharing via the `job_access` table), `tokens.py` (long-lived API tokens, `full` or `aule-mcp` scope), `oidc.py` (SSO), `manage_users.py` |
+| `src/web/backend/auth/` | Sign-in: `users.py` (file store), `access.py` (the server-mode middleware: every route, job ownership and sharing via the `job_access` table), `tokens.py` (long-lived API tokens, `full` or `smith-mcp` scope), `oidc.py` (SSO), `manage_users.py` |
 | `src/common/startup_progress.py` | `rowanholt start --progress`: phases, ETA from start history, the Shire-to-Rowanholt places the apps draw |
 | `src/mordor/` | Security datasets and recorded attack telemetry |
-| `src/aule_mcp/` | Aulë's MCP server (`rowanholt mcp`), read-only over Rowanholt's API |
-| `src/models/` | Ollama Modelfiles for the aule-* models |
+| `src/smith_mcp/` | Smith's MCP server (`rowanholt mcp`), read-only over Rowanholt's API |
+| `src/models/` | Ollama Modelfiles for the smith-* models |
 | `desktop/` | Desktop app, laid out as Shikari's and Ostraka's: the release installers `desktop/install.sh`, `install.ps1`, `uninstall.sh`, `uninstall.ps1`; `macos/` (Swift WebKit app + first-run setup, `build.sh`/`package.sh` → universal DMG), `linux/` (launcher + zenity setup, `.deb`), `windows/` (launcher and first-run setup, WiX MSI), `icons/`, `source-tarball.sh`; release builds and smoke tests in `.github/workflows/desktop-release.yml`; `rowanholt app install` for a checkout; see `desktop/README.md` |
 | `lab/` | Test lab: Linux targets, Tart/UTM VMs, Gandalf against seeded hosts; bugs in `tests/docs/BUGS.md` |
 | `src/analysis/web/`, `src/analysis/docker/` | Legacy standalone Elrond stack (ports 3000/8000), not used |
 
 ## Stack
 
-- Python 3.10 in the backend image (`python:3.10-slim`) and the worker (Ubuntu 22.04's python3; Python 3.12 there is only iLEAPP's and ALEAPP's venvs, from deadsnakes), 3.12 in the aule-mcp and Andúril images; the package needs 3.10+ (`requires-python`, for samarkand); host-side scripts that import nothing of the backend's or Elrond's (the launcher's helpers, `startup_progress.py`, `samples.py`) and Gandalf's Python collector stay Python 3.8-compatible
+- Python 3.10 in the backend image (`python:3.10-slim`) and the worker (Ubuntu 22.04's python3; Python 3.12 there is only iLEAPP's and ALEAPP's venvs, from deadsnakes), 3.12 in the smith-mcp and Andúril images; the package needs 3.10+ (`requires-python`, for samarkand); host-side scripts that import nothing of the backend's or Elrond's (the launcher's helpers, `startup_progress.py`, `samples.py`) and Gandalf's Python collector stay Python 3.8-compatible
 - FastAPI, SQLAlchemy and Alembic over Postgres (users, jobs, history); Redis + Celery for the job queue; case data in case directories on disk
 - argparse for CLIs (`src/cli/rowanholt.py`, `elrond.py`)
 - openpyxl for XLSX output
 - Volatility 3, Plaso (psteal), Artemis, RegRipper, YARA, The Sleuth Kit, ClamAV, ewfmount/qemu-nbd/apfs-fuse as subprocess calls
-- Aulë's LLM backend is Ollama (`OLLAMA_HOST`, `ROWANHOLT_MODEL_NAME`, default `llama3.2:3b`); the CLI can also use llama.cpp through LangChain. No hosted-API backend exists
+- Smith's LLM backend is Ollama (`OLLAMA_HOST`, `ROWANHOLT_MODEL_NAME`, default `llama3.2:3b`); the CLI can also use llama.cpp through LangChain. No hosted-API backend exists
 - React 18 front end; Docker Compose for everything (`docker-compose.yml`)
 
 ## Code conventions
@@ -73,28 +73,28 @@ Gandalf (acquisition) → Elrond (analysis) → Aulë (AI analyst)
 - New forensic tool integrations: define the tool in `src/analysis/tools/definitions.py` and add its processing under `src/analysis/rowanholt/process/` following the existing modules
 - New artefact parsers (no external tool): a stdlib module in `process/extractions/` that returns rows, routed from `process/extra_artefacts.py` (or the OS router: `windows_artefacts.py`, `linux_artefacts.py`, `mac_artefacts.py`) into `cooked/<name>.csv`, techniques via `_record_techniques`; selection in `process/select.py` follows `is_extra_artefact`
 
-## What Aulë touches
+## What Smith touches
 
-Aulë is the AI layer. It reads Elrond's case output and provides:
-- Natural-language answers, case summaries and investigation suggestions (with Ollama), from per-host rows tagged `[R1]`…; answers return only the cited rows they were given, which Ask Aulë offers to flag
-- Fixed questions answered straight from the case files when Ollama or the model isn't available (`aule_offline.py`): hosts, ATT&CK techniques, persistence, logins, IOCs, suspicious commands
-- ATT&CK mapping itself is Elrond's (`post/mitre/`), not Aulë's
+Smith is the AI layer. It reads Elrond's case output and provides:
+- Natural-language answers, case summaries and investigation suggestions (with Ollama), from per-host rows tagged `[R1]`…; answers return only the cited rows they were given, which Ask Smith offers to flag
+- Fixed questions answered straight from the case files when Ollama or the model isn't available (`smith_offline.py`): hosts, ATT&CK techniques, persistence, logins, IOCs, suspicious commands
+- ATT&CK mapping itself is Elrond's (`post/mitre/`), not Smith's
 
 ## Threat intelligence, collaboration, stacking
 
-- Threat intelligence: `src/analysis/rowanholt/threat_intel/` (Iran APT loader `iran_apt_loader.py`, STIX/TAXII in `stix.py` over `samarkand.stix` and `samarkand.taxii`, MITRESaw, matching, `enrich_artefact()` as the Aulë-facing function); fixed 10-column schema: Evidential Element, Threat Group, Procedure Example, Technique ID, Technique Name, Tactic, Contextual Evidence, Reference URL, Navigation Layer URL, Source Type; table `threat_intel_indicators` — don't rename or restructure without asking. Expiry and confidence live beside it in `threat_intel_validity` (`threat_intel/validity.py`; STIX's own, else 90 days for IPs and domains); expired indicators stay listed but are left out of the CSV export (Elrond's matching) and the value index (`/enrich`, Aulë) Elrond `--threatIntel`, API `/api/threat-intel`, the Intel page. Online lookups (`threat_intel_lookup.py`, VirusTotal, off unless `.env` turns them on): any analyst from Pippin, refused to Aulë; approved 4 November 2026 (`.claude/threat-model.md`)
+- Threat intelligence: `src/analysis/rowanholt/threat_intel/` (Iran APT loader `iran_apt_loader.py`, STIX/TAXII in `stix.py` over `samarkand.stix` and `samarkand.taxii`, MITRESaw, matching, `enrich_artefact()` as the Smith-facing function); fixed 10-column schema: Evidential Element, Threat Group, Procedure Example, Technique ID, Technique Name, Tactic, Contextual Evidence, Reference URL, Navigation Layer URL, Source Type; table `threat_intel_indicators` — don't rename or restructure without asking. Expiry and confidence live beside it in `threat_intel_validity` (`threat_intel/validity.py`; STIX's own, else 90 days for IPs and domains); expired indicators stay listed but are left out of the CSV export (Elrond's matching) and the value index (`/enrich`, Smith) Elrond `--threatIntel`, API `/api/threat-intel`, the Intel page. Online lookups (`threat_intel_lookup.py`, VirusTotal, off unless `.env` turns them on): any analyst from Pippin, refused to Smith; approved 4 November 2026 (`.claude/threat-model.md`)
 - Case browser and collaboration: `src/web/backend/case_routes.py` + `case_files.py` (read-only over cooked/ and analysis/, never raw/), tables `case_findings`, `case_notes`, `case_hosts`, `case_activity`
 - Stacking across hosts: `src/analysis/rowanholt/analysis/stacking.py` (stdlib; run by `--Analysis` on 2+ hosts, rarity needs 3+ of an OS, Linux grouped by distro family, persistence ranked above programs at equal score); no learned model (scikit-learn was dropped)
 
-## Aulë's MCP server
+## Smith's MCP server
 
-- `src/aule_mcp/server.py` (`rowanholt mcp`, stdio; or `--http` on a team server, the `aule-mcp` service behind Caddy at `/mcp`, each request's own aule-mcp API token checked by `RowanholtTokens` (full tokens and JWTs refused), reviewed 4 November 2026; mcp 2's `MCPServer`, formerly FastMCP; `requirements/mcp.txt`, Python 3.10+, never in the worker or backend images). Register every Aulë capability through this one server — no parallel registration system
-- A thin client of Rowanholt's API only (`RowanholtAPI` refuses anything but `/api/` paths), read-only by default; every phase 1 tool `readOnlyHint`. Never expose starting/restarting/deleting jobs, Gandalf, threat intelligence import/delete, host assignment, changing or removing findings, or `raw/`. Phase 2 (`flag_lead`, `add_note`) only with `--allow-writes`: leads only, every call sends `X-Rowanholt-Agent: aule-mcp` so the backend records "Aulë (for <user>)" and refuses Aulë anything else, capped by `--max-writes`. An `aule-mcp` API token (`auth/tokens.py`, table `api_tokens`) makes the backend treat the caller as Aulë without the header and refuse anything but reads, leads and notes; on a team server `--allow-writes` won't start without one (`write_refusal`). Reviewed 3 November 2026 with conditions (`.claude/threat-model.md`): on a live case only in an MCP host with no other network-capable tools and no shell or file access to the case store; any new tool needs a fresh review
-- Tests: `tests/unit/test_aule_mcp.py` over `test_server_access.BackendCase` (the real backend in server mode)
+- `src/smith_mcp/server.py` (`rowanholt mcp`, stdio; or `--http` on a team server, the `smith-mcp` service behind Caddy at `/mcp`, each request's own smith-mcp API token checked by `RowanholtTokens` (full tokens and JWTs refused), reviewed 4 November 2026; mcp 2's `MCPServer`, formerly FastMCP; `requirements/mcp.txt`, Python 3.10+, never in the worker or backend images). Register every Smith capability through this one server — no parallel registration system
+- A thin client of Rowanholt's API only (`RowanholtAPI` refuses anything but `/api/` paths), read-only by default; every phase 1 tool `readOnlyHint`. Never expose starting/restarting/deleting jobs, Gandalf, threat intelligence import/delete, host assignment, changing or removing findings, or `raw/`. Phase 2 (`flag_lead`, `add_note`) only with `--allow-writes`: leads only, every call sends `X-Rowanholt-Agent: smith-mcp` so the backend records "Smith (for <user>)" and refuses Smith anything else, capped by `--max-writes`. A `smith-mcp` API token (`auth/tokens.py`, table `api_tokens`) makes the backend treat the caller as Smith without the header and refuse anything but reads, leads and notes; on a team server `--allow-writes` won't start without one (`write_refusal`). Reviewed 3 November 2026 with conditions (`.claude/threat-model.md`): on a live case only in an MCP host with no other network-capable tools and no shell or file access to the case store; any new tool needs a fresh review
+- Tests: `tests/unit/test_smith_mcp.py` over `test_server_access.BackendCase` (the real backend in server mode)
 
 ## What not to do
 
-- Do not rename Gandalf, Elrond, Aulë, Aragorn, Andúril, Mordor or Pippin
+- Do not rename Gandalf, Elrond, Smith, Aragorn, Andúril, Mordor or Pippin
 - Do not restructure the execution graph model without explicit instruction
 - Do not add new Python dependencies without checking `requirements/` (and `src/web/backend/requirements.txt`) first
 - Do not convert subprocess tool calls to library imports — the subprocess boundary is intentional (isolation)

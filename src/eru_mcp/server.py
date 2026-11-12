@@ -1,8 +1,8 @@
-"""aule_mcp.server by its old name (see __init__.py): the same module, so the same server."""
+"""smith_mcp.server by its old name (see __init__.py): the same module, so the same server."""
 
 import sys
 
-from aule_mcp import server as _server
+from smith_mcp import server as _server
 
 if __name__ == "__main__":
     sys.exit(_server.main())

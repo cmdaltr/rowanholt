@@ -1,7 +1,7 @@
 """
 Builds Rowanholt's architecture map: a self-contained HTML page (fonts and images
 embedded) in the style of a map of Middle-earth. Page 1 is the realm (Gandalf, the
-web UI, the worker, Elrond, Aulë, Aragorn, Mordor); page 2 is Elrond's directed graph,
+web UI, the worker, Elrond, Smith, Aragorn, Mordor); page 2 is Elrond's directed graph,
 branching by evidence type and operating system.
 
     python3 scripts/docs/architecture/build_map.py [out.html]
@@ -115,21 +115,21 @@ parts.append(f'<img src="data:image/png;base64,{b64(ASSETS / "rowanholt.png")}" 
              f'style="position:absolute;left:52px;top:26px;height:108px;border-radius:8px;border:1px solid {PARCH_DIM}">')
 parts.append(f'<div style="position:absolute;left:{52 + 180}px;top:30px;width:720px">'
              f'<div class="h1">Rowanholt</div>'
-             f'<div class="h2">A map of the realm: how a case travels from Gandalf to Elrond to Aulë</div></div>')
+             f'<div class="h2">A map of the realm: how a case travels from Gandalf to Elrond to Smith</div></div>')
 
-# Aulë: the smith in the Uttermost West (top centre, above the map)
-box(1020, 18, 640, 134, "Aulë <span class='sub'>AI analyst · Ask Aulë</span>",
+# Smith: the forge above the map (top centre)
+box(1020, 18, 640, 134, "Smith <span class='sub'>AI analyst · Ask Smith</span>",
     "Reads Elrond's cooked artefacts, IOCs and ATT&amp;CK tags; answers in plain language with a local model "
     "(<b>Ollama</b>, nothing leaves the host). Without Ollama it says why and answers a fixed set of questions "
     "straight from the case files.",
-    VIOLET, kicker="The smith in the Uttermost West")
+    VIOLET, kicker="The forge above the realm")
 
 # legend
 lx, ly = 1700, 24
 parts.append(f'<div class="legend" style="left:{lx}px;top:{ly}px;width:800px;height:116px"></div>')
 legend = [(GREEN, "", "live acquisition (hosts, cloud)"), (GOLD, "10 7", "the Great East Road: Gandalf archives"),
           (TEAL, "", "web UI, jobs and queues"), (CRIMSON, "", "Mordor: attack datasets"),
-          (VIOLET, "6 6", "Aulë: AI, read-only"), ("#9aa3b5", "", "administration and the lab")]
+          (VIOLET, "6 6", "Smith: AI, read-only"), ("#9aa3b5", "", "administration and the lab")]
 for i, (col, dash, text) in enumerate(legend):
     x = lx + 24 + (i % 2) * 390
     y = ly + 20 + (i // 2) * 30
@@ -183,7 +183,7 @@ box(MX + 20, MY + 420, 330, 286, "Gandalf <span class='sub'>acquisition</span>",
 
 box(MX + 240, MY + 24, 360, 168, "Web UI and API <span class='sub'>:5687 · :5688</span>",
     "React front end and FastAPI back end: start jobs, upload or pick images, watch progress, read results, "
-    "Ask Aulë, Pippin (threat intelligence), shared findings. Admins also see Aragorn.",
+    "Ask Smith, Pippin (threat intelligence), shared findings. Admins also see Aragorn.",
     TEAL, kicker="The Prancing Pony, Bree")
 
 box(MX + 600, MY + 230, 330, 196, "Elrond worker <span class='sub'>Celery</span>",
@@ -275,7 +275,7 @@ outputs = [
     ("ATT&amp;CK Navigator", "A layer of every technique tagged in the case, served by the bundled Navigator", GOLD),
     ("Timeline", "One Plaso super-timeline of every source, also indexed into Splunk or Kibana", GOLD),
     ("Dashboards", "Splunk app and Kibana dashboards over the same cooked data", RUST),
-    ("Answers and findings", "Aulë: case summaries and suggestions with a model; exact answers from the files "
+    ("Answers and findings", "Smith: case summaries and suggestions with a model; exact answers from the files "
      "without one. Findings the team confirmed in the case browser, as a report and a layer",
      VIOLET),
 ]
@@ -315,9 +315,9 @@ route(c((rx + rw, ry + 60), (MX + 1600, MY + 690), (MX + 1600, MY + 472)), RUST,
 # Rowanholt -> Erebor (case store), past the keep
 route(c((rx + rw, ry + 30), (MX + 1426, MY + 640), (MX + 1426, MY + 400), (MX + 1426, MY + 226)), GOLD, 3.5,
       label="case output, job state", lx=MX + 1240, ly=MY + 296, lw=176)
-# Erebor -> Aulë (read-only)
+# Erebor -> Smith (read-only)
 route(c((MX + 1480, MY + 50), (MX + 1440, MY + 16), (1500, 140)), VIOLET, 3, dash="6 6",
-      label="Aulë reads the case", lx=1250, ly=MY + 10, lw=180)
+      label="Smith reads the case", lx=1250, ly=MY + 10, lw=180)
 # Mordor -> Rowanholt
 route(c((MX + 1400, MY + 960), (MX + 1400, MY + 920), (rx + rw, MY + 920)), CRIMSON, 4,
       label="<code>--Mordor</code>: datasets as event logs", lx=MX + 1420, ly=MY + 914, lw=262)
@@ -333,7 +333,7 @@ for i, y in enumerate(oys):
     route(c((rx + rw, y0), (gxo, y0), (gxo, y + 103), (2160, y + 103)),
           GOLD if i < 3 else (RUST if i == 3 else VIOLET), 3, dash="6 6" if i == 4 else "")
 
-parts.append(f'<div class="footer">Rowanholt · Gandalf collects · Elrond analyses · Aulë answers · '
+parts.append(f'<div class="footer">Rowanholt · Gandalf collects · Elrond analyses · Smith answers · '
              f'Aragorn keeps the realm · page 1 of 2 · generated from the codebase, November 2026</div>')
 
 

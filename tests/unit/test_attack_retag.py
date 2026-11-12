@@ -33,7 +33,7 @@ TAG_TABLES = [
     ANALYSIS / "rowanholt" / "post" / "splunk" / "app" / "transforms.py",
     ANALYSIS / "rowanholt" / "post" / "splunk" / "app" / "views" / "xml" / "techniques.py",
     ANALYSIS / "rowanholt" / "post" / "elastic" / "dashboards" / "techniques.py",
-    REPO / "src" / "web" / "backend" / "aule_offline.py",
+    REPO / "src" / "web" / "backend" / "smith_offline.py",
     REPO / "src" / "mordor" / "telemetry" / "macos_attack.py",
 ]
 

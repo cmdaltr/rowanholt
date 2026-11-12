@@ -140,7 +140,7 @@ so Rowanholt moves from MIT to ELv2 from the next release.
 |---|---|---|---|
 | Local mode (one analyst, no sign-in) | The Free edition: needs no licence | With a Pro licence installed | With a Services licence installed |
 | Accounts that can sign in to a team server | 4 (`FREE_SEATS`) | The licence's `seats` | The licence's `seats` |
-| The product | All of it: acquisition, analysis, the case browser, single sign-on, Aulë | The same | The same |
+| The product | All of it: acquisition, analysis, the case browser, single sign-on, Smith | The same | The same |
 | The Word case report | Rowanholt's own style | The installation's brand (`report-branding`) | The case's brand, else the installation's (`brand-library`) |
 | The Markdown report and the Navigator layer | Rowanholt's own | The same | The same |
 | Webhooks (`automation`) | Kept, not sent | Sent | Sent |

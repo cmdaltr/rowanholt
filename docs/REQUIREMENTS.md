@@ -153,12 +153,12 @@ sudo sh get-docker.sh
 sudo apt-get install docker-compose-plugin
 ```
 
-### Aulë (AI analyst)
+### Smith (AI analyst)
 ```bash
 # Install Ollama for local LLM
 curl -fsSL https://ollama.com/install.sh | sh
 
-# Pull the default model (ROWANHOLT_MODEL_NAME); see AULE.md for the aule-* models
+# Pull the default model (ROWANHOLT_MODEL_NAME); see SMITH.md for the smith-* models
 ollama pull llama3.2:3b
 ```
 

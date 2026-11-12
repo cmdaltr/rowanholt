@@ -58,7 +58,7 @@ def load_app():
 
 class BackendCase(unittest.TestCase):
     """The real backend in server mode, with an admin, alice and bob signed in (no tests of its own:
-    test_aule_mcp.py drives its MCP server against the same setup)."""
+    test_smith_mcp.py drives its MCP server against the same setup)."""
 
     @classmethod
     def setUpClass(cls):
