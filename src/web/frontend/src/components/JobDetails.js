@@ -4,6 +4,7 @@ import { getJob, cancelJob, pauseJob, resumeJob, deleteJob, restartJob, exportSi
 import { serviceUrl } from '../apiBase';
 import JobSharing from './JobSharing';
 import { statusLabel } from '../jobStatus';
+import { canManage, jobPageActions, restartFresh } from '../jobActions';
 
 const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
 
@@ -19,14 +20,16 @@ function JobDetails() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showRemovalModal, setShowRemovalModal] = useState(false);
 
-  // Ask whether to try again when removing the old output failed
+  // Ask whether to try again when removing the old output failed (its owner or an admin: anyone
+  // else it's shared with sees that it's waiting for them)
+  const managesJob = canManage(job);
   useEffect(() => {
-    if (job?.status === 'awaiting_confirmation' && job?.pending_action) {
+    if (job?.status === 'awaiting_confirmation' && job?.pending_action && managesJob) {
       setShowRemovalModal(true);
     } else {
       setShowRemovalModal(false);
     }
-  }, [job?.status, job?.pending_action]);
+  }, [job?.status, job?.pending_action, managesJob]);
 
   useEffect(() => {
     loadJob();
@@ -107,7 +110,7 @@ function JobDetails() {
     setActionLoading(true);
     try {
       try {
-        await restartJob(jobId);
+        await restartJob(jobId, false, restartFresh(job));
       } catch (err) {
         // The case has findings: the backend says how many, and the restart waits for a yes
         if (err.response?.status !== 409) throw err;
@@ -117,7 +120,7 @@ function JobDetails() {
           + 'row that changes will show "row changed" in the case browser. Restart anyway?')) {
           return;
         }
-        await restartJob(jobId, true);
+        await restartJob(jobId, true, restartFresh(job));
       }
       await loadJob();
     } catch (err) {
@@ -376,6 +379,9 @@ function JobDetails() {
       </div>
     );
   }
+
+  // Only what the server would allow: the people a job is shared with don't get its owner's buttons
+  const actions = jobPageActions(job);
 
   return (
     <div className="job-details journey-detail">
@@ -732,7 +738,7 @@ function JobDetails() {
             <div className="job-id">ID: {job.id}</div>
           </div>
           <div data-guide="job.actions" className="job-actions">
-            {(job.status === 'running' || job.status === 'paused') && (
+            {(actions.pause || actions.resume) && (
               <button
                 className="secondary"
                 onClick={handlePauseResume}
@@ -742,7 +748,7 @@ function JobDetails() {
                 {job.status === 'paused' ? 'Resume Job' : 'Pause Job'}
               </button>
             )}
-            {(job.status === 'pending' || job.status === 'running' || job.status === 'paused') && (
+            {actions.cancel && (
               <button
                 className="secondary"
                 onClick={handleCancel}
@@ -751,11 +757,13 @@ function JobDetails() {
                 Cancel Job
               </button>
             )}
-            {(job.status === 'failed' || job.status === 'cancelled' || job.status === 'completed') && (
+            {actions.restart && (
               <>
                 <button
                   onClick={handleRestart}
                   disabled={actionLoading}
+                  title={canManage(job) ? undefined
+                    : "Re-runs into the existing output: only the job's owner or an admin can restart it with fresh output"}
                   style={{
                     background: 'rgba(107, 142, 63, 0.3)',
                     border: '1px solid rgba(107, 142, 63, 0.5)',
@@ -764,13 +772,15 @@ function JobDetails() {
                 >
                   Restart Job
                 </button>
-                <button
-                  className="secondary"
-                  onClick={handleDelete}
-                  disabled={actionLoading}
-                >
-                  Delete Job
-                </button>
+                {actions.delete && (
+                  <button
+                    className="secondary"
+                    onClick={handleDelete}
+                    disabled={actionLoading}
+                  >
+                    Delete Job
+                  </button>
+                )}
               </>
             )}
             {job.status === 'completed' && (
@@ -785,6 +795,20 @@ function JobDetails() {
         </div>
 
         {error && <div className="error">{error}</div>}
+
+        {!canManage(job) && (
+          <div className="info" role="note" style={{ marginBottom: '1rem' }}>
+            {job.owner ? `${job.owner}'s job, shared with you` : 'Shared with you'}: you can watch it, restart it into
+            its output, export it and ask Smith. Cancelling, pausing, deleting, a fresh restart and sharing are
+            for its owner or an admin.
+          </div>
+        )}
+
+        {job.status === 'awaiting_confirmation' && job.pending_action && !actions.settleRemoval && (
+          <div className="info" role="status" style={{ marginBottom: '1rem', color: '#ff9800' }}>
+            Removing this job's old output failed. It waits for its owner or an admin to try again or give up.
+          </div>
+        )}
 
         {job.status === 'removing' && (
           <div className="info" role="status" style={{ marginBottom: '1rem', color: '#ff9800' }}>

@@ -232,13 +232,15 @@ def _fresh_restart_refusal(request: Request, job: Job) -> Optional[str]:
     return None
 
 
-def _with_access(jobs: List[Job]) -> List[Job]:
-    """Fill in each job's owner and who it's shared with."""
+def _with_access(jobs: List[Job], request: Request) -> List[Job]:
+    """Fill in each job's owner, who it's shared with, and whether the caller may manage it."""
     records = job_storage.all_access() if jobs else {}
+    user = access.current_user(request)
     for job in jobs:
-        record = records.get(job.id) or {}
-        job.owner = record.get("owner_username")
-        job.shared_with = record.get("shared_with") or []
+        record = records.get(job.id)
+        job.owner = (record or {}).get("owner_username")
+        job.shared_with = (record or {}).get("shared_with") or []
+        job.can_manage = access.manages(user, record)
     return jobs
 
 
@@ -548,6 +550,7 @@ async def create_job(job_request: JobCreate, request: Request):
         owner = user
         job_storage.set_owner(job.id, owner["id"], owner["username"])
         job.owner = owner["username"]
+        job.can_manage = True
 
         # Start analysis task and store Celery task ID
         queue_job(job)
@@ -585,7 +588,7 @@ async def list_jobs(
     """
     try:
         visible = access.visible_job_ids(access.current_user(request))
-        jobs = _with_access(job_storage.list_jobs(status=status, limit=limit, offset=offset, job_ids=visible))
+        jobs = _with_access(job_storage.list_jobs(status=status, limit=limit, offset=offset, job_ids=visible), request)
         total = job_storage.count_jobs(status=status, job_ids=visible)
 
         # Truncate logs to avoid sending massive payloads
@@ -633,7 +636,8 @@ async def validate_case_id(case_id: str, request: Request):
 
 
 @app.get("/api/jobs/{job_id}", response_model=Job)
-async def get_job(job_id: str, log_limit: int = Query(100, description="Max log entries to return")):
+async def get_job(job_id: str, request: Request,
+                  log_limit: int = Query(100, description="Max log entries to return")):
     """
     Get job details.
 
@@ -655,7 +659,7 @@ async def get_job(job_id: str, log_limit: int = Query(100, description="Max log 
         if log_limit > 0 and len(job.log) > log_limit:
             job.log = job.log[-log_limit:]
 
-        return _with_access([job])[0]
+        return _with_access([job], request)[0]
 
     except HTTPException:
         raise
@@ -697,7 +701,7 @@ async def update_job(job_id: str, update: JobUpdate, request: Request):
         raise HTTPException(status_code=409, detail="The job changed while the note was added; try again")
     job_storage.audit("job.note_added", {"id": user.get("id"), "username": user.get("username")},
                       _client_ip(request), resource_id=job_id)
-    return _with_access([saved])[0]
+    return _with_access([saved], request)[0]
 
 
 @app.delete("/api/jobs/{job_id}")

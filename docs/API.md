@@ -648,7 +648,10 @@ Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, whic
       "status": "completed",
       "progress": 100,
       "created_at": "2025-01-15T12:00:00Z",
-      "completed_at": "2025-01-15T13:00:00Z"
+      "completed_at": "2025-01-15T13:00:00Z",
+      "owner": "alice",
+      "shared_with": ["bob"],
+      "can_manage": true
     },
     ...
   ],
@@ -657,6 +660,8 @@ Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, whic
   "offset": 0
 }
 ```
+
+`owner` and `shared_with` come from the job's sharing (server mode). `can_manage` says whether the caller may do the owner's things to the job: cancel, pause, resume, delete, archive, unarchive, restart with fresh output, change its sharing, and confirm or give up a failed removal. It's `true` for the owner and for admins, `false` for the people the job is only shared with (who may see it, restart it with `fresh=false`, export it and ask Smith), and always `true` in local mode. It's per caller and never stored. The web app uses it to offer only the actions the server would allow; the server still refuses the rest with `403`. `GET /api/jobs/{job_id}`, `PATCH /api/jobs/{job_id}` and `GET /api/jobs/{job_id}/sharing` return it too.
 
 ---
 
@@ -690,9 +695,14 @@ Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, whic
   "celery_task_id": "task-uuid",
   "created_at": "2025-01-15T12:00:00Z",
   "started_at": "2025-01-15T12:00:01Z",
-  "completed_at": null
+  "completed_at": null,
+  "owner": "alice",
+  "shared_with": ["bob"],
+  "can_manage": true
 }
 ```
+
+`can_manage`: as in [List Jobs](#list-jobs).
 
 **Errors:**
 - `404 Not Found`: Job not found or unauthorized access

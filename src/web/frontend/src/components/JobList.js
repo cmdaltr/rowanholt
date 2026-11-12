@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { BUSY_STATUSES, STATUS_FILTERS, STOPPABLE_STATUSES, statusLabel } from '../jobStatus';
+import { STATUS_FILTERS, statusLabel } from '../jobStatus';
+import { bulkOffered, bulkPlan, skippedNote } from '../jobActions';
 import { Link } from 'react-router-dom';
 import { listJobs, bulkDeleteJobs, bulkArchiveJobs, bulkRestartJobs, bulkCancelJobs, countFindings } from '../api';
 
@@ -111,12 +112,14 @@ function JobList() {
   const handleBulkDelete = async () => {
     // Check if any selected jobs can actually be deleted
     const selectedJobData = jobs.filter(job => selectedJobs.includes(job.id));
-    const deletableJobs = selectedJobData.filter(job => !BUSY_STATUSES.includes(job.status));
+    const plan = bulkPlan(selectedJobData, 'delete');
+    const deletableJobs = plan.eligible;
 
     if (deletableJobs.length === 0) {
       setErrorModalData({
         title: 'Cannot Delete Jobs',
         message: 'None of the selected jobs can be deleted. Cannot delete PENDING or RUNNING jobs. Please stop them first.'
+          + skippedNote(plan, 'delete')
       });
       setShowErrorModal(true);
       return;
@@ -124,7 +127,7 @@ function JobList() {
 
     setConfirmModalData({
       title: '⚠️ Delete Confirmation',
-      message: `Are you sure you want to delete ${deletableJobs.length} job(s)? This action cannot be undone.`,
+      message: `Are you sure you want to delete ${deletableJobs.length} job(s)? This action cannot be undone.${skippedNote(plan, 'delete')}`,
       actionType: 'delete',
       action: async () => {
         try {
@@ -209,12 +212,14 @@ function JobList() {
   const handleBulkArchive = async () => {
     // Check if any selected jobs can actually be archived
     const selectedJobData = jobs.filter(job => selectedJobs.includes(job.id));
-    const archivableJobs = selectedJobData.filter(job => !BUSY_STATUSES.includes(job.status) && job.status !== 'archived');
+    const plan = bulkPlan(selectedJobData, 'archive');
+    const archivableJobs = plan.eligible;
 
     if (archivableJobs.length === 0) {
       setErrorModalData({
         title: 'Cannot Archive Jobs',
         message: 'None of the selected jobs can be archived. Cannot archive PENDING, RUNNING, or already ARCHIVED jobs.'
+          + skippedNote(plan, 'archive')
       });
       setShowErrorModal(true);
       return;
@@ -222,7 +227,7 @@ function JobList() {
 
     setConfirmModalData({
       title: '📦 Archive Confirmation',
-      message: `Are you sure you want to archive ${archivableJobs.length} job(s)?`,
+      message: `Are you sure you want to archive ${archivableJobs.length} job(s)?${skippedNote(plan, 'archive')}`,
       actionType: 'archive',
       action: async () => {
         try {
@@ -259,7 +264,8 @@ function JobList() {
   const handleBulkRestart = async () => {
     // Check if any selected jobs can actually be restarted
     const selectedJobData = jobs.filter(job => selectedJobs.includes(job.id));
-    const restartableJobs = selectedJobData.filter(job => job.status === 'failed' || job.status === 'cancelled' || job.status === 'completed');
+    const plan = bulkPlan(selectedJobData, 'restart');
+    const restartableJobs = plan.eligible;
 
     if (restartableJobs.length === 0) {
       setErrorModalData({
@@ -272,6 +278,11 @@ function JobList() {
 
     const counts = await Promise.all(restartableJobs.map(job => countFindings(job.id)));
     const withFindings = counts.filter(Boolean).length;
+    const kept = plan.keepOutput.length;
+    const keepNote = kept
+      ? ` ${kept} of them ${kept === 1 ? 'is' : 'are'} someone else's: ${kept === 1 ? 'it re-runs' : 'they re-run'} into the existing output, `
+        + 'since only the owner or an admin can restart with fresh output.'
+      : '';
     const findingsNote = withFindings
       ? ` ${withFindings} of them ha${withFindings === 1 ? 's' : 've'} findings (${counts.reduce((a, b) => a + b, 0)} in all): `
         + 'restarting rewrites their output, so changed rows will show "row changed" in the case browser.'
@@ -279,14 +290,19 @@ function JobList() {
 
     setConfirmModalData({
       title: '🔄 Restart Confirmation',
-      message: `Are you sure you want to restart ${restartableJobs.length} job(s)?${findingsNote}`,
+      message: `Are you sure you want to restart ${restartableJobs.length} job(s)?${findingsNote}${keepNote}`,
       actionType: 'restart',
       action: async () => {
         try {
-          // Only send restartable job IDs
-          const restartableJobIds = restartableJobs.map(job => job.id);
-          // The message above already warned about any findings
-          const response = await bulkRestartJobs(restartableJobIds, true);
+          // The message above already warned about any findings. Jobs the user doesn't manage go
+          // in a request of their own with fresh=false: the server's default would refuse them
+          const keptIds = new Set(plan.keepOutput.map(job => job.id));
+          const ownIds = restartableJobs.map(job => job.id).filter(id => !keptIds.has(id));
+          const batches = await Promise.all([
+            ownIds.length ? bulkRestartJobs(ownIds, true) : { results: [] },
+            keptIds.size ? bulkRestartJobs([...keptIds], true, false) : { results: [] },
+          ]);
+          const response = { results: batches.flatMap(batch => batch.results) };
 
           // Check results and show feedback
           const successful = response.results.filter(r => r.success).length;
@@ -317,12 +333,14 @@ function JobList() {
   const handleBulkStop = async () => {
     // Check if any selected jobs can actually be stopped
     const selectedJobData = jobs.filter(job => selectedJobs.includes(job.id));
-    const stoppableJobs = selectedJobData.filter(job => STOPPABLE_STATUSES.includes(job.status));
+    const plan = bulkPlan(selectedJobData, 'stop');
+    const stoppableJobs = plan.eligible;
 
     if (stoppableJobs.length === 0) {
       setErrorModalData({
         title: 'Cannot Stop Jobs',
         message: 'None of the selected jobs can be stopped. Only PENDING or RUNNING jobs can be stopped.'
+          + skippedNote(plan, 'stop')
       });
       setShowErrorModal(true);
       return;
@@ -330,7 +348,7 @@ function JobList() {
 
     setConfirmModalData({
       title: '⛔ Stop Confirmation',
-      message: `Are you sure you want to stop ${stoppableJobs.length} job(s)?`,
+      message: `Are you sure you want to stop ${stoppableJobs.length} job(s)?${skippedNote(plan, 'stop')}`,
       actionType: 'stop',
       action: async () => {
         try {
@@ -374,6 +392,11 @@ function JobList() {
   if (loading) {
     return <div className="loading">Loading jobs...</div>;
   }
+
+  // The bulk buttons offered for this selection: stopping, archiving and deleting only when at
+  // least one selected job is the user's (the others are skipped, and the confirmation says so)
+  const selectedJobData = jobs.filter(job => selectedJobs.includes(job.id));
+  const offered = (action) => bulkOffered(selectedJobData, action);
 
   return (
     <div className="job-list journey-detail">
@@ -616,7 +639,7 @@ function JobList() {
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           {selectedJobs.length > 0 && (
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button
+              {offered('stop') && <button
                 onClick={() => handleBulkStop()}
                 style={{
                   padding: '0.5rem 1rem',
@@ -631,7 +654,7 @@ function JobList() {
                 }}
               >
                 Stop ({selectedJobs.length})
-              </button>
+              </button>}
               <button
                 onClick={() => handleBulkRestart()}
                 style={{
@@ -664,7 +687,7 @@ function JobList() {
               >
                 Export ({selectedJobs.length})
               </button>
-              <button
+              {offered('archive') && <button
                 onClick={() => handleBulkArchive()}
                 style={{
                   padding: '0.5rem 1rem',
@@ -679,8 +702,8 @@ function JobList() {
                 }}
               >
                 Archive ({selectedJobs.length})
-              </button>
-              <button
+              </button>}
+              {offered('delete') && <button
                 onClick={() => handleBulkDelete()}
                 style={{
                   padding: '0.5rem 1rem',
@@ -695,7 +718,7 @@ function JobList() {
                 }}
               >
                 Delete ({selectedJobs.length})
-              </button>
+              </button>}
             </div>
           )}
             <Link to="/archive">

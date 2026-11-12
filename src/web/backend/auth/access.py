@@ -244,12 +244,19 @@ def can_access_job(user: dict, job_id: str) -> bool:
     return allowed(user, _storage.get_access(job_id))
 
 
+def manages(user: dict, access: Optional[dict]) -> bool:
+    """Whether `user` may manage a job with this access record: its owner or an admin. The job
+    list asks this of every row from one read of the access table, rather than a query per job."""
+    if not server_mode() or is_admin(user):
+        return True
+    return bool(access) and access.get("owner_id") == user["id"]
+
+
 def can_manage_job(user: dict, job_id: str) -> bool:
     """Owners and admins change who a job is shared with; the people it's shared with don't."""
     if not server_mode() or is_admin(user):
         return True
-    access = _storage.get_access(job_id) if _storage else None
-    return bool(access) and access.get("owner_id") == user["id"]
+    return manages(user, _storage.get_access(job_id) if _storage else None)
 
 
 def visible_job_ids(user: dict) -> Optional[set]:

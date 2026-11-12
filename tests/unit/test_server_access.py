@@ -145,6 +145,32 @@ class ServerAccessTest(BackendCase):
         resp = self.client.put(f"/api/jobs/{job}/sharing", headers=self.bob, json={"usernames": []})
         self.assertEqual(resp.status_code, 403)
 
+    def test_the_list_says_who_may_manage_each_job(self):
+        # The web app hides cancel, delete, share and the rest from the people a job is only
+        # shared with: the list says so per job, from one read of the access table
+        mine = self.create_job(self.alice, "CASE-MANAGE-ALICE")
+        theirs = self.create_job(self.bob, "CASE-MANAGE-BOB")
+        self.client.put(f"/api/jobs/{theirs}/sharing", headers=self.bob, json={"usernames": ["alice"]})
+
+        def can_manage(headers):
+            resp = self.client.get("/api/jobs", headers=headers, params={"limit": 100})
+            self.assertEqual(resp.status_code, 200, resp.text)
+            return {job["id"]: job["can_manage"] for job in resp.json()["jobs"]}
+
+        listed = can_manage(self.alice)
+        self.assertIs(listed[mine], True)
+        self.assertIs(listed[theirs], False)
+        self.assertIs(can_manage(self.bob)[theirs], True)
+        self.assertTrue(all(can_manage(self.admin).values()))
+        # The job page says the same, as /sharing does
+        self.assertIs(self.client.get(f"/api/jobs/{theirs}", headers=self.alice).json()["can_manage"], False)
+        self.assertIs(self.client.get(f"/api/jobs/{theirs}/sharing", headers=self.alice).json()["can_manage"], False)
+        self.settings.rowanholt_server_mode = False
+        try:
+            self.assertTrue(all(job["can_manage"] for job in self.client.get("/api/jobs").json()["jobs"]))
+        finally:
+            self.settings.rowanholt_server_mode = True
+
     def test_shared_users_cant_stop_the_job(self):
         # Cancelling, pausing and resuming change how the owner's work runs: owner and admins only.
         # The people a job is shared with watch it

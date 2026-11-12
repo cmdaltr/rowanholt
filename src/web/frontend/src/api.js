@@ -85,8 +85,15 @@ export const resumeJob = async (jobId) => {
 };
 
 // A job with findings answers 409 unless confirm is set: restarting rewrites the rows they point at
-export const restartJob = async (jobId, confirm = false) => {
-  const response = await api.post(`/api/jobs/${jobId}/restart`, null, { params: confirm ? { confirm: true } : {} });
+// `fresh` undefined leaves it to the server (fresh output for a completed job); false re-runs into
+// the old output, the only restart the people a job is shared with may make
+const restartParams = (confirm, fresh) => ({
+  ...(confirm ? { confirm: true } : {}),
+  ...(fresh === undefined ? {} : { fresh }),
+});
+
+export const restartJob = async (jobId, confirm = false, fresh = undefined) => {
+  const response = await api.post(`/api/jobs/${jobId}/restart`, null, { params: restartParams(confirm, fresh) });
   return response.data;
 };
 
@@ -127,8 +134,8 @@ export const bulkArchiveJobs = async (jobIds) => {
   return response.data;
 };
 
-export const bulkRestartJobs = async (jobIds, confirm = false) => {
-  const response = await api.post('/api/jobs/bulk/restart', jobIds, { params: confirm ? { confirm: true } : {} });
+export const bulkRestartJobs = async (jobIds, confirm = false, fresh = undefined) => {
+  const response = await api.post('/api/jobs/bulk/restart', jobIds, { params: restartParams(confirm, fresh) });
   return response.data;
 };
 

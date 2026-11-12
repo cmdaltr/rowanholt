@@ -145,6 +145,9 @@ class Job(BaseModel):
     # From the job_access table, filled in by the API (server mode)
     owner: Optional[str] = Field(None, description="Username of the job's creator")
     shared_with: list[str] = Field(default_factory=list, description="Usernames it's shared with")
+    # Whether the caller may cancel, pause, delete, share... it (its owner or an admin; always true
+    # when local), so the web app offers only what the server would allow. Per caller, never stored
+    can_manage: Optional[bool] = Field(None, description="Whether the caller owns it or is an admin")
 
     class Config:
         json_encoders = {
