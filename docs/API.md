@@ -683,7 +683,9 @@ It's deleted without following symbolic links or crossing onto another device, a
 - `404 Not Found`: Job not found
 - `500 Internal Server Error`: the export failed (also written to the job's log)
 
-> In this build the route answers `500` before it starts: it imports `run_siem_export` with a relative import (`from .tasks import`), which fails when the backend runs as `uvicorn main:app`, as its image and `docker-compose.yml` start it.
+**Who:** whoever can see the job (its owner, the people it's shared with, admins); a `smith-mcp` token is refused (`403`).
+
+> The export runs in the backend container, which in the stock `docker-compose.yml` has neither the Docker CLI nor Elrond's ingest code: an `elastic` job answers `500` (Elastic's ingest script isn't there), and a `splunk` job answers `200` with each Splunk step logged as a warning and nothing indexed. To send a finished case to a SIEM, run Elrond's `--Index` against its folder (`docs/CLI.md`).
 
 ---
 

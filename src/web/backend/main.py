@@ -1307,10 +1307,14 @@ async def trigger_siem_export(job_id: str):
     Returns:
         Export status
     """
-    from .tasks import run_siem_export
-    from pathlib import Path
-    import logging
+    # The house pattern: a package import under the tests' and tools' `backend.main`, a top-level
+    # one under `uvicorn main:app`, as the image runs it (a bare relative import failed there)
+    try:
+        from .tasks import run_siem_export
+    except ImportError:
+        from tasks import run_siem_export
 
+    job = None
     try:
         job = job_storage.get_job(job_id)
 
