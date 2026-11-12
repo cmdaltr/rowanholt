@@ -197,11 +197,18 @@ function ConvertTo-ServerUrl([string]$Text, [switch]$AllowHttp) {
     return ''
 }
 
+# Where "On this PC" unpacks Rowanholt: always here, not a choice. The containers write into it
+# (symbols\, the source's caches), so a folder OneDrive syncs (Desktop, Documents) or a network drive
+# would fight them, and the launcher and uninstall.ps1 find it by the path setup saved, so a copy
+# moved later is set up afresh and the old one left behind. %USERPROFILE% itself isn't synced.
+# The databases are Docker volumes named after the compose project, wherever this folder is
+$AppCopy = Join-Path $env:USERPROFILE 'Rowanholt'
+
 function Select-Mode {
     # Where Rowanholt runs: 0 here (unpacked), 1 a copy already here, 2 a team server; $null cancelled
     $form = New-SetupForm 'Where should Rowanholt run?' 'You can change this later with Set Up Rowanholt in the Start menu.' 210
     $options = @(
-        @('On this PC', "Rowanholt $(Get-AppVersion) runs here in Docker Desktop, and your evidence stays on this PC."),
+        @('On this PC', "Rowanholt $(Get-AppVersion) runs here in Docker Desktop. Its files go in $AppCopy; your evidence stays where it is."),
         @('From a copy I already have', 'A Rowanholt folder that is already on this PC, such as a git clone.'),
         @("On my team's server", "Opens your team's Rowanholt in a window. Nothing else is installed or run here.")
     )
@@ -661,16 +668,14 @@ function Invoke-Setup {
             exit 1
         }
     } else {
-        $parent = Select-Folder 'Choose where to put the Rowanholt folder' $env:USERPROFILE
-        if (-not $parent) { exit 1 }
-        $dir = Join-Path $parent 'Rowanholt'
+        $dir = $AppCopy
     }
     # Unpack into a new folder, or over a copy setup unpacked before (never a git clone)
     $unpacked = (Test-Copy $dir) -and (Test-Path (Join-Path $dir '.rowanholt-version')) -and -not (Test-Path (Join-Path $dir '.git'))
     if (-not (Test-Path $dir) -or $unpacked) {
         Expand-Bundle $dir
     } elseif (-not (Test-Copy $dir)) {
-        Show-Message "$dir already exists and isn't Rowanholt. Choose another folder." 'OK' 'Error' | Out-Null
+        Show-Message "$dir already exists and isn't Rowanholt. Rename or move that folder, then open Rowanholt again." 'OK' 'Error' | Out-Null
         exit 1
     }
     Write-Evidence $dir @(Select-Evidence)
