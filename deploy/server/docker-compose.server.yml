@@ -48,6 +48,7 @@ services:
       - SECRET_KEY=${SECRET_KEY:?Run rowanholt server init first}
       - ROWANHOLT_ADMIN_PASSWORD=${ROWANHOLT_ADMIN_PASSWORD:?Run rowanholt server init first}
       - ROWANHOLT_LOCAL_LOGIN=${ROWANHOLT_LOCAL_LOGIN:-true}
+      - ROWANHOLT_REQUIRE_MFA=${ROWANHOLT_REQUIRE_MFA:-false}
       - OIDC_ISSUER=${OIDC_ISSUER:-}
       - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
       - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
