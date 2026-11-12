@@ -543,7 +543,7 @@ class WorkerHeartbeatTest(unittest.TestCase):
             job.status = status
             return job
         storage.transition.side_effect = claim
-        storage.save_job.side_effect = lambda saved: events.append(("save", saved.status.value))
+        storage.save_worker_job.side_effect = lambda saved: events.append(("save", saved.status.value))
         with mock.patch.object(tasks, "job_storage", storage), \
                 mock.patch.object(tasks.job_liveness, "Heartbeat", Beat), \
                 mock.patch.object(tasks, "build_elrond_command", side_effect=RuntimeError("boom")), \

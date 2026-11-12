@@ -268,21 +268,7 @@ class JobStorage:
 
             if existing:
                 previous = existing.status
-                # Update existing job
-                existing.case_number = job.case_number
-                existing.source_paths = job.source_paths
-                existing.destination_path = job.destination_path
-                existing.options = job.options.dict()
-                existing.status = job.status.value
-                existing.progress = job.progress
-                existing.log = job.log
-                existing.result = job.result
-                existing.error = job.error
-                existing.celery_task_id = job.celery_task_id
-                existing.pending_action = job.pending_action.dict() if job.pending_action else None
-                existing.created_at = job.created_at
-                existing.started_at = job.started_at
-                existing.completed_at = job.completed_at
+                self._copy_into(existing, job)
             else:
                 # Create new job
                 job_model = JobModel(
@@ -311,6 +297,60 @@ class JobStorage:
         finally:
             session.close()
         self._after_save(job, previous)
+
+    @staticmethod
+    def _copy_into(row: "JobModel", job: Job) -> None:
+        """Every column of the row from the job: a full save."""
+        row.case_number = job.case_number
+        row.source_paths = job.source_paths
+        row.destination_path = job.destination_path
+        row.options = job.options.dict()
+        row.status = job.status.value
+        row.progress = job.progress
+        row.log = job.log
+        row.result = job.result
+        row.error = job.error
+        row.celery_task_id = job.celery_task_id
+        row.pending_action = job.pending_action.dict() if job.pending_action else None
+        row.created_at = job.created_at
+        row.started_at = job.started_at
+        row.completed_at = job.completed_at
+
+    def save_worker_job(self, job: Job) -> None:
+        """The worker's save of the job it's running: a full save, as save_job, unless the job was
+        cancelled meanwhile (POST /cancel marks it cancelled before it kills the process group).
+        Then the cancel stands: its status, completed_at, error and pending action are kept, and so
+        is its log line, with the worker's own new lines merged in after the stored ones; the
+        worker's progress and result are still written. Without this, the worker's save after the
+        kill (exit code -9) would turn a cancelled job into a failed one and drop the cancel's
+        line. The row is locked (FOR UPDATE on Postgres) from the read to the write, so a cancel
+        can't land in between."""
+        session = self.Session()
+        previous = None
+        saved = job
+        try:
+            row = session.query(JobModel).filter_by(id=job.id).with_for_update().first()
+            if row is None:
+                session.close()
+                self.save_job(job)
+                return
+            previous = row.status
+            if row.status == JobStatus.CANCELLED.value and job.status != JobStatus.CANCELLED:
+                stored = list(row.log or [])
+                known = set(stored)
+                row.log = stored + [line for line in job.log if line not in known]
+                row.progress = job.progress
+                row.result = job.result
+            else:
+                self._copy_into(row, job)
+            session.commit()
+            saved = self._job_model_to_pydantic(row)
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+        self._after_save(saved, previous)
 
     @staticmethod
     def _after_save(job: Job, previous: Optional[str]) -> None:

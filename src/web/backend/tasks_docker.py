@@ -169,7 +169,7 @@ def acquire_image_locks(job_id: str, image_paths: list, timeout: int = 3600, ret
                             job.log.append(
                                 f"[{datetime.now().isoformat().replace('T', ' ')}] -> Waiting for '{image_name}' (in use by another job)"
                             )
-                            job_storage.save_job(job)
+                            job_storage.save_worker_job(job)
 
                     # Wait and retry
                     time.sleep(retry_interval)
@@ -388,7 +388,7 @@ def _request_removal_confirmation(job, target_path: str, reason: str) -> None:
         target_path=target_path,
         message=f"Removing the old output failed: {reason}. Try again?",
     )
-    job_storage.save_job(job)
+    job_storage.save_worker_job(job)
     logger.info(f"Job {job.id} awaiting confirmation to retry removing: {target_path}")
 
 
@@ -553,9 +553,10 @@ class JobLogSpool:
 
 
 def _safe_save(job):
-    """Save without letting a transient database error kill a running job."""
+    """Save without letting a transient database error kill a running job. Like every save of a
+    job this worker is running, a cancel that landed meanwhile stands (save_worker_job)."""
     try:
-        job_storage.save_job(job)
+        job_storage.save_worker_job(job)
         return True
     except Exception as e:
         logger.warning(f"Job {job.id}: progress save failed, will retry: {e}")
@@ -691,7 +692,7 @@ def start_analysis(self, job_id: str):
         # This ensures jobs using the same image wait for each other
         if job.source_paths:
             job.log.append(f"[{datetime.now().isoformat().replace('T', ' ')}] -> Checking image availability...")
-            job_storage.save_job(job)
+            job_storage.save_worker_job(job)
 
             # Try to acquire all locks (will wait if images are in use)
             if not acquire_image_locks(job_id, job.source_paths, timeout=7200, retry_interval=10,
@@ -868,7 +869,7 @@ def start_analysis(self, job_id: str):
                         ie_indexdat_logged = True
                         line = f"[{datetime.now().isoformat().replace('T', ' ')}] -> processing IE index.dat files..."
                         job.log.append(line)
-                        job_storage.save_job(job)
+                        job_storage.save_worker_job(job)
                     continue  # Skip individual IE index.dat entries
 
                 # Only include lines with ' -> ' (audit log format) OR phase messages OR errors/tracebacks

@@ -395,6 +395,72 @@ class WorkerTest(Folders):
         self.assertEqual(save.call_count, 0)
         self.assertTrue(folder.exists())
 
+    def test_a_cancel_stands_when_the_killed_run_saves_its_end(self):
+        # The cancel route marks the job cancelled, then kills Elrond's process group: the worker
+        # sees it exit with -9 and saves its end. The job stays cancelled, with the cancel's log
+        # line and the worker's own, and not the "exited with code -9" failure
+        job = self.saved(make_job(self.root / "out", status=JobStatus.PENDING))
+        elrond = self.tmp / "elrond"
+        elrond.mkdir()
+        (elrond / "elrond.py").write_text("")
+        store = self.store
+        cancelled_at = []
+
+        class Killed:
+            pid = 4321
+            stdin = None
+
+            def __init__(self, *args, **kwargs):
+                self.lines = iter(["[2026-11-12 10:00:00] -> Parsing $MFT\n"])
+
+            def readline(self):
+                line = next(self.lines, None)
+                if line is not None:
+                    return line
+                if not cancelled_at:  # the route's cancel, between two lines of output
+                    cancelled_at.append(store.transition(job.id, (JobStatus.RUNNING,), JobStatus.CANCELLED,
+                                                         log_line="Job cancelled by user",
+                                                         completed_at=datetime(2026, 11, 12, 10, 0, 5)))
+                return ""
+
+            @property
+            def stdout(self):
+                return self
+
+            def wait(self, timeout=None):
+                return -9
+
+            def poll(self):
+                return -9
+
+        with mock.patch.object(self.tasks, "build_elrond_command", return_value=["--Brisk"]), \
+                mock.patch.dict(os.environ, {"ELROND_HOME": str(elrond)}), \
+                mock.patch.object(self.tasks.subprocess, "Popen", Killed), \
+                mock.patch.object(self.tasks, "_register_job_process"), \
+                mock.patch.object(self.tasks, "_drain_job_events"):  # pause/resume events, from Redis
+            self.tasks.start_analysis(job.id)
+        self.assertIsNotNone(cancelled_at[0])
+        stored = self.store.get_job(job.id)
+        self.assertEqual(stored.status, JobStatus.CANCELLED)
+        self.assertNotEqual(stored.error, "Process exited with code -9")
+        self.assertEqual(stored.completed_at, datetime(2026, 11, 12, 10, 0, 5))
+        self.assertTrue(any(line.endswith("-> Job cancelled by user") for line in stored.log))
+        self.assertTrue(any("Starting rowanholt" in line for line in stored.log))
+        # The worker's own lines after the kill are kept too, after the cancel's
+        failed = [i for i, line in enumerate(stored.log) if "Analysis failed" in line]
+        cancel = [i for i, line in enumerate(stored.log) if line.endswith("-> Job cancelled by user")]
+        self.assertTrue(failed and failed[0] > cancel[0], stored.log)
+
+    def test_the_worker_saves_a_job_nobody_cancelled_in_full(self):
+        job = self.saved(make_job(self.root / "out", status=JobStatus.RUNNING))
+        job.status, job.progress, job.error = JobStatus.FAILED, 40, "Process exited with code 1"
+        job.log.append("worker line")
+        self.store.save_worker_job(job)
+        stored = self.store.get_job(job.id)
+        self.assertEqual((stored.status, stored.progress, stored.error),
+                         (JobStatus.FAILED, 40, "Process exited with code 1"))
+        self.assertEqual(stored.log, ["worker line"])
+
     def test_the_first_try_applies_the_same_checks(self):
         # force_overwrite onto another client's evidence folder: refused, the job failed, nothing gone
         job = self.saved(make_job(self.root / "client-a", status=JobStatus.PENDING, force_overwrite=True))

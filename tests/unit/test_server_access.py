@@ -197,15 +197,27 @@ class ServerAccessTest(BackendCase):
         self.assertEqual(self.main.job_storage.get_job(job).status, JobStatus.CANCELLED)
 
     def worker_writes(self, job_id, **changes):
-        """What the worker does while a cancel is under way: a full save of its own copy, with a
-        new log line and progress (or a new status), between the route's read and its write."""
+        """What the worker does while it's being stopped: a save of its own copy (save_worker_job,
+        as every save of a job it's running), with a new log line and progress."""
         def write(_job_id):
             job = self.main.job_storage.get_job(job_id)
             job.log.append("[worker] -> Parsing $MFT")
             for name, value in changes.items():
                 setattr(job, name, value)
-            self.main.job_storage.save_job(job)
+            self.main.job_storage.save_worker_job(job)
         return mock.patch.object(self.main, "_kill_job_process_group", side_effect=write)
+
+    def ends_before_the_cancel(self, job_id):
+        """The worker finishes the job after the route read it and before the cancel's update."""
+        real = self.main.job_storage.transition
+
+        def finish_then_transition(target, statuses, status, **kwargs):
+            if target == job_id:
+                job = self.main.job_storage.get_job(job_id)
+                job.status, job.progress = self.JobStatus.COMPLETED, 100
+                self.main.job_storage.save_job(job)
+            return real(target, statuses, status, **kwargs)
+        return mock.patch.object(self.main.job_storage, "transition", side_effect=finish_then_transition)
 
     def test_cancel_keeps_what_the_worker_wrote_meanwhile(self):
         from models.job import JobStatus
@@ -225,25 +237,45 @@ class ServerAccessTest(BackendCase):
             self.assertIsNotNone(stored.completed_at)
             self.assertEqual(stored.progress, 70)
             self.assertIn("[worker] -> Parsing $MFT", stored.log)
-            self.assertIn("Job cancelled by user", stored.log[-1])
+            self.assertTrue(any("Job cancelled by user" in line for line in stored.log))
 
-    def test_cancel_leaves_a_job_that_finished_meanwhile(self):
+    def test_a_job_that_ended_before_the_cancel_is_left_alone_and_not_stopped(self):
         from models.job import JobStatus
-        for bulk in (False, True):
-            job = self.create_job(self.alice, f"CASE-CANCEL-DONE-{int(bulk)}")
+        self.JobStatus = JobStatus
+        job = self.create_job(self.alice, "CASE-CANCEL-DONE")
+        self.main.job_storage.set_status(job, JobStatus.RUNNING)
+        locks = sys.modules["tasks_docker"].release_image_locks_for_job
+        locks.reset_mock()
+        with self.ends_before_the_cancel(job), mock.patch("celery.current_app") as celery, \
+                mock.patch.object(self.main, "_kill_job_process_group") as kill:
+            resp = self.client.post(f"/api/jobs/{job}/cancel", headers=self.alice)
+        self.assertEqual(resp.status_code, 409, resp.text)
+        self.assertIn("already completed", resp.json()["detail"])
+        kill.assert_not_called()
+        celery.control.revoke.assert_not_called()
+        locks.assert_not_called()
+        stored = self.main.job_storage.get_job(job)
+        self.assertEqual(stored.status, JobStatus.COMPLETED)
+        self.assertFalse(any("cancelled" in line for line in stored.log))
+
+    def test_a_bulk_cancel_reports_each_job(self):
+        from models.job import JobStatus
+        self.JobStatus = JobStatus
+        running = self.create_job(self.alice, "CASE-BULK-RUNNING")
+        ended = self.create_job(self.alice, "CASE-BULK-ENDED")
+        for job in (running, ended):
             self.main.job_storage.set_status(job, JobStatus.RUNNING)
-            with self.worker_writes(job, status=JobStatus.COMPLETED, progress=100), mock.patch("celery.current_app"):
-                if bulk:
-                    [result] = self.client.post("/api/jobs/bulk/cancel", headers=self.alice, json=[job]).json()["results"]
-                    self.assertFalse(result["success"])
-                    self.assertIn("became completed", result["error"])
-                else:
-                    resp = self.client.post(f"/api/jobs/{job}/cancel", headers=self.alice)
-                    self.assertEqual(resp.status_code, 409, resp.text)
-                    self.assertIn("became completed", resp.json()["detail"])
-            stored = self.main.job_storage.get_job(job)
-            self.assertEqual(stored.status, JobStatus.COMPLETED)
-            self.assertFalse(any("cancelled" in line for line in stored.log))
+        with self.ends_before_the_cancel(ended), mock.patch("celery.current_app"), \
+                mock.patch.object(self.main, "_kill_job_process_group") as kill:
+            results = self.client.post("/api/jobs/bulk/cancel", headers=self.alice,
+                                       json=[running, ended]).json()["results"]
+        self.assertEqual(results[0], {"job_id": running, "success": True})
+        self.assertEqual(results[1]["job_id"], ended)
+        self.assertFalse(results[1]["success"])
+        self.assertIn("already completed", results[1]["error"])
+        kill.assert_called_once_with(running)
+        self.assertEqual(self.main.job_storage.get_job(running).status, JobStatus.CANCELLED)
+        self.assertEqual(self.main.job_storage.get_job(ended).status, JobStatus.COMPLETED)
 
     def test_shared_users_cant_destroy_the_job(self):
         # Deleting, archiving and a fresh restart lose the owner's work: owner and admins only.

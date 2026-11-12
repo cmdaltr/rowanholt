@@ -762,9 +762,14 @@ def _stop_job(job: Job) -> None:
 
 def _mark_cancelled(job_id: str, log_line: str) -> Optional[Job]:
     """Set a job cancelled, with its completion time and a log line, if it's still pending, running
-    or paused: the job as saved, or None when it moved on (finished or failed meanwhile). One
-    conditional UPDATE, not a save of the row the route read: the worker writes log lines and
-    progress until it's killed, and a full save would put back the stale ones."""
+    or paused: the job as saved, or None when it had already finished or failed. One conditional
+    UPDATE, not a save of the row the route read: the worker writes log lines and progress until
+    it's killed, and a full save would put back the stale ones.
+
+    It comes before the job is stopped (_stop_job). Killed first, the worker would see Elrond die
+    and save the job failed (exit code -9) before the cancel was recorded, and a cancel that worked
+    would be reported as a conflict. Marked first, the worker's later saves keep the cancel
+    (JobStorage.save_worker_job), and a job that ended before the cancel isn't touched at all."""
     return job_storage.transition(job_id, CANCELLABLE_STATUSES, JobStatus.CANCELLED,
                                   log_line=log_line, completed_at=datetime.now())
 
@@ -804,12 +809,13 @@ async def bulk_cancel_jobs(job_ids: list[str], request: Request):
                 results.append({"job_id": job_id, "success": False, "error": f"Job already {job.status.value}"})
                 continue
 
-            _stop_job(job)
-            if _mark_cancelled(job_id, "Job cancelled by user (bulk operation)") is None:
+            cancelled = _mark_cancelled(job_id, "Job cancelled by user (bulk operation)")
+            if cancelled is None:
                 current = job_storage.get_job(job_id)
                 results.append({"job_id": job_id, "success": False, "error": (
-                    f"Job became {current.status.value if current else 'deleted'} while it was being cancelled")})
+                    f"Job already {current.status.value if current else 'deleted'}: it ended before the cancel")})
                 continue
+            _stop_job(cancelled)
             results.append({"job_id": job_id, "success": True})
 
         return {"results": results}
@@ -995,12 +1001,12 @@ async def cancel_job(job_id: str, request: Request):
                 detail=f"Job already {job.status.value} - can only cancel pending, running or paused jobs",
             )
 
-        _stop_job(job)
         cancelled = _mark_cancelled(job_id, "Job cancelled by user")
         if cancelled is None:
             current = job_storage.get_job(job_id)
             raise HTTPException(status_code=409, detail=(
-                f"The job became {current.status.value if current else 'deleted'} while it was being cancelled"))
+                f"The job is already {current.status.value if current else 'deleted'}: it ended before the cancel"))
+        _stop_job(cancelled)
         return _with_access([cancelled], request)[0]
 
     except HTTPException:

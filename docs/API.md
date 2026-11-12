@@ -765,13 +765,13 @@ Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, whic
 
 **Response:** `200 OK` with the updated job object (`"status": "cancelled"`).
 
-Only the status, `completed_at` and a log line are written, in one conditional update from pending, running or paused: the progress and log lines the worker wrote while the job was being stopped are kept, and a job that finished or failed meanwhile is left as it is.
+The job is marked cancelled first (the status, `completed_at` and a log line, in one conditional update from pending, running or paused), and only then stopped. A job that had already finished or failed is left as it is and nothing is killed. One that's marked stays cancelled: the worker's saves after the kill keep the cancel's status, `completed_at`, error and log line, and add the worker's own log lines and progress, so a killed run's "Process exited with code -9" doesn't turn it into a failure.
 
 **Errors:**
 - `400 Bad Request`: Job is not pending, running or paused. A job in `awaiting_confirmation` is given up with `cancel-removal`; one that's `removing` can't be cancelled (the worker finishes or fails it).
 - `403 Forbidden`: Not the job's owner or an admin
 - `404 Not Found`: Job not found
-- `409 Conflict`: The job finished or failed while it was being cancelled; `detail` says what it became
+- `409 Conflict`: The job finished or failed before the cancel; `detail` says which (`The job is already completed: it ended before the cancel`)
 
 ---
 
@@ -977,12 +977,12 @@ A bare JSON array of job IDs:
   "results": [
     {"job_id": "uuid1", "success": true},
     {"job_id": "uuid2", "success": false, "error": "Only the job's owner or an admin can cancel it"},
-    {"job_id": "uuid3", "success": false, "error": "Job became completed while it was being cancelled"}
+    {"job_id": "uuid3", "success": false, "error": "Job already completed: it ended before the cancel"}
   ]
 }
 ```
 
-Each job is cancelled as with the single cancel: a job that finished or failed meanwhile is left as it is and reported with `success: false`.
+Each job is cancelled as with the single cancel: marked first, then stopped; a job that had already finished or failed is left alone, not stopped, and reported with `success: false`.
 
 ---
 
