@@ -460,8 +460,10 @@ $OllamaExe = Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama.exe'
 $OllamaUrl = 'http://127.0.0.1:11434'
 # The backend's default (ROWANHOLT_MODEL_NAME in docker-compose.yml)
 $SmithModel = 'llama3.2:3b'
-# WSL 2 comes with Docker Desktop's tick: Docker Desktop needs it, and installs fine without it
+# WSL 2 comes with Docker Desktop's tick: Docker Desktop needs it, and installs fine without it.
+# Start clean (CleanFirst) goes first, removing what's there before it's installed again
 $Dependencies = [ordered]@{
+    clean  = @{ Value = 'CleanFirst'; Name = 'Removing the old installs' }
     wsl    = @{ Value = 'InstallDocker'; Name = 'WSL 2' }
     docker = @{ Value = 'InstallDocker'; Name = 'Docker Desktop' }
     ollama = @{ Value = 'InstallOllama'; Name = 'Ollama' }
@@ -609,6 +611,79 @@ function Wait-Exit($Process) {
     return $Process.ExitCode
 }
 
+function Invoke-Elevated([string[]]$Lines, [string]$What) {
+    # Lines of PowerShell run as administrator under one UAC prompt, from a script removed after.
+    # Returns its exit code; a UAC prompt answered no is an error
+    $elevated = Join-Path $env:TEMP 'rowanholt-elevated.ps1'
+    Set-Content -Path $elevated -Value ($Lines -join "`r`n") -Encoding ASCII
+    try {
+        $p = Start-Process (Join-Path $PSHOME 'powershell.exe') -Verb RunAs -WindowStyle Hidden -PassThru `
+            -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$elevated`""
+    } catch {
+        Remove-Item $elevated -ErrorAction SilentlyContinue
+        throw "$What needs administrator rights, and Windows was told no"
+    }
+    $code = Wait-Exit $p
+    Remove-Item $elevated -ErrorAction SilentlyContinue
+    return $code
+}
+
+function Get-WslProductCode {
+    # The WSL package's MSI product code, from its Settings > Apps entry
+    $key = Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall' -ErrorAction SilentlyContinue |
+        Where-Object { (Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue).DisplayName -eq 'Windows Subsystem for Linux' } |
+        Select-Object -First 1
+    if ($key) { return $key.PSChildName }
+    return $null
+}
+
+function Remove-Components($Ui) {
+    # Start clean: Ollama with its models, Docker Desktop with every container, image and volume it
+    # holds, and the WSL package with Docker's distributions. Windows' WSL features stay on: taking
+    # them off and on again is two restarts that change nothing
+    Set-Status $Ui 'clean' 'Stopping Docker Desktop and Ollama'
+    Get-Process -Name 'Docker Desktop', 'com.docker.backend', 'com.docker.build', 'ollama app', 'ollama' -ErrorAction SilentlyContinue |
+        Stop-Process -Force -ErrorAction SilentlyContinue
+    $uninstaller = Get-ChildItem (Split-Path $OllamaExe) -Filter 'unins*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($uninstaller) {
+        Set-Status $Ui 'clean' 'Removing Ollama'
+        Wait-Exit (Start-Process $uninstaller.FullName -PassThru -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') | Out-Null
+    }
+    Remove-Item -Recurse -Force (Join-Path $env:USERPROFILE '.ollama'), (Join-Path $env:LOCALAPPDATA 'Ollama') -ErrorAction SilentlyContinue
+    if (Test-WslPackage) {
+        Set-Status $Ui 'clean' "Removing Docker Desktop's WSL distributions"
+        foreach ($distro in 'docker-desktop', 'docker-desktop-data') {
+            & (Join-Path $env:ProgramFiles 'WSL\wsl.exe') --unregister $distro 2>&1 | Out-Null
+        }
+    }
+    $userInstaller = Join-Path (Split-Path $DockerUserExe) 'Docker Desktop Installer.exe'
+    if (Test-Path $userInstaller) {
+        Set-Status $Ui 'clean' 'Removing Docker Desktop'
+        Wait-Exit (Start-Process $userInstaller -PassThru -ArgumentList 'uninstall', '--quiet') | Out-Null
+    }
+    $lines = @()
+    $machineInstaller = Join-Path (Split-Path $DockerMachineExe) 'Docker Desktop Installer.exe'
+    if (Test-Path $machineInstaller) { $lines += "Start-Process '$machineInstaller' -ArgumentList 'uninstall', '--quiet' -Wait" }
+    $wsl = Get-WslProductCode
+    if ($wsl) { $lines += "Start-Process msiexec.exe -ArgumentList '/x', '$wsl', '/quiet', '/norestart' -Wait" }
+    if ($lines) {
+        Set-Status $Ui 'clean' 'Removing WSL (Windows asks for administrator rights)'
+        Invoke-Elevated $lines 'Removing WSL' | Out-Null
+    }
+    $left = @()
+    if (Get-DockerDesktop) { $left += 'Docker Desktop' }
+    if (Test-WslPackage) { $left += 'WSL' }
+    if (Test-Path $OllamaExe) { $left += 'Ollama' }
+    if ($left) { throw "$($left -join ', ') couldn't be removed; remove it from Settings > Apps and open Rowanholt again" }
+    Set-Status $Ui 'clean' 'Removed' 1
+}
+
+function Register-Resume {
+    # The next sign-in carries on where this one stopped: RunOnce runs it once, then forgets it
+    $command = "`"$(Join-Path $PSHOME 'powershell.exe')`" -NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`""
+    Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce' -Name 'Rowanholt' -Value $command
+}
+
 function Install-Wsl($Ui, $Result) {
     if (Test-WslReady) { Set-Status $Ui 'wsl' 'Already installed' 1; return }
     if (-not (Test-Virtualisation)) {
@@ -638,19 +713,8 @@ function Install-Wsl($Ui, $Result) {
     if ($msi) {
         $lines += "`$p = Start-Process msiexec.exe -ArgumentList '/i', '`"$msi`"', '/quiet', '/norestart' -Wait -PassThru; if (`$p.ExitCode -notin 0, 3010) { exit `$p.ExitCode }"
     }
-    $elevated = Join-Path $env:TEMP 'rowanholt-wsl.ps1'
-    Set-Content -Path $elevated -Value ($lines -join "`r`n") -Encoding ASCII
-    try {
-        $p = Start-Process (Join-Path $PSHOME 'powershell.exe') -Verb RunAs -WindowStyle Hidden -PassThru `
-            -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$elevated`""
-    } catch {
-        Remove-Item $elevated -ErrorAction SilentlyContinue
-        if ($msi) { Remove-Item $msi -ErrorAction SilentlyContinue }
-        throw 'WSL 2 needs administrator rights to install, and Windows was told no'
-    }
-    $code = Wait-Exit $p
-    Remove-Item $elevated -ErrorAction SilentlyContinue
-    if ($msi) { Remove-Item $msi -ErrorAction SilentlyContinue }
+    try { $code = Invoke-Elevated $lines 'Installing WSL 2' }
+    finally { if ($msi) { Remove-Item $msi -ErrorAction SilentlyContinue } }
     if (-not (Test-WslReady)) { throw "installing WSL 2 failed (exit $code)" }
     if ($features) { $Result.Restart = $true }
     Set-Status $Ui 'wsl' $(if ($features) { 'Installed: restart Windows to finish' } else { 'Installed' }) 1
@@ -740,6 +804,7 @@ function Install-Dependencies([string[]]$Items) {
         if ($cancelled) { $ui.Status[$item] = 'Cancelled'; $ui.Rows[$item].Text = 'Cancelled'; $result.Failed += $item; continue }
         try {
             switch ($item) {
+                'clean'  { Remove-Components $ui }
                 'wsl'    { Install-Wsl $ui $result }
                 'docker' { Install-Docker $ui $result }
                 'ollama' { Install-Ollama $ui }
@@ -759,8 +824,13 @@ function Install-Dependencies([string[]]$Items) {
     Clear-PendingDependencies $Items
 
     $title = if ($result.Failed) { 'Not everything was installed' } else { 'Installed' }
-    $subtitle = if ($result.Restart) { 'Restart Windows to finish turning on WSL 2.' } else { 'Rowanholt carries on from here.' }
-    $body = Show-Page $title $subtitle -Next $(if ($result.Restart) { 'Close' } else { 'Continue' }) -Cancel ''
+    $subtitle = if ($result.Restart) { 'Windows needs a restart to finish turning on WSL 2.' } else { 'Rowanholt carries on from here.' }
+    if ($result.Restart) {
+        Register-Resume
+        $body = Show-Page $title $subtitle -Next 'Restart now' -Back 'Later' -Cancel ''
+    } else {
+        $body = Show-Page $title $subtitle -Next 'Continue' -Cancel ''
+    }
     $y = 20
     foreach ($item in $Items) {
         Add-Text $body $Dependencies[$item].Name $y -Width 200 -Bold
@@ -770,11 +840,14 @@ function Install-Dependencies([string[]]$Items) {
     $notes = @()
     if ($ui.Problems) { $notes += 'What went wrong:'; $notes += $ui.Problems; $notes += '' }
     if ($result.Failed -contains 'docker') { $notes += 'Set Up Rowanholt in the Start menu offers Docker Desktop again.' }
-    if ($result.Restart) { $notes += 'Then open Rowanholt from the Start menu: it carries on with setup.' }
+    if ($result.Restart) { $notes += 'Rowanholt carries on by itself when you next sign in after the restart.' }
     $notes += "A record of what happened is in $(Join-Path $State 'components.log')."
     Add-Text $body ($notes -join "`n") ($y + 12) -Height (300 - $y) -Muted
-    Wait-Page | Out-Null
-    if ($result.Restart) { Close-Wizard }
+    $action = Wait-Page
+    if ($result.Restart) {
+        Close-Wizard
+        if ($action -eq 'next') { & shutdown.exe /r /t 5 /c 'Restarting to finish installing WSL 2 for Rowanholt' }
+    }
     return $result
 }
 
@@ -971,7 +1044,11 @@ function Wait-Docker {
         if ($script:Journey) { Show-Journey $script:Journey }
         if (Test-Docker) { Write-Step 'Docker started'; return }
     }
-    throw 'Docker did not start in time. Start it manually and retry.'
+    if (-not (Test-WslReady)) {
+        throw "Docker Desktop didn't start: WSL 2, which it runs on, isn't fully installed. Open Rowanholt again and it offers to install it."
+    }
+    throw "Docker Desktop didn't start within 4 minutes. Open Docker Desktop from the Start menu to see what it says, then open Rowanholt again."
+
 }
 
 function Get-ComposeFiles {

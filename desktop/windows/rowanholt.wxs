@@ -54,6 +54,8 @@
     <Property Id="INSTALLMODEL" Secure="yes" />
     <!-- The options page's one checkbox for both: the model needs Ollama, and Ollama is only there for it -->
     <Property Id="INSTALLAI" Secure="yes" />
+    <!-- The Start clean page: remove Docker Desktop, WSL and Ollama before installing them again -->
+    <Property Id="INSTALLCLEAN" Secure="yes" />
     <SetProperty Id="INSTALLDOCKER" Value="1" After="SetDOCKERFOUND" Sequence="ui" Condition="NOT DOCKERFOUND AND NOT Installed" />
 
     <!-- Double-clicked, it's the wizard most Windows installers show (WixUI_Rowanholt below), with
@@ -152,6 +154,9 @@
       <Component Id="WantDocker" Directory="INSTALLFOLDER" Condition="INSTALLDOCKER = 1">
         <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="InstallDocker" Type="integer" Value="1" KeyPath="yes" />
       </Component>
+      <Component Id="WantClean" Directory="INSTALLFOLDER" Condition="INSTALLCLEAN = 1">
+        <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="CleanFirst" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
       <Component Id="WantOllama" Directory="INSTALLFOLDER" Condition="INSTALLOLLAMA = 1 OR INSTALLAI = 1">
         <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="InstallOllama" Type="integer" Value="1" KeyPath="yes" />
       </Component>
@@ -217,6 +222,25 @@
                  Text="Add a Rowanholt shortcut to the &amp;desktop" />
       </Dialog>
 
+      <Dialog Id="CleanDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="&amp;Next" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="&amp;Back" />
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="Cancel">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="220" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Start clean?" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="Optional: remove what's installed before installing it again." />
+        <Control Id="CleanIntro" Type="Text" X="20" Y="54" Width="330" Height="38" NoPrefix="yes"
+                 Text="If Docker Desktop, WSL or Ollama is misbehaving, Rowanholt can remove them first and then install them afresh: Docker Desktop and WSL 2 always, Smith's AI answers if you ticked it." />
+        <Control Id="CleanCheckBox" Type="CheckBox" X="20" Y="98" Width="330" Height="14" Property="INSTALLCLEAN" CheckBoxValue="1"
+                 Text="Remove Docker Desktop, WSL and Ollama first" />
+        <Control Id="CleanWarning" Type="Text" X="33" Y="116" Width="320" Height="60" NoPrefix="yes"
+                 Text="This deletes everything they hold, for every app on this PC, not only Rowanholt: Docker's containers, images and volumes (Rowanholt's databases and cases among them) and Ollama's models. Evidence folders and Rowanholt's own folder are left alone. Removing WSL needs administrator rights; Windows' WSL features stay on, so it needs no restart." />
+      </Dialog>
+
       <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999" />
       <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchRowanholt"
                Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
@@ -228,13 +252,18 @@
       <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="OptionsDlg" Condition="LicenseAccepted = &quot;1&quot;" />
 
       <Publish Dialog="OptionsDlg" Control="Back" Event="NewDialog" Value="LicenseAgreementDlg" />
-      <Publish Dialog="OptionsDlg" Control="Next" Property="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT"
-               Value="Install what you chose, then open Rowanholt" Condition="INSTALLDOCKER = 1 OR INSTALLAI = 1 OR INSTALLOLLAMA = 1 OR INSTALLMODEL = 1" />
-      <Publish Dialog="OptionsDlg" Control="Next" Property="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT"
-               Value="Launch Rowanholt" Condition="NOT (INSTALLDOCKER = 1 OR INSTALLAI = 1 OR INSTALLOLLAMA = 1 OR INSTALLMODEL = 1)" />
-      <Publish Dialog="OptionsDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="OptionsDlg" Control="Next" Event="NewDialog" Value="CleanDlg" />
 
-      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="OptionsDlg" Order="1" Condition="NOT Installed" />
+      <!-- Starting clean reinstalls Docker Desktop and WSL 2 whatever the options page said -->
+      <Publish Dialog="CleanDlg" Control="Back" Event="NewDialog" Value="OptionsDlg" />
+      <Publish Dialog="CleanDlg" Control="Next" Property="INSTALLDOCKER" Value="1" Condition="INSTALLCLEAN = 1" />
+      <Publish Dialog="CleanDlg" Control="Next" Property="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT"
+               Value="Install what you chose, then open Rowanholt" Condition="INSTALLDOCKER = 1 OR INSTALLCLEAN = 1 OR INSTALLAI = 1 OR INSTALLOLLAMA = 1 OR INSTALLMODEL = 1" />
+      <Publish Dialog="CleanDlg" Control="Next" Property="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT"
+               Value="Launch Rowanholt" Condition="NOT (INSTALLDOCKER = 1 OR INSTALLCLEAN = 1 OR INSTALLAI = 1 OR INSTALLOLLAMA = 1 OR INSTALLMODEL = 1)" />
+      <Publish Dialog="CleanDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" />
+
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="CleanDlg" Order="1" Condition="NOT Installed" />
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" Condition="Installed AND NOT PATCH" />
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2" Condition="Installed AND PATCH" />
 
