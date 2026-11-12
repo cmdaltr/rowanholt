@@ -652,7 +652,7 @@ def fetch_sample(self, sample_id: str) -> dict:
         return {"ok": False, "output": str(exc)}
 
 
-def _case_folder(job) -> Optional[Path]:
+def _case_folder(job) -> Path | None:
     """The job's output folder as the worker sees it, where the route found it: its destination,
     else the folder its result names."""
     folder = job.destination_path or (job.result or {}).get("output_directory")
@@ -677,7 +677,7 @@ def export_siem(self, job_id: str) -> dict:
     alive = job_liveness.Heartbeat(job_id, key=siem_export.heartbeat_key(job_id)).start()
     try:
         return _run_siem_export(job_id, task_id, record["targets"])
-    except Exception as exc:  # noqa: BLE001 - whatever happened, the record must say it ended
+    except Exception as exc:  # whatever happened, the record must say it ended
         logger.exception(f"Job {job_id}: SIEM export failed")
         final = {"state": siem_export.FAILED, "error": str(exc), "finished_at": _stamp()}
         siem_export.update(job_id, task_id, **final)

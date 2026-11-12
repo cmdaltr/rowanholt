@@ -143,3 +143,15 @@ describe('the SIEM export', () => {
     expect(api.getSiemExport).not.toHaveBeenCalled();
   });
 });
+
+test('a restart refused while a SIEM export runs says so, without asking about findings', async () => {
+  const confirm = jest.spyOn(window, 'confirm');
+  await show({ ...JOB, status: 'completed', can_manage: true });
+  api.restartJob.mockRejectedValue({
+    response: { status: 409, data: { detail: 'A SIEM export is running for this job; wait for it to finish' } },
+  });
+  fireEvent.click(screen.getByText('Restart Job'));
+  expect(await screen.findByText('A SIEM export is running for this job; wait for it to finish')).toBeInTheDocument();
+  expect(confirm).not.toHaveBeenCalled();
+  confirm.mockRestore();
+});

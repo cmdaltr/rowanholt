@@ -678,7 +678,7 @@ It's deleted without following symbolic links or crossing onto another device, a
 
 **Description:** Index a completed job's output, again or for the first time, into the SIEMs its options name (`splunk`, `elastic`, `opensearch`, `timesketch`, `navigator`). The `POST` queues a task in the worker and answers at once; the worker runs Elrond's own `--Index` of the job's output folder (`python3 $ELROND_HOME/elrond.py <case> <output> --Index --Splunk ...`, the code a run with those options ends with), so the export uses the worker's `SPLUNK_*`, `ELASTICSEARCH_*`, `OPENSEARCH_*` and `TIMESKETCH_*` settings and its network. Each SIEM's index for the case is replaced, as `--Index` does (`docs/CLI.md`). The `GET` answers the job's last export: poll it while `state` is `queued` or `running`.
 
-The export's notable lines (each target's phase, warnings and errors, and the outcome) are appended to the job's log one at a time, each a conditional update of a still-completed job, so the job's other fields are never rewritten; Elrond's full output goes to `rowanholt_siem_export.log` in the job's output folder. A job restarted, archived or deleted while it exports stops the export (Elrond is stopped, the export fails). Its state is kept in Redis for 30 days, not in the job.
+The export's notable lines (each target's phase, warnings and errors, and the outcome) are appended to the job's log one at a time, each a conditional update of a still-completed job, so the job's other fields are never rewritten; Elrond's full output goes to `rowanholt_siem_export.log` in the job's output folder. While an export is queued or running, nothing replaces or removes the output it reads: restarting, archiving or deleting the job answers `409` ("A SIEM export is running for this job; wait for it to finish", or `queued`), and the bulk forms skip it with that reason as its `error`. If Redis can't be read, those actions go ahead rather than be refused. Should the job still move on mid-export (Redis was unreadable), the export notices on its next log line, stops Elrond and fails. Its state is kept in Redis for 30 days, not in the job.
 
 **`POST` response:** `202 Accepted`, the export's record:
 ```json
@@ -1065,8 +1065,9 @@ The test lab (`lab/`) from the browser: Linux targets, Tart and UTM VMs, Gandalf
 | Check | Busy while |
 |---|---|
 | `jobs` | a job is running or paused and its worker's heartbeat is live, or lapsed less than 90 seconds ago (see [Jobs left by a crash](#jobs-left-by-a-crash)). Pending jobs never count |
-| `requests` | a mutating `/api` request (not GET, HEAD or OPTIONS) from a caller the access checks let through is being handled: uploads, a manual SIEM export |
+| `requests` | a mutating `/api` request (not GET, HEAD or OPTIONS) from a caller the access checks let through is being handled: uploads |
 | `downloads` | a Mordor dataset download is running in the background |
+| `siem-exports` | a worker is running a job's SIEM export: its heartbeat key in Redis is live (refreshed every 15 seconds, expiring after 60). A queued export doesn't count, as a pending job doesn't (see [Export Job to SIEM](#export-job-to-siem)) |
 | `side-tasks` | a sample fetch or symbol table build queued in the worker hasn't finished (forgotten after six hours with no result) |
 | `telemetry-build` | the Mordor telemetry update is running |
 | `removals` | the worker is removing a job's old output (`removing`), its task waiting in the queue or its heartbeat beating; a removal whose worker died is failed after the same grace, with its own reason (registered by `removal_routes.py`) |

@@ -28,8 +28,8 @@ import logging
 import re
 import threading
 import time
+from collections.abc import Callable, Iterable
 from datetime import datetime
-from typing import Callable, Dict, Iterable, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -90,19 +90,19 @@ def _now() -> str:
     return datetime.now().isoformat(timespec="seconds")
 
 
-def targets(options) -> List[str]:
+def targets(options) -> list[str]:
     """The SIEM targets a job's options name, in Elrond's order (names as Elrond prints them)."""
     return [name for option, _, name in TARGETS if getattr(options, option, False)]
 
 
-def index_command(elrond_script: str, case: str, case_dir: str, names: Iterable[str]) -> List[str]:
+def index_command(elrond_script: str, case: str, case_dir: str, names: Iterable[str]) -> list[str]:
     """Elrond's --Index of a processed case into the named targets: the command a run with these
     options ends with, without processing anything again."""
     flags = {name: flag for _, flag, name in TARGETS}
     return ["python3", elrond_script, case, case_dir, "--Index", *(flags[name] for name in names)]
 
 
-def read(job_id: str, client=None) -> Optional[dict]:
+def read(job_id: str, client=None) -> dict | None:
     """The job's last export record, or None."""
     raw = (client or _redis()).get(record_key(job_id))
     if not raw:
@@ -114,7 +114,7 @@ def _write(job_id: str, record: dict, client=None) -> None:
     (client or _redis()).set(record_key(job_id), json.dumps(record), ex=RECORD_TTL)
 
 
-def status(job_id: str, client=None, queued_ids: Optional[Callable[[Iterable[str]], set]] = None,
+def status(job_id: str, client=None, queued_ids: Callable[[Iterable[str]], set] | None = None,
            clock: Callable[[], float] = time.time, queued_grace: float = 120) -> dict:
     """What the job's last export is doing, or did: its record, with `state` read against the
     signals of life. A queued export whose message has left the queue with no worker beating for it,
@@ -140,8 +140,8 @@ def status(job_id: str, client=None, queued_ids: Optional[Callable[[Iterable[str
 _claim_lock = threading.Lock()
 
 
-def claim(job_id: str, task_id: str, names: List[str], requested_by: str, client=None,
-          **status_options) -> Optional[dict]:
+def claim(job_id: str, task_id: str, names: list[str], requested_by: str, client=None,
+          **status_options) -> dict | None:
     """Record a new export of the job as queued, unless one is queued or running already (then
     None). Called just before the task is queued, so there's no moment it's queued unrecorded."""
     client = client or _redis()
@@ -202,15 +202,15 @@ class Progress:
     """What Elrond's --Index output says: the phase it's in, the hosts, and each target's outcome.
     Fed one line at a time; `feed` returns the line for the job's log, or None."""
 
-    def __init__(self, names: List[str]) -> None:
+    def __init__(self, names: list[str]) -> None:
         self.names = list(names)
-        self.phase: Optional[str] = None
-        self.hosts: List[str] = []
-        self.failures: Dict[str, str] = {}
-        self.counts: Dict[str, Dict[str, int]] = {}
-        self.error: Optional[str] = None
+        self.phase: str | None = None
+        self.hosts: list[str] = []
+        self.failures: dict[str, str] = {}
+        self.counts: dict[str, dict[str, int]] = {}
+        self.error: str | None = None
 
-    def feed(self, raw: str) -> Optional[str]:
+    def feed(self, raw: str) -> str | None:
         line = ANSI.sub("", raw).strip()
         if not line or set(line) <= {"-"}:
             return None
@@ -243,10 +243,10 @@ class Progress:
         index = self.names.index(self.phase) + 1 if self.phase in self.names else 0
         return {"phase": self.phase, "step": index, "steps": len(self.names)}
 
-    def results(self, returncode: int) -> Dict[str, dict]:
+    def results(self, returncode: int) -> dict[str, dict]:
         """Each target's outcome. A run that stopped before indexing (Elrond's own Error: a SIEM
         unreachable, no processed hosts) failed every target with that reason."""
-        out: Dict[str, dict] = {}
+        out: dict[str, dict] = {}
         for name in self.names:
             if name in self.failures:
                 out[name] = {"ok": False, "error": self.failures[name]}
@@ -263,7 +263,7 @@ class Progress:
         return out
 
 
-def elastic_count(case: str, environ: Optional[dict] = None, opener=None) -> Optional[int]:
+def elastic_count(case: str, environ: dict | None = None, opener=None) -> int | None:
     """How many documents the case's Elasticsearch index holds now (refreshed first, so the last
     bulk request is counted), or None when Elastic is a local install or doesn't say. Elrond's
     Elastic ingest prints no total of its own."""

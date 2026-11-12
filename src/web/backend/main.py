@@ -192,6 +192,21 @@ def _awaiting_refusal(job: Job, action: str) -> Optional[str]:
             "or cancel-removal)")
 
 
+def _export_refusal(job_id: str) -> str | None:
+    """Why the job's output mustn't be replaced or removed now, or None: a SIEM export of it is
+    queued or running, and Elrond's --Index would read (and Splunk monitor) a folder going away. If
+    Redis can't say, the action goes ahead: an export can't be running unrecorded, and refusing every
+    restart, archive and delete while Redis is down would be worse than the race it guards."""
+    try:
+        state = siem_export.status(job_id)["state"]
+    except Exception as exc:  # noqa: BLE001 - see the docstring
+        logger.warning("Job %s: SIEM export state unreadable (%s); not refusing", job_id, exc)
+        return None
+    if state in siem_export.ACTIVE:
+        return f"A SIEM export is {state} for this job; wait for it to finish"
+    return None
+
+
 def _manager_refusal(request: Request, job_id: str, action: str) -> Optional[str]:
     """Why the caller may not do this to the job (they can see it but don't own it), or None."""
     if access.can_manage_job(access.current_user(request), job_id):
@@ -738,6 +753,9 @@ async def delete_job(job_id: str, request: Request):
         refusal = _awaiting_refusal(job, "delete")
         if refusal:
             raise HTTPException(status_code=400, detail=refusal)
+        refusal = _export_refusal(job_id)
+        if refusal:
+            raise HTTPException(status_code=409, detail=refusal)
 
         _delete_job(request, job)
 
@@ -869,7 +887,7 @@ async def bulk_delete_jobs(job_ids: list[str], request: Request):
             if job.status in BUSY_JOB_STATUSES:
                 results.append({"job_id": job_id, "success": False, "error": "Cannot delete running job"})
                 continue
-            refusal = _awaiting_refusal(job, "delete")
+            refusal = _awaiting_refusal(job, "delete") or _export_refusal(job_id)
             if refusal:
                 results.append({"job_id": job_id, "success": False, "error": refusal})
                 continue
@@ -912,7 +930,7 @@ async def bulk_archive_jobs(job_ids: list[str], request: Request):
             if job.status in BUSY_JOB_STATUSES:
                 results.append({"job_id": job_id, "success": False, "error": "Cannot archive running job"})
                 continue
-            refusal = _awaiting_refusal(job, "archive")
+            refusal = _awaiting_refusal(job, "archive") or _export_refusal(job_id)
             if refusal:
                 results.append({"job_id": job_id, "success": False, "error": refusal})
                 continue
@@ -1028,6 +1046,10 @@ async def bulk_restart_jobs(job_ids: list[str], request: Request, fresh: Optiona
 
             if job.status not in [JobStatus.FAILED, JobStatus.CANCELLED, JobStatus.COMPLETED]:
                 results.append({"job_id": job_id, "success": False, "error": "Can only restart failed, cancelled, or completed jobs"})
+                continue
+            refusal = _export_refusal(job_id)
+            if refusal:
+                results.append({"job_id": job_id, "success": False, "error": refusal})
                 continue
 
             refusal = case_routes.restart_refusal(job_id, confirm)
@@ -1211,6 +1233,9 @@ async def restart_job(job_id: str, request: Request, confirm: bool = False, fres
                 status_code=400,
                 detail="Can only restart failed, cancelled, or completed jobs",
             )
+        refusal = _export_refusal(job_id)
+        if refusal:
+            raise HTTPException(status_code=409, detail=refusal)
 
         refusal = case_routes.restart_refusal(job_id, confirm)
         if refusal:
@@ -1275,6 +1300,9 @@ async def archive_job(job_id: str, request: Request):
         refusal = _awaiting_refusal(job, "archive")
         if refusal:
             raise HTTPException(status_code=400, detail=refusal)
+        refusal = _export_refusal(job_id)
+        if refusal:
+            raise HTTPException(status_code=409, detail=refusal)
 
         if job.status == JobStatus.ARCHIVED:
             raise HTTPException(
@@ -1387,13 +1415,13 @@ async def trigger_siem_export(job_id: str, request: Request) -> dict:
     task_id = str(uuid.uuid4())
     try:
         record = siem_export.claim(job_id, task_id, names, user.get("username") or "local")
-    except Exception as exc:  # Redis down: nothing is queued, so say so rather than pretend
+    except Exception as exc:  # noqa: BLE001 - Redis down: nothing is queued, so say so rather than pretend
         raise HTTPException(status_code=503, detail=f"Can't record the export (Redis): {exc}")
     if record is None:
         raise HTTPException(status_code=409, detail="A SIEM export is already queued or running for this job")
     try:
         export_siem.apply_async(args=[job_id], task_id=task_id)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - the broker down: forget the claim and say so
         siem_export.drop(job_id, task_id)
         raise HTTPException(status_code=503, detail=f"Can't queue the export: {exc}")
     # A conditional append, not a full save: the row's other columns stay as the worker left them
@@ -1420,7 +1448,7 @@ async def siem_export_status(job_id: str) -> dict:
         raise HTTPException(status_code=404, detail="Job not found")
     try:
         return siem_export.status(job_id)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Redis down: the state is unknown, not "none"
         raise HTTPException(status_code=503, detail=f"Can't read the export's state (Redis): {exc}")
 
 

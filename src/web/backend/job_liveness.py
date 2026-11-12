@@ -132,7 +132,7 @@ class Heartbeat:
     and a key that lapses for a moment comes back on the next refresh, well inside STALE_GRACE."""
 
     def __init__(self, job_id: str, client=None, interval: float = HEARTBEAT_INTERVAL,
-                 ttl: int = HEARTBEAT_TTL, key: Optional[str] = None) -> None:
+                 ttl: int = HEARTBEAT_TTL, key: str | None = None) -> None:
         self.job_id = job_id
         # Another key for work on a job that isn't its run (siem_export's), so it never reads as
         # the job's own heartbeat

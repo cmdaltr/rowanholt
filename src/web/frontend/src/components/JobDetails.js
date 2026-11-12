@@ -134,8 +134,9 @@ function JobDetails() {
       try {
         await restartJob(jobId, false, restartFresh(job));
       } catch (err) {
-        // The case has findings: the backend says how many, and the restart waits for a yes
-        if (err.response?.status !== 409) throw err;
+        // The case has findings: the backend says how many, and the restart waits for a yes. Any
+        // other 409 (a SIEM export of its output under way) is a plain refusal
+        if (err.response?.status !== 409 || typeof err.response.data?.detail?.findings !== 'number') throw err;
         const { findings } = err.response.data.detail;
         if (!window.confirm(
           `This case has ${findings} finding${findings === 1 ? '' : 's'}. Restarting rewrites the case's output, so any `

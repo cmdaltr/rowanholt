@@ -21,8 +21,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from test_server_access import BACKEND, BackendCase, TestClient
 from test_job_liveness import FakeRedis as LivenessRedis
+from test_server_access import BACKEND, BackendCase, TestClient
 
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
@@ -43,13 +43,15 @@ class FakeRedis(LivenessRedis):
         return iter([key for key in list(self.store) if self._alive(key) and fnmatch.fnmatch(key, match)])
 
 
-@unittest.skipIf(TestClient is None, "backend requirements (fastapi) not installed")
-class SiemExportRoutes(BackendCase):
+class ExportCase(BackendCase):
+    """The real backend with the export's Redis a stand-in, and a completed job to export (no tests
+    of its own)."""
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        from models.job import JobStatus
         import siem_export
+        from models.job import JobStatus
         cls.JobStatus, cls.se = JobStatus, siem_export
 
     def setUp(self):
@@ -77,6 +79,9 @@ class SiemExportRoutes(BackendCase):
             resp = self.client.post(f"/api/jobs/{job_id}/export-siem", headers=headers)
         return resp, task.apply_async
 
+
+@unittest.skipIf(TestClient is None, "backend requirements (fastapi) not installed")
+class SiemExportRoutes(ExportCase):
     def test_the_export_is_queued_and_answers_202(self):
         job_id = self.completed_job("CASE-SIEM-1", elastic=True)
         resp, queued = self.export(job_id, self.alice)
@@ -129,7 +134,7 @@ class SiemExportRoutes(BackendCase):
         first, _ = self.export(job_id, self.alice)
         task_id = first.json()["task_id"]
         self.assertEqual(self.se.status(job_id, self.redis)["state"], "queued")
-        later = lambda: self.se.read(job_id, self.redis)["queued_epoch"] + 121  # noqa: E731
+        later = lambda: self.se.read(job_id, self.redis)["queued_epoch"] + 121
         self.assertEqual(self.se.status(job_id, self.redis, queued_ids=lambda ids: {task_id}, clock=later)["state"],
                          "queued")
         self.assertEqual(self.se.status(job_id, self.redis, queued_ids=lambda ids: set(), clock=later)["state"],
@@ -222,6 +227,64 @@ class SiemExportRoutes(BackendCase):
         self.redis.down = True
         with self.assertLogs(busy.logger, "ERROR"):
             self.assertIn("siem-exports", busy.busy_reasons())  # can't tell is busy
+
+
+@unittest.skipIf(TestClient is None, "backend requirements (fastapi) not installed")
+class ExportHoldsTheOutput(ExportCase):
+    """While an export is queued or running, nothing replaces or removes the output it reads:
+    restart, archive and delete answer 409, and their bulk forms skip the job with the reason."""
+
+    REASON = "A SIEM export is {} for this job; wait for it to finish"
+
+    def exporting(self, case: str, state: str = "running") -> str:
+        job_id = self.completed_job(case)
+        task_id = self.export(job_id, self.alice)[0].json()["task_id"]
+        if state == "running":
+            self.se.update(job_id, task_id, client=self.redis, state="running")
+            self.redis.set(self.se.heartbeat_key(job_id), "w", ex=60)
+        return job_id
+
+    def single(self, method: str, path: str):
+        return getattr(self.client, method)(path, headers=self.alice)
+
+    def test_restart_archive_and_delete_are_refused_with_409(self):
+        for state in ("queued", "running"):
+            job_id = self.exporting(f"CASE-HOLD-{state}", state)
+            for method, path in (("post", f"/api/jobs/{job_id}/restart"), ("post", f"/api/jobs/{job_id}/archive"),
+                                 ("delete", f"/api/jobs/{job_id}")):
+                resp = self.single(method, path)
+                self.assertEqual(resp.status_code, 409, f"{method} {path}: {resp.text}")
+                self.assertEqual(resp.json()["detail"], self.REASON.format(state))
+            job = self.main.job_storage.get_job(job_id)
+            self.assertEqual(job.status, self.JobStatus.COMPLETED)
+            self.assertTrue(Path(job.destination_path).is_dir())
+
+    def test_the_bulk_forms_skip_the_job_with_the_reason(self):
+        held = self.exporting("CASE-HOLD-BULK")
+        for action in ("restart", "archive", "delete"):
+            resp = self.client.post(f"/api/jobs/bulk/{action}", headers=self.alice, json=[held])
+            self.assertEqual(resp.status_code, 200, resp.text)
+            [result] = resp.json()["results"]
+            self.assertEqual((result["success"], result["error"]), (False, self.REASON.format("running")), action)
+        self.assertEqual(self.main.job_storage.get_job(held).status, self.JobStatus.COMPLETED)
+
+    def test_a_finished_or_interrupted_export_holds_nothing(self):
+        job_id = self.exporting("CASE-HOLD-DONE")
+        self.redis.delete(self.se.heartbeat_key(job_id))  # its worker died: interrupted
+        resp = self.single("post", f"/api/jobs/{job_id}/archive")
+        self.assertEqual(resp.status_code, 200, resp.text)
+
+    def test_redis_unreadable_lets_the_action_through(self):
+        job_id = self.exporting("CASE-HOLD-NOREDIS")
+        self.redis.down = True
+        with self.assertLogs(self.main.logger, "WARNING"):
+            resp = self.single("post", f"/api/jobs/{job_id}/archive")
+        self.assertEqual(resp.status_code, 200, resp.text)
+
+    def test_a_job_with_no_export_is_unaffected(self):
+        job_id = self.completed_job("CASE-HOLD-NONE")
+        resp = self.client.post("/api/jobs/bulk/archive", headers=self.alice, json=[job_id])
+        self.assertTrue(resp.json()["results"][0]["success"], resp.text)
 
 
 class ProgressTest(unittest.TestCase):
