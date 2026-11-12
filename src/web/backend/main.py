@@ -724,7 +724,7 @@ async def delete_job(job_id: str, request: Request):
                 detail="Cannot delete running or pending job",
             )
 
-        job_storage.delete_job(job_id)
+        _delete_job(request, job)
 
         return {"message": "Job deleted successfully"}
 
@@ -732,6 +732,15 @@ async def delete_job(job_id: str, request: Request):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def _delete_job(request: Request, job: Job, bulk: bool = False) -> None:
+    """Delete the job and its case's rows (storage.delete_job), never anything on disk, and say so
+    in the security log, which keeps it: the case's own activity record goes with the job."""
+    removed = job_storage.delete_job(job.id)
+    user = access.current_user(request)
+    job_storage.audit("job.deleted", {"id": user.get("id"), "username": user.get("username")},
+                      _client_ip(request), resource_id=job.id, case=job.case_number, bulk=bulk, removed=removed)
 
 
 # A job these can be cancelled from (a removal can't: it runs to the end, or fails)
@@ -846,7 +855,7 @@ async def bulk_delete_jobs(job_ids: list[str], request: Request):
                 results.append({"job_id": job_id, "success": False, "error": "Cannot delete running job"})
                 continue
 
-            job_storage.delete_job(job_id)
+            _delete_job(request, job, bulk=True)
             results.append({"job_id": job_id, "success": True})
 
         return {"results": results}

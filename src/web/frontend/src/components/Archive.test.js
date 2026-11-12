@@ -100,10 +100,14 @@ test('the delete confirmation says the output stays on disk, and where', async (
   const asked = window.confirm.mock.calls[0][0];
   expect(asked).toMatch(/^Permanently delete 2 archived jobs\? This can't be undone\./);
   expect(asked).toContain("deletes each job's record (its settings, status, log, owner and sharing)");
+  // The case's rows go with the job (storage.delete_job); they used to be left behind, and the
+  // confirmation said so
+  expect(asked).toContain("its case's findings, notes, host assignments and activity");
+  expect(asked).not.toMatch(/stay in Rowanholt's database/);
+  expect(asked).toContain('The security log keeps a record of the deletion.');
   expect(asked).toContain('Nothing on disk is removed.');
   expect(asked).toContain('CASE-a: /out/CASE-a');
   expect(asked).toContain('CASE-b: /data/b');
-  expect(asked).toContain('findings, notes and host assignments');
   // Declined: nothing sent
   expect(api.bulkDeleteJobs).not.toHaveBeenCalled();
 });

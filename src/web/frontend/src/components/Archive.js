@@ -8,22 +8,23 @@ const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
 // Where a job wrote, as the backend records it (output_removal.recorded_output)
 const outputFolder = (job) => job.destination_path || job.result?.output_directory || null;
 
-// What DELETE /api/jobs/{id} (and bulk/delete) actually removes: the job's row and its owner and
-// sharing row (storage.delete_job). Nothing on disk, and not the case's findings, notes or host
-// assignments, which are keyed by job and left behind. The wording mustn't promise more.
+// What DELETE /api/jobs/{id} (and bulk/delete) actually removes (storage.delete_job): the job's row,
+// its owner and sharing, and its case's findings, notes, host assignments and activity, together.
+// Nothing on disk, and not the security log, which records the deletion. The wording mustn't
+// promise more, or less.
 export const deleteConfirmation = (jobs, plan) => {
   const n = jobs.length;
   const folders = jobs.map((job) => `  ${job.case_number}: ${outputFolder(job) || 'no output folder recorded'}`);
   return [
     `Permanently delete ${n} archived job${n === 1 ? '' : 's'}? This can't be undone.`,
-    "Rowanholt deletes each job's record (its settings, status, log, owner and sharing), so the job "
-      + 'and its case pages are gone from Rowanholt.',
+    "Rowanholt deletes each job's record (its settings, status, log, owner and sharing) and its case's "
+      + 'findings, notes, host assignments and activity, so the job and its case pages are gone from Rowanholt. '
+      + 'The security log keeps a record of the deletion.',
     'Nothing on disk is removed. The evidence and the output stay where they are, and the output has '
       + 'to be removed by hand if it should go:',
     folders.join('\n'),
-    "The findings, notes and host assignments made on its case stay in Rowanholt's database, but nothing "
-      + `shows them any more.${skippedNote(plan, 'delete')}`,
-  ].join('\n\n');
+    skippedNote(plan, 'delete').trim(),
+  ].filter(Boolean).join('\n\n');
 };
 
 // "3 jobs", or "1 job"

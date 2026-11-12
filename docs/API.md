@@ -486,7 +486,7 @@ Each job has every field in [Get Job Details](#get-job-details) (shortened here)
 
 **Endpoint:** `DELETE /api/jobs/{job_id}`
 
-**Description:** Delete a job's record, with its owner and sharing. Nothing on disk is removed: its evidence and its output folder stay where they are. The case's findings, notes, host assignments and activity stay in the database but can no longer be reached through the API. A pending, running, paused or removing job can't be deleted (cancel it first).
+**Description:** Delete a job's record, with its owner and sharing and its case's findings, notes, host assignments and activity (`case_findings`, `case_notes`, `case_hosts`, `case_activity`), in one transaction. Nothing on disk is removed: its evidence and its output folder stay where they are. The audit log (`audit_logs`) is kept, and records the deletion: `job.deleted`, with the case number and how many rows went from each table. A pending, running, paused or removing job can't be deleted (cancel it first).
 
 **Authentication:** In server mode, the job's owner or an admin.
 
@@ -750,7 +750,7 @@ It's deleted without following symbolic links or crossing onto another device, a
 A job the caller can't see comes back `Job not found`; one they see but don't manage, with the owner-or-admin refusal (for unarchive, `Only the job's owner or an admin can restore it from the archive`). Otherwise:
 
 - **cancel**: as the single cancel, marked first, then stopped; a job that had already finished or failed is left alone, not stopped, and reported with `success: false`
-- **delete**: as the single delete, nothing on disk removed; `Cannot delete running job` for a pending, running, paused or removing one
+- **delete**: as the single delete (the case's rows go with the job, nothing on disk is removed, the audit log records each); `Cannot delete running job` for a pending, running, paused or removing one
 - **archive**: `Cannot archive running job` for a pending, running, paused or removing one; `Already archived`
 - **unarchive**: `Job is not archived`; on success the result's `status` is the status restored
 

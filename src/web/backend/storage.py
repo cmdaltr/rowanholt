@@ -597,21 +597,22 @@ class JobStorage:
         finally:
             session.close()
 
-    def delete_job(self, job_id: str) -> None:
-        """
-        Delete job from storage.
+    # The tables keyed by a job's ID that go with it. audit_logs isn't one: the security log
+    # outlives what it records, a deletion included
+    JOB_TABLES = (JobAccessModel, CaseFindingModel, CaseNoteModel, CaseHostModel, CaseActivityModel)
 
-        Args:
-            job_id: Job ID
-        """
+    def delete_job(self, job_id: str) -> Dict[str, int]:
+        """Delete a job's row and every row keyed by its ID (JOB_TABLES), in one transaction: left
+        behind, a case's findings, notes, host assignments and activity can't be reached by anyone.
+        Nothing on disk is touched. Returns how many rows went from each table."""
         session = self.Session()
         try:
-            job_model = session.query(JobModel).filter_by(id=job_id).first()
-
-            if job_model:
-                session.delete(job_model)
-            session.query(JobAccessModel).filter_by(job_id=job_id).delete()
+            removed = {"jobs": session.query(JobModel).filter_by(id=job_id).delete(synchronize_session=False)}
+            for model in self.JOB_TABLES:
+                removed[model.__tablename__] = (
+                    session.query(model).filter_by(job_id=job_id).delete(synchronize_session=False))
             session.commit()
+            return removed
         except Exception as e:
             session.rollback()
             raise
