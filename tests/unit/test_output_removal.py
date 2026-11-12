@@ -583,8 +583,16 @@ class RemovalApiTest(BackendCase):
     def test_a_removal_counts_for_busy(self):
         import busy
         import removal_routes
-        self.assertEqual(busy._checks["removals"], removal_routes._liveness.check)
+        self.assertEqual(busy._checks["removals"], removal_routes.check)
         self.assertEqual(removal_routes._liveness.statuses, (JobStatus.REMOVING,))
+        for job_id, _, _ in self.main.job_storage.active_jobs((JobStatus.REMOVING,)):
+            self.main.job_storage.set_status(job_id, JobStatus.CANCELLED)
+        with mock.patch.object(removal_routes._liveness, "check", return_value=False):
+            self.assertFalse(removal_routes.check())
+            # Queued, not yet started: the liveness pass sees it as pending and so not busy, but it is
+            job_id = self.awaiting(self.alice, "CASE-QUEUED-RM")
+            self.main.job_storage.set_status(job_id, JobStatus.REMOVING)
+            self.assertTrue(removal_routes.check())
 
     def test_the_removal_liveness_starts_with_the_backend(self):
         import removal_routes
@@ -610,12 +618,13 @@ class RemovalApiTest(BackendCase):
         dead, live = (self.awaiting(self.alice, case) for case in ("CASE-DEAD-RM", "CASE-LIVE-RM"))
         for job_id in (dead, live):
             self.main.job_storage.set_status(job_id, JobStatus.REMOVING)
-        with mock.patch.dict("sys.modules", {"tasks_docker": mock.MagicMock()}):
+        with mock.patch.dict("sys.modules", {"tasks_docker": mock.MagicMock()}), \
+                mock.patch.object(removal_routes, "_liveness", liveness):
             redis.set(job_liveness.heartbeat_key(live), "w", ex=60)
-            self.assertTrue(liveness.check())
+            self.assertTrue(removal_routes.check())
             clock.now += job_liveness.STALE_GRACE + 1
             redis.set(job_liveness.heartbeat_key(live), "w", ex=60)
-            self.assertTrue(liveness.check())
+            self.assertTrue(removal_routes.check())
         self.assertEqual(self.main.job_storage.get_job(dead).status, JobStatus.FAILED)
         self.assertIn("removing this job's old output", self.main.job_storage.get_job(dead).error)
         self.assertEqual(self.main.job_storage.get_job(live).status, JobStatus.REMOVING)

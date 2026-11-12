@@ -67,7 +67,18 @@ def configure(storage) -> None:
     global _storage, _liveness
     _storage = storage
     _liveness = job_liveness.Liveness(_RemovalRows(storage), (JobStatus.REMOVING,))
-    busy.register("removals", _liveness.check)
+    busy.register("removals", check)
+
+
+def check() -> bool:
+    """Busy while any job is still removing once the dead ones are failed. The liveness pass sees a
+    removal as pending, so its queued task keeps it alive, but pending jobs never count as busy
+    there: a removal half done when the worker restarts would leave half the old output, so a
+    queued removal holds a rebuild as well as a running one."""
+    if _liveness is None:
+        return False
+    _liveness.check()
+    return bool(_storage.active_jobs((JobStatus.REMOVING,)))
 
 
 # Some FastAPI versions run an included router's handlers twice (its own and the app's copy):
