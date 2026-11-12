@@ -460,11 +460,13 @@ $OllamaExe = Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama.exe'
 $OllamaUrl = 'http://127.0.0.1:11434'
 # The backend's default (ROWANHOLT_MODEL_NAME in docker-compose.yml)
 $SmithModel = 'llama3.2:3b'
-# WSL 2 comes with Docker Desktop's tick: Docker Desktop needs it, and installs fine without it.
-# Start clean (CleanFirst) goes first, removing what's there before it's installed again
+# In the order they run: a clean reinstall removes first, then WSL 2 before the Docker Desktop that
+# needs it. Value is the HKCU value msiexec's properties queue each under (INSTALLDOCKER=1 queues
+# WSL 2 with Docker Desktop; CleanFirst both removals); setup's What Rowanholt needs page picks them too
 $Dependencies = [ordered]@{
-    clean  = @{ Value = 'CleanFirst'; Name = 'Removing the old installs' }
-    wsl    = @{ Value = 'InstallDocker'; Name = 'WSL 2' }
+    cleandocker = @{ Value = 'CleanFirst'; Name = 'Removing Docker Desktop and WSL' }
+    cleanai     = @{ Value = 'CleanFirst'; Name = 'Removing Ollama and its models' }
+    wsl         = @{ Value = 'InstallDocker'; Name = 'WSL 2' }
     docker = @{ Value = 'InstallDocker'; Name = 'Docker Desktop' }
     ollama = @{ Value = 'InstallOllama'; Name = 'Ollama' }
     model  = @{ Value = 'InstallModel'; Name = "Smith's model ($SmithModel)" }
@@ -637,28 +639,21 @@ function Get-WslProductCode {
     return $null
 }
 
-function Remove-Components($Ui) {
-    # Start clean: Ollama with its models, Docker Desktop with every container, image and volume it
-    # holds, and the WSL package with Docker's distributions. Windows' WSL features stay on: taking
-    # them off and on again is two restarts that change nothing
-    Set-Status $Ui 'clean' 'Stopping Docker Desktop and Ollama'
-    Get-Process -Name 'Docker Desktop', 'com.docker.backend', 'com.docker.build', 'ollama app', 'ollama' -ErrorAction SilentlyContinue |
+function Remove-Docker($Ui) {
+    # Docker Desktop with every container, image and volume it holds, and the WSL package with
+    # Docker's distributions. Windows' WSL features stay on: off and on again is two restarts for nothing
+    Set-Status $Ui 'cleandocker' 'Stopping Docker Desktop'
+    Get-Process -Name 'Docker Desktop', 'com.docker.backend', 'com.docker.build' -ErrorAction SilentlyContinue |
         Stop-Process -Force -ErrorAction SilentlyContinue
-    $uninstaller = Get-ChildItem (Split-Path $OllamaExe) -Filter 'unins*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($uninstaller) {
-        Set-Status $Ui 'clean' 'Removing Ollama'
-        Wait-Exit (Start-Process $uninstaller.FullName -PassThru -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') | Out-Null
-    }
-    Remove-Item -Recurse -Force (Join-Path $env:USERPROFILE '.ollama'), (Join-Path $env:LOCALAPPDATA 'Ollama') -ErrorAction SilentlyContinue
     if (Test-WslPackage) {
-        Set-Status $Ui 'clean' "Removing Docker Desktop's WSL distributions"
+        Set-Status $Ui 'cleandocker' "Removing Docker Desktop's WSL distributions"
         foreach ($distro in 'docker-desktop', 'docker-desktop-data') {
             & (Join-Path $env:ProgramFiles 'WSL\wsl.exe') --unregister $distro 2>&1 | Out-Null
         }
     }
     $userInstaller = Join-Path (Split-Path $DockerUserExe) 'Docker Desktop Installer.exe'
     if (Test-Path $userInstaller) {
-        Set-Status $Ui 'clean' 'Removing Docker Desktop'
+        Set-Status $Ui 'cleandocker' 'Removing Docker Desktop'
         Wait-Exit (Start-Process $userInstaller -PassThru -ArgumentList 'uninstall', '--quiet') | Out-Null
     }
     $lines = @()
@@ -667,15 +662,125 @@ function Remove-Components($Ui) {
     $wsl = Get-WslProductCode
     if ($wsl) { $lines += "Start-Process msiexec.exe -ArgumentList '/x', '$wsl', '/quiet', '/norestart' -Wait" }
     if ($lines) {
-        Set-Status $Ui 'clean' 'Removing WSL (Windows asks for administrator rights)'
+        Set-Status $Ui 'cleandocker' 'Removing WSL (Windows asks for administrator rights)'
         Invoke-Elevated $lines 'Removing WSL' | Out-Null
     }
     $left = @()
     if (Get-DockerDesktop) { $left += 'Docker Desktop' }
     if (Test-WslPackage) { $left += 'WSL' }
-    if (Test-Path $OllamaExe) { $left += 'Ollama' }
-    if ($left) { throw "$($left -join ', ') couldn't be removed; remove it from Settings > Apps and open Rowanholt again" }
-    Set-Status $Ui 'clean' 'Removed' 1
+    if ($left) { throw "$($left -join ' and ') couldn't be removed; remove it from Settings > Apps and open Rowanholt again" }
+    Set-Status $Ui 'cleandocker' 'Removed' 1
+}
+
+function Remove-Ollama($Ui) {
+    Set-Status $Ui 'cleanai' 'Stopping Ollama'
+    Get-Process -Name 'ollama app', 'ollama' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    $uninstaller = Get-ChildItem (Split-Path $OllamaExe) -Filter 'unins*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($uninstaller) {
+        Set-Status $Ui 'cleanai' 'Removing Ollama'
+        Wait-Exit (Start-Process $uninstaller.FullName -PassThru -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') | Out-Null
+    }
+    Remove-Item -Recurse -Force (Join-Path $env:USERPROFILE '.ollama'), (Join-Path $env:LOCALAPPDATA 'Ollama') -ErrorAction SilentlyContinue
+    if (Test-Path $OllamaExe) { throw "Ollama couldn't be removed; remove it from Settings > Apps and open Rowanholt again" }
+    Set-Status $Ui 'cleanai' 'Removed' 1
+}
+
+function Get-InstalledVersion([string]$Root, [string]$DisplayName) {
+    # A Settings > Apps entry's version, or '' when it isn't installed
+    $key = Get-ChildItem $Root -ErrorAction SilentlyContinue |
+        ForEach-Object { Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue } |
+        Where-Object { $_.DisplayName -eq $DisplayName } | Select-Object -First 1
+    if ($key) { return [string]$key.DisplayVersion }
+    return ''
+}
+
+function Get-ComponentState {
+    # What's on this PC now, for the What Rowanholt needs page
+    $uninstall = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
+    $docker = Get-InstalledVersion "HKCU:\$uninstall" 'Docker Desktop'
+    if (-not $docker) { $docker = Get-InstalledVersion "HKLM:\$uninstall" 'Docker Desktop' }
+    $model = Join-Path $env:USERPROFILE ('.ollama\models\manifests\registry.ollama.ai\library\' + ($SmithModel -replace ':', '\'))
+    return @{
+        Docker = [bool](Get-DockerDesktop); DockerVersion = $docker
+        Wsl = (Test-WslReady); WslVersion = (Get-InstalledVersion "HKLM:\$uninstall" 'Windows Subsystem for Linux')
+        Ollama = (Test-Path $OllamaExe)
+        OllamaVersion = $(if (Test-Path $OllamaExe) { (Get-Item $OllamaExe).VersionInfo.ProductVersion } else { '' })
+        Model = (Test-Path $model)
+    }
+}
+
+function Select-Components {
+    # What Rowanholt needs: what's here and what to do with each. Returns the items to run, in order,
+    # or 'back'. A clean reinstall removes first, then installs afresh
+    $state = Get-ComponentState
+    $body = Show-Page 'What Rowanholt needs' "What's on this PC, and what to do with it." -Back 'Back'
+    $green = [System.Drawing.Color]::FromArgb(24, 120, 60)
+
+    # Docker Desktop and WSL 2
+    Add-Text $body 'Docker Desktop and WSL 2' 14 -Width 230 -Bold
+    $parts = @()
+    $parts += $(if ($state.Docker) { "Docker Desktop $($state.DockerVersion)".Trim() } else { 'Docker Desktop missing' })
+    $parts += $(if ($state.Wsl) { "WSL $($state.WslVersion)".Trim() } else { 'WSL missing' })
+    $dockerStatus = New-Object System.Windows.Forms.Label
+    $dockerStatus.Text = $parts -join ', '; $dockerStatus.TextAlign = 'TopRight'; $dockerStatus.SetBounds(256, 14, 280, 20)
+    if ($state.Docker -and $state.Wsl) { $dockerStatus.ForeColor = $green }
+    $body.Controls.Add($dockerStatus)
+    Add-Text $body "Runs Rowanholt's containers: needed to run it on this PC." 36 -Muted
+    $dockerGroup = New-Object System.Windows.Forms.Panel
+    $dockerGroup.SetBounds(24, 58, 512, 28)
+    $dockerKeep = New-Object System.Windows.Forms.RadioButton
+    $dockerKeep.Text = $(if ($state.Docker -and $state.Wsl) { 'Keep it' } elseif ($state.Docker -or $state.Wsl) { "Install what's missing" } else { 'Install' })
+    $dockerKeep.SetBounds(0, 2, 200, 24); $dockerKeep.Checked = $true
+    $dockerClean = New-Object System.Windows.Forms.RadioButton
+    $dockerClean.Text = 'Reinstall clean'; $dockerClean.SetBounds(220, 2, 200, 24)
+    $dockerGroup.Controls.Add($dockerKeep)
+    if ($state.Docker -or $state.Wsl) { $dockerGroup.Controls.Add($dockerClean) }
+    $body.Controls.Add($dockerGroup)
+
+    # Smith's AI answers
+    Add-Text $body "Smith's AI answers (optional)" 100 -Width 230 -Bold
+    $aiStatus = New-Object System.Windows.Forms.Label
+    $aiStatus.Text = $(if ($state.Ollama -and $state.Model) { "Ollama $($state.OllamaVersion), Smith's model".Trim() } elseif ($state.Ollama) { "Ollama $($state.OllamaVersion); model missing" } else { 'Not installed' })
+    $aiStatus.TextAlign = 'TopRight'; $aiStatus.SetBounds(256, 100, 280, 20)
+    if ($state.Ollama -and $state.Model) { $aiStatus.ForeColor = $green }
+    $body.Controls.Add($aiStatus)
+    Add-Text $body ("Ollama runs Smith's model, Meta's Llama 3.2 (3B), on this PC, so nothing leaves it: about 3 GB. " +
+        'Without them, Smith answers fixed questions from the case files.') 122 -Height 36 -Muted
+    $aiGroup = New-Object System.Windows.Forms.Panel
+    $aiGroup.SetBounds(24, 160, 512, 28)
+    $aiKeep = New-Object System.Windows.Forms.RadioButton
+    $aiKeep.SetBounds(0, 2, 200, 24); $aiKeep.Checked = $true
+    $aiClean = New-Object System.Windows.Forms.RadioButton
+    $aiClean.Text = 'Reinstall clean'; $aiClean.SetBounds(220, 2, 150, 24)
+    $aiSkip = New-Object System.Windows.Forms.RadioButton
+    $aiSkip.SetBounds(380, 2, 130, 24)
+    if ($state.Ollama -and $state.Model) {
+        $aiKeep.Text = 'Keep it'; $aiGroup.Controls.AddRange(@($aiKeep, $aiClean))
+    } elseif ($state.Ollama) {
+        $aiKeep.Text = "Install the model"; $aiSkip.Text = 'Leave it'; $aiGroup.Controls.AddRange(@($aiKeep, $aiClean, $aiSkip))
+    } else {
+        $aiKeep.Text = 'Install'; $aiSkip.Text = 'Not now'; $aiKeep.Checked = $false; $aiSkip.Checked = $true
+        $aiSkip.SetBounds(220, 2, 150, 24); $aiGroup.Controls.AddRange(@($aiKeep, $aiSkip))
+    }
+    $body.Controls.Add($aiGroup)
+
+    Add-Text $body ('Reinstall clean removes the installation and everything it holds, then installs it afresh. For ' +
+        "Docker Desktop that's every container, image and volume on this PC, for every app, Rowanholt's databases " +
+        "and cases among them; for Ollama, its models. Evidence folders and Rowanholt's own folder are left alone.") 202 -Height 66
+    Add-Text $body ("Installing Docker Desktop accepts Docker's Subscription Service Agreement: free for personal use, " +
+        'education and small businesses; larger organisations need a paid subscription.') 274 -Height 40 -Muted
+
+    $action = Wait-Page
+    if ($action -eq 'back') { return 'back' }
+    if ($action -ne 'next') { Close-Wizard; exit 1 }
+    $items = @()
+    if ($dockerClean.Checked) { $items += 'cleandocker' }
+    if ($aiClean.Checked) { $items += 'cleanai' }
+    if ($dockerClean.Checked -or -not $state.Wsl) { $items += 'wsl' }
+    if ($dockerClean.Checked -or -not $state.Docker) { $items += 'docker' }
+    if ($aiClean.Checked -or ($aiKeep.Checked -and -not $state.Ollama)) { $items += 'ollama' }
+    if ($aiClean.Checked -or ($aiKeep.Checked -and -not $state.Model)) { $items += 'model' }
+    return ,$items
 }
 
 function Register-Resume {
@@ -804,7 +909,8 @@ function Install-Dependencies([string[]]$Items) {
         if ($cancelled) { $ui.Status[$item] = 'Cancelled'; $ui.Rows[$item].Text = 'Cancelled'; $result.Failed += $item; continue }
         try {
             switch ($item) {
-                'clean'  { Remove-Components $ui }
+                'cleandocker' { Remove-Docker $ui }
+                'cleanai'     { Remove-Ollama $ui }
                 'wsl'    { Install-Wsl $ui $result }
                 'docker' { Install-Docker $ui $result }
                 'ollama' { Install-Ollama $ui }
@@ -967,7 +1073,14 @@ function Invoke-Setup {
                 exit 1
             }
         }
-        Assert-DockerInstalled
+        $items = Select-Components
+        if ($items -eq 'back') { continue }
+        if ($items.Count) {
+            $result = Install-Dependencies $items
+            if ($result.Restart) { exit 0 }
+            if (-not (Test-DockerInstalled) -or -not (Test-WslReady)) { Close-Wizard; exit 1 }
+        }
+        Add-DockerToPath
         $evidence = Select-Evidence (Read-Evidence $dir)
         if ($evidence.Action -eq 'back') { continue }
         Remove-Item $ServerFile -ErrorAction SilentlyContinue
