@@ -19,7 +19,8 @@ class JobStatus(str, Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
     ARCHIVED = "archived"
-    AWAITING_CONFIRMATION = "awaiting_confirmation"  # Waiting for user to confirm sudo action
+    AWAITING_CONFIRMATION = "awaiting_confirmation"  # Removing the old output failed: retry or give up?
+    REMOVING = "removing"  # The worker is removing the old output, confirmed (output_removal.py)
 
 
 class AnalysisOptions(BaseModel):
@@ -95,6 +96,11 @@ class AnalysisOptions(BaseModel):
 
     # Internal options
     force_overwrite: bool = False
+    # Set by the API only (whatever a request sends is replaced): the job whose output folder this
+    # one may remove, once the API has checked the caller may manage it, and whether the job was
+    # created since output folders carry a marker (output_removal.py). Jobs from before have neither
+    replaces_output_of: Optional[str] = None
+    output_marker: bool = False
 
     # Logging options
     debug: bool = False  # Enable verbose debug messages in job log
@@ -114,7 +120,7 @@ class JobCreate(BaseModel):
 
 class PendingAction(BaseModel):
     """Pending action awaiting user confirmation."""
-    action_type: str  # e.g., "sudo_remove_directory"
+    action_type: str  # "remove_output" ("sudo_remove_directory" before 12 November 2026)
     target_path: str  # Path to act on
     message: str  # Message to show user
 

@@ -460,43 +460,8 @@ class QueueingTest(BackendCase):
         self.assertEqual(jobs[0].status, self.JobStatus.FAILED)
         self.assertIn("Not queued: redis down", jobs[0].error)
 
-    def awaiting(self, case):
-        job_id = self.create_job(self.admin, case)
-        store = self.main.job_storage
-        job = store.get_job(job_id)
-        job.status = self.JobStatus.AWAITING_CONFIRMATION
-        job.celery_task_id = "celery-finished-task"
-        store.save_job(job)
-        self.redis.flush()
-
-        def confirm(job_id):  # what tasks_docker.confirm_sudo_action does once rm -rf succeeds
-            job = store.get_job(job_id)
-            job.status, job.pending_action = self.JobStatus.PENDING, None
-            store.save_job(job)
-            return True
-        return job_id, confirm
-
-    def test_sudo_removal_queues_the_restart(self):
-        job_id, confirm = self.awaiting("CASE-SUDO")
-        with mock.patch("tasks_docker.confirm_sudo_action", side_effect=confirm), \
-                mock.patch.object(self.main.start_analysis, "delay", return_value=mock.Mock(id="celery-again")) as delay:
-            resp = self.client.post(f"/api/jobs/{job_id}/confirm-sudo", headers=self.admin)
-        self.assertEqual(resp.status_code, 200, resp.text)
-        delay.assert_called_once_with(job_id)
-        job = self.main.job_storage.get_job(job_id)
-        self.assertEqual(job.status, self.JobStatus.PENDING)
-        self.assertEqual(job.celery_task_id, "celery-again")
-        self.assertTrue(self.redis.exists(self.lv.queued_key(job_id)))
-
-    def test_sudo_removal_that_cant_requeue_fails_the_job(self):
-        job_id, confirm = self.awaiting("CASE-SUDO-NOQUEUE")
-        with mock.patch("tasks_docker.confirm_sudo_action", side_effect=confirm), \
-                mock.patch.object(self.main.start_analysis, "delay", side_effect=ConnectionError("redis down")):
-            resp = self.client.post(f"/api/jobs/{job_id}/confirm-sudo", headers=self.admin)
-        self.assertEqual(resp.status_code, 500)
-        job = self.main.job_storage.get_job(job_id)
-        self.assertEqual(job.status, self.JobStatus.FAILED)
-        self.assertIn("Not queued", job.error)
+    # Confirming a failed removal queues the worker's remove_output, which queues the run itself:
+    # tests/unit/test_output_removal.py
 
     def test_no_route_queues_a_job_but_through_queue_job(self):
         source = (BACKEND / "main.py").read_text()
@@ -534,6 +499,11 @@ class WorkerHeartbeatTest(unittest.TestCase):
 
         storage = mock.Mock()
         storage.get_job.return_value = job
+
+        def claim(job_id, statuses, status, log_line=None, **fields):  # the pending-to-running update
+            job.status = status
+            return job
+        storage.transition.side_effect = claim
         storage.save_job.side_effect = lambda saved: events.append(("save", saved.status.value))
         with mock.patch.object(tasks, "job_storage", storage), \
                 mock.patch.object(tasks.job_liveness, "Heartbeat", Beat), \

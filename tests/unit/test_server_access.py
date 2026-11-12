@@ -50,6 +50,7 @@ def load_app():
     # would unload config with it and leave the test holding a second settings object.)
     fake_tasks = mock.MagicMock()
     fake_tasks.start_analysis.delay.return_value = mock.Mock(id="celery-task")
+    fake_tasks.remove_output.delay.return_value = mock.Mock(id="celery-removal")
     sys.modules["tasks_docker"] = fake_tasks
     import main  # noqa: E402
     return main
@@ -164,6 +165,19 @@ class ServerAccessTest(BackendCase):
             self.assertFalse(result["success"], path)
             self.assertIn("owner or an admin", result["error"])
         self.assertEqual(self.main.job_storage.get_job(job).status, JobStatus.COMPLETED)
+
+        # Confirming or giving up removing the old output: the owner's output, the owner's job
+        stored = self.main.job_storage.get_job(job)
+        stored.status = JobStatus.AWAITING_CONFIRMATION
+        self.main.job_storage.save_job(stored)
+        for path in (f"/api/jobs/{job}/confirm-removal", f"/api/jobs/{job}/cancel-removal",
+                     f"/api/jobs/{job}/confirm-sudo", f"/api/jobs/{job}/cancel-sudo"):
+            resp = self.client.post(path, headers=self.bob)
+            self.assertEqual(resp.status_code, 403, f"{path}: {resp.text}")
+            self.assertIn("owner or an admin", resp.json()["detail"])
+        self.assertEqual(self.main.job_storage.get_job(job).status, JobStatus.AWAITING_CONFIRMATION)
+        stored.status = JobStatus.COMPLETED
+        self.main.job_storage.save_job(stored)
 
         resp = self.client.post(f"/api/jobs/{job}/restart?fresh=false", headers=self.bob)
         self.assertEqual(resp.status_code, 200, resp.text)

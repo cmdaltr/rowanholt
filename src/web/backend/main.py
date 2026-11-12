@@ -36,6 +36,8 @@ try:
     from . import case_routes  # The case browser, findings, notes and assignments
     from . import aule_offline
     from . import backup_secrets  # Phone backup passwords, job form to worker
+    from . import output_removal  # Where a job may write, and removing its old output
+    from . import removal_routes  # Confirming or giving up a failed removal
     from . import licence  # The licence: edition, seats and features
     from .licence_routes import router as licence_router
     from . import branding_routes  # Report brands (report-branding, brand-library)
@@ -69,6 +71,8 @@ except ImportError:
     import case_routes  # The case browser, findings, notes and assignments
     import aule_offline
     import backup_secrets  # Phone backup passwords, job form to worker
+    import output_removal  # Where a job may write, and removing its old output
+    import removal_routes  # Confirming or giving up a failed removal
     import licence  # The licence: edition, seats and features
     from licence_routes import router as licence_router
     import branding_routes  # Report brands (report-branding, brand-library)
@@ -85,38 +89,10 @@ except ImportError:
     from storage import JobStorage
     from tasks_docker import start_analysis
 
-# Temporary replacements for security_utils
+# Temporary replacement for security_utils (paths: output_removal.contained)
 def sanitize_case_number(case_number: str) -> str:
     """Basic sanitization of case number."""
     return case_number.replace("/", "_").replace("\\", "_").replace("..", "")
-
-def sanitize_path(path: str, allowed_prefixes: List[str]) -> Optional[str]:
-    """
-    Sanitize and validate file path.
-
-    Args:
-        path: Path to validate
-        allowed_prefixes: List of allowed path prefixes
-
-    Returns:
-        Sanitized path if valid, None otherwise
-    """
-    if not path:
-        return None
-
-    # Resolve to absolute path to prevent traversal
-    try:
-        abs_path = os.path.abspath(path)
-    except (ValueError, OSError):
-        return None
-
-    # Check if path starts with any allowed prefix
-    for prefix in allowed_prefixes:
-        abs_prefix = os.path.abspath(prefix)
-        if abs_path.startswith(abs_prefix):
-            return abs_path
-
-    return None
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -152,6 +128,7 @@ threat_intel_store.configure(job_storage)
 case_routes.configure(job_storage)
 licence.configure(job_storage)
 branding_routes.configure(job_storage)
+removal_routes.configure(job_storage)
 aule_offline.FINDINGS = case_routes.findings_for_case
 
 # Jobs a rebuild would cut off: queued (Celery's queue lives in Redis, which is recreated with the
@@ -196,6 +173,8 @@ def _job_for(request: Request, job_id: str) -> Optional[Job]:
 # Deleting, archiving and restarting with fresh output lose the owner's work, so the people a job
 # is shared with can't (as they can't change its sharing); a plain restart, which keeps it, they can
 NOT_THEIRS = "Only the job's owner or an admin can {}"
+# A job these can't be deleted or archived: it's being worked on (a removal among them)
+BUSY_JOB_STATUSES = (JobStatus.PENDING, JobStatus.RUNNING, JobStatus.PAUSED, JobStatus.REMOVING)
 
 
 def _manager_refusal(request: Request, job_id: str, action: str) -> Optional[str]:
@@ -203,6 +182,51 @@ def _manager_refusal(request: Request, job_id: str, action: str) -> Optional[str
     if access.can_manage_job(access.current_user(request), job_id):
         return None
     return NOT_THEIRS.format(action)
+
+
+def _client_ip(request: Request) -> Optional[str]:
+    return request.client.host if request.client else None
+
+
+def _replaceable_output(request: Request, folder: str, jobs: List[Job]) -> str:
+    """The job whose output an existing folder is, when the caller may replace it (its owner or
+    an admin) and it isn't still going; HTTPException otherwise. A folder that isn't Rowanholt's
+    output (no marker, and not recorded as an older job's) is never removed: whoever put it there
+    removes it, or the job writes somewhere else."""
+    owner = output_removal.folder_owner(folder, jobs)
+    if owner is None:
+        raise HTTPException(status_code=409, detail=(
+            f"{folder} is there already and isn't a Rowanholt output folder, so it won't be replaced: "
+            "choose another destination or case number, or move it away first"))
+    previous = next((job for job in jobs if job.id == owner), None)
+    user = access.current_user(request)
+    if previous is None:
+        # Its job was deleted: nobody owns it any more, so only an admin may replace it
+        if not access.is_admin(user) and access.server_mode():
+            raise HTTPException(status_code=403, detail=f"Only an admin can replace {folder}: its job was deleted")
+    else:
+        if not access.can_manage_job(user, previous.id):
+            raise HTTPException(status_code=403, detail=(
+                f"{folder} is the output of case {previous.case_number}: only its owner or an admin can replace it"))
+        if previous.status.value in output_removal.ACTIVE_STATUSES:
+            raise HTTPException(status_code=409, detail=(
+                f"{folder} is the output of case {previous.case_number}, which is {previous.status.value}"))
+    return owner
+
+
+def _fresh_restart_refusal(request: Request, job: Job) -> Optional[str]:
+    """Why the job mustn't restart with fresh output (its old output removed), or None: the owner
+    or an admin only, and only into a destination that's still allowed (one recorded before the
+    checks may be an allowed folder itself)."""
+    refusal = _manager_refusal(request, job.id, "restart it with fresh output (fresh=false re-runs into it)")
+    if refusal:
+        return refusal
+    if job.destination_path:
+        try:
+            output_removal.contained(job.destination_path, settings.allowed_paths + [str(settings.output_dir)])
+        except output_removal.PathRefused as exc:
+            return f"Its output folder can't be removed: {exc}"
+    return None
 
 
 def _with_access(jobs: List[Job]) -> List[Job]:
@@ -249,6 +273,7 @@ app.include_router(licence_router)
 app.include_router(branding_routes.router)
 app.include_router(branding_routes.case_router)
 app.include_router(webhook_router)
+app.include_router(removal_routes.router)
 
 # Include Anduril (Docker administration) routes; /api/aragorn is the name before the rename
 app.include_router(anduril_router, prefix="/api/anduril")
@@ -438,16 +463,14 @@ async def create_job(job_request: JobCreate, request: Request):
         if job_request.backup_password and not job_request.options.mobile:
             raise HTTPException(status_code=400, detail="A backup password is only for Mobile jobs (phone backups)")
 
-        # Validate and sanitize source paths
+        roots = settings.allowed_paths
+        # Validate and sanitize source paths: inside an allowed folder (a whole one may be read)
         sanitized_source_paths = []
         for path in job_request.source_paths:
-            # Sanitize path to prevent directory traversal
-            sanitized = sanitize_path(path, settings.allowed_paths)
-            if not sanitized:
-                raise HTTPException(
-                    status_code=403,
-                    detail=f"Access denied to path: {path}",
-                )
+            try:
+                sanitized = str(output_removal.contained(path, roots, allow_root=True))
+            except output_removal.PathRefused as exc:
+                raise HTTPException(status_code=403, detail=f"Access denied to path: {exc}")
             if not Path(sanitized).exists():
                 raise HTTPException(
                     status_code=400,
@@ -455,27 +478,11 @@ async def create_job(job_request: JobCreate, request: Request):
                 )
             sanitized_source_paths.append(sanitized)
 
-        # Sanitize destination path if provided
-        destination_path = job_request.destination_path
-        if destination_path:
-            sanitized_dest = sanitize_path(destination_path, settings.allowed_paths)
-            if not sanitized_dest:
-                raise HTTPException(
-                    status_code=403,
-                    detail=f"Access denied to destination path: {destination_path}",
-                )
-            destination_path = sanitized_dest
-
         # Generate job ID
         job_id = str(uuid.uuid4())
 
-        # An encrypted phone backup's password goes to the worker through Redis (expiring), never
-        # the job: stashed before the job is saved, so a Redis failure leaves no job behind
-        password = job_request.backup_password.get_secret_value() if job_request.backup_password else ""
-        if password:
-            backup_secrets.stash(job_id, password)
-
         # Set destination path - if not specified, use case number as directory name
+        destination_path = job_request.destination_path
         if not destination_path and sanitized_source_paths:
             first_source = Path(sanitized_source_paths[0])
             # Create output directory using case number (e.g., /tmp/rowanholt/mfttesting/)
@@ -484,16 +491,43 @@ async def create_job(job_request: JobCreate, request: Request):
                 destination_path = str(first_source.parent / case_number)
             else:
                 destination_path = str(first_source / case_number)
+        if destination_path:
+            # Inside an allowed folder, never one of them or above one: a fresh run removes it
+            try:
+                destination_path = str(output_removal.contained(destination_path, roots))
+            except output_removal.PathRefused as exc:
+                raise HTTPException(status_code=403, detail=f"Access denied to destination path: {exc}")
+        else:
+            destination_path = str(Path(settings.output_dir) / case_number)
 
-        # Check if destination directory already exists (unless force_overwrite is set)
-        if not job_request.options.force_overwrite and destination_path:
-            dest_path = Path(destination_path)
-            # Only check if it exists as a directory, not as a file
-            if dest_path.exists() and dest_path.is_dir():
+        # Never over evidence, nor at, in or around another job's output while that job is going
+        others = job_storage.list_jobs(limit=1_000_000)
+        refusal = output_removal.destination_refusal(destination_path, None, sanitized_source_paths, others)
+        if refusal:
+            raise HTTPException(status_code=409, detail=refusal)
+
+        # What the worker may remove is decided here and only here, whatever the request said
+        options = job_request.options
+        options.replaces_output_of = None
+        options.output_marker = True
+        user = access.current_user(request)
+        dest_path = Path(destination_path)
+        if dest_path.is_dir():
+            # Check if destination directory already exists (unless force_overwrite is set)
+            if not options.force_overwrite:
                 raise HTTPException(
                     status_code=400,
                     detail=f"[Errno 17] File exists: '{destination_path}'",
                 )
+            options.replaces_output_of = _replaceable_output(request, destination_path, others)
+            job_storage.audit("output.removal_requested", user, _client_ip(request), resource_id=job_id,
+                              path=destination_path, replaces=options.replaces_output_of, case=case_number)
+
+        # An encrypted phone backup's password goes to the worker through Redis (expiring), never
+        # the job: stashed before the job is saved, so a Redis failure leaves no job behind
+        password = job_request.backup_password.get_secret_value() if job_request.backup_password else ""
+        if password:
+            backup_secrets.stash(job_id, password)
 
         # Create job
         job = Job(
@@ -501,14 +535,14 @@ async def create_job(job_request: JobCreate, request: Request):
             case_number=case_number,
             source_paths=sanitized_source_paths,
             destination_path=destination_path,
-            options=job_request.options,
+            options=options,
             status=JobStatus.PENDING,
             created_at=datetime.now(),
         )
 
         # Save job, and who it belongs to
         job_storage.save_job(job)
-        owner = access.current_user(request)
+        owner = user
         job_storage.set_owner(job.id, owner["id"], owner["username"])
         job.owner = owner["username"]
 
@@ -698,7 +732,7 @@ async def delete_job(job_id: str, request: Request):
             raise HTTPException(status_code=403, detail=refusal)
 
         # Only allow deleting completed/failed/cancelled jobs
-        if job.status in [JobStatus.PENDING, JobStatus.RUNNING, JobStatus.PAUSED]:
+        if job.status in BUSY_JOB_STATUSES:
             raise HTTPException(
                 status_code=400,
                 detail="Cannot delete running or pending job",
@@ -798,7 +832,7 @@ async def bulk_delete_jobs(job_ids: list[str], request: Request):
                 results.append({"job_id": job_id, "success": False, "error": refusal})
                 continue
 
-            if job.status in [JobStatus.PENDING, JobStatus.RUNNING, JobStatus.PAUSED]:
+            if job.status in BUSY_JOB_STATUSES:
                 results.append({"job_id": job_id, "success": False, "error": "Cannot delete running job"})
                 continue
 
@@ -837,7 +871,7 @@ async def bulk_archive_jobs(job_ids: list[str], request: Request):
                 results.append({"job_id": job_id, "success": False, "error": refusal})
                 continue
 
-            if job.status in [JobStatus.PENDING, JobStatus.RUNNING, JobStatus.PAUSED]:
+            if job.status in BUSY_JOB_STATUSES:
                 results.append({"job_id": job_id, "success": False, "error": "Cannot archive running job"})
                 continue
 
@@ -892,8 +926,7 @@ async def bulk_restart_jobs(job_ids: list[str], request: Request, fresh: Optiona
                 continue
 
             clean = _restarts_fresh(job, fresh)
-            refusal = _manager_refusal(request, job_id, "restart it with fresh output (fresh=false re-runs into it)") \
-                if clean else None
+            refusal = _fresh_restart_refusal(request, job) if clean else None
             if refusal:
                 results.append({"job_id": job_id, "success": False, "error": refusal})
                 continue
@@ -1079,8 +1112,7 @@ async def restart_job(job_id: str, request: Request, confirm: bool = False, fres
             raise HTTPException(status_code=409, detail=refusal)
 
         clean = _restarts_fresh(job, fresh)
-        refusal = _manager_refusal(request, job_id, "restart it with fresh output (fresh=false re-runs into it)") \
-            if clean else None
+        refusal = _fresh_restart_refusal(request, job) if clean else None
         if refusal:
             raise HTTPException(status_code=403, detail=refusal)
         # Reset job state
@@ -1106,85 +1138,8 @@ async def restart_job(job_id: str, request: Request, confirm: bool = False, fres
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/jobs/{job_id}/confirm-sudo")
-async def confirm_sudo(job_id: str):
-    """
-    Confirm sudo action for a job awaiting confirmation.
-
-    Args:
-        job_id: Job ID
-
-    Returns:
-        Updated job
-    """
-    try:
-        from tasks_docker import confirm_sudo_action
-
-        job = job_storage.get_job(job_id)
-
-        if not job:
-            raise HTTPException(status_code=404, detail="Job not found")
-
-        if job.status != JobStatus.AWAITING_CONFIRMATION:
-            raise HTTPException(
-                status_code=400,
-                detail="Job is not awaiting confirmation",
-            )
-
-        success = confirm_sudo_action(job_id)
-
-        # Refresh job after action
-        job = job_storage.get_job(job_id)
-
-        if success:
-            # Restart the job now that directory is removed
-            queue_job(job)
-
-        return job
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/jobs/{job_id}/cancel-sudo")
-async def cancel_sudo(job_id: str):
-    """
-    Cancel sudo action for a job awaiting confirmation.
-
-    Args:
-        job_id: Job ID
-
-    Returns:
-        Updated job
-    """
-    try:
-        from tasks_docker import cancel_sudo_action
-
-        job = job_storage.get_job(job_id)
-
-        if not job:
-            raise HTTPException(status_code=404, detail="Job not found")
-
-        if job.status != JobStatus.AWAITING_CONFIRMATION:
-            raise HTTPException(
-                status_code=400,
-                detail="Job is not awaiting confirmation",
-            )
-
-        cancel_sudo_action(job_id)
-
-        # Refresh job after action
-        job = job_storage.get_job(job_id)
-
-        return job
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+# Confirming or giving up a failed removal of a job's old output (confirm-removal, cancel-removal,
+# and the old confirm-sudo and cancel-sudo): removal_routes.py
 
 @app.post("/api/jobs/{job_id}/archive")
 async def archive_job(job_id: str, request: Request):
@@ -1207,7 +1162,7 @@ async def archive_job(job_id: str, request: Request):
         if refusal:
             raise HTTPException(status_code=403, detail=refusal)
 
-        if job.status in [JobStatus.PENDING, JobStatus.RUNNING, JobStatus.PAUSED]:
+        if job.status in BUSY_JOB_STATUSES:
             raise HTTPException(
                 status_code=400,
                 detail="Cannot archive pending or running jobs",

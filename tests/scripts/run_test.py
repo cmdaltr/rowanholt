@@ -2674,8 +2674,8 @@ def cancel_jobs(api_url: str, job_ids: List[str]):
         try:
             response = requests.post(f"{api_url}/api/jobs/{job_id}/cancel", timeout=30)
             if response.status_code == 400:
-                # Jobs parked on a sudo prompt only accept /cancel-sudo
-                response = requests.post(f"{api_url}/api/jobs/{job_id}/cancel-sudo", timeout=30)
+                # Jobs waiting on a failed removal of their old output only accept /cancel-removal
+                response = requests.post(f"{api_url}/api/jobs/{job_id}/cancel-removal", timeout=30)
             print(f"  {job_id}: HTTP {response.status_code}")
             if not response.ok:
                 failed += 1

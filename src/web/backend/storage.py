@@ -485,6 +485,78 @@ class JobStorage:
         self._after_save(job, previous)
         return job
 
+    def transition(self, job_id: str, statuses: Iterable[JobStatus], status: JobStatus,
+                   log_line: Optional[str] = None, **fields) -> Optional[Job]:
+        """Move a job to `status` only if it still has one of `statuses`, in one conditional UPDATE,
+        so of two callers racing (two confirmations, two workers given the same job) exactly one
+        wins; `fields` are other columns to set with it, `log_line` is appended to its log.
+        Returns the job as saved, or None when it had moved on."""
+        values = [s.value for s in statuses]
+        session = self.Session()
+        try:
+            changed = (session.query(JobModel)
+                       .filter(JobModel.id == job_id, JobModel.status.in_(values))
+                       .update({"status": status.value, **fields}, synchronize_session=False))
+            if not changed:
+                session.rollback()
+                return None
+            row = session.query(JobModel).filter_by(id=job_id).first()
+            if log_line:
+                stamp = datetime.now().isoformat().replace("T", " ")
+                row.log = list(row.log or []) + [f"[{stamp}] -> {log_line}"]
+            session.commit()
+            job = self._job_model_to_pydantic(row)
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+        self._after_save(job, values[0] if values else None)
+        return job
+
+    def audit(self, action: str, actor: Optional[dict] = None, ip: Optional[str] = None,
+              resource_type: str = "job", resource_id: Optional[str] = None, **details) -> None:
+        """A row in audit_logs. The worker has no licence module to call (licence.audit), and a
+        removal's record must outlive the job log, which lives in the folder being removed. A
+        database that's down is logged loudly rather than raised: the action has happened."""
+        import uuid
+
+        actor = actor or {}
+        session = self.Session()
+        try:
+            session.add(AuditLogModel(
+                id=str(uuid.uuid4()),
+                user_id=actor.get("id"),
+                username=actor.get("username") or "worker",
+                action=action,
+                resource_type=resource_type,
+                resource_id=resource_id,
+                details=details,
+                ip_address=ip,
+                timestamp=datetime.utcnow(),
+            ))
+            session.commit()
+        except Exception:  # noqa: BLE001 - see the docstring
+            session.rollback()
+            logger.exception("%s not audited: %s", action, details)
+        finally:
+            session.close()
+
+    def audit_records(self, resource_id: Optional[str] = None, action_prefix: str = "") -> List[dict]:
+        """Audit rows, oldest first, for one resource and the actions starting with a prefix."""
+        session = self.Session()
+        try:
+            query = session.query(AuditLogModel).order_by(AuditLogModel.timestamp)
+            if resource_id:
+                query = query.filter(AuditLogModel.resource_id == resource_id)
+            if action_prefix:
+                query = query.filter(AuditLogModel.action.startswith(action_prefix))
+            return [{"action": row.action, "username": row.username, "user_id": row.user_id,
+                     "ip_address": row.ip_address, "resource_id": row.resource_id, "details": row.details,
+                     "timestamp": row.timestamp} for row in query.all()]
+        finally:
+            session.close()
+
     def delete_job(self, job_id: str) -> None:
         """
         Delete job from storage.

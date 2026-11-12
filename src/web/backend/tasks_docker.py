@@ -29,6 +29,7 @@ from storage import JobStorage
 from models.job import JobStatus, PendingAction
 import backup_secrets
 import job_liveness
+import output_removal
 
 # Initialize Celery
 celery_app = Celery(
@@ -321,138 +322,145 @@ def send_job_signal(job_id: str, action: str, timeout: float = 5.0) -> dict:
             return result
     return {"ok": False, "error": f"worker {process['hostname']} did not reply within {timeout}s"}
 
-def _request_sudo_confirmation(job, target_path: str, reason: str):
-    """Set job to awaiting confirmation status for sudo directory removal."""
-    from models.job import PendingAction
+# =====================================================
+# REMOVING A JOB'S OLD OUTPUT (output_removal.py)
+# =====================================================
+# A fresh run removes the job's old output first. Removal happens here, in the worker, the
+# container whose mounts it acts on, and only after output_removal.check_removal has found the
+# folder to be this job's own and nothing else's. A removal that fails (a busy file, permissions)
+# waits for its owner to say try again or give up: confirmed, the backend moves the job to
+# `removing` and queues `remove_output`, which re-derives the folder from the job record.
 
+REMOVAL_ACTION = "remove_output"
+# Pending actions saved before the rename (12 November 2026) are still confirmed
+REMOVAL_ACTIONS = (REMOVAL_ACTION, "sudo_remove_directory")
+
+
+def worker_roots() -> list:
+    """The folders the worker may write output in: the allowed folders and its own output folder."""
+    return list(settings.allowed_paths) + [str(settings.output_dir)]
+
+
+def _stamp() -> str:
+    return datetime.now().isoformat().replace("T", " ")
+
+
+def _all_jobs() -> list:
+    """Every job (without logs), for the removal's overlap checks."""
+    return job_storage.list_jobs(limit=1_000_000)
+
+
+def _request_removal_confirmation(job, target_path: str, reason: str) -> None:
+    """Hold the job until its owner says try the removal again, or give up."""
     job.status = JobStatus.AWAITING_CONFIRMATION
     job.pending_action = PendingAction(
-        action_type="sudo_remove_directory",
+        action_type=REMOVAL_ACTION,
         target_path=target_path,
-        message=f"Failed to remove directory: {reason}. Use sudo to force removal?"
+        message=f"Removing the old output failed: {reason}. Try again?",
     )
     job_storage.save_job(job)
-    logger.info(f"Job {job.id} awaiting sudo confirmation for: {target_path}")
+    logger.info(f"Job {job.id} awaiting confirmation to retry removing: {target_path}")
 
 
-def confirm_sudo_action(job_id: str) -> bool:
-    """
-    Execute the pending sudo action for a job.
-    Returns True if successful, False otherwise.
-    """
-    job = job_storage.get_job(job_id)
-    if not job or job.status != JobStatus.AWAITING_CONFIRMATION:
-        return False
-
-    if not job.pending_action or job.pending_action.action_type != "sudo_remove_directory":
-        return False
-
-    target_path = job.pending_action.target_path
-
-    job.log.append(
-        f"[{datetime.now().isoformat().replace('T', ' ')}] -> User confirmed sudo removal of: {target_path}"
-    )
-    job_storage.save_job(job)
-
+def _remove_old_output(job, dest_dir: Path, actor: dict = None, ip: str = None,
+                       confirm_failure: bool = True) -> str:
+    """Check and remove the job's old output: 'removed'; 'refused', with the job failed (trying
+    again can't help); or 'failed', with the job awaiting confirmation to try again, or failed when
+    not `confirm_failure` (it was the confirmed retry). The job object is changed, not saved."""
+    target = str(dest_dir)
+    job.log.append(f"[{_stamp()}] -> Removing the old output: {target} - stand by...")
+    _safe_save(job)
+    started = time.monotonic()
     try:
-        # Use rm -rf (container runs as root, no sudo needed)
-        result = subprocess.run(
-            ["rm", "-rf", target_path],
-            capture_output=True,
-            timeout=300  # 5 minute timeout
-        )
+        plan = output_removal.remove_output(target, job, _all_jobs(), worker_roots())
+    except output_removal.PathRefused as exc:
+        job_storage.audit("output.removal_refused", actor, ip, resource_id=job.id, path=target, reason=str(exc))
+        logger.warning(f"Job {job.id}: old output not removed: {exc}")
+        job.status = JobStatus.FAILED
+        job.error = f"The old output wasn't removed: {exc}"
+        job.pending_action = None
+        job.log.append(f"[{_stamp()}] -> {job.error}")
+        return "refused"
+    except OSError as exc:
+        job_storage.audit("output.removal_failed", actor, ip, resource_id=job.id, path=target, reason=str(exc))
+        logger.error(f"Job {job.id}: removing {target} failed: {exc}")
+        job.log.append(f"[{_stamp()}] -> Removing the old output failed: {exc}")
+        if confirm_failure:
+            _request_removal_confirmation(job, target, str(exc))
+        else:
+            job.status = JobStatus.FAILED
+            job.error = f"Removing the old output failed: {exc}"
+            job.pending_action = None
+        return "failed"
+    elapsed = time.monotonic() - started
+    job_storage.audit("output.removed", actor, ip, resource_id=job.id, path=target, files=plan.files,
+                      bytes=plan.bytes, seconds=round(elapsed, 1))
+    logger.info(f"Job {job.id}: removed {target} ({plan.files} files) in {elapsed:.1f}s")
+    job.log.append(f"[{_stamp()}] -> Removed the old output ({plan.files:,} files, "
+                   f"{output_removal.size_text(plan.bytes)}) in {elapsed:.1f}s")
+    return "removed"
 
-        if result.returncode == 0:
-            job.log.append(
-                f"[{datetime.now().isoformat().replace('T', ' ')}] -> Successfully removed directory"
-            )
-            # Pending again: the confirm-sudo route queues it straight after (main.queue_job), and
-            # fails it there if it can't be queued, so it's never left pending with nothing to run it
+
+def _mark_output(job, dest_dir: Path, created: bool) -> None:
+    """Write the marker that makes the folder this job's output: into a folder the worker just
+    created, or into an older job's folder from before the marker that is its own (the job log
+    and the recorded destination say so). Never into a folder that was just there."""
+    if not created:
+        if output_removal.read_marker(dest_dir) is not None or getattr(job.options, "output_marker", False):
+            return
+        if output_removal.owner_refusal(dest_dir, job, {job.id: job}, translate_path_for_worker):
+            return
+    try:
+        output_removal.write_marker(dest_dir, job.id)
+    except OSError as e:
+        logger.warning(f"Job {job.id}: output marker not written in {dest_dir}: {e}")
+
+
+def _queue_analysis(job_id: str) -> None:
+    """The worker's main.queue_job: queued marker first, then the task, then only its ID saved.
+    A task that can't be queued fails the job rather than leaving it pending."""
+    job_liveness.mark_queued(job_id)
+    try:
+        task = start_analysis.delay(job_id)
+    except Exception as exc:
+        job_storage.interrupt_job(job_id, (JobStatus.PENDING,), f"Not queued: {exc}. Restart the job to try again.")
+        raise
+    job_storage.set_celery_task_id(job_id, task.id)
+
+
+@celery_app.task(bind=True)
+def remove_output(self, job_id: str, actor: dict = None, ip: str = None) -> dict:
+    """A confirmed retry of removing a job's old output (POST /api/jobs/{id}/confirm-removal).
+    The folder comes from the job record, never the request or the pending action, and goes
+    through every check again. Removed: the job is pending again and its analysis queued."""
+    job = job_storage.get_job(job_id)
+    if not job or job.status != JobStatus.REMOVING:
+        logger.warning(f"Job {job_id}: not removing (it's {job.status.value if job else 'gone'}), nothing done")
+        return {"ok": False, "outcome": "not removing"}
+    alive = job_liveness.Heartbeat(job_id).start()
+    try:
+        dest_dir = Path(translate_path_for_worker(str(_resolve_destination(job))))
+        if not os.path.lexists(dest_dir):
+            outcome = "removed"  # already gone: nothing to do but run
+            job.log.append(f"[{_stamp()}] -> The old output is already gone: {dest_dir}")
+        else:
+            # A confirmed retry that fails again ends the job, with the reason: no endless loop of
+            # confirmations (a restart with fresh output tries once more)
+            outcome = _remove_old_output(job, dest_dir, actor, ip, confirm_failure=False)
+        if outcome == "removed":
             job.status = JobStatus.PENDING
             job.pending_action = None
-            job_storage.save_job(job)
-            return True
-        else:
-            stderr = result.stderr.decode() if result.stderr else "Unknown error"
-            job.log.append(
-                f"[{datetime.now().isoformat().replace('T', ' ')}] -> Removal failed: {stderr}"
-            )
-            job.status = JobStatus.FAILED
-            job.error = f"Directory removal failed: {stderr}"
-            job.pending_action = None
+        if job.status == JobStatus.FAILED:
             job.completed_at = datetime.now()
-            job_storage.save_job(job)
-            return False
-
-    except subprocess.TimeoutExpired:
-        job.log.append(
-            f"[{datetime.now().isoformat().replace('T', ' ')}] -> Directory removal timed out"
-        )
-        job.status = JobStatus.FAILED
-        job.error = "Directory removal timed out after 5 minutes"
-        job.pending_action = None
-        job.completed_at = datetime.now()
         job_storage.save_job(job)
-        return False
-    except Exception as e:
-        job.log.append(
-            f"[{datetime.now().isoformat().replace('T', ' ')}] -> Directory removal error: {e}"
-        )
-        job.status = JobStatus.FAILED
-        job.error = f"Directory removal error: {e}"
-        job.pending_action = None
-        job.completed_at = datetime.now()
-        job_storage.save_job(job)
-        return False
+        if outcome == "removed":
+            _queue_analysis(job_id)
+        return {"ok": outcome == "removed", "outcome": outcome}
+    finally:
+        alive.stop()
 
 
-def cancel_sudo_action(job_id: str) -> bool:
-    """Cancel the pending sudo action and fail the job."""
-    job = job_storage.get_job(job_id)
-    if not job or job.status != JobStatus.AWAITING_CONFIRMATION:
-        return False
-
-    job.log.append(
-        f"[{datetime.now().isoformat().replace('T', ' ')}] -> User cancelled sudo removal"
-    )
-    job.status = JobStatus.FAILED
-    job.error = "Directory removal cancelled by user"
-    job.pending_action = None
-    job.completed_at = datetime.now()
-    job_storage.save_job(job)
-    return True
-
-
-def translate_path_for_worker(path_str: str) -> str:
-    """
-    Translate paths from backend container perspective to celery-worker perspective.
-
-    Both containers mount:
-      - elrond_uploads volume -> /tmp/elrond/uploads (SAME in both containers)
-      - /tmp/rowanholt (host) -> /tmp/elrond/output (worker) or /host/tmp/rowanholt (backend)
-
-    Args:
-        path_str: Path from backend perspective
-
-    Returns:
-        Path translated for celery worker
-    """
-    path_str = str(path_str)
-
-    # Paths in /tmp/elrond/uploads are the SAME in both containers (shared volume)
-    if path_str.startswith("/tmp/elrond/uploads/"):
-        return path_str
-
-    # Backend uses /host/tmp/rowanholt for output, worker uses /tmp/elrond/output
-    if path_str.startswith("/host/tmp/rowanholt"):
-        return path_str.replace("/host/tmp/rowanholt", "/tmp/elrond/output")
-
-    # Backend uses /tmp/elrond/output, worker uses same
-    if path_str.startswith("/tmp/elrond/output"):
-        return path_str
-
-    # Default: return as-is
-    return path_str
+translate_path_for_worker = output_removal.translate_path_for_worker
 
 
 def _resolve_destination(job) -> Path:
@@ -627,12 +635,20 @@ def start_analysis(self, job_id: str):
     if not job:
         logger.error(f"Job {job_id} not found")
         return
+    # Only a pending job is started. A second task for the same job (queued twice, re-delivered)
+    # finds it running, finished or removing, and must neither run it again nor, with fresh
+    # output, remove what the first run wrote. Checked before the heartbeat, whose stop would
+    # delete the running task's own.
+    if job.status != JobStatus.PENDING:
+        logger.warning(f"Job {job_id} is {job.status.value}, not pending: not started again")
+        return
 
     # Track acquired locks for cleanup
     acquired_lock_keys = []
     process = None
     spool = None
     lock_heartbeat = None
+    final_save = True  # off when another task has the job: its row isn't this task's to write
     # Proof for the backend (job_liveness, GET /api/busy) that this job has a worker, from now
     # (a job waiting for its images' locks is still pending) until its final status is saved.
     # It ends with this process: a killed worker leaves a key that expires by itself.
@@ -660,11 +676,14 @@ def start_analysis(self, job_id: str):
 
             lock_heartbeat = _start_lock_heartbeat(acquired_lock_keys)
 
-        # Update job status
-        job.status = JobStatus.RUNNING
-        job.started_at = datetime.now()
-        job.log.append(f"[{datetime.now().isoformat().replace('T', ' ')}] -> Starting rowanholt...")
-        job_storage.save_job(job)
+        # Pending to running in one conditional update: of two tasks given the job, one runs it
+        claimed = job_storage.transition(job_id, (JobStatus.PENDING,), JobStatus.RUNNING,
+                                         log_line="Starting rowanholt...", started_at=datetime.now())
+        if claimed is None:
+            final_save = False
+            logger.warning(f"Job {job_id} was started by another task first: this one stops")
+            return
+        job = claimed
 
         # Build elrond command
         cmd = build_elrond_command(job)
@@ -676,83 +695,16 @@ def start_analysis(self, job_id: str):
         dest_dir_str = translate_path_for_worker(str(dest_dir_backend))
         dest_dir = Path(dest_dir_str)
 
-        # Check if force_overwrite is set and directory exists
-        if getattr(job.options, "force_overwrite", False):
-            if dest_dir.exists():
-                import shutil
+        # Fresh output: the old folder goes first, through every check output_removal makes
+        if getattr(job.options, "force_overwrite", False) and os.path.lexists(dest_dir):
+            if _remove_old_output(job, dest_dir) != "removed":
+                return
+            _safe_save(job)
 
-                logger.info(f"Force overwrite enabled, removing existing directory: {dest_dir_str}")
-
-                job.log.append(
-                    f"[{datetime.now().isoformat().replace('T', ' ')}] -> Removing existing directory: {dest_dir_str} - stand by..."
-                )
-                job_storage.save_job(job)
-
-                # Use rm -rf with progress monitoring for large directories
-                start_time = datetime.now()
-                try:
-                    # Start rm -rf in background
-                    rm_process = subprocess.Popen(
-                        ["rm", "-rf", dest_dir_str],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                    )
-
-                    # Monitor with periodic updates every 10 seconds
-                    last_update = datetime.now()
-                    while rm_process.poll() is None:
-                        time.sleep(1)
-                        elapsed = (datetime.now() - start_time).total_seconds()
-
-                        # Update every 10 seconds
-                        if (datetime.now() - last_update).total_seconds() >= 10:
-                            job.log.append(
-                                f"[{datetime.now().isoformat().replace('T', ' ')}] -> Still removing directory... ({int(elapsed)}s elapsed)"
-                            )
-                            job_storage.save_job(job)
-                            last_update = datetime.now()
-
-                        # Timeout after 5 minutes
-                        if elapsed > 300:
-                            rm_process.kill()
-                            raise subprocess.TimeoutExpired(
-                                cmd=["rm", "-rf", dest_dir_str], timeout=300
-                            )
-
-                    # Check exit code
-                    if rm_process.returncode != 0:
-                        raise subprocess.CalledProcessError(
-                            rm_process.returncode, ["rm", "-rf", dest_dir_str]
-                        )
-
-                    elapsed = (datetime.now() - start_time).total_seconds()
-                    logger.info(f"Successfully removed directory: {dest_dir_str} in {elapsed:.1f}s")
-                    job.log.append(
-                        f"[{datetime.now().isoformat().replace('T', ' ')}] -> Successfully removed directory in {elapsed:.1f}s"
-                    )
-                except subprocess.TimeoutExpired:
-                    logger.error(f"Timeout removing directory: {dest_dir_str}")
-                    job.log.append(
-                        f"[{datetime.now().isoformat().replace('T', ' ')}] -> Timeout removing directory - requesting sudo confirmation"
-                    )
-                    _request_sudo_confirmation(job, dest_dir_str, "Timeout after 5 minutes")
-                    return
-                except subprocess.CalledProcessError as e:
-                    logger.error(f"Error removing directory (exit code {e.returncode})")
-                    job.log.append(f"[{datetime.now().isoformat().replace('T', ' ')}] -> Error removing directory - requesting sudo confirmation")
-                    _request_sudo_confirmation(job, dest_dir_str, f"Permission denied (exit code {e.returncode})")
-                    return
-                except Exception as e:
-                    logger.error(f"Error removing directory: {e}")
-                    job.log.append(
-                        f"[{datetime.now().isoformat().replace('T', ' ')}] -> Error removing directory - requesting sudo confirmation"
-                    )
-                    _request_sudo_confirmation(job, dest_dir_str, str(e))
-                    return
-                job_storage.save_job(job)
-
-        # Create the output directory if it doesn't exist
+        # Create the output directory if it doesn't exist, and mark it as this job's
+        created = not dest_dir.exists()
         dest_dir.mkdir(parents=True, exist_ok=True)
+        _mark_output(job, dest_dir, created)
 
         # Run elrond directly in container
         # Since we're already in the forensics container, we can run it directly
@@ -1202,7 +1154,8 @@ def start_analysis(self, job_id: str):
                 try:
                     template_data = {}
                     # Extract all processing options (exclude mode selections and save_template itself)
-                    mode_keys = {'brisk', 'exhaustive', 'custom', 'template', 'save_template', 'collect', 'process'}
+                    mode_keys = {'brisk', 'exhaustive', 'custom', 'template', 'save_template', 'collect', 'process',
+                                 'output_marker'}
                     for key, value in vars(job.options).items():
                         if not key.startswith('_') and key not in mode_keys and isinstance(value, bool):
                             template_data[key] = value
@@ -1245,27 +1198,31 @@ def start_analysis(self, job_id: str):
         try:
             if lock_heartbeat:
                 lock_heartbeat.set()
-            try:
-                _clear_job_process(job_id)
-            except Exception as e:
-                logger.warning(f"Job {job_id}: could not clear its process record: {e}")
+            if final_save:  # the other task's Elrond process record is its own
+                try:
+                    _clear_job_process(job_id)
+                except Exception as e:
+                    logger.warning(f"Job {job_id}: could not clear its process record: {e}")
 
             # Release image locks
             if acquired_lock_keys:
                 release_image_locks(acquired_lock_keys)
                 logger.info(f"Job {job_id}: Released {len(acquired_lock_keys)} image lock(s)")
 
-            job.completed_at = datetime.now()
-            if spool:
-                spool.sync(job)
-                spool.close()
-            for attempt in range(5):  # the final status must land even after a DB blip
-                if _safe_save(job):
-                    break
-                time.sleep(10 * (attempt + 1))
+            if final_save:
+                job.completed_at = datetime.now()
+                if spool:
+                    spool.sync(job)
+                    spool.close()
+                for attempt in range(5):  # the final status must land even after a DB blip
+                    if _safe_save(job):
+                        break
+                    time.sleep(10 * (attempt + 1))
         finally:
             # Only now, and whatever happened above: stopped earlier, a slow final save would look
-            # like a dead worker; never stopped, this pool process would keep the job alive for ever
+            # like a dead worker; never stopped, this pool process would keep the job alive for ever.
+            # A task that lost the job to another removes the shared key too; the other's next beat
+            # (every 15 s) sets it again, well inside job_liveness's grace.
             alive.stop()
 
 
