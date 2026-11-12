@@ -1,10 +1,10 @@
 """
 Whether Rowanholt is in the middle of work a restart would interrupt.
 
-`homelab pull` and `homelab update` ask `GET /api/busy` before rebuilding (every container
-recreated) and hold off while it says `{"busy": true}`. Each kind of work that a rebuild would cut
-off registers a named check here. The endpoint is unauthenticated, so the names go to the log
-only: the answer says busy or not, never what or whose.
+`homelab pull` and `homelab update` ask `GET /api/busy` before rebuilding (the backend, worker and
+frontend recreated; Redis, and the job queue in it, left running) and hold off while it says
+`{"busy": true}`. Each kind of work that a rebuild would cut off registers a named check here.
+The endpoint is unauthenticated, so the names go to the log only: the answer says busy or not, never what or whose.
 
 The contract counts anything but `{"busy": true}` as idle (an error, a timeout after 5 seconds),
 so every check must be cheap, and a check that raises counts as busy: a check that can't tell

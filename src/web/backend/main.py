@@ -154,13 +154,16 @@ licence.configure(job_storage)
 branding_routes.configure(job_storage)
 aule_offline.FINDINGS = case_routes.findings_for_case
 
-# Jobs a rebuild would cut off: queued (Celery's queue lives in Redis, which is recreated with the
-# rest), running, or paused (Elrond stopped with SIGSTOP in the worker, killed with it). The jobs
-# table says which jobs claim one of these; job_liveness says whether a worker is still on each
-# (a heartbeat in Redis, or the task in the queue), and fails the ones dead for longer than its
-# grace, so a job left `running` by a crash doesn't hold every rebuild for ever. Asking Celery's
-# workers instead would wait out a broadcast timeout each time. Awaiting confirmation isn't busy:
-# the task has returned and the job waits on a person, in the database, which a rebuild doesn't touch.
+# Jobs a rebuild would cut off: running, or paused (Elrond stopped with SIGSTOP in the worker,
+# killed with it). Pending jobs are checked too but aren't busy: Celery's queue lives in Redis,
+# which a rebuild leaves running (its container is unchanged, and `redis_data` holds its
+# snapshots), so a queued job waits out the rebuild and runs on the new worker. The jobs table says
+# which jobs claim one of these; job_liveness says whether a worker is still on each (a heartbeat
+# in Redis, or for a pending job the task in the queue), and fails the ones dead for longer than
+# its grace, so a job left `running` by a crash doesn't hold every rebuild for ever, nor one Redis
+# lost stay pending. Asking Celery's workers instead would wait out a broadcast timeout each time.
+# Awaiting confirmation isn't busy: the task has returned and the job waits on a person, in the
+# database, which a rebuild doesn't touch.
 ACTIVE_JOB_STATUSES = (JobStatus.PENDING, JobStatus.RUNNING, JobStatus.PAUSED)
 job_liveness_check = job_liveness.Liveness(job_storage, ACTIVE_JOB_STATUSES)
 busy.register("jobs", job_liveness_check.check)

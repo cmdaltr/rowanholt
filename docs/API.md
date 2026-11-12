@@ -1211,28 +1211,28 @@ The test lab (`lab/`) from the browser: Linux targets, Tart and UTM VMs, Gandalf
 
 **Endpoint:** `GET /api/busy`
 
-**Description:** Whether Rowanholt is in the middle of work a restart (every container recreated, images rebuilt) would interrupt. The homelab's `homelab pull` and `homelab update` ask before rebuilding and hold off while it says `true`; anything else (an error, a timeout) they read as idle, so it answers in well under a second. It's busy while any of these is true:
+**Description:** Whether Rowanholt is in the middle of work a restart (the backend, worker and frontend recreated, images rebuilt; Redis left running) would interrupt. The homelab's `homelab pull` and `homelab update` ask before rebuilding and hold off while it says `true`; anything else (an error, a timeout) they read as idle, so it answers in well under a second. It's busy while any of these is true:
 
 | Check | Busy while |
 |---|---|
-| `jobs` | a job is pending (queued for the worker), running or paused, and a worker is still on it (see [Jobs left by a crash](#jobs-left-by-a-crash)) |
+| `jobs` | a job is running or paused and its worker's heartbeat is live, or lapsed less than 90 seconds ago (see [Jobs left by a crash](#jobs-left-by-a-crash)). Pending jobs never count |
 | `requests` | a mutating `/api` request (not GET, HEAD or OPTIONS) from someone signed in is being handled: uploads, a manual SIEM export |
 | `downloads` | a Mordor dataset download is running in the background |
 | `side-tasks` | a sample fetch or symbol table build queued in the worker hasn't finished (forgotten after six hours with no result) |
 | `telemetry-build` | the Mordor telemetry update is running |
 
-A check that fails (the database unreachable, say) counts as busy. A job awaiting confirmation isn't busy: it waits on a person, in the database. Lab runs aren't counted: they run on the host, through the lab agent, which a rebuild doesn't touch.
+A check that fails (the database unreachable, say) counts as busy. A pending job isn't busy (decided 12 November 2026): it's a message in Celery's queue, and the queue is in Redis, which a rebuild doesn't recreate (`rowanholt start` runs `docker compose up -d --build`, which leaves the unchanged Redis container alone, and its `redis_data` volume keeps the RDB snapshots if it is ever recreated). The job waits out the rebuild and runs on the new worker a few minutes later; counting it held updates for hours behind a long queue. A job awaiting confirmation isn't busy: it waits on a person, in the database. Lab runs aren't counted: they run on the host, through the lab agent, which a rebuild doesn't touch.
 
 #### Jobs left by a crash
 
-The jobs table only says what was last saved, so a worker killed mid-job (its container recreated, the host restarted, out of memory) would leave its job `running` for ever and every rebuild held. Each job therefore has a signal of life in Redis (`src/web/backend/job_liveness.py`):
+The jobs table only says what was last saved, so a worker killed mid-job (its container recreated, the host restarted, out of memory) would leave its job `running` for ever and every rebuild held, and a job whose queued message Redis lost would stay `pending` for ever. Each job therefore has a signal of life in Redis (`src/web/backend/job_liveness.py`); only running and paused jobs feed `/api/busy`, but pending ones are checked the same way so a lost one is failed:
 
 | Status | Live while |
 |---|---|
 | `running`, `paused` | the worker's heartbeat key exists. A thread in the worker refreshes it every 15 seconds with a 60-second expiry, from the task's start to its final save, whatever Elrond is doing: a Volatility or Plaso step silent for hours, or a paused job, keeps it |
 | `pending` | the same heartbeat (a job waiting for its images' locks is still pending), or its task's message is in Celery's queue (any priority) or delivered to a worker and not yet started, or it was queued in the last two minutes |
 
-A job with none of these counts as busy for a further 90 seconds (a Redis restart loses every key while the workers carry on; their next refresh puts them back), then it's failed: status `failed`, the reason in `error` and as the last line of its log, `completed_at` set, a `job.failed` webhook, and its image locks released. Its output so far is kept and nothing is deleted; restart it as any failed job. A dead job stops holding rebuilds within about three minutes of dying: up to 60 seconds for its heartbeat to expire, then the grace. The backend looks for such jobs at start-up and every 30 seconds, and on each busy check; a pass is one indexed query and one Redis round trip.
+A job with none of these is given a further 90 seconds, during which a running or paused one still counts as busy (a Redis restart loses every key while the workers carry on; their next refresh puts them back), then it's failed: status `failed`, the reason in `error` and as the last line of its log, `completed_at` set, a `job.failed` webhook, and its image locks released. Its output so far is kept and nothing is deleted; restart it as any failed job. A dead job stops holding rebuilds within about three minutes of dying: up to 60 seconds for its heartbeat to expire, then the grace. The backend looks for such jobs at start-up and every 30 seconds, and on each busy check; a pass is one indexed query and one Redis round trip.
 
 The two reasons a user sees:
 
