@@ -210,6 +210,19 @@ class Fetching(unittest.TestCase):
 
 
 class Unpacking(unittest.TestCase):
+    def test_13cubeds_vmware_memory_is_found(self):
+        # The challenge zip holds a VMware snapshot: memory/memory.vmem beside memory.vmsn, which
+        # isn't an image (12 November 2026: the fetch said nothing matched)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            s = samples.sample("13cubed-linux-memory")
+            folder = root / s["folder"]
+            folder.mkdir(parents=True)
+            (folder / "linux_challenge.zip").write_bytes(
+                zipped({"memory/memory.vmem": b"mem", "memory/memory.vmsn": b"snapshot"}))
+            found = samples.unpack(s, root)
+            self.assertEqual([p.name for p in found], ["memory.vmem"])
+
     def test_unpacked_beside_the_archive_and_found(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

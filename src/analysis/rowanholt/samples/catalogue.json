@@ -33,7 +33,7 @@
       "files": [
         {"name": "linux_challenge.zip", "url": "https://cdn.13cubed.com/downloads/linux_challenge.zip"}
       ],
-      "images": ["*.lime", "*.mem", "*.raw", "*.bin", "*.dmp", "*.elf"],
+      "images": ["*.lime", "*.mem", "*.raw", "*.bin", "*.dmp", "*.elf", "*.vmem"],
       "options": {"analysis": true, "extract_iocs": true, "memory": true, "navigator": true}
     },
     {
