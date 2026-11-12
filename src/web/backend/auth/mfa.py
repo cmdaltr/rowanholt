@@ -44,6 +44,7 @@ DIGITS = 6
 DRIFT_STEPS = 1  # the step before and after now: a phone's clock a little out, or a slow typist
 BACKUP_CODES = 10
 CHALLENGE_SECONDS = 300
+BACKUP_CLAIM_SECONDS = 24 * 60 * 60
 CHALLENGE_PREFIX = "mfa_"
 # No 0/O, 1/I/L: a code read off paper is typed back right. 31 symbols, 10 of them: 49 bits
 _BACKUP_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
@@ -190,20 +191,24 @@ def check_code(record: dict, code: str, allow_backup: bool = True) -> Tuple[bool
         stored = list(record.get("mfa_backup_codes") or [])
         for index, candidate in enumerate(stored):
             if hmac.compare_digest(candidate, hashed):
+                # Claimed as well as removed: two requests with one code both read the list before
+                # either saves it. The key is the hash, never the code; a day outlasts any save
+                if not _first_use(f"backup|{record['id']}|{hashed}", BACKUP_CLAIM_SECONDS):
+                    return False, ""
                 del stored[index]
                 record["mfa_backup_codes"] = stored
                 return True, "backup_code"
     return False, ""
 
 
-def _first_use(key: str) -> bool:
+def _first_use(key: str, seconds: int = (2 * DRIFT_STEPS + 2) * STEP_SECONDS) -> bool:
     """Whether this is the first time `key` is seen, across every backend process (Redis, else this
     one): two requests racing with one code both read the old mfa_last_step."""
     try:
         from .throttle import throttle
     except ImportError:
         from auth.throttle import throttle
-    return throttle.first_use(key, (2 * DRIFT_STEPS + 2) * STEP_SECONDS)
+    return throttle.first_use(key, seconds)
 
 
 def enable(record: dict, secret: str, step: int) -> Optional[List[str]]:

@@ -251,6 +251,33 @@ class MfaTest(BackendCase):
         [used] = self.audited(user_id, "mfa_backup_code_used")
         self.assertEqual(used["details"]["left"], 9)
 
+    def test_one_backup_code_used_twice_at_once_signs_in_once(self):
+        """Two requests with the same code each load users.json before either saves it: the
+        second's list still holds the code, so only the claim can refuse it."""
+        name, user_id, headers = self.new_user()
+        _, codes = self.enrol(headers)
+        first = self.password_step(name).json()["challenge"]
+        second = self.password_step(name).json()["challenge"]
+        stale = self.users_module.load_users()  # what the second request read, before the first saved
+        real_load = sys.modules["auth.routes_simple"].load_users
+        loads = iter([None, stale])
+
+        def interleaved():
+            snapshot = next(loads, None)
+            return snapshot if snapshot is not None else real_load()
+
+        with mock.patch.object(sys.modules["auth.routes_simple"], "load_users", interleaved), \
+                mock.patch.object(sys.modules["auth.routes_simple"], "init_default_admin", interleaved):
+            results = [self.second_step(first, codes[0]).status_code,
+                       self.second_step(second, codes[0]).status_code]
+        self.assertEqual(sorted(results), [200, 401])
+        self.assertEqual(len(self.audited(user_id, "mfa_backup_code_used")), 1)
+        self.assertNotIn(self.mfa.hash_backup_code(codes[0]), self.record(user_id)["mfa_backup_codes"])
+        # The claim is keyed on the hash, never the code itself
+        memory = sys.modules["auth.throttle"].throttle._memory
+        self.assertFalse([k for k in memory if codes[0] in k or codes[0].replace("-", "") in k])
+        self.assertTrue([k for k in memory if self.mfa.hash_backup_code(codes[0]) in k])
+
     def test_regenerating_backup_codes_needs_a_current_code_and_replaces_them(self):
         name, user_id, headers = self.new_user()
         secret, old = self.enrol(headers)
