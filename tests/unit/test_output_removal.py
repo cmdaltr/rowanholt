@@ -620,6 +620,16 @@ class RemovalApiTest(BackendCase):
         self.assertIn("removing this job's old output", self.main.job_storage.get_job(dead).error)
         self.assertEqual(self.main.job_storage.get_job(live).status, JobStatus.REMOVING)
 
+    def test_a_mordor_dataset_id_is_never_a_parent_folder(self):
+        import mordor_routes
+        parent = Path(tempfile.mkdtemp(prefix="rowanholt-mordor-"))
+        (parent / "mordor").mkdir()
+        (parent / "metadata.json").write_text("{}")  # what dataset_exists("..") would find
+        with mock.patch.object(mordor_routes, "STORAGE_DIR", parent / "mordor"):
+            resp = self.client.delete("/api/mordor/datasets/%2E%2E", headers=self.admin)
+        self.assertEqual(resp.status_code, 404, resp.text)
+        self.assertTrue((parent / "mordor").exists())
+
     def test_a_cookie_needs_the_header_and_a_token_doesnt(self):
         resp = self.client.post("/api/auth/login", data={"username": "bob", "password": "bob-password-123"})
         cookie = {"Cookie": f"session_token={resp.cookies.get('session_token')}"}

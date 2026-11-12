@@ -682,6 +682,10 @@ async def download_dataset_endpoint(
 async def delete_dataset_endpoint(dataset_id: str):
     """Delete a locally downloaded dataset."""
     try:
+        # A dataset is a folder directly in STORAGE_DIR: ".." (sent as %2E%2E) would be its parent,
+        # every job's output with it
+        if dataset_id in ("", ".", "..") or Path(dataset_id).name != dataset_id:
+            raise HTTPException(status_code=404, detail="Dataset not found locally")
         if not storage.dataset_exists(dataset_id):
             raise HTTPException(status_code=404, detail="Dataset not found locally")
 
