@@ -15,8 +15,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from pydantic import BaseModel, Field
 
 try:
+    from . import busy
     from .lab_routes import _agent as _lab_agent, require_lab_admin
 except ImportError:
+    import busy
     from lab_routes import _agent as _lab_agent, require_lab_admin
 
 router = APIRouter(prefix="/api/mordor", tags=["mordor"])
@@ -659,7 +661,8 @@ async def download_dataset_endpoint(
             )
 
         def run_download():
-            download_dataset(catalog, storage, dataset_id, request.output_dir)
+            with busy.downloads.working():
+                download_dataset(catalog, storage, dataset_id, request.output_dir)
 
         background_tasks.add_task(run_download)
 
@@ -795,6 +798,7 @@ from collections import deque  # noqa: E402
 _build_job: Dict[str, Any] = {"state": "idle", "started": None, "finished": None, "error": None, "sources": []}
 _build_log: deque = deque(maxlen=400)
 _build_lock = threading.Lock()
+busy.register("telemetry-build", lambda: _build_job["state"] == "running")
 
 
 def _buildable_sources() -> List[str]:

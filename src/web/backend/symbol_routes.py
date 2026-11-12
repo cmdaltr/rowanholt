@@ -20,9 +20,11 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 try:
+    from . import busy
     from .auth.access import require_admin
     from .case_files import _elrond_sources
 except ImportError:
+    import busy
     from auth.access import require_admin
     from case_files import _elrond_sources
 
@@ -134,6 +136,7 @@ async def add_symbols(
         shutil.rmtree(work, ignore_errors=True)
         raise HTTPException(status_code=503, detail="The worker's task queue isn't available")
     task = add_symbol_table.delay(args, str(work))
+    busy.side_tasks.add(task.id)
     logger.info("Symbol table %s upload by %s queued as %s", kind, user.get("username"), task.id)
     return {"task_id": task.id}
 

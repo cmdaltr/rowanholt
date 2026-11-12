@@ -15,9 +15,11 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 
 try:
+    from . import busy
     from .auth.access import require_admin
     from .case_files import _elrond_sources
 except ImportError:
+    import busy
     from auth.access import require_admin
     from case_files import _elrond_sources
 
@@ -100,6 +102,7 @@ async def fetch_sample(sample_id: str, user: dict = Depends(require_admin)) -> d
     except ImportError:
         raise HTTPException(status_code=503, detail="The worker's task queue isn't available")
     queued = task.delay(sample_id)
+    busy.side_tasks.add(queued.id)
     logger.info("Sample %s fetch by %s queued as %s", sample_id, user.get("username"), queued.id)
     return {"task_id": queued.id}
 

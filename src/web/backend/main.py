@@ -15,10 +15,12 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 try:
     from .config import settings
+    from . import busy  # GET /api/busy, the homelab's question before a rebuild
     from .auth import access
     from .auth.users import load_users
     from .auth.routes_simple import router as auth_router  # Simple file-based auth
@@ -50,6 +52,7 @@ try:
 except ImportError:
     # Fallback for standalone execution
     from config import settings
+    import busy  # GET /api/busy, the homelab's question before a rebuild
     from auth import access
     from auth.users import load_users
     from auth.routes_simple import router as auth_router  # Simple file-based auth
@@ -123,6 +126,10 @@ app = FastAPI(
     debug=settings.debug,
 )
 
+# Added before access's middleware, so inside it: only requests access let through are counted,
+# and nobody without an account can hold a rebuild back by sending requests
+app.middleware("http")(busy.middleware)
+
 # Who is calling; in server mode this also enforces sign-in, admin areas and job
 # access for every /api route (auth/access.py). Added before CORS so CORS wraps it.
 app.middleware("http")(access.middleware)
@@ -144,6 +151,14 @@ case_routes.configure(job_storage)
 licence.configure(job_storage)
 branding_routes.configure(job_storage)
 aule_offline.FINDINGS = case_routes.findings_for_case
+
+# Jobs a rebuild would cut off: queued (Celery's queue lives in Redis, which is recreated with the
+# rest), running, or paused (Elrond stopped with SIGSTOP in the worker, killed with it). The jobs
+# table is the record the app keeps of every job, and one indexed query; asking Celery's workers
+# would wait out a broadcast timeout each time. Awaiting confirmation isn't busy: the task has
+# returned and the job waits on a person, in the database, which a rebuild doesn't touch.
+ACTIVE_JOB_STATUSES = (JobStatus.PENDING, JobStatus.RUNNING, JobStatus.PAUSED)
+busy.register("jobs", lambda: job_storage.any_job_in(ACTIVE_JOB_STATUSES))
 
 
 class SharingUpdate(BaseModel):
@@ -227,6 +242,17 @@ async def root():
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+
+@app.get("/api/busy")
+def busy_status() -> dict:
+    """The homelab contract: `{"busy": true}` holds back a rebuild. No sign-in, so the answer is the
+    one bit: which checks said busy goes to the log. A plain def, so the jobs query runs in the
+    thread pool and a slow database doesn't stall other requests."""
+    reasons = busy.busy_reasons()
+    if reasons:
+        logger.info("busy: %s", ", ".join(reasons))
+    return {"busy": bool(reasons)}
 
 
 # File System API
@@ -1279,9 +1305,10 @@ async def trigger_siem_export(job_id: str):
         job.log.append(f"[{datetime.now().isoformat()}] -> ")
         job_storage.save_job(job)
 
-        # Run SIEM export
+        # Run SIEM export, in the thread pool: it takes minutes, and on the event loop it would
+        # stall every other request, /api/busy among them, which would then time out and read as idle
         logger = logging.getLogger(__name__)
-        run_siem_export(job, dest_dir, logger)
+        await run_in_threadpool(run_siem_export, job, dest_dir, logger)
 
         job.log.append(f"[{datetime.now().isoformat()}] -> ")
         job.log.append(f"[{datetime.now().isoformat()}] -> ======== SIEM EXPORT COMPLETED ========")

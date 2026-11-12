@@ -50,6 +50,7 @@ LOCAL_USER = {
 
 PUBLIC_PATHS = {
     "/api/health",
+    "/api/busy",  # the homelab asks before a rebuild, with no account (busy.py)
     "/api/auth/config",
     "/api/auth/login",
     "/api/auth/logout",

@@ -429,6 +429,16 @@ class JobStorage:
         finally:
             session.close()
 
+    def any_job_in(self, statuses: Iterable[JobStatus]) -> bool:
+        """Whether any job has one of these statuses: one indexed lookup, for /api/busy."""
+        session = self.Session()
+        try:
+            values = [status.value for status in statuses]
+            query = session.query(JobModel.id).filter(JobModel.status.in_(values))
+            return query.first() is not None
+        finally:
+            session.close()
+
     def delete_job(self, job_id: str) -> None:
         """
         Delete job from storage.

@@ -21,7 +21,7 @@
 10. [Case Browser and Collaboration](#case-browser-and-collaboration)
 11. [Aulë (AI Analyst)](#aulë-ai-analyst)
 12. [Lab](#lab)
-13. [Health Check](#health-check)
+13. [Health Check](#health-check) (and Busy)
 14. [Request/Response Formats](#requestresponse-formats)
 15. [Error Handling](#error-handling)
 16. [Code Examples](#code-examples)
@@ -1206,6 +1206,33 @@ The test lab (`lab/`) from the browser: Linux targets, Tart and UTM VMs, Gandalf
   "version": "2.1.0"
 }
 ```
+
+### Busy
+
+**Endpoint:** `GET /api/busy`
+
+**Description:** Whether Rowanholt is in the middle of work a restart (every container recreated, images rebuilt) would interrupt. The homelab's `homelab pull` and `homelab update` ask before rebuilding and hold off while it says `true`; anything else (an error, a timeout) they read as idle, so it answers in well under a second. It's busy while any of these is true:
+
+| Check | Busy while |
+|---|---|
+| `jobs` | a job is pending (queued for the worker), running or paused, from the jobs table |
+| `requests` | a mutating `/api` request (not GET, HEAD or OPTIONS) from someone signed in is being handled: uploads, a manual SIEM export |
+| `downloads` | a Mordor dataset download is running in the background |
+| `side-tasks` | a sample fetch or symbol table build queued in the worker hasn't finished (forgotten after six hours with no result) |
+| `telemetry-build` | the Mordor telemetry update is running |
+
+A check that fails (the database unreachable, say) counts as busy. A job awaiting confirmation isn't busy: it waits on a person, in the database. Lab runs aren't counted: they run on the host, through the lab agent, which a rebuild doesn't touch.
+
+**Authentication:** None, in server mode too. The answer is the one bit; which checks said busy goes to the backend's log, never to the caller.
+
+**Response:** `200 OK`
+```json
+{
+  "busy": false
+}
+```
+
+New work a restart would cut off registers a check in `src/web/backend/busy.py`.
 
 ---
 
