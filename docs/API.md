@@ -1215,13 +1215,31 @@ The test lab (`lab/`) from the browser: Linux targets, Tart and UTM VMs, Gandalf
 
 | Check | Busy while |
 |---|---|
-| `jobs` | a job is pending (queued for the worker), running or paused, from the jobs table |
+| `jobs` | a job is pending (queued for the worker), running or paused, and a worker is still on it (see [Jobs left by a crash](#jobs-left-by-a-crash)) |
 | `requests` | a mutating `/api` request (not GET, HEAD or OPTIONS) from someone signed in is being handled: uploads, a manual SIEM export |
 | `downloads` | a Mordor dataset download is running in the background |
 | `side-tasks` | a sample fetch or symbol table build queued in the worker hasn't finished (forgotten after six hours with no result) |
 | `telemetry-build` | the Mordor telemetry update is running |
 
 A check that fails (the database unreachable, say) counts as busy. A job awaiting confirmation isn't busy: it waits on a person, in the database. Lab runs aren't counted: they run on the host, through the lab agent, which a rebuild doesn't touch.
+
+#### Jobs left by a crash
+
+The jobs table only says what was last saved, so a worker killed mid-job (its container recreated, the host restarted, out of memory) would leave its job `running` for ever and every rebuild held. Each job therefore has a signal of life in Redis (`src/web/backend/job_liveness.py`):
+
+| Status | Live while |
+|---|---|
+| `running`, `paused` | the worker's heartbeat key exists. A thread in the worker refreshes it every 15 seconds with a 60-second expiry, from the task's start to its final save, whatever Elrond is doing: a Volatility or Plaso step silent for hours, or a paused job, keeps it |
+| `pending` | the same heartbeat (a job waiting for its images' locks is still pending), or its task's message is in Celery's queue (any priority) or delivered to a worker and not yet started, or it was queued in the last two minutes |
+
+A job with none of these counts as busy for a further 90 seconds (a Redis restart loses every key while the workers carry on; their next refresh puts them back), then it's failed: status `failed`, the reason in `error` and as the last line of its log, `completed_at` set, a `job.failed` webhook, and its image locks released. Its output so far is kept and nothing is deleted; restart it as any failed job. A dead job stops holding rebuilds within about three minutes of dying: up to 60 seconds for its heartbeat to expire, then the grace. The backend looks for such jobs at start-up and every 30 seconds, and on each busy check; a pass is one indexed query and one Redis round trip.
+
+The two reasons a user sees:
+
+- *Interrupted: the worker running this job stopped without finishing it (killed, or its container or the host restarted). Its output so far is kept; restart the job to run it again.*
+- *Interrupted: this job was queued, but its task is no longer in the queue and no worker picked it up (the worker or Redis restarted first). Restart the job to run it.*
+
+A job whose task can't be queued at all (Redis down when it's created, restarted or confirmed after a sudo removal) is failed there and then with `Not queued: <error>`, and the request returns `500`.
 
 **Authentication:** None, in server mode too. The answer is the one bit; which checks said busy goes to the backend's log, never to the caller.
 

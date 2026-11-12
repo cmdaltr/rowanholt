@@ -28,6 +28,7 @@ from config import settings
 from storage import JobStorage
 from models.job import JobStatus, PendingAction
 import backup_secrets
+import job_liveness
 
 # Initialize Celery
 celery_app = Celery(
@@ -365,7 +366,9 @@ def confirm_sudo_action(job_id: str) -> bool:
             job.log.append(
                 f"[{datetime.now().isoformat().replace('T', ' ')}] -> Successfully removed directory"
             )
-            job.status = JobStatus.PENDING  # Reset to pending so it can be restarted
+            # Pending again: the confirm-sudo route queues it straight after (main.queue_job), and
+            # fails it there if it can't be queued, so it's never left pending with nothing to run it
+            job.status = JobStatus.PENDING
             job.pending_action = None
             job_storage.save_job(job)
             return True
@@ -630,6 +633,10 @@ def start_analysis(self, job_id: str):
     process = None
     spool = None
     lock_heartbeat = None
+    # Proof for the backend (job_liveness, GET /api/busy) that this job has a worker, from now
+    # (a job waiting for its images' locks is still pending) until its final status is saved.
+    # It ends with this process: a killed worker leaves a key that expires by itself.
+    alive = job_liveness.Heartbeat(job_id).start()
 
     try:
         # Acquire locks on all source images before starting
@@ -1235,26 +1242,31 @@ def start_analysis(self, job_id: str):
             _stop_process_group(process)
 
     finally:
-        if lock_heartbeat:
-            lock_heartbeat.set()
         try:
-            _clear_job_process(job_id)
-        except Exception as e:
-            logger.warning(f"Job {job_id}: could not clear its process record: {e}")
+            if lock_heartbeat:
+                lock_heartbeat.set()
+            try:
+                _clear_job_process(job_id)
+            except Exception as e:
+                logger.warning(f"Job {job_id}: could not clear its process record: {e}")
 
-        # Release image locks
-        if acquired_lock_keys:
-            release_image_locks(acquired_lock_keys)
-            logger.info(f"Job {job_id}: Released {len(acquired_lock_keys)} image lock(s)")
+            # Release image locks
+            if acquired_lock_keys:
+                release_image_locks(acquired_lock_keys)
+                logger.info(f"Job {job_id}: Released {len(acquired_lock_keys)} image lock(s)")
 
-        job.completed_at = datetime.now()
-        if spool:
-            spool.sync(job)
-            spool.close()
-        for attempt in range(5):  # the final status must land even after a DB blip
-            if _safe_save(job):
-                break
-            time.sleep(10 * (attempt + 1))
+            job.completed_at = datetime.now()
+            if spool:
+                spool.sync(job)
+                spool.close()
+            for attempt in range(5):  # the final status must land even after a DB blip
+                if _safe_save(job):
+                    break
+                time.sleep(10 * (attempt + 1))
+        finally:
+            # Only now, and whatever happened above: stopped earlier, a slow final save would look
+            # like a dead worker; never stopped, this pool process would keep the job alive for ever
+            alive.stop()
 
 
 def export_threat_intel(job_id: str) -> str:

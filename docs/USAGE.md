@@ -423,7 +423,7 @@ docker logs rowanholt-celery-worker --tail 100
 docker restart rowanholt-celery-worker
 ```
 
-Restarting the worker kills any running job.
+Restarting the worker kills any running job. The backend notices within about three minutes and marks it failed, with *Interrupted: …* as its error and the last line of its log; restart it from the job list. A pending job whose task was lost from the queue is failed the same way ([API: jobs left by a crash](API.md#jobs-left-by-a-crash)).
 
 ### "Failed to load directory"
 

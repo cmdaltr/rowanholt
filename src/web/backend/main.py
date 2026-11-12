@@ -21,6 +21,7 @@ from pydantic import BaseModel
 try:
     from .config import settings
     from . import busy  # GET /api/busy, the homelab's question before a rebuild
+    from . import job_liveness  # Whether a pending, running or paused job has a worker
     from .auth import access
     from .auth.users import load_users
     from .auth.routes_simple import router as auth_router  # Simple file-based auth
@@ -53,6 +54,7 @@ except ImportError:
     # Fallback for standalone execution
     from config import settings
     import busy  # GET /api/busy, the homelab's question before a rebuild
+    import job_liveness  # Whether a pending, running or paused job has a worker
     from auth import access
     from auth.users import load_users
     from auth.routes_simple import router as auth_router  # Simple file-based auth
@@ -154,11 +156,29 @@ aule_offline.FINDINGS = case_routes.findings_for_case
 
 # Jobs a rebuild would cut off: queued (Celery's queue lives in Redis, which is recreated with the
 # rest), running, or paused (Elrond stopped with SIGSTOP in the worker, killed with it). The jobs
-# table is the record the app keeps of every job, and one indexed query; asking Celery's workers
-# would wait out a broadcast timeout each time. Awaiting confirmation isn't busy: the task has
-# returned and the job waits on a person, in the database, which a rebuild doesn't touch.
+# table says which jobs claim one of these; job_liveness says whether a worker is still on each
+# (a heartbeat in Redis, or the task in the queue), and fails the ones dead for longer than its
+# grace, so a job left `running` by a crash doesn't hold every rebuild for ever. Asking Celery's
+# workers instead would wait out a broadcast timeout each time. Awaiting confirmation isn't busy:
+# the task has returned and the job waits on a person, in the database, which a rebuild doesn't touch.
 ACTIVE_JOB_STATUSES = (JobStatus.PENDING, JobStatus.RUNNING, JobStatus.PAUSED)
-busy.register("jobs", lambda: job_storage.any_job_in(ACTIVE_JOB_STATUSES))
+job_liveness_check = job_liveness.Liveness(job_storage, ACTIVE_JOB_STATUSES)
+busy.register("jobs", job_liveness_check.check)
+
+
+def queue_job(job: Job) -> None:
+    """Queue a saved, pending job's analysis task. The queued marker goes first, so the job
+    is never pending with no signal of life; only the task ID is saved afterwards, because the
+    worker may already be saving the whole row. A task that can't be queued (Redis down) fails
+    the job there and then rather than leaving it pending with nothing to run it."""
+    job_liveness.mark_queued(job.id)
+    try:
+        task = start_analysis.delay(job.id)
+    except Exception as exc:
+        job_storage.interrupt_job(job.id, (JobStatus.PENDING,), f"Not queued: {exc}. Restart the job to try again.")
+        raise
+    job.celery_task_id = task.id
+    job_storage.set_celery_task_id(job.id, task.id)
 
 
 class SharingUpdate(BaseModel):
@@ -199,8 +219,17 @@ def _with_access(jobs: List[Job]) -> List[Job]:
 @app.on_event("startup")
 async def on_startup():
     """Run startup tasks."""
-    # startup()  # Disabled - using file-based storage, not database
-    pass
+    # Jobs left pending, running or paused by a crash or a host restart are failed within a few
+    # minutes of start-up, and any that die later within a few minutes of dying (job_liveness)
+    app.state.stop_liveness = job_liveness_check.start()
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    """Stop the background passes."""
+    stop = getattr(app.state, "stop_liveness", None)
+    if stop is not None:
+        stop.set()
 
 
 # Include authentication routes
@@ -484,9 +513,7 @@ async def create_job(job_request: JobCreate, request: Request):
         job.owner = owner["username"]
 
         # Start analysis task and store Celery task ID
-        task = start_analysis.delay(job_id)
-        job.celery_task_id = task.id
-        job_storage.save_job(job)
+        queue_job(job)
 
         return job
 
@@ -882,9 +909,7 @@ async def bulk_restart_jobs(job_ids: list[str], request: Request, fresh: Optiona
             job_storage.save_job(job)
 
             # Start new analysis task
-            task = start_analysis.delay(job_id)
-            job.celery_task_id = task.id
-            job_storage.save_job(job)
+            queue_job(job)
 
             results.append({"job_id": job_id, "success": True})
 
@@ -1071,9 +1096,7 @@ async def restart_job(job_id: str, request: Request, confirm: bool = False, fres
         job_storage.save_job(job)
 
         # Start new analysis task
-        task = start_analysis.delay(job_id)
-        job.celery_task_id = task.id
-        job_storage.save_job(job)
+        queue_job(job)
 
         return job
 
@@ -1115,9 +1138,7 @@ async def confirm_sudo(job_id: str):
 
         if success:
             # Restart the job now that directory is removed
-            task = start_analysis.delay(job_id)
-            job.celery_task_id = task.id
-            job_storage.save_job(job)
+            queue_job(job)
 
         return job
 

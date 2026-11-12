@@ -65,20 +65,22 @@ class Checks(BackendCase):
         folder = tempfile.mkdtemp(prefix="rowanholt-busy-")
         store = storage.JobStorage(f"sqlite:///{folder}/jobs.db")
         active = self.main.ACTIVE_JOB_STATUSES
-        self.assertFalse(store.any_job_in(active))
+        self.assertEqual(store.active_jobs(active), [])
         job = Job(id=str(uuid.uuid4()), case_number="CASE-BUSY", source_paths=["/e/x.E01"],
                   destination_path=None, options=AnalysisOptions(), status=JobStatus.COMPLETED,
                   created_at=datetime.now())
         store.save_job(job)
         for status in JobStatus:
             store.set_status(job.id, status)
-            self.assertEqual(store.any_job_in(active), status in active, status)
+            self.assertEqual(store.active_jobs(active), [(job.id, status.value, None)] if status in active else [], status)
         for idle in (JobStatus.AWAITING_CONFIRMATION, JobStatus.FAILED, JobStatus.ARCHIVED):
             self.assertNotIn(idle, active)
 
     def test_the_jobs_check_asks_the_backends_storage(self):
-        with mock.patch.object(self.main.job_storage, "any_job_in", return_value=True) as asked:
-            self.assertTrue(self.busy._checks["jobs"]())
+        # Then whether each active job has a worker: test_job_liveness.py
+        self.assertEqual(self.busy._checks["jobs"], self.main.job_liveness_check.check)
+        with mock.patch.object(self.main.job_storage, "active_jobs", return_value=[]) as asked:
+            self.assertFalse(self.busy._checks["jobs"]())
         asked.assert_called_once_with(self.main.ACTIVE_JOB_STATUSES)
 
     def test_a_counter_is_busy_while_work_is_in_flight(self):
@@ -198,21 +200,28 @@ class Endpoint(BackendCase):
 
     def test_busy_while_a_job_is_active(self):
         self.only_jobs()
-        with mock.patch.object(self.main.job_storage, "any_job_in", return_value=False):
+        with mock.patch.object(self.main.job_storage, "active_jobs", return_value=[]):
             self.assertEqual(self.client.get("/api/busy").json(), {"busy": False})
-        with mock.patch.object(self.main.job_storage, "any_job_in", return_value=True):
+        with mock.patch.object(self.main.job_liveness_check, "check", return_value=True):
+            self.busy.register("jobs", self.main.job_liveness_check.check)
             self.assertEqual(self.client.get("/api/busy").json(), {"busy": True})
 
     def test_busy_with_the_real_jobs_table(self):
-        # Jobs here never reach a worker (the queue is a stand-in), so a new one stays pending
+        # Jobs here never reach a worker (the queue is a stand-in), so a new one stays pending,
+        # live by its queued marker
+        from test_job_liveness import FakeRedis
+        import job_liveness
+        redis = FakeRedis()
         self.only_jobs()
-        self.create_job(self.alice, "CASE-PENDING")
-        self.assertEqual(self.client.get("/api/busy").json(), {"busy": True})
+        with mock.patch.object(job_liveness, "_client", redis), \
+                mock.patch.object(self.main.job_liveness_check, "_client", lambda: redis):
+            self.create_job(self.alice, "CASE-PENDING")
+            self.assertEqual(self.client.get("/api/busy").json(), {"busy": True})
 
     def test_a_failing_check_counts_as_busy(self):
         self.only_jobs()
         down = OSError("connection refused")
-        with mock.patch.object(self.main.job_storage, "any_job_in", side_effect=down), \
+        with mock.patch.object(self.main.job_storage, "active_jobs", side_effect=down), \
                 self.assertLogs(self.busy.logger, "ERROR"):
             resp = self.client.get("/api/busy")
         self.assertEqual(resp.status_code, 200)

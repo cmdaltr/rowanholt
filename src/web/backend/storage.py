@@ -8,7 +8,7 @@ import logging
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 from sqlalchemy import create_engine, text, Column, String, Integer, Text, DateTime, Enum as SQLEnum, JSON, \
     UniqueConstraint
 from sqlalchemy.orm import sessionmaker, declarative_base, defer
@@ -310,8 +310,13 @@ class JobStorage:
             raise
         finally:
             session.close()
-        # Every way a job ends is a save (the worker's, a cancel, a failed start): the webhook
-        # follows the change of status, once, whichever path got there
+        self._after_save(job, previous)
+
+    @staticmethod
+    def _after_save(job: Job, previous: Optional[str]) -> None:
+        # Every way a job ends is a save (the worker's, a cancel, a failed start, a dead worker's
+        # job failed by job_liveness): the webhook follows the change of status, once, whichever
+        # path got there
         status = job.status.value
         if status in (JobStatus.COMPLETED.value, JobStatus.FAILED.value) and previous != status:
             try:
@@ -429,15 +434,56 @@ class JobStorage:
         finally:
             session.close()
 
-    def any_job_in(self, statuses: Iterable[JobStatus]) -> bool:
-        """Whether any job has one of these statuses: one indexed lookup, for /api/busy."""
+    def active_jobs(self, statuses: Iterable[JobStatus]) -> List[Tuple[str, str, Optional[str]]]:
+        """(ID, status, Celery task ID) of every job with one of these statuses: the three
+        columns job_liveness needs, from the status index, never the log."""
         session = self.Session()
         try:
             values = [status.value for status in statuses]
-            query = session.query(JobModel.id).filter(JobModel.status.in_(values))
-            return query.first() is not None
+            query = session.query(JobModel.id, JobModel.status, JobModel.celery_task_id)
+            return [tuple(row) for row in query.filter(JobModel.status.in_(values)).all()]
         finally:
             session.close()
+
+    def set_celery_task_id(self, job_id: str, task_id: str) -> None:
+        """Record the task queued for a job, and nothing else: the worker may already have
+        picked it up and saved, and a full save from the API would put its status back."""
+        session = self.Session()
+        try:
+            session.query(JobModel).filter_by(id=job_id).update({"celery_task_id": task_id})
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def interrupt_job(self, job_id: str, statuses: Iterable[JobStatus], reason: str) -> Optional[Job]:
+        """Fail a job no worker is working on (job_liveness), if it still has one of these
+        statuses: the reason goes in its error and at the end of its log, so the web app shows
+        why. Returns the job as saved, or None when it had moved on (finished, cancelled)."""
+        values = [status.value for status in statuses]
+        session = self.Session()
+        try:
+            row = (session.query(JobModel).filter(JobModel.id == job_id, JobModel.status.in_(values))
+                   .with_for_update().first())
+            if row is None:
+                return None
+            previous = row.status
+            stamp = datetime.now().isoformat().replace("T", " ")
+            row.status = JobStatus.FAILED.value
+            row.error = reason
+            row.log = list(row.log or []) + [f"[{stamp}] -> {reason}"]
+            row.completed_at = datetime.now()
+            session.commit()
+            job = self._job_model_to_pydantic(row)
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+        self._after_save(job, previous)
+        return job
 
     def delete_job(self, job_id: str) -> None:
         """
