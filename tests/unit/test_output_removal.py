@@ -655,7 +655,10 @@ class RemovalApiTest(BackendCase):
 
 
 class ComposeTest(unittest.TestCase):
-    """The API (open without sign-in outside server mode), Postgres and Redis on loopback only."""
+    """Outside server mode nothing is published beyond this machine: the API (open without sign-in),
+    Postgres, Redis, the frontend's dev server, Splunk, Elastic, Kibana and the Navigator."""
+
+    LOCAL_FILES = ("docker-compose.yml", "src/web/docker-compose.yml")
 
     @staticmethod
     def load(path):
@@ -683,6 +686,34 @@ class ComposeTest(unittest.TestCase):
     def test_a_server_publishes_nothing_of_the_backend(self):
         services = self.load(REPO / "deploy" / "server" / "docker-compose.server.yml")["services"]
         self.assertEqual(services["backend"]["ports"], [])
+
+    @staticmethod
+    def host_ip(port):
+        """The address a `ports` entry is published on; "" for every interface."""
+        if isinstance(port, dict):
+            return port.get("host_ip", "")
+        parts = str(port).rsplit(":", 2)
+        return parts[0] if len(parts) == 3 else ""
+
+    def test_no_local_port_is_published_on_every_interface(self):
+        for name in self.LOCAL_FILES:
+            for service, spec in self.load(REPO / name)["services"].items():
+                for port in spec.get("ports") or []:
+                    self.assertEqual(self.host_ip(port), "127.0.0.1", f"{name} {service}: {port}")
+
+    def test_a_server_resets_every_local_port_and_publishes_only_its_proxy(self):
+        # Compose merges `ports` lists, so a service the override doesn't reset would add its
+        # loopback ports to the server's: every one must be reset, leaving Caddy alone
+        local = self.load(REPO / "docker-compose.yml")["services"]
+        server = self.load(REPO / "deploy" / "server" / "docker-compose.server.yml")["services"]
+        for service, spec in local.items():
+            if spec.get("ports"):
+                self.assertEqual(server.get(service, {}).get("ports"), [], service)
+        published = {s for s, spec in server.items() if spec.get("ports")}
+        self.assertEqual(published, {"proxy"})
+        service = self.load(REPO / "deploy" / "server" / "docker-compose.service.yml")["services"]
+        self.assertEqual(set(service), {"proxy"})
+        self.assertEqual(service["proxy"]["ports"], ["127.0.0.1:5680-5683:5680-5683"])
 
 
 if __name__ == "__main__":

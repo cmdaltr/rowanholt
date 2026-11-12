@@ -388,11 +388,11 @@ docker compose ps
 
 ```
 NAME                STATUS          PORTS
-rowanholt-backend   Up 30 seconds   0.0.0.0:5688->5688/tcp
+rowanholt-backend   Up 30 seconds   127.0.0.1:5688->5688/tcp
 rowanholt-celery    Up 30 seconds
-rowanholt-frontend  Up 30 seconds   0.0.0.0:5687->5687/tcp
-rowanholt-postgres  Up 45 seconds   5432/tcp
-rowanholt-redis     Up 45 seconds   6379/tcp
+rowanholt-frontend  Up 30 seconds   127.0.0.1:5687->3000/tcp
+rowanholt-postgres  Up 45 seconds   127.0.0.1:5432->5432/tcp
+rowanholt-redis     Up 45 seconds   127.0.0.1:6379->6379/tcp
 ```
 
 ---

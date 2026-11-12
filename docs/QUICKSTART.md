@@ -219,6 +219,8 @@ docker compose --profile siem up -d
 | Kibana | http://localhost:5601 |
 | Navigator | http://localhost:5602 |
 
+Like the web app and API, they're published on this machine's loopback only, with `.env.example`'s default passwords. For other machines to reach them, run a team server ([SERVER.md](SERVER.md)), which puts them behind its proxy and the Rowanholt sign-in.
+
 Splunk runs under Rosetta on Apple silicon and needs several minutes to start. Give Docker at least 16 GB of memory with the profile up.
 
 To use an existing Splunk or Elasticsearch instead, set these on the worker:

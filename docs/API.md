@@ -32,7 +32,7 @@
 
 The backend mounts the simple file-based auth router (`src/web/backend/auth/routes_simple.py`, users in `USERS_FILE`, default `/app/data/users.json`). It provides `register`, `login`, `guest`, `logout`, a stub `me` and a stub `forgot-password`. The MFA, password-reset and admin endpoints below are implemented in `auth/routes.py`, which is not mounted.
 
-No job, file-system, AI or Mordor endpoint checks the token or cookie, so anyone who can reach port 5688 can submit, read, cancel and delete jobs. Keep the API on localhost or behind a reverse proxy that authenticates. The local stack publishes it on `127.0.0.1:5688` only (as it does Postgres and Redis); a team server (`ROWANHOLT_SERVER_MODE`) publishes nothing but its proxy and signs in every route.
+No job, file-system, AI or Mordor endpoint checks the token or cookie, so anyone who can reach port 5688 can submit, read, cancel and delete jobs. Keep the API on localhost or behind a reverse proxy that authenticates. The local stack publishes it on `127.0.0.1:5688` only, as it does every other port (Postgres, Redis, the web app, Splunk, Elastic, Kibana, the Navigator); a team server (`ROWANHOLT_SERVER_MODE`) publishes nothing but its proxy and signs in every route.
 
 ---
 

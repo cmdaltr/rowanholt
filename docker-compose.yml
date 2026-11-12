@@ -247,7 +247,8 @@ services:
       dockerfile: Dockerfile
     container_name: rowanholt-frontend
     ports:
-      - "5687:3000"
+      # This machine only, like the API: the dev server is the local analyst's web app
+      - "127.0.0.1:5687:3000"
     environment:
       - REACT_APP_API_URL=http://localhost:5688
     volumes:
@@ -272,9 +273,11 @@ services:
     container_name: rowanholt-splunk
     hostname: splunk
     ports:
-      - "8089:8089" # Splunk API
-      - "7755:8000" # Splunk Web
-      - "9997:9997" # Splunk Forwarder
+      # This machine only: .env.example's default password is changeme, and a team server puts
+      # Splunk, Kibana and the Navigator behind its proxy and sign-in instead
+      - "127.0.0.1:8089:8089" # Splunk API
+      - "127.0.0.1:7755:8000" # Splunk Web
+      - "127.0.0.1:9997:9997" # Splunk Forwarder
     environment:
       - SPLUNK_START_ARGS=--accept-license
       - SPLUNK_GENERAL_TERMS=--accept-sgt-current-at-splunk-com
@@ -313,8 +316,8 @@ services:
     container_name: rowanholt-elastic
     hostname: elastic
     ports:
-      - "9200:9200"
-      - "9300:9300"
+      - "127.0.0.1:9200:9200" # this machine only, as Splunk
+      - "127.0.0.1:9300:9300"
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=true
@@ -382,7 +385,7 @@ services:
     container_name: rowanholt-kibana
     hostname: kibana
     ports:
-      - "5601:5601"
+      - "127.0.0.1:5601:5601" # this machine only, as Splunk
     environment:
       - ELASTICSEARCH_HOSTS=http://elastic:9200
       - ELASTICSEARCH_USERNAME=kibana_system
@@ -471,7 +474,7 @@ services:
     container_name: rowanholt-navigator
     hostname: navigator
     ports:
-      - "5602:4200"
+      - "127.0.0.1:5602:4200" # this machine only, as Splunk
     working_dir: /navigator
     volumes:
       - navigator_data:/navigator

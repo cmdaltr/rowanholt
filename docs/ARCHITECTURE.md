@@ -880,17 +880,17 @@ rowanholt-celery-worker:
 
 rowanholt-frontend:
   Build: src/web/frontend
-  Ports: 5687:3000
+  Ports: 127.0.0.1:5687:3000
 
 rowanholt-postgres:
   Image: postgres:16-alpine
-  Ports: 5432:5432
+  Ports: 127.0.0.1:5432:5432
 
 rowanholt-redis:
   Image: redis:7-alpine
-  Ports: 6379:6379
+  Ports: 127.0.0.1:6379:6379
 
-SIEM profile (docker compose --profile siem up -d):
+SIEM profile (docker compose --profile siem up -d), on 127.0.0.1 like every local port:
   rowanholt-splunk      splunk/splunk:latest     8089 API, 7755 web, 9997 forwarder
   rowanholt-elastic     elasticsearch:8.11.0     9200, 9300
   rowanholt-kibana      kibana:8.11.0            5601
