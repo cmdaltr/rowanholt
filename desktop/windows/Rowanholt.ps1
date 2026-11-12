@@ -353,7 +353,15 @@ function Step-Gui { [System.Windows.Forms.Application]::DoEvents() }
 
 function Assert-NotCancelled { if ($script:DependenciesCancelled) { throw 'Cancelled' } }
 
+function Write-ComponentLog([string]$Line) {
+    # What happened, for after the window has gone: %LOCALAPPDATA%\Rowanholt\components.log
+    Add-Content -Path (Join-Path $State 'components.log') -Value "$((Get-Date).ToString('s')) $Line" -ErrorAction SilentlyContinue
+}
+
 function Set-Status($Ui, [string]$Item, [string]$Text, [double]$Fraction = -1) {
+    # Kept beside the label: the summary is written after the window, and its labels, have closed
+    if ($Ui.Status[$Item] -ne $Text -and $Text -notlike 'Downloading *') { Write-ComponentLog "$Item`: $Text" }
+    $Ui.Status[$Item] = $Text
     $Ui.Rows[$Item].Text = $Text
     $Ui.Detail.Text = "$($Dependencies[$Item].Name): $Text"
     if ($Fraction -lt 0) { $Ui.Bar.Style = 'Marquee' } else {
@@ -426,13 +434,19 @@ function Install-Docker($Ui, $Result) {
     Set-Status $Ui 'docker' 'Installing (a few minutes)'
     $code = Wait-Exit (Start-Process $installer -PassThru -ArgumentList 'install', '--user', '--quiet', '--accept-license')
     Remove-Item $installer -Force -ErrorAction SilentlyContinue
-    if ($code -ne 0 -or -not (Get-DockerDesktop)) { throw "Docker's installer failed (exit $code)" }
+    # Judged by what's there: Process.ExitCode can come back empty for a process that has gone
+    if (-not (Get-DockerDesktop)) { throw "Docker's installer failed (exit $code)" }
     Set-Status $Ui 'docker' $(if ($Result.Restart) { 'Installed: restart Windows to finish' } else { 'Installed' }) 1
 }
 
 function Start-Ollama($Ui, [string]$Item) {
     if (Test-Ollama) { return }
     Set-Status $Ui $Item 'Starting Ollama'
+    # Its installer starts the app itself: give that a chance before starting another copy
+    for ($i = 0; $i -lt 30; $i++) {
+        if (Test-Ollama) { return }
+        if (Get-Process -Name 'ollama app', 'ollama' -ErrorAction SilentlyContinue) { Start-Sleep -Milliseconds 500; Step-Gui } else { break }
+    }
     $app = Join-Path (Split-Path $OllamaExe) 'ollama app.exe'
     if (Test-Path $app) { Start-Process $app } else { Start-Process $OllamaExe -ArgumentList 'serve' -WindowStyle Hidden }
     for ($i = 0; $i -lt 60; $i++) {
@@ -451,7 +465,7 @@ function Install-Ollama($Ui) {
     Set-Status $Ui 'ollama' 'Installing'
     $code = Wait-Exit (Start-Process $installer -PassThru -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-')
     Remove-Item $installer -Force -ErrorAction SilentlyContinue
-    if ($code -ne 0 -or -not (Test-Path $OllamaExe)) { throw "Ollama's installer failed (exit $code)" }
+    if (-not (Test-Path $OllamaExe)) { throw "Ollama's installer failed (exit $code)" }
     Start-Ollama $Ui 'ollama'
     Set-Status $Ui 'ollama' 'Installed' 1
 }
@@ -493,7 +507,8 @@ function Install-Dependencies([string[]]$Items) {
     $form.CancelButton.Add_Click({ $script:DependenciesCancelled = $true })
     $form.Add_FormClosing({ param($s, $e) if (-not $script:DependenciesDone) { $script:DependenciesCancelled = $true; $e.Cancel = $true } })
     $script:DependenciesDone = $false
-    $ui = @{ Rows = @{} }
+    $ui = @{ Rows = @{}; Status = @{}; Problems = @() }
+    Write-ComponentLog "Installing: $($Items -join ', ')"
     $y = 84
     foreach ($item in $Items) {
         $name = New-Object System.Windows.Forms.Label
@@ -539,7 +554,7 @@ function Install-Dependencies([string[]]$Items) {
     $form.Show(); Step-Gui
 
     foreach ($item in $Items) {
-        if ($script:DependenciesCancelled) { $ui.Rows[$item].Text = 'Cancelled'; $result.Failed += $item; continue }
+        if ($script:DependenciesCancelled) { $ui.Status[$item] = 'Cancelled'; $ui.Rows[$item].Text = 'Cancelled'; $result.Failed += $item; continue }
         try {
             switch ($item) {
                 'docker' { Install-Docker $ui $result }
@@ -548,8 +563,11 @@ function Install-Dependencies([string[]]$Items) {
             }
         } catch {
             $result.Failed += $item
+            $ui.Status[$item] = 'Not installed'
             $ui.Rows[$item].Text = 'Not installed'
             $ui.Detail.Text = "$($Dependencies[$item].Name): $($_.Exception.Message)"
+            if ($_.Exception.Message -ne 'Cancelled') { $ui.Problems += "$($Dependencies[$item].Name): $($_.Exception.Message)" }
+            Write-ComponentLog "$item`: not installed: $($_.Exception.Message)"
             $ui.Bar.Style = 'Continuous'; $ui.Bar.Value = 0
             Step-Gui
             if ($_.Exception.Message -ne 'Cancelled') { Start-Sleep -Seconds 3 }
@@ -561,8 +579,8 @@ function Install-Dependencies([string[]]$Items) {
     $form.Close()
 
     $lines = @()
-    foreach ($item in $Items) { $lines += "$($Dependencies[$item].Name): $($ui.Rows[$item].Text)" }
-    if ($result.Failed -and -not $script:DependenciesCancelled) { $lines += '', "The last problem: $($ui.Detail.Text)" }
+    foreach ($item in $Items) { $lines += "$($Dependencies[$item].Name): $($ui.Status[$item])" }
+    if ($ui.Problems) { $lines += '', 'What went wrong:'; $lines += $ui.Problems }
     if ($result.Failed -contains 'docker') { $lines += '', 'Set Up Rowanholt in the Start menu offers Docker Desktop again.' }
     if ($result.Restart) { $lines += '', 'Restart Windows to finish turning on WSL 2, then open Rowanholt from the Start menu.' }
     $icon = if ($result.Failed) { 'Warning' } else { 'Information' }
