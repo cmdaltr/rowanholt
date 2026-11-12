@@ -1,5 +1,6 @@
 """Removing a job's old output: the paths the API accepts, which folder the worker may remove, who
-may confirm a retry, and the cross-site header (the 12 November 2026 review).
+may confirm a retry, and the API's other defences from the 12 November 2026 review (the
+cross-site header, the loopback-only ports).
 
 Run: python3 -m unittest tests/unit/test_output_removal.py
 """
@@ -632,6 +633,37 @@ class RemovalApiTest(BackendCase):
         self.assertEqual(self.client.post("/api/jobs/bulk/cancel", headers=self.bob, json=[]).status_code, 200)
         both = {**cookie, **self.bob}  # a bearer token decides, whatever cookie comes with it
         self.assertEqual(self.client.post("/api/jobs/bulk/cancel", headers=both, json=[]).status_code, 200)
+
+
+class ComposeTest(unittest.TestCase):
+    """The API (open without sign-in outside server mode), Postgres and Redis on loopback only."""
+
+    @staticmethod
+    def load(path):
+        try:
+            import yaml
+        except ImportError:
+            raise unittest.SkipTest("PyYAML not installed")
+
+        class Loader(yaml.SafeLoader):
+            pass
+        Loader.add_constructor("!reset", lambda loader, node: loader.construct_sequence(node)
+                               if isinstance(node, yaml.SequenceNode) else None)
+        return yaml.load(path.read_text(), Loader=Loader)
+
+    def test_local_stack_publishes_the_api_redis_and_postgres_on_loopback(self):
+        services = self.load(REPO / "docker-compose.yml")["services"]
+        self.assertEqual(services["backend"]["ports"], ["127.0.0.1:5688:5688"])
+        for name in ("backend", "postgres", "redis"):
+            for port in services[name]["ports"]:
+                self.assertTrue(str(port).startswith("127.0.0.1:"), f"{name}: {port}")
+        legacy = self.load(REPO / "src" / "web" / "docker-compose.yml")["services"]
+        backend = next(s for s in legacy.values() if "5688" in str(s.get("ports")))
+        self.assertTrue(all(str(p).startswith("127.0.0.1:") for p in backend["ports"]))
+
+    def test_a_server_publishes_nothing_of_the_backend(self):
+        services = self.load(REPO / "deploy" / "server" / "docker-compose.server.yml")["services"]
+        self.assertEqual(services["backend"]["ports"], [])
 
 
 if __name__ == "__main__":

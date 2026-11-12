@@ -20,7 +20,7 @@ services:
       dockerfile: Dockerfile
     container_name: rowanholt-backend
     ports:
-      - "5688:5688"
+      - "127.0.0.1:5688:5688" # this machine only: the API is open in local mode
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379

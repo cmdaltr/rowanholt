@@ -7,7 +7,8 @@ services:
     image: postgres:16-alpine
     container_name: rowanholt-postgres
     ports:
-      - "5432:5432"
+      # This machine only: without sign-in (local mode) nothing here is for the network
+      - "127.0.0.1:5432:5432"
     environment:
       - POSTGRES_DB=rowanholt
       - POSTGRES_USER=rowanholt
@@ -34,7 +35,8 @@ services:
     image: redis:7-alpine
     container_name: rowanholt-redis
     ports:
-      - "6379:6379"
+      # This machine only: anyone who reaches Redis can queue the worker's tasks
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -52,7 +54,10 @@ services:
       dockerfile: Dockerfile
     container_name: rowanholt-backend
     ports:
-      - "5688:5688"
+      # This machine only. Outside server mode the API answers anyone who reaches it, as the local
+      # analyst (an admin): it isn't published to the network. A team server publishes nothing but
+      # its proxy (deploy/server/docker-compose.server.yml resets these)
+      - "127.0.0.1:5688:5688"
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
