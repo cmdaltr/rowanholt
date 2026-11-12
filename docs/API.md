@@ -1,9 +1,11 @@
 # Rowanholt Web API Reference
 
 **Version:** 2.1.0
-**Base URL:** `http://localhost:5688/api`
-**Protocol:** REST
-**Authentication:** JWT Bearer Token or HTTP-only Cookie
+**Base URL:** `http://127.0.0.1:5688/api` on a local stack; `https://<server>/api` on a team server, through its proxy
+**Protocol:** REST, and two WebSockets (the case browser's live feed and the lab's VM consoles)
+**Authentication:** none on a local stack; on a team server a session cookie, a sign-in's JWT, or an API token (see [Authentication Status](#authentication-status))
+
+Paths below are given in full (`/api/...`), except under Authentication, where they're relative to the base URL (`/auth/login` is `/api/auth/login`). FastAPI's own schema is at `/openapi.json` and `/docs` on a running backend.
 
 ---
 
@@ -11,82 +13,119 @@
 
 1. [Authentication Status](#authentication-status)
 2. [Authentication](#authentication)
-3. [Multi-Factor Authentication (MFA)](#multi-factor-authentication-mfa)
-4. [Admin Endpoints](#admin-endpoints)
+3. [API Tokens](#api-tokens)
+4. [Users](#users)
 5. [Job Management](#job-management)
 6. [File System](#file-system)
-7. [Docker Administration (Anduril)](#docker-administration-anduril)
-8. [Mordor: Recorded Attack Telemetry](#mordor-recorded-attack-telemetry)
-9. [Threat Intelligence](#threat-intelligence)
-10. [Case Browser and Collaboration](#case-browser-and-collaboration)
-11. [Smith (AI Analyst)](#smith-ai-analyst)
-12. [Lab](#lab)
-13. [Health Check](#health-check) (and Busy)
-14. [Request/Response Formats](#requestresponse-formats)
-15. [Error Handling](#error-handling)
-16. [Code Examples](#code-examples)
+7. [Administration (Aragorn)](#administration-aragorn)
+8. [Docker Administration (Anduril)](#docker-administration-anduril)
+9. [Mordor: Recorded Attack Telemetry](#mordor-recorded-attack-telemetry) (and datasets)
+10. [Threat Intelligence](#threat-intelligence)
+11. [Case Browser and Collaboration](#case-browser-and-collaboration)
+12. [Smith (AI Analyst)](#smith-ai-analyst)
+13. [Lab](#lab)
+14. [Health Check](#health-check) (and Busy)
+15. [Request/Response Formats](#requestresponse-formats)
+16. [Error Handling](#error-handling)
+17. [Code Examples](#code-examples)
 
 ---
 
 ## Authentication Status
 
-The backend mounts the simple file-based auth router (`src/web/backend/auth/routes_simple.py`, users in `USERS_FILE`, default `/app/data/users.json`). It provides `register`, `login`, `guest`, `logout`, a stub `me` and a stub `forgot-password`. The MFA, password-reset and admin endpoints below are implemented in `auth/routes.py`, which is not mounted.
+What a caller may do depends on the mode the backend runs in. Every request goes through one middleware (`src/web/backend/auth/access.py`), which works out who is calling and, in server mode, turns away what they may not do, so a route added later is covered without remembering to protect it.
 
-No job, file-system, AI or Mordor endpoint checks the token or cookie, so anyone who can reach port 5688 can submit, read, cancel and delete jobs. Keep the API on localhost or behind a reverse proxy that authenticates. The local stack publishes it on `127.0.0.1:5688` only, as it does every other port (Postgres, Redis, the web app, Splunk, Elastic, Kibana, the Navigator); a team server (`ROWANHOLT_SERVER_MODE`) publishes nothing but its proxy and signs in every route.
+**Local mode** (the default: a stack on an analyst's own machine). Nothing needs a sign-in. A request without a token acts as the local analyst (`local`, role `admin`) and sees every job and case. The stack publishes the API on `127.0.0.1:5688` only, as it does every other port (Postgres, Redis, the web app, Splunk, Elastic, Kibana, the Navigator), so the open API is the machine's own. Signing in still works (login, guest and register are open), and a signed-in caller is that account: a non-admin one gets `403` from the admin-only routes (licence, brands, webhooks, users, symbol tables, sample data), which an anonymous request passes. A guest's token names no account, so a guest acts as the local analyst. Two areas want a signed-in admin even locally, since they drive the host: the lab (`/api/lab`, the Mordor lab and the Mordor telemetry Update) and Andúril (`/api/anduril`). Both are off (`503`) while the backend uses the default `SECRET_KEY`.
+
+**Server mode** (`ROWANHOLT_SERVER_MODE`, set by `deploy/server/docker-compose.server.yml`; see [SERVER.md](SERVER.md)). Every `/api` route needs a signed-in user (`401 Sign in required`) except `/api/health`, `/api/busy`, `/api/auth/config`, `/api/auth/login`, `/api/auth/logout`, `/api/auth/oidc/login`, `/api/auth/oidc/callback` and `/api/auth/verify`. There are no guests and no open sign-up. On top of that:
+
+| Who | What |
+|---|---|
+| Admins only (`403`) | Everything under `/api/lab`, `/api/anduril` (and its old name `/api/aragorn`), `/api/auth/users`, `/api/symbols`, `/api/samples`, `/api/licence`, `/api/brands` and `/api/webhooks`, and a case's brand; anything but GET under `/api/mordor` and `/api/threat-intel`, apart from `POST /api/threat-intel/lookup` |
+| Whoever can see the job (`404` otherwise, so job IDs can't be probed) | Everything under `/api/jobs/{job_id}`: its owner, the users it's shared with, and admins. A job from before server mode has no owner, so only admins see it until one shares it |
+| Whoever can see the case (`404`) | `/api/ai/cases/{case_id}/…`: a case number behind a job they can see. A case folder in Smith's data directory with no job behind it is for admins |
+| The job's owner or an admin (`403`) | Cancel, pause, resume, delete, archive, restart with fresh output, add a note (`PATCH`), change its sharing, confirm or give up a failed removal; the bulk actions check each job the same way |
+
+A job's `can_manage` says which side of the last row the caller is on ([List Jobs](#list-jobs)).
+
+**Credentials.** The backend reads the `Authorization: Bearer` header first, then the `session_token` cookie, so a stale header doesn't hide a good cookie.
+
+- A sign-in ([Login](#login), or single sign-on) returns a JWT and sets it as the `session_token` cookie: `httpOnly`, `SameSite=Lax`, `Secure` in server mode, valid for 24 hours (`access_token_expire_minutes`). Each request checks the account in the user store, so disabling someone stops their next request.
+- An API token (`rvt_…`, [API Tokens](#api-tokens)) goes in the bearer header. Its scope limits it: `full` is whatever its user may do, `smith-mcp` only what Smith's MCP server needs. Tokens are made on a team server only.
+
+The lab and Andúril check a sign-in's JWT against the user store themselves, so an API token doesn't open them (`401`), even an admin's `full` one.
 
 ---
 
 ## Authentication
 
-All authenticated endpoints require either:
-- **Bearer Token** in `Authorization` header: `Authorization: Bearer <token>`
-- **HTTP-only cookie** set during login
+The routes under `/api/auth` (`src/web/backend/auth/routes_simple.py`). Accounts are kept in a JSON file (`USERS_FILE`, default `/app/data/users.json`; on a team server `src/web/backend/data/users.json` through the backend's bind mount), not the database. The first sign-in on an empty store creates `admin`: locally with the built-in password, on a server with `ROWANHOLT_ADMIN_PASSWORD` (`503` without it).
+
+There is no MFA, no password reset by email and no `/auth/admin/*` route in this build: those endpoints, which this reference used to list, are in `auth/routes.py`, which the backend doesn't mount. Admins manage accounts through [Users](#users) or `rowanholt server users`.
 
 #### Cross-site requests: the `X-Rowanholt` header
 
-A state-changing request (anything but GET, HEAD and OPTIONS) under `/api` that the session cookie signs in must send `X-Rowanholt: 1`, or it's refused with `403`. The web app's API client sends it on every request. The cookie is `SameSite=Lax`, which stops other sites but not the same site, and `ts.net` is a public suffix: every app on one tailnet (`*.<tailnet>.ts.net`) is the same site, and its pages' requests carry Rowanholt's cookie. A page on another origin can't add a custom header without the API's CORS allowing it, so the header proves the request came from Rowanholt's own pages. A request with a bearer token doesn't need it (a browser never sends one by itself): API tokens, the MCP server and scripts are unaffected, and so are requests with no credentials at all (a local stack's scripts).
+A state-changing request (anything but GET, HEAD and OPTIONS) under `/api` that the session cookie signs in must send `X-Rowanholt: 1`, or it's refused with `403`, in either mode (logout included). The web app's API client sends it on every request. The cookie is `SameSite=Lax`, which stops other sites but not the same site, and `ts.net` is a public suffix: every app on one tailnet (`*.<tailnet>.ts.net`) is the same site, and its pages' requests carry Rowanholt's cookie. A page on another origin can't add a custom header without the API's CORS allowing it, so the header proves the request came from Rowanholt's own pages. A request with a bearer token doesn't need it (a browser never sends one by itself): API tokens, the MCP server and scripts are unaffected, and so are requests with no credentials at all (a local stack's scripts).
+
+### Sign-in Options
+
+**Endpoint:** `GET /auth/config`
+
+**Description:** How this Rowanholt signs people in, for the login page. No sign-in needed.
+
+**Response:** `200 OK`
+```json
+{
+  "server_mode": true,
+  "local_login": true,
+  "guest": false,
+  "register": false,
+  "sso": {"enabled": true, "name": "Entra ID"}
+}
+```
+
+---
 
 ### Register New User
 
 **Endpoint:** `POST /auth/register`
 
-**Description:** Create a new user account.
+**Description:** Create an account. Locally anyone may, and the account is always a `user`. On a team server only an admin may (as with `POST /api/auth/users`), and `role` is honoured.
 
 **Request Body:**
 ```json
 {
   "email": "user@example.com",
   "username": "username",
-  "password": "SecurePassword123!",
-  "full_name": "John Doe"  // Optional
+  "password": "a long passphrase",
+  "full_name": "John Doe",
+  "role": "user"
 }
 ```
 
-**Response:** `201 Created`
+`full_name` is optional; `role` is `user` or `admin`, read in server mode only.
+
+**Response:** `200 OK`
 ```json
 {
-  "user": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "username": "username",
-    "full_name": "John Doe",
-    "role": "user",
-    "is_active": true,
-    "created_at": "2025-01-15T10:00:00Z",
-    "last_login": null
-  }
+  "id": "uuid",
+  "email": "user@example.com",
+  "username": "username",
+  "full_name": "John Doe",
+  "role": "user"
 }
 ```
 
 **Validation:**
-- Email: Valid email format
-- Username: Min 3 chars, alphanumeric + underscores only
-- Password: Min 8 characters
-- Full name: Optional, max 255 characters
+- Username: 2–64 letters, digits, `.`, `_`, `@` or `-`
+- Password: at least 12 characters on a team server; no minimum locally
+- Email: not checked beyond being unique
 
 **Errors:**
-- `400 Bad Request`: Validation error or user already exists
-- `500 Internal Server Error`: Server error
+- `400 Bad Request`: email or username taken, or an invalid username or role
+- `401`/`403`: on a team server, not signed in, or not an admin
+- `402 Payment Required`: on a team server, the licence has no free place
+- `503 Service Unavailable`: no accounts yet and no `ROWANHOLT_ADMIN_PASSWORD`
 
 ---
 
@@ -94,12 +133,12 @@ A state-changing request (anything but GET, HEAD and OPTIONS) under `/api` that 
 
 **Endpoint:** `POST /auth/login`
 
-**Description:** Authenticate and receive an access token. Also sets an HTTP-only cookie.
+**Description:** Sign in with a password: returns a JWT and sets it as the session cookie.
 
 **Request Body:** OAuth2 form data (`application/x-www-form-urlencoded`), not JSON. `username` accepts the username or the email address.
 
 ```bash
-curl -X POST http://localhost:5688/api/auth/login \
+curl -X POST http://127.0.0.1:5688/api/auth/login \
   -d "username=user@example.com" --data-urlencode "password=<password>"
 ```
 
@@ -113,17 +152,21 @@ curl -X POST http://localhost:5688/api/auth/login \
     "email": "user@example.com",
     "username": "username",
     "full_name": "John Doe",
-    "role": "user"
+    "role": "user",
+    "is_active": true,
+    "auth": "password",
+    "last_login": "2026-11-12T10:00:00"
   }
 }
 ```
 
-There is no MFA step in the mounted auth router.
+`auth` is `password` or `sso`. There is no MFA step.
 
 **Errors:**
-- `401 Unauthorized`: Invalid credentials
-- `403 Forbidden`: Account disabled
-- `500 Internal Server Error`: Server error
+- `401 Unauthorized`: wrong username or password
+- `403 Forbidden`: account disabled, or single sign-on is the only way in and the account isn't an admin's (admins keep a password, to break glass)
+- `429 Too Many Requests`: locked out. Five failures from one address lock that username from that address for 15 minutes; fifty across all addresses lock it everywhere (`max_login_attempts`, `lockout_duration_minutes`; [SERVER.md](SERVER.md#how-sign-in-lockouts-work))
+- `503 Service Unavailable`: no accounts yet and no `ROWANHOLT_ADMIN_PASSWORD`
 
 ---
 
@@ -131,7 +174,7 @@ There is no MFA step in the mounted auth router.
 
 **Endpoint:** `POST /auth/guest`
 
-**Description:** Create temporary guest session (expires in 1 hour).
+**Description:** A one-hour guest token and cookie, locally only (`403` on a team server). The token names no account, so requests made with it act as the local analyst.
 
 **Request Body:** None
 
@@ -141,14 +184,11 @@ There is no MFA step in the mounted auth router.
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "token_type": "bearer",
   "user": {
-    "id": "uuid",
-    "email": null,
-    "username": "guest_abc123",
+    "id": "guest",
+    "email": "guest@rowanholt.app",
+    "username": "guest",
     "full_name": "Guest User",
-    "role": "guest",
-    "is_active": true,
-    "created_at": "2025-01-15T12:00:00Z",
-    "last_login": "2025-01-15T12:00:00Z"
+    "role": "guest"
   }
 }
 ```
@@ -159,385 +199,111 @@ There is no MFA step in the mounted auth router.
 
 **Endpoint:** `POST /auth/logout`
 
-**Description:** End current session and invalidate token.
-
-**Authentication:** Required
-
-**Request Body:** None
+**Description:** Clear the session cookie. The JWT itself isn't revoked: it works until it expires. No sign-in needed (but a request carrying the cookie needs `X-Rowanholt: 1`, as above).
 
 **Response:** `200 OK`
 ```json
-{
-  "message": "Successfully logged out"
-}
+{"message": "Logged out successfully"}
 ```
 
 ---
 
 ### Get Current User
 
-> **Stub.** Returns a fixed guest user in the current build.
-
 **Endpoint:** `GET /auth/me`
 
-**Description:** Retrieve current authenticated user information.
+**Description:** The caller, with the same fields as `user` in [Login](#login). Locally without a sign-in, the local analyst (`"username": "local"`, `"role": "admin"`, `"auth": "local"`). For an API token there's also `token`: its `id`, `name` and `scope`.
 
-**Authentication:** Required
+**Errors:**
+- `401 Unauthorized`: on a team server, not signed in
 
-**Response:** `200 OK`
-```json
-{
-  "user": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "username": "username",
-    "full_name": "John Doe",
-    "role": "user",
-    "is_active": true,
-    "mfa_enabled": false,
-    "created_at": "2025-01-15T10:00:00Z",
-    "last_login": "2025-01-15T12:00:00Z"
-  }
-}
-```
+---
+
+### Session from the Cookie
+
+**Endpoint:** `POST /auth/session`
+
+**Description:** A fresh JWT for whoever the session cookie signs in, set again as the cookie, with the [Login](#login) response. The web app uses it after single sign-on, which leaves only the cookie. Refused to API tokens (`403`).
+
+---
+
+### Change Password
+
+**Endpoint:** `POST /auth/change-password`
+
+**Request Body:** `{"current_password": "...", "new_password": "..."}`
+
+**Response:** `200 OK`, `{"message": "Password changed"}`
+
+**Errors:**
+- `400 Bad Request`: the account signs in with single sign-on, the current password is wrong, or (on a team server) the new one is under 12 characters
+- `403 Forbidden`: made with an API token
 
 ---
 
 ### Forgot Password
 
-> **Stub.** Always returns the success message; no email is sent.
+> **Stub.** Always returns the message; nothing is sent.
 
-**Endpoint:** `POST /auth/forgot-password`
+**Endpoint:** `POST /auth/forgot-password?email=user@example.com`
 
-**Description:** Request password reset email (development: token logged to console).
-
-**Request Body:**
-```json
-{
-  "email": "user@example.com"
-}
-```
+`email` is a query parameter, not a JSON body.
 
 **Response:** `200 OK`
 ```json
-{
-  "message": "Password reset instructions sent to email",
-  "reset_token": "abc123..."  // Only in development mode
-}
-```
-
-**Note:** In production, token is sent via email only.
-
----
-
-### Reset Password
-
-> **Not mounted.** Implemented in `auth/routes.py`; the backend mounts `auth/routes_simple.py`, which does not provide this endpoint.
-
-**Endpoint:** `POST /auth/reset-password`
-
-**Description:** Reset password using token from forgot-password endpoint.
-
-**Request Body:**
-```json
-{
-  "token": "reset_token_here",
-  "new_password": "NewSecurePassword123!"
-}
-```
-
-**Response:** `200 OK`
-```json
-{
-  "message": "Password reset successful"
-}
-```
-
-**Errors:**
-- `400 Bad Request`: Invalid token, token expired, or password validation failed
-- `500 Internal Server Error`: Server error
-
----
-
-## Multi-Factor Authentication (MFA)
-
-### Setup MFA
-
-> **Not mounted.** Implemented in `auth/routes.py`; the backend mounts `auth/routes_simple.py`, which does not provide this endpoint.
-
-**Endpoint:** `POST /auth/mfa/setup`
-
-**Description:** Initialize MFA setup and generate TOTP secret with QR code URI.
-
-**Authentication:** Required
-
-**Response:** `200 OK`
-```json
-{
-  "secret": "JBSWY3DPEHPK3PXP",
-  "qr_code_uri": "otpauth://totp/Rowanholt:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Rowanholt",
-  "backup_codes": [
-    "1234-5678",
-    "9012-3456",
-    ...  // 10 codes total
-  ]
-}
-```
-
-**Note:** Save backup codes securely. They are shown only once.
-
----
-
-### Enable MFA
-
-> **Not mounted.** Implemented in `auth/routes.py`; the backend mounts `auth/routes_simple.py`, which does not provide this endpoint.
-
-**Endpoint:** `POST /auth/mfa/enable`
-
-**Description:** Enable MFA after verifying TOTP code.
-
-**Authentication:** Required
-
-**Request Body:**
-```json
-{
-  "code": "123456"  // 6-digit TOTP code from authenticator app
-}
-```
-
-**Response:** `200 OK`
-```json
-{
-  "message": "MFA enabled successfully"
-}
-```
-
-**Errors:**
-- `400 Bad Request`: Invalid TOTP code or MFA already enabled
-- `401 Unauthorized`: Not authenticated
-
----
-
-### Disable MFA
-
-> **Not mounted.** Implemented in `auth/routes.py`; the backend mounts `auth/routes_simple.py`, which does not provide this endpoint.
-
-**Endpoint:** `POST /auth/mfa/disable`
-
-**Description:** Disable MFA for current user.
-
-**Authentication:** Required
-
-**Request Body:**
-```json
-{
-  "code": "123456"  // Current TOTP code or backup code
-}
-```
-
-**Response:** `200 OK`
-```json
-{
-  "message": "MFA disabled successfully"
-}
+{"message": "If the email exists, a password reset link has been sent"}
 ```
 
 ---
 
-### Verify MFA
+### Proxy Check
 
-> **Not mounted.** Implemented in `auth/routes.py`; the backend mounts `auth/routes_simple.py`, which does not provide this endpoint.
+**Endpoint:** `GET /auth/verify`
 
-**Endpoint:** `POST /auth/mfa/verify`
-
-**Description:** Complete login with MFA code.
-
-**Request Body:**
-```json
-{
-  "temp_token": "temporary_token_from_login",
-  "code": "123456"  // TOTP code or backup code
-}
-```
-
-**Response:** `200 OK`
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "token_type": "bearer",
-  "user": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "username": "username",
-    "role": "user",
-    "mfa_enabled": true
-  }
-}
-```
-
-**Errors:**
-- `401 Unauthorized`: Invalid code or temp token
-- `400 Bad Request`: Backup code already used
-
----
-
-### Regenerate Backup Codes
-
-> **Not mounted.** Implemented in `auth/routes.py`; the backend mounts `auth/routes_simple.py`, which does not provide this endpoint.
-
-**Endpoint:** `POST /auth/mfa/regenerate-backup-codes`
-
-**Description:** Generate new set of backup codes (invalidates old ones).
-
-**Authentication:** Required
-
-**Request Body:**
-```json
-{
-  "code": "123456"  // Current TOTP code for verification
-}
-```
-
-**Response:** `200 OK`
-```json
-{
-  "backup_codes": [
-    "1234-5678",
-    "9012-3456",
-    ...  // 10 new codes
-  ]
-}
-```
-
----
-
-## Admin Endpoints
-
-**Role Required:** `ADMIN`
-
-### Reset User Password (Admin)
-
-> **Not mounted.** Implemented in `auth/routes.py`; the backend mounts `auth/routes_simple.py`, which does not provide this endpoint.
-
-**Endpoint:** `POST /auth/admin/reset-user-password`
-
-**Description:** Admin can reset any user's password (except other admins). Invalidates all user sessions.
-
-**Authentication:** Admin role required
-
-**Request Body:**
-```json
-{
-  "user_id": "uuid",
-  "new_password": "NewPassword123!"
-}
-```
-
-**Response:** `200 OK`
-```json
-{
-  "message": "Password reset successful for user username"
-}
-```
-
-**Errors:**
-- `403 Forbidden`: Cannot reset admin passwords or insufficient permissions
-- `404 Not Found`: User not found
-
----
-
-### Disable User MFA (Admin)
-
-> **Not mounted.** Implemented in `auth/routes.py`; the backend mounts `auth/routes_simple.py`, which does not provide this endpoint.
-
-**Endpoint:** `POST /auth/admin/disable-user-mfa`
-
-**Description:** Emergency MFA disable for locked-out users.
-
-**Authentication:** Admin role required
-
-**Request Body:**
-```json
-{
-  "user_id": "uuid"
-}
-```
-
-**Response:** `200 OK`
-```json
-{
-  "message": "MFA disabled for user username"
-}
-```
-
-**Errors:**
-- `400 Bad Request`: MFA not enabled for user
-- `404 Not Found`: User not found
-
----
-
-### Toggle User Account Status (Admin)
-
-> **Not mounted.** Implemented in `auth/routes.py`; the backend mounts `auth/routes_simple.py`, which does not provide this endpoint.
-
-**Endpoint:** `POST /auth/admin/toggle-user-status`
-
-**Description:** Enable or disable user account.
-
-**Authentication:** Admin role required
-
-**Request Body:**
-```json
-{
-  "user_id": "uuid",
-  "is_active": false  // true to enable, false to disable
-}
-```
-
-**Response:** `200 OK`
-```json
-{
-  "message": "User account disabled successfully"
-}
-```
-
-**Errors:**
-- `403 Forbidden`: Cannot disable admin accounts or insufficient permissions
-- `404 Not Found`: User not found
-
----
-
-### List All Users (Admin)
-
-> **Not mounted.** Implemented in `auth/routes.py`; the backend mounts `auth/routes_simple.py`, which does not provide this endpoint.
-
-**Endpoint:** `GET /auth/admin/users`
-
-**Description:** Get list of all users with security status.
-
-**Authentication:** Admin role required
+**Description:** The team server's proxy (Caddy's `forward_auth`) asks this before passing a request to Kibana, Splunk or the ATT&CK Navigator. `200` with `{"username"}` and an `X-Rowanholt-User` header for a signed-in user, `401` otherwise. No sign-in needed to ask.
 
 **Query Parameters:**
-- `role` (optional): Filter by role (user, admin, guest)
-- `active_only` (optional): Boolean, show only active users
+- `login_redirect` (bool): answer a caller who isn't signed in with a `302` to the sign-in page instead of `401`
+- `service`: `navigator` also checks the case behind a layer, from the URI in `X-Forwarded-Uri`; someone who can't see that case gets `403`
 
-**Response:** `200 OK`
-```json
-[
-  {
-    "id": "uuid",
-    "email": "user@example.com",
-    "username": "username",
-    "full_name": "John Doe",
-    "role": "user",
-    "is_active": true,
-    "mfa_enabled": false,
-    "created_at": "2025-01-15T10:00:00Z",
-    "last_login": "2025-01-15T12:00:00Z"
-  },
-  ...
-]
-```
+---
+
+### Single Sign-On
+
+**Endpoints:** `GET /auth/oidc/login`, `GET /auth/oidc/callback`
+
+**Description:** OpenID Connect, when configured ([SERVER.md](SERVER.md#single-sign-on)). `login` redirects to the identity provider (`404` when single sign-on isn't set up); the provider returns to `callback`, which sets the session cookie and redirects to `/login/sso`. A failure redirects to `/login?sso_error=<reason>`.
+
+---
+
+## API Tokens
+
+Long-lived, revocable tokens for scripts and Smith's MCP server, in place of a sign-in's 24-hour JWT (`auth/tokens.py`, table `api_tokens`). Team server only: locally these return `400`, since the API there needs none. A token is managed from a sign-in, never with a token: `/api/auth/tokens`, `/api/auth/session`, `/api/auth/users` and `/api/auth/change-password` refuse one (`403`).
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/auth/tokens?all=` | The caller's tokens, `{"tokens": [...]}`; with `all=true`, everyone's (admins; `403` otherwise) |
+| `POST` | `/api/auth/tokens` | `{"name": "...", "scope": "full", "days": 90}`: a new token for the caller. The response is the record plus `token`, shown this once (only its SHA-256 is kept). `name` 1–100 characters, `scope` `full` or `smith-mcp`, `days` 1–365 (`400` otherwise) |
+| `DELETE` | `/api/auth/tokens/{token_id}` | Revoke one of the caller's tokens (an admin, anyone's). Returns the record; `404` if there's no such token |
+
+A record has `id`, `user_id`, `username`, `name`, `prefix` (the first characters, to recognise it), `scope`, `created_at`, `expires_at`, `last_used_at` (written at most once a minute) and `revoked_at`. A token stops working when it's revoked, when it expires, or when its user is disabled or removed.
+
+**The `smith-mcp` scope** allows reads (GET, HEAD, OPTIONS), flagging leads and adding notes (`POST /api/jobs/{job_id}/case/findings` and `/notes`), and Smith's questions, which are POSTs that only read (`/api/ai/offline/answer`, `/api/ai/cases/{case_id}/query`, `/summary`, `/suggestions`); anything else is `403`, and so are the admin areas, even for an admin's token. Everything it writes is recorded as "Smith (for <user>)". The scope's names from before the analyst was renamed, `aule-mcp` and `eru-mcp`, are still accepted when a token is made (stored as `smith-mcp`) and read as `smith-mcp` wherever a scope is checked.
+
+A caller that sends `X-Rowanholt-Agent: smith-mcp` (or `aule-mcp`, `eru-mcp`, or the old header `X-Rivendell-Agent`) is treated as Smith on the case routes without such a token: its findings are leads only, and it can't change or remove findings or assign hosts (`403`). Online threat intelligence lookups are refused to both.
+
+---
+
+## Users
+
+| Method | Endpoint | Who | Description |
+|---|---|---|---|
+| `GET` | `/api/auth/directory` | Anyone signed in | Active users' `username` and `full_name`, for sharing a job |
+| `GET` | `/api/auth/users` | Admins | Every account, with the fields in [Login](#login) |
+| `POST` | `/api/auth/users` | Admins | `{"username", "email", "password", "full_name", "role"}`, validated as [Register](#register-new-user). `400` when the username or email is taken, `402` when the licence has no free place |
+| `PATCH` | `/api/auth/users/{user_id}` | Admins | Any of `role` (`admin` or `user`), `is_active`, `password`, `full_name`. The last active admin can't be demoted or disabled (`400`); re-enabling an account needs a free place (`402`); `404` for no such user |
+
+The same can be done from the host with `rowanholt server users` ([SERVER.md](SERVER.md#users)), which works when nobody can sign in.
 
 ---
 
@@ -549,7 +315,7 @@ There is no MFA step in the mounted auth router.
 
 **Description:** Create and queue a new forensic analysis job.
 
-**Authentication:** Not enforced in the current build (see [Authentication Status](#authentication-status))
+**Authentication:** In server mode, anyone signed in; the caller becomes the job's owner.
 
 **Request Body:**
 ```json
@@ -570,57 +336,42 @@ There is no MFA step in the mounted auth router.
 }
 ```
 
+`destination_path` is optional. `backup_password` (optional, Mobile jobs only) is an encrypted phone backup's password: it goes to the worker through Redis, expiring, and is never stored with the job.
+
 `options` maps onto Elrond's command line (`build_elrond_command` in `tasks_docker.py`). All are optional booleans unless shown otherwise:
 
 | Group | Fields |
 |---|---|
-| Source | `local` (default `true`; collect from images), `gandalf` (pre-collected Gandalf archives) |
+| Source | `local` (default `true`; collect from images), `gandalf` (pre-collected Gandalf archives), `network` (PCAPs, Zeek logs, NetFlow exports), `mobile` (phone backups and extractions) |
 | Modes | `brisk`, `mordor` |
 | Phases | `analysis`, `memory`, `memory_timeline`, `timeline` |
 | Collection | `vss`, `userprofiles`, `collectFiles` + `collectFiles_filter`, `collect_files_all`, `collect_files_archive`, `collect_files_bin`, `collect_files_docs`, `collect_files_hidden`, `collect_files_lnk`, `collect_files_mail`, `collect_files_scripts`, `collect_files_unalloc` (carving), `collect_files_virtual`, `collect_files_web` |
 | Detection | `extract_iocs` + `iocs_file` and `ioc_system_volume` (a macOS image's sealed system volume too: `--iocsSystemVolume` in [CLI.md](CLI.md)), `keywords` + `keywords_file`, `yara` + `yara_dir`, `misplaced_binaries`, `masquerading`, `clamav` |
 | Hashing | `hash_collected`, `hash_all`, `nsrl` |
-| Output | `splunk`, `elastic`, `navigator`, `archive`, `delete`, `save_template` |
+| Output | `splunk`, `elastic`, `opensearch`, `timesketch`, `navigator`, `threat_intel` (match the stored [threat intelligence](#threat-intelligence)), `archive`, `delete`, `save_template` |
 | Job control | `force_overwrite` (replace an existing output folder: see below), `debug` (verbose job log) |
 
 `replaces_output_of` and `output_marker` are the API's own: whatever a request sends is replaced.
 
 Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, which becomes `/tmp/elrond/output/…`. Host paths under `/Volumes` work because both containers mount `/Volumes` at the same path.
 
-**Paths.** Every source and the destination must be inside one of the allowed folders (this OS's defaults and `ROWANHOLT_EVIDENCE_PATHS`): a folder boundary, not a prefix (`/tmp/rowanholtX` isn't inside `/tmp/rowanholt`), with no `..` and no symbolic link below the allowed folder (`403` otherwise). A source may be a whole allowed folder; the destination may be neither an allowed folder nor above one. Without `destination_path`, the output goes beside the first source as before (`<folder>/<case>` for a folder, `<parent>/<case>` for a file or a Gandalf acquisitions folder), and that's checked the same way. The destination is refused (`409`) when it would hold evidence (any job's source), is where Elrond mounts images (`/mnt/elrond_mount*` and the like), or is at, in or around the output of a job that's still going.
+**Paths.** Every source and the destination must be inside one of the allowed folders (this OS's defaults and `ROWANHOLT_EVIDENCE_PATHS`): a folder boundary, not a prefix (`/tmp/rowanholtX` isn't inside `/tmp/rowanholt`), with no `..` and no symbolic link below the allowed folder (`403` otherwise). A source may be a whole allowed folder, and must exist (`400`); the destination may be neither an allowed folder nor above one. Without `destination_path`, the output goes beside the first source as before (`<folder>/<case>` for a folder, `<parent>/<case>` for a file or a Gandalf acquisitions folder), and that's checked the same way; with no sources either, it's `OUTPUT_DIR/<case>`. The destination is refused (`409`) when it would hold evidence (any job's source), is where Elrond mounts images (`/mnt/elrond_mount*` and the like), or is at, in or around the output of a job that's still going.
 
 **An output folder that's already there.** Without `force_overwrite`: `400` with `[Errno 17] File exists: '<path>'` (the web app then offers to overwrite). With it, the folder is replaced only if it's Rowanholt's output: the `.rowanholt-output` marker the worker writes when it creates a job's output folder, or, for output from before the marker (12 November 2026), the recorded output of an older job with its `rowanholt_job.log` in it. That job must be one the caller owns (or the caller an admin; only an admin for a job since deleted) and must not still be going. Anything else is never removed: `409` (not Rowanholt's, or still going) or `403` (someone else's), and the request is recorded in the audit log (`output.removal_requested`). The removal itself happens in the worker, which checks it all again first: see [Removing a job's old output](#removing-a-jobs-old-output).
 
-**Response:** `201 Created`
-```json
-{
-  "id": "uuid",
-  "case_number": "CASE-2025-001",
-  "source_paths": ["/evidence/disk.E01"],
-  "destination_path": "/output/CASE-2025-001",
-  "options": {},
-  "status": "pending",
-  "progress": 0,
-  "log": [],
-  "result": null,
-  "error": null,
-  "celery_task_id": "task-uuid",
-  "created_at": "2025-01-15T12:00:00Z",
-  "started_at": null,
-  "completed_at": null
-}
-```
+**Response:** `200 OK`, the job as in [Get Job Details](#get-job-details) (`"status": "pending"`, `"owner"` the caller, `"can_manage": true`).
 
 **Validation:**
-- `case_number`: Required, sanitized (alphanumeric, hyphens, underscores)
-- `source_paths`: Required, non-empty array, validated against allowed paths
-- `destination_path`: Required, validated path
-- `options`: Optional JSON object
+- `case_number`: required; `/` and `\` become `_` and `..` is dropped, then it must be 6–30 characters (`400`)
+- `source_paths`: required list; each inside the allowed folders (`403`) and existing (`400`)
+- `destination_path`: optional, checked as above
+- `backup_password`: only with `options.mobile` (`400`)
 
 **Errors:**
-- `400 Bad Request`: Validation error or invalid paths
-- `403 Forbidden`: Guest users cannot create jobs or access denied to path
-- `500 Internal Server Error`: Server error
+- `400 Bad Request`: as above, or the output folder exists without `force_overwrite`
+- `403 Forbidden`: a path outside the allowed folders, or an output folder the caller may not replace
+- `409 Conflict`: the destination would hold evidence, is a mount point, or is around a job that's still going; or the folder isn't Rowanholt's output
+- `500 Internal Server Error`: anything else, including a task that couldn't be queued (the job is failed with `Not queued: <error>`)
 
 ---
 
@@ -628,15 +379,13 @@ Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, whic
 
 **Endpoint:** `GET /api/jobs`
 
-**Description:** List all jobs. Jobs are not filtered by user in the current build.
-
-**Authentication:** Not enforced in the current build (see [Authentication Status](#authentication-status))
+**Description:** The jobs the caller can see: in server mode their own, the ones shared with them, and every job for an admin; every job in local mode.
 
 **Query Parameters:**
-- `status` (optional): Filter by status (pending, running, paused, awaiting_confirmation, removing, completed, failed, cancelled, archived)
-- `limit` (optional): Number of results (default: 50, max: 100)
-- `offset` (optional): Pagination offset (default: 0)
-- `case_number` (optional): Filter by case number
+- `status` (optional): one of pending, running, paused, awaiting_confirmation, removing, completed, failed, cancelled, archived
+- `limit` (optional): 1–100, default 50
+- `offset` (optional): default 0
+- `log_limit` (optional): log lines kept per job, the newest (default 10; 0 for all)
 
 **Response:** `200 OK`
 ```json
@@ -647,21 +396,20 @@ Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, whic
       "case_number": "CASE-2025-001",
       "status": "completed",
       "progress": 100,
-      "created_at": "2025-01-15T12:00:00Z",
-      "completed_at": "2025-01-15T13:00:00Z",
+      "created_at": "2025-01-15T12:00:00",
+      "completed_at": "2025-01-15T13:00:00",
       "owner": "alice",
       "shared_with": ["bob"],
       "can_manage": true
-    },
-    ...
+    }
   ],
-  "total": 150,
-  "limit": 50,
-  "offset": 0
+  "total": 150
 }
 ```
 
-`owner` and `shared_with` come from the job's sharing (server mode). `can_manage` says whether the caller may do the owner's things to the job: cancel, pause, resume, delete, archive, unarchive, restart with fresh output, change its sharing, and confirm or give up a failed removal. It's `true` for the owner and for admins, `false` for the people the job is only shared with (who may see it, restart it with `fresh=false`, export it and ask Smith), and always `true` in local mode. It's per caller and never stored. The web app uses it to offer only the actions the server would allow; the server still refuses the rest with `403`. `GET /api/jobs/{job_id}`, `PATCH /api/jobs/{job_id}` and `GET /api/jobs/{job_id}/sharing` return it too.
+Each job has every field in [Get Job Details](#get-job-details) (shortened here). `total` counts the caller's jobs with that status.
+
+`owner` and `shared_with` come from the job's sharing (server mode). `can_manage` says whether the caller may do the owner's things to the job: cancel, pause, resume, delete, archive, unarchive, restart with fresh output, add a note, change its sharing, and confirm or give up a failed removal. It's `true` for the owner and for admins, `false` for the people the job is only shared with (who may see it, restart it with `fresh=false`, export it and ask Smith), and always `true` in local mode. It's per caller and never stored. The web app uses it to offer only the actions the server would allow; the server still refuses the rest with `403`. `GET /api/jobs/{job_id}`, `PATCH /api/jobs/{job_id}` and `GET /api/jobs/{job_id}/sharing` return it too.
 
 ---
 
@@ -671,10 +419,13 @@ Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, whic
 
 **Description:** Retrieve detailed information about a specific job.
 
-**Authentication:** Not enforced in the current build (see [Authentication Status](#authentication-status))
+**Authentication:** Whoever can see the job (see [Authentication Status](#authentication-status)).
 
 **Path Parameters:**
 - `job_id`: UUID of the job
+
+**Query Parameters:**
+- `log_limit` (optional): log lines returned, the newest (default 100; 0 for all). A long job's log runs to tens of thousands of lines
 
 **Response:** `200 OK`
 ```json
@@ -687,14 +438,15 @@ Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, whic
   "status": "running",
   "progress": 45,
   "log": [
-    {"timestamp": "2025-01-15T12:00:00Z", "level": "INFO", "message": "Job started"},
-    {"timestamp": "2025-01-15T12:15:00Z", "level": "INFO", "message": "Processing artifacts..."}
+    "[2025-01-15T12:00:00] Job started",
+    "[2025-01-15T12:15:00] Processing artefacts..."
   ],
   "result": null,
   "error": null,
   "celery_task_id": "task-uuid",
-  "created_at": "2025-01-15T12:00:00Z",
-  "started_at": "2025-01-15T12:00:01Z",
+  "pending_action": null,
+  "created_at": "2025-01-15T12:00:00",
+  "started_at": "2025-01-15T12:00:01",
   "completed_at": null,
   "owner": "alice",
   "shared_with": ["bob"],
@@ -702,7 +454,7 @@ Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, whic
 }
 ```
 
-`can_manage`: as in [List Jobs](#list-jobs).
+`log` is a list of strings. `options` has every field listed under [Create Job](#create-job). `pending_action` is set only while the job is `awaiting_confirmation` ([Removing a job's old output](#removing-a-jobs-old-output)). `can_manage`: as in [List Jobs](#list-jobs).
 
 **Errors:**
 - `404 Not Found`: Job not found or unauthorized access
@@ -734,9 +486,9 @@ Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, whic
 
 **Endpoint:** `DELETE /api/jobs/{job_id}`
 
-**Description:** Permanently delete a job. Cannot delete pending or running jobs (cancel first).
+**Description:** Delete a job's record, with its owner and sharing. Nothing on disk is removed: its evidence and its output folder stay where they are. The case's findings, notes, host assignments and activity stay in the database but can no longer be reached through the API. A pending, running, paused or removing job can't be deleted (cancel it first).
 
-**Authentication:** Not enforced in the current build (see [Authentication Status](#authentication-status))
+**Authentication:** In server mode, the job's owner or an admin.
 
 **Path Parameters:**
 - `job_id`: UUID of the job
@@ -747,7 +499,8 @@ Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, whic
 ```
 
 **Errors:**
-- `400 Bad Request`: Cannot delete running job
+- `400 Bad Request`: the job is pending, running, paused or removing
+- `403 Forbidden`: not the job's owner or an admin
 - `404 Not Found`: Job not found
 
 ---
@@ -772,6 +525,24 @@ The job is marked cancelled first (the status, `completed_at` and a log line, in
 - `403 Forbidden`: Not the job's owner or an admin
 - `404 Not Found`: Job not found
 - `409 Conflict`: The job finished or failed before the cancel; `detail` says which (`The job is already completed: it ended before the cancel`)
+
+---
+
+### Pause and Resume Job
+
+**Endpoints:** `POST /api/jobs/{job_id}/pause`, `POST /api/jobs/{job_id}/resume`
+
+**Description:** `pause` sends `SIGSTOP` to a running job's Elrond process group and sets it `paused`; `resume` sends `SIGCONT` and sets it `running` again. Image mounts and the image lock stay held while it's paused, and Elrond's wall-clock timeouts keep counting, so a tool call paused for longer than its timeout fails on resume. The worker writes the event to the job's log.
+
+**Authentication:** In server mode, the job's owner or an admin.
+
+**Response:** `200 OK` with the job.
+
+**Errors:**
+- `400 Bad Request`: the job isn't running (pause) or paused (resume)
+- `403 Forbidden`: Not the job's owner or an admin
+- `404 Not Found`: Job not found
+- `409 Conflict`: the signal couldn't be sent (`Could not pause job: <reason>`)
 
 ---
 
@@ -827,7 +598,7 @@ It's deleted without following symbolic links or crossing onto another device, a
 
 **Description:** Restart a failed, cancelled or completed job. Creates new Celery task. A job with findings is refused unless the request confirms, since the re-run rewrites the rows they point at.
 
-**Authentication:** Not enforced in the current build (see [Authentication Status](#authentication-status))
+**Authentication:** Whoever can see the job. With fresh output (`fresh=true`, the default for a completed job), only the job's owner or an admin, since it removes their output.
 
 **Path Parameters:**
 - `job_id`: UUID of the job
@@ -836,20 +607,14 @@ It's deleted without following symbolic links or crossing onto another device, a
 - `confirm` (bool, default `false`): restart even though the job has findings
 - `fresh` (bool, default `true` for a completed job, `false` for a failed or cancelled one): remove the job's output first. Elrond skips any artefact whose cooked file is already there, so a completed job re-run into its old output comes out unchanged. The worker never removes an output directory that holds one of the job's sources
 
-**Response:** `200 OK`
-```json
-{
-  "id": "uuid",
-  "status": "pending",
-  "celery_task_id": "new-task-uuid",
-  "message": "Job restarted successfully"
-}
-```
+**Response:** `200 OK` with the job, `"status": "pending"` and its new `celery_task_id`.
 
 **Errors:**
 - `400 Bad Request`: Job not in failed/cancelled/completed state
+- `403 Forbidden`: a fresh restart by someone who isn't the job's owner or an admin, or a job whose recorded output folder is no longer inside the allowed folders
 - `404 Not Found`: Job not found
 - `409 Conflict`: The job has findings and `confirm` wasn't set; `detail` is `{"findings": 3, "message": "..."}`
+- `500 Internal Server Error`: the task couldn't be queued (the job is failed with `Not queued: <error>`)
 
 ---
 
@@ -857,25 +622,18 @@ It's deleted without following symbolic links or crossing onto another device, a
 
 **Endpoint:** `POST /api/jobs/{job_id}/archive`
 
-**Description:** Archive a completed or failed job. Preserves original status for restoration.
+**Description:** Set a job `archived`, with a line in its log. Nothing else changes: the previous status isn't kept, and [Unarchive](#unarchive-job) works it out again.
 
-**Authentication:** Not enforced in the current build (see [Authentication Status](#authentication-status))
+**Authentication:** In server mode, the job's owner or an admin.
 
 **Path Parameters:**
 - `job_id`: UUID of the job
 
-**Response:** `200 OK`
-```json
-{
-  "id": "uuid",
-  "status": "archived",
-  "archived_at": "2025-01-15T15:00:00Z",
-  "message": "Job archived successfully"
-}
-```
+**Response:** `200 OK` with the job, `"status": "archived"`.
 
 **Errors:**
-- `400 Bad Request`: Cannot archive running jobs
+- `400 Bad Request`: the job is pending, running, paused or removing, or already archived
+- `403 Forbidden`: Not the job's owner or an admin
 - `404 Not Found`: Job not found
 
 ---
@@ -884,25 +642,18 @@ It's deleted without following symbolic links or crossing onto another device, a
 
 **Endpoint:** `POST /api/jobs/{job_id}/unarchive`
 
-**Description:** Restore archived job to original status (completed/failed).
+**Description:** Restore an archived job: to `failed` if it has an error, `completed` if it has a completion time, `cancelled` if it has neither.
 
-**Authentication:** Not enforced in the current build (see [Authentication Status](#authentication-status))
+**Authentication:** In server mode, the job's owner or an admin.
 
 **Path Parameters:**
 - `job_id`: UUID of the job
 
-**Response:** `200 OK`
-```json
-{
-  "id": "uuid",
-  "status": "completed",  // Restored to original status
-  "archived_at": null,
-  "message": "Job restored successfully"
-}
-```
+**Response:** `200 OK` with the job (with `owner`, `shared_with` and `can_manage`).
 
 **Errors:**
-- `400 Bad Request`: Job not archived
+- `400 Bad Request`: Job is not archived
+- `403 Forbidden`: `Only the job's owner or an admin can restore it from the archive`
 - `404 Not Found`: Job not found
 
 ---
@@ -911,7 +662,7 @@ It's deleted without following symbolic links or crossing onto another device, a
 
 **Endpoint:** `POST /api/jobs/bulk/restart`
 
-**Description:** Restart failed, cancelled or completed jobs. Takes a bare JSON array of job IDs and returns a result per job. Without `confirm=true`, a job with findings is skipped: its result has `success: false`, the reason in `error` and the count in `findings`.
+**Description:** Restart failed, cancelled or completed jobs. Takes a bare JSON array of job IDs and returns `{"results": [...]}`, one `{"job_id", "success", "error"}` per job. Without `confirm=true`, a job with findings is skipped: its result has `success: false`, the reason in `error` and the count in `findings`. A fresh restart is the owner's or an admin's, job by job, as for a single restart; a job the caller can't see comes back `Job not found`.
 
 **Query Parameters:**
 - `fresh` (bool, default `true` for completed jobs, `false` for failed or cancelled ones): remove each job's previous output before it runs again
@@ -923,15 +674,24 @@ It's deleted without following symbolic links or crossing onto another device, a
 
 **Endpoint:** `POST /api/jobs/{job_id}/export-siem`
 
-**Description:** Run, or re-run, the SIEM export for a completed job.
+**Description:** Run, or re-run, the SIEM export for a completed job that has `splunk`, `elastic` or `navigator` set, into its output folder. It runs to the end before answering (minutes, in the thread pool) and writes its start and end to the job's log. Whoever can see the job may.
+
+**Response:** `200 OK`, `{"success": true, "message": "SIEM export completed successfully"}`
+
+**Errors:**
+- `400 Bad Request`: the job isn't completed, has no SIEM option, or its output folder is unknown or gone
+- `404 Not Found`: Job not found
+- `500 Internal Server Error`: the export failed (also written to the job's log)
+
+> In this build the route answers `500` before it starts: it imports `run_siem_export` with a relative import (`from .tasks import`), which fails when the backend runs as `uvicorn main:app`, as its image and `docker-compose.yml` start it.
 
 ---
 
 ### Get Navigator Layer
 
-**Endpoint:** `GET /api/jobs/{job_id}/navigator`
+**Endpoint:** `GET /api/jobs/{job_id}/navigator?domain=`
 
-**Description:** Download the job's MITRE ATT&CK Navigator JSON layer.
+**Description:** Download the job's MITRE ATT&CK Navigator layer, found in its output: `domain` is `enterprise-attack` (`<case>_navigator.json`) or `mobile-attack` (`<case>_mobile_navigator.json`); without it, Enterprise when the case has one, else Mobile. `404` when there's no output folder or no layer. The layer of confirmed findings only is [`/case/layer`](#case-browser-and-collaboration).
 
 ---
 
@@ -939,11 +699,11 @@ It's deleted without following symbolic links or crossing onto another device, a
 
 **Endpoint:** `GET /api/validate/case-id/{case_id}`
 
-**Description:** Check whether a case ID is already in use.
+**Description:** Check whether a case ID is already in use. Case numbers name output folders, so `exists` counts every job's, whoever owns it; `jobs` lists only the ones the caller can see.
 
 **Response:** `200 OK`
 ```json
-{"exists": true, "jobs": ["uuid1"]}
+{"exists": true, "case_id": "CASE-001", "jobs": [{"id": "uuid1", "status": "completed", "created_at": "2025-01-15T12:00:00"}]}
 ```
 
 ---
@@ -952,20 +712,23 @@ It's deleted without following symbolic links or crossing onto another device, a
 
 **Endpoints:** `POST /api/check-required-files`, `POST /api/upload-required-files`
 
-**Description:** Keyword, YARA and collect-files options need input files. `check-required-files` takes `{"options": ["keywords", "yara", "collectFiles"]}` and returns `{"missing": [...], "found": [...]}`. `upload-required-files` takes multipart fields `keywords`, `yara` and `collectFiles`.
+**Description:** Keyword, YARA and collect-files options read their input from fixed files in `/tmp/rowanholt` (`%TEMP%\rowanholt` on Windows): `keywords.txt`, `yara.yar` and `files.txt`. `check-required-files` takes `{"options": ["keywords", "yara", "collectFiles"]}` and returns `{"missing": [...], "found": [...], "directory": "/tmp/rowanholt"}` (a file counts when it isn't empty). `upload-required-files` takes multipart fields `keywords`, `yara` and `collectFiles`, overwrites those files, and returns `{"success": true, "uploaded": [{"option", "filename", "path", "size"}], "directory"}`. In server mode, anyone signed in.
 
 ---
 
-### Bulk Cancel Jobs
+### Job Sharing
 
-**Endpoint:** `POST /api/jobs/bulk/cancel`
+**Endpoints:** `GET /api/jobs/{job_id}/sharing`, `PUT /api/jobs/{job_id}/sharing`
 
-**Description:** Cancel multiple jobs at once.
+**Description:** Who owns a job and who it's shared with. `GET` (whoever can see the job) returns `{"owner", "shared_with", "can_manage"}`. `PUT` (the owner or an admin; `403` otherwise) takes `{"usernames": ["bob", "carol"]}`, which replaces the list, and returns the same shape; `400` names any that isn't an active user. The people a job is shared with can see it and work on its case; see [SERVER.md](SERVER.md#sharing-jobs).
 
-**Authentication:** In server mode, each job is cancelled only for its owner or an admin; any other comes back with `success: false` and the reason.
+---
 
-**Request Body:**
-A bare JSON array of job IDs:
+### Bulk Actions
+
+**Endpoints:** `POST /api/jobs/bulk/cancel`, `/bulk/delete`, `/bulk/archive`, `/bulk/unarchive` (and [`/bulk/restart`](#bulk-restart-jobs))
+
+**Description:** The single-job action for each of several jobs, with the same rules job by job. The body is a bare JSON array of job IDs:
 
 ```json
 ["uuid1", "uuid2", "uuid3"]
@@ -982,59 +745,12 @@ A bare JSON array of job IDs:
 }
 ```
 
-Each job is cancelled as with the single cancel: marked first, then stopped; a job that had already finished or failed is left alone, not stopped, and reported with `success: false`.
+A job the caller can't see comes back `Job not found`; one they see but don't manage, with the owner-or-admin refusal (for unarchive, `Only the job's owner or an admin can restore it from the archive`). Otherwise:
 
----
-
-### Bulk Delete Jobs
-
-**Endpoint:** `POST /api/jobs/bulk/delete`
-
-**Description:** Delete multiple jobs at once.
-
-**Authentication:** Not enforced in the current build (see [Authentication Status](#authentication-status))
-
-**Request Body:**
-A bare JSON array of job IDs:
-
-```json
-["uuid1", "uuid2", "uuid3"]
-```
-
-**Response:** `200 OK`
-```json
-{
-  "deleted": 3,
-  "failed": 0,
-  "errors": []
-}
-```
-
----
-
-### Bulk Archive Jobs
-
-**Endpoint:** `POST /api/jobs/bulk/archive`
-
-**Description:** Archive multiple jobs at once.
-
-**Authentication:** Not enforced in the current build (see [Authentication Status](#authentication-status))
-
-**Request Body:**
-A bare JSON array of job IDs:
-
-```json
-["uuid1", "uuid2", "uuid3"]
-```
-
-**Response:** `200 OK`
-```json
-{
-  "archived": 3,
-  "failed": 0,
-  "errors": []
-}
-```
+- **cancel**: as the single cancel, marked first, then stopped; a job that had already finished or failed is left alone, not stopped, and reported with `success: false`
+- **delete**: as the single delete, nothing on disk removed; `Cannot delete running job` for a pending, running, paused or removing one
+- **archive**: `Cannot archive running job` for a pending, running, paused or removing one; `Already archived`
+- **unarchive**: `Job is not archived`; on success the result's `status` is the status restored
 
 ---
 
@@ -1044,48 +760,76 @@ A bare JSON array of job IDs:
 
 **Endpoint:** `GET /api/fs/browse`
 
-**Description:** Browse server filesystem (limited to configured allowed paths).
+**Description:** List a folder on the backend, for choosing images. The path is resolved and must start with one of the allowed folders (a prefix match, unlike the folder-boundary check job paths get). macOS metadata files (`._*`, `.DS_Store`) are left out; entries that can't be read are skipped and counted.
 
-**Authentication:** Not enforced in the current build (see [Authentication Status](#authentication-status))
+**Authentication:** In server mode, anyone signed in.
 
 **Query Parameters:**
-- `path` (optional): Path to browse (default: "/")
+- `path` (optional): folder to list (default `/`, which is refused unless it's an allowed folder)
 
 **Response:** `200 OK`
 ```json
-[
-  {
-    "name": "evidence",
-    "path": "/evidence",
-    "type": "directory",
-    "size": null,
-    "modified": "2025-01-15T10:00:00Z"
-  },
-  {
-    "name": "disk.E01",
-    "path": "/evidence/disk.E01",
-    "type": "file",
-    "size": 10737418240,
-    "modified": "2025-01-15T09:00:00Z"
-  }
-]
+{
+  "items": [
+    {"name": "..", "path": "/evidence", "is_directory": true, "size": null, "modified": null, "is_image": false},
+    {"name": "cases", "path": "/evidence/cases", "is_directory": true, "size": null, "modified": "2025-01-15T10:00:00", "is_image": false},
+    {"name": "disk.E01", "path": "/evidence/disk.E01", "is_directory": false, "size": 10737418240, "modified": "2025-01-15T09:00:00", "is_image": true}
+  ],
+  "current_path": "/evidence",
+  "permission_warning": null,
+  "skipped_count": 0
+}
 ```
 
+Folders come first, then files, by name; `..` leads when there's a parent. `is_image` marks `.e01`, `.ex01`, `.raw`, `.dd`, `.img`, `.bin`, `.vmdk`, `.vhd`, `.vhdx`, `.mem`, `.dmp` and `.lime`. `permission_warning` explains macOS's Full Disk Access when Docker couldn't read something.
+
 **Errors:**
-- `403 Forbidden`: Access denied to path
+- `400 Bad Request`: not a folder
+- `403 Forbidden`: outside the allowed folders, or permission denied
 - `404 Not Found`: Path does not exist
+
+---
+
+## Administration (Aragorn)
+
+**Role Required:** `ADMIN` (the local analyst on a local stack). These back Aragorn's pages in the web app.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/licence` | The edition, `state` (`free`, `pending`, `active`, `grace`, `lapsed`), licensee, seats, features, `places_held`, `free_seats`, dates, the terms version an install accepts now, and who accepted the installed one |
+| `GET` | `/api/licence/terms` | The commercial terms: `{"version", "text"}` |
+| `POST` | `/api/licence/check` | `{"text"}`: what a licence says, installing nothing. `422` for one that doesn't verify or has run out |
+| `PUT` | `/api/licence` | `{"text", "accept_terms": true, "terms_version"}`: install it. `422` without acceptance, `409` when the terms have changed since the admin read them |
+| `DELETE` | `/api/licence` | Back to the Free edition (nobody is deactivated) |
+| `GET` `POST` | `/api/brands` | Report brands, the installation's and each case's choice, and what the licence does with them; `POST` `{"name", "primary": "#RRGGBB", "secondary", "prepared_for"}` |
+| `PATCH` `DELETE` | `/api/brands/{brand_id}` | Change or remove a brand (`404` for none) |
+| `PUT` `GET` `DELETE` | `/api/brands/{brand_id}/logos/{slot}` | A logo for `cover`, `header` or `client`: multipart `file`, cleaned and redrawn as PNG; `GET` returns that PNG |
+| `PUT` | `/api/brands/installation` | `{"brand_id"}` (or `null`): the installation's brand |
+| `GET` `PUT` | `/api/jobs/{job_id}/case/brand` | The brand of a job's case number, `{"brand_id"}` |
+| `GET` `POST` | `/api/webhooks` | `events`, the webhooks (`has_secret`, never the secret), and `sending` with `reason`; `POST` `{"url", "events", "secret", "description"}`, the secret generated when not given and returned this once. `422` for a URL or event refused |
+| `PATCH` `DELETE` | `/api/webhooks/{hook_id}` | Change `url`, `events`, `enabled` or `description`, or remove it |
+| `POST` | `/api/webhooks/{hook_id}/test` | Send a test `job.completed` now and return the delivery; `402` when this edition doesn't send webhooks |
+| `GET` | `/api/symbols` | Volatility symbol tables for Linux and macOS, with their kernel banners and the folders' audit log |
+| `POST` | `/api/symbols/add` | Multipart `kind` (`package`, `table`, `vmlinux` or `kdk`), `file`, and `system_map` or `dwarf` where the kind needs one; built in the worker. Returns `{"task_id"}` |
+| `GET` | `/api/symbols/tasks/{task_id}` | `{"state": "pending"}`, then `done` with the build's output |
+| `GET` | `/api/samples` | The sample cases (public forensic images): their files' state and, once there, the job to start |
+| `POST` | `/api/samples/{sample_id}/fetch` | Download, check and unpack one in the worker: `{"task_id"}`. `409` for a sample that's built locally, not downloaded |
+| `GET` | `/api/samples/tasks/{task_id}` | `running` with progress, then `done` |
+| `POST` | `/api/samples/{sample_id}/import` | The job request for a fetched sample (backup password included), for the caller to `POST` to `/api/jobs` so the job is theirs. `409` until it's fetched or built |
+
+Every licence, brand and webhook change goes in the audit log. Editions, events, signing and the URL rules are in [LICENSING_MODEL.md](LICENSING_MODEL.md#rowanholts-split). `/api/symbols` and `/api/samples` answer `503` when Elrond's package isn't mounted in the backend, or the worker's queue isn't available.
 
 ---
 
 ## Docker Administration (Anduril)
 
-**Role Required:** `ADMIN` (except `/status`)
+**Role Required:** `ADMIN`, signed in with a password or single sign-on (a sign-in's JWT, by cookie or bearer; not an API token), locally as well as on a team server. `/status` needs nothing locally and an admin on a team server. `/api/aragorn/…`, the name before the rename, answers the same.
 
 Anduril manages Rowanholt's own containers and images. The backend doesn't hold the Docker socket: these endpoints proxy to the `anduril` service over the internal `rowanholt-anduril` network. Anduril only acts on containers that carry the `com.docker.compose.project=rowanholt` label and are named `rowanholt-*`, and on the images those containers use; anything else returns `403`. The API is off (`503`) until Anduril is enabled on the host with `rowanholt anduril enable`, and it stays off while the backend uses the default `SECRET_KEY`.
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/anduril/status` | Whether Anduril is usable. No authentication; returns `enabled`, `reason` (`secret_key`, `not_enabled`, `unreachable`) and `enable_command` |
+| `GET` | `/api/anduril/status` | Whether Anduril is usable: `enabled`, `secret_configured`, `token_present`, `reachable`, `reason` (`secret_key`, `not_enabled`, `unreachable`, `error`) and `enable_command` |
 | `GET` | `/api/anduril/containers` | Rowanholt containers: name, service, image, state, health, upstream or built image |
 | `GET` | `/api/anduril/images` | Rowanholt images: tags, size, whether built locally, which containers use them |
 | `GET` | `/api/anduril/containers/{name}/logs?tail=200` | Last `tail` log lines (1–5000) |
@@ -1116,7 +860,7 @@ Anduril won't stop, restart or recreate its own container from the API. Use `row
 
 ## Mordor: Recorded Attack Telemetry
 
-**Authentication:** none to read; `ADMIN` for Update and the lab
+**Authentication:** locally, none, apart from Update and the lab, which need a signed-in admin (as [Lab](#lab)). On a team server, anyone signed in may read (GET); everything else under `/api/mordor` is admin-only, `/check` and `/noisy` included, as are dataset downloads and deletion
 
 Which logs record each ATT&CK technique, from attacks emulated in labs, and whether a detection's indicators appear in the recorded events. The engine is `src/mordor/telemetry`, ported from Archer. It ships with 1,632 recordings covering 354 techniques: OTRF Security-Datasets (Mordor), Splunk attack_data and EVTX-to-MITRE-Attack. Your own recordings from `./lab.sh mordor-record` or the Mordor page show up as the source `lab`, and Microsoft GUIDE adds Defender XDR's alerting per technique. Reading touches no network. A rebuild from the CLI (`python -m src.mordor.telemetry --build`) or the lab is picked up on the next request.
 
@@ -1145,9 +889,23 @@ A detection for `/check`:
 
 Indicator kinds are `cmd`, `file`, `sw`, `path`, `reg`, `network`, `domain`, `ip`, `port`, `service`, `acct`, `evt`, `api` and `op`/`operation`.
 
+### Mordor Datasets
+
+OTRF Security-Datasets (Mordor) to download as evidence (`mordor_routes.py`).
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/mordor/catalog?platform=&tactic=&technique=&search=&limit=&offset=` | The OTRF catalogue (`limit` up to 200), each with `status` `available` or `downloaded`: `{"datasets", "total", "platforms", "tactics"}` |
+| `POST` | `/api/mordor/catalog/refresh?force=` | Re-read the catalogue from OTRF's GitHub repository |
+| `GET` | `/api/mordor/datasets?status=&limit=&offset=` | The datasets downloaded here, in the same shape |
+| `GET` | `/api/mordor/datasets/{dataset_id}` | One dataset, its files and where it's stored |
+| `POST` | `/api/mordor/datasets/{dataset_id}/download` | `{"output_dir": null}`: download in the background (`status` `downloading`, or `downloaded` when it's there already). Counts as busy for `/api/busy` while it runs |
+| `DELETE` | `/api/mordor/datasets/{dataset_id}` | Remove a downloaded dataset |
+| `GET` | `/api/mordor/datasets/{dataset_id}/verify` | Check its files: `valid`, `files_checked`, `total_files`, `errors` |
+
 ### Mordor Lab
 
-**Role Required:** `ADMIN`
+**Role Required:** `ADMIN`, signed in (a sign-in's JWT, not an API token), locally as well as on a team server
 
 The machines recordings run on (`src/mordor/lab`, ported from Archer). Docker, Tart and UTM are on the host, so these proxy to the lab agent (`./lab.sh agent start`) and return `503` without it. Machine and snapshot names are 1–64 letters, digits, `.`, `-` or `_`.
 
@@ -1170,7 +928,7 @@ A job returns `202` with a lab run (`id`, `label`, `status`); poll `/api/lab/run
 
 ## Threat Intelligence
 
-**Authentication:** none to read; `ADMIN` to import, pull or delete on a team server
+**Authentication:** none locally. On a team server, anyone signed in may read and make an online lookup; importing, pulling, changing expiry and deleting are admin-only
 
 The indicators in `threat_intel_indicators`, in the fixed ten-column schema (Evidential Element, Threat Group, Procedure Example, Technique ID, Technique Name, Tactic, Contextual Evidence, Reference URL, Navigation Layer URL, Source Type). Parsing and matching are Elrond's (`src/analysis/rowanholt/threat_intel/`); the backend mounts that package. A job with `"threat_intel": true` exports them for Elrond's `--threatIntel`.
 
@@ -1192,7 +950,7 @@ The indicators in `threat_intel_indicators`, in the fixed ten-column schema (Evi
 
 ## Case Browser and Collaboration
 
-**Authentication:** whoever can see the job (its owner, the people it's shared with, admins); everyone in local mode
+**Authentication:** whoever can see the job (its owner, the people it's shared with, admins); everyone in local mode. Smith (a `smith-mcp` token, or the `X-Rowanholt-Agent` header: [API Tokens](#api-tokens)) may read, flag leads and add notes, recorded as "Smith (for <user>)"; it can't confirm or dismiss, change or remove a finding, or assign a host (`403`)
 
 A job's output, read-only, and the team's findings, notes, host assignments and activity on it (`case_routes.py`, `case_files.py`). Only `<host>/artefacts/cooked/`, `<host>/analysis/` and the case's top-level CSVs are readable; `raw/` never is, and nothing writes to the case directory. Findings reference a row by file, row (`2` onwards for a CSV line, `#0` onwards for a JSON record) and the SHA-256 of the row, so a re-run that changes it shows up.
 
@@ -1200,23 +958,26 @@ A job's output, read-only, and the team's findings, notes, host assignments and 
 |---|---|---|
 | `GET` | `/api/jobs/{job_id}/case` | `hosts` (each with `files`, `assignee`, `status`), `case_files`, and `findings` counted by status. `404` until the job has output |
 | `GET` | `/api/jobs/{job_id}/case/rows?host=&path=&q=&offset=&limit=` | Rows of one table containing `q` in any field: `columns`, `rows` (`ref`, `hash`, `cells`), `total`, and `exact` (false when the count stopped early). `host` is `(case)` for the case's own files |
+| `GET` | `/api/jobs/{job_id}/case/rows.csv?host=&path=&q=` | The same table (its rows containing `q`) as a CSV download, named after the host and table |
 | `GET` | `/api/jobs/{job_id}/case/findings?status=&verify=` | Findings; with `verify=true`, `intact` says whether each row still hashes the same |
 | `POST` | `/api/jobs/{job_id}/case/findings` | `{"host", "artefact", "row_ref", "title", "technique", "status"}`; the row is read server-side for its hash and excerpt. `status` is `lead` (default), `confirmed` or `benign`; `technique` an ATT&CK ID. `409` if the row is already flagged |
 | `PATCH` | `/api/jobs/{job_id}/case/findings/{id}` | Change `title`, `technique` or `status`; pass the `updated_at` you loaded and a change someone else made first returns `409` instead of being overwritten |
-| `DELETE` | `/api/jobs/{job_id}/case/findings/{id}` | Remove a finding and its notes |
+| `DELETE` | `/api/jobs/{job_id}/case/findings/{id}` | Remove a finding and its notes (anyone who can see the job, as for the other case routes) |
 | `GET` `POST` | `/api/jobs/{job_id}/case/notes` | Notes, Markdown: `{"body", "finding_id"}`, `finding_id` null for the case |
 | `PUT` | `/api/jobs/{job_id}/case/hosts/{host}` | `{"assignee", "status"}`; status is `to do`, `in progress` or `done`. In server mode the assignee must be an active user (username or email, stored as the username), otherwise `400`; `""` unassigns |
 | `GET` | `/api/jobs/{job_id}/case/activity?since=` | Who did what, newest first; `since` (the highest `id` seen) for polling |
 | `WS` | `/api/jobs/{job_id}/case/live` | Sends `{activity, status, progress}` when any of them changes (checked every 2 seconds): the newest activity id and the job's state, so a page knows when to reload; no case data. Authenticated like the routes above, by the session cookie or a bearer header (never a token in the URL), and checked again before each check, so signing out or losing the share closes it (code 1008); refused from a page on an origin the backend doesn't serve |
 | `GET` | `/api/jobs/{job_id}/case/report` | Markdown: case notes, then confirmed findings by host with their notes (the case browser's **Findings**) |
 | `GET` | `/api/jobs/{job_id}/case/full-report?format=docx\|markdown` | The case report as a download (DOCX by default): case notes and confirmed findings, each with its row and whether the row is unchanged; Appendix A, open leads and dismissed rows; Appendix B, Elrond's report from the case (hosts and timespan, techniques with their rows, indicators, Gandalf's integrity check, method; [CLI.md](CLI.md#case-report)). Read-only over the case; the case's reading is kept until its files change, since the first download of a large case reads all its tables. Recorded in the activity feed. `503` if Elrond's `rowanholt/report` isn't mounted |
-| `GET` | `/api/jobs/{job_id}/case/layer` | An ATT&CK Navigator layer of confirmed findings' techniques only |
+| `GET` | `/api/jobs/{job_id}/case/layer?domain=` | An ATT&CK Navigator layer of confirmed findings' techniques only; `domain` `enterprise-attack` or `mobile-attack` |
+
+A case's report brand (`/api/jobs/{job_id}/case/brand`) is an admin's: see [Administration](#administration-aragorn).
 
 ---
 
 ## Smith (AI Analyst)
 
-**Authentication:** none
+**Authentication:** none locally. On a team server, anyone signed in, over the cases behind jobs they can see (`404` for another case); case folders in Smith's data directory with no job behind them are admins'. A `smith-mcp` token may call the GETs and the question POSTs (`/offline/answer`, `/query`, `/summary`, `/suggestions`), not `/chat`
 
 Ask Smith's back end. Free-text answers come from Ollama at `OLLAMA_HOST` (default `http://host.docker.internal:11434`) with the model `ROWANHOLT_MODEL_NAME` (default `llama3.2:3b`) and a `ROWANHOLT_NUM_CTX`-token window (default 8192). Without them, `/status` says why and the offline endpoints answer fixed questions from Elrond's output.
 
@@ -1238,13 +999,13 @@ The LLM endpoints return `503` when Ollama or the model isn't available.
 
 ## Lab
 
-**Role Required:** `ADMIN` (except `/status`)
+**Role Required:** `ADMIN`, signed in with a password or single sign-on (a sign-in's JWT, by cookie or bearer; not an API token), locally as well as on a team server, since the lab drives the host. Off (`503`) while the backend uses the default `SECRET_KEY`. `/status` needs nothing locally and an admin on a team server.
 
 The test lab (`lab/`) from the browser: Linux targets, Tart and UTM VMs, Gandalf against seeded hosts. Docker, Tart and UTM are on the host, so these proxy to the lab agent (`./lab.sh agent start`, loopback `:5691`).
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/lab/status` | Whether the agent is reachable. No authentication; returns `available`, and `reason` and `start_command` when it isn't |
+| `GET` | `/api/lab/status` | Whether the agent is reachable: `available`, and `reason` and `start_command` when it isn't |
 | `GET` | `/api/lab/state` | Host profile, lab settings, whether the lab password is stored, and any running command |
 | `PUT` | `/api/lab/config` | `{"settings": {...}}`: change `lab.conf` on the host |
 | `PUT` | `/api/lab/password` | `{"password": "..."}`: store the lab password in the host's keyring |
@@ -1252,6 +1013,9 @@ The test lab (`lab/`) from the browser: Linux targets, Tart and UTM VMs, Gandalf
 | `GET` | `/api/lab/runs` | Recent runs |
 | `GET` | `/api/lab/runs/{id}?offset=` | A run's status and its output from byte `offset` on |
 | `POST` | `/api/lab/runs/{id}/cancel` | Cancel a run |
+| `GET` | `/api/lab/consoles` | The running VMs with a console (a VNC server on the host's loopback): `engine`, `name`, `port`, `auth`, never the password |
+| `GET` | `/api/lab/consoles/{engine}/{name}` | One VM's console, with the VNC password noVNC answers with (Tart's, new each run). `404` when it has none |
+| `WS` | `/api/lab/consoles/{engine}/{name}/ws` | The VM's VNC stream for noVNC, binary frames each way through the lab agent. Refused at the handshake (code 1008) unless the caller is a signed-in admin and the page is on an origin the backend serves; checked again while open, so a sign-out or demotion ends it ([SERVER.md](SERVER.md#lab-vm-consoles)) |
 
 ---
 
@@ -1261,7 +1025,7 @@ The test lab (`lab/`) from the browser: Linux targets, Tart and UTM VMs, Gandalf
 
 **Endpoint:** `GET /api/health`
 
-**Description:** Check API health status.
+**Description:** Check API health status. `GET /` returns the web app's build where the backend has one, else `{"name", "version", "status": "running"}`.
 
 **Authentication:** None
 
@@ -1269,8 +1033,7 @@ The test lab (`lab/`) from the browser: Linux targets, Tart and UTM VMs, Gandalf
 ```json
 {
   "status": "healthy",
-  "timestamp": "2025-01-15T12:00:00Z",
-  "version": "2.1.0"
+  "timestamp": "2025-01-15T12:00:00"
 }
 ```
 
@@ -1283,7 +1046,7 @@ The test lab (`lab/`) from the browser: Linux targets, Tart and UTM VMs, Gandalf
 | Check | Busy while |
 |---|---|
 | `jobs` | a job is running or paused and its worker's heartbeat is live, or lapsed less than 90 seconds ago (see [Jobs left by a crash](#jobs-left-by-a-crash)). Pending jobs never count |
-| `requests` | a mutating `/api` request (not GET, HEAD or OPTIONS) from someone signed in is being handled: uploads, a manual SIEM export |
+| `requests` | a mutating `/api` request (not GET, HEAD or OPTIONS) from a caller the access checks let through is being handled: uploads, a manual SIEM export |
 | `downloads` | a Mordor dataset download is running in the background |
 | `side-tasks` | a sample fetch or symbol table build queued in the worker hasn't finished (forgotten after six hours with no result) |
 | `telemetry-build` | the Mordor telemetry update is running |
@@ -1324,33 +1087,27 @@ New work a restart would cut off registers a check in `src/web/backend/busy.py`.
 
 ## Request/Response Formats
 
-### Standard Success Response
+A successful response is the resource itself (a job, a list, a finding), with no wrapper. Most job actions return the job.
+
+### Error Response
 
 ```json
-{
-  "data": { ... },
-  "message": "Operation successful"
-}
+{"detail": "Only the job's owner or an admin can cancel it"}
 ```
 
-### Standard Error Response
-
-```json
-{
-  "detail": "Error description",
-  "error_code": "ERR_001"  // Optional
-}
-```
+`detail` is a string, except in a few places where it's an object: a restart refused for findings (`{"findings": 3, "message": "..."}`) and Andúril's busy refusal (`{"message", "busy"}`). There are no error codes beyond the HTTP status.
 
 ### Validation Error Response (422)
+
+FastAPI's, for a body or parameter of the wrong shape:
 
 ```json
 {
   "detail": [
     {
-      "loc": ["body", "email"],
-      "msg": "Invalid email format",
-      "type": "value_error.email"
+      "type": "missing",
+      "loc": ["body", "case_number"],
+      "msg": "Field required"
     }
   ]
 }
@@ -1363,34 +1120,32 @@ New work a restart would cut off registers a check in `src/web/backend/busy.py`.
 ### HTTP Status Codes
 
 - `200 OK`: Successful request
-- `201 Created`: Resource created successfully
-- `204 No Content`: Successful deletion
-- `400 Bad Request`: Invalid request or validation error
-- `401 Unauthorized`: Authentication required or invalid credentials
-- `403 Forbidden`: Insufficient permissions
-- `404 Not Found`: Resource not found
+- `202 Accepted`: queued: a confirmed removal, an Andúril operation, a lab job
+- `400 Bad Request`: Invalid request, or not allowed in the job's state
+- `401 Unauthorized`: not signed in (server mode), or a wrong password
+- `402 Payment Required`: the licence has no free place for another account, or this edition doesn't send webhooks
+- `403 Forbidden`: not allowed: an admin area, someone else's job, a token's scope, a path outside the allowed folders, or a cookie request without `X-Rowanholt: 1`
+- `404 Not Found`: not found, including a job or case the caller can't see
+- `409 Conflict`: the state moved on (a job that ended before the cancel, a finding changed since it was loaded) or the action would clash (a busy service, an output folder in use)
+- `413 Payload Too Large`: a threat intelligence file over 200 MB
 - `422 Unprocessable Entity`: Validation error
+- `429 Too Many Requests`: sign-in locked out
 - `500 Internal Server Error`: Server error
-
-### Common Error Codes
-
-- `ERR_AUTH_001`: Invalid credentials
-- `ERR_AUTH_002`: Account disabled
-- `ERR_AUTH_003`: MFA verification failed
-- `ERR_JOB_001`: Job not found
-- `ERR_JOB_002`: Invalid job state transition
-- `ERR_PATH_001`: Path access denied
+- `502 Bad Gateway`: a TAXII collection or VirusTotal couldn't be read
+- `503 Service Unavailable`: a dependency is missing: Ollama, the lab agent, Andúril, an Elrond package not mounted, the worker's queue, or the default `SECRET_KEY`
 
 ---
 
 ## Code Examples
+
+Locally the API needs no token, so the sign-in below only matters on a team server (use its `https://<server>/api` address). A script there is better off with an [API token](#api-tokens) than a password.
 
 ### Python
 
 ```python
 import requests
 
-BASE_URL = "http://localhost:5688/api"
+BASE_URL = "http://127.0.0.1:5688/api"
 
 # Login
 response = requests.post(f"{BASE_URL}/auth/login", data={
@@ -1426,7 +1181,7 @@ print(f"Job status: {status_response.json()['status']}")
 ```javascript
 const axios = require('axios');
 
-const BASE_URL = 'http://localhost:5688/api';
+const BASE_URL = 'http://127.0.0.1:5688/api';
 
 async function main() {
   // Login
@@ -1470,14 +1225,19 @@ main();
 
 ```bash
 # Login
-curl -s -X POST http://localhost:5688/api/auth/login \
+curl -s -X POST http://127.0.0.1:5688/api/auth/login \
   -d "username=user@example.com" -d "password=password" \
   | jq -r '.access_token' > token.txt
 
 TOKEN=$(cat token.txt)
 
+# Or, on a team server, an API token made from a sign-in (shown once)
+curl -s -X POST https://rowanholt.example.org/api/auth/tokens \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"name": "nightly export", "scope": "full", "days": 90}' | jq -r '.token'
+
 # Create job
-curl -X POST http://localhost:5688/api/jobs \
+curl -X POST http://127.0.0.1:5688/api/jobs \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1488,52 +1248,44 @@ curl -X POST http://localhost:5688/api/jobs \
   }'
 
 # List jobs
-curl -X GET "http://localhost:5688/api/jobs?status=running" \
+curl -X GET "http://127.0.0.1:5688/api/jobs?status=running" \
   -H "Authorization: Bearer $TOKEN"
 
 # Cancel job
-curl -X POST "http://localhost:5688/api/jobs/{job_id}/cancel" \
+curl -X POST "http://127.0.0.1:5688/api/jobs/{job_id}/cancel" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
+A bearer request needs no `X-Rowanholt` header; one signed in by the cookie (`curl -b`) does.
+
 ---
 
-## Security Best Practices
+## Security Notes
 
-1. **Always use HTTPS in production** - Encrypt all API communication
-2. **Store tokens securely** - Never log or expose JWT tokens
-3. **Implement rate limiting** - Prevent brute force attacks
-4. **Validate all inputs** - API performs sanitization, but client validation helps UX
-5. **Use MFA for sensitive accounts** - Especially admin accounts
-6. **Rotate tokens regularly** - Implement token refresh mechanism
-7. **Monitor API usage** - Track suspicious activity
-8. **Keep secrets secret** - Use environment variables, never hardcode
+1. **Keep the local API local.** It's open to anyone who can reach it, so it's published on `127.0.0.1` only; anything shared belongs on a team server
+2. **Use HTTPS on a team server.** Caddy terminates TLS and is the only thing published ([SERVER.md](SERVER.md))
+3. **Prefer API tokens for scripts.** Give each a name and the shortest life that works, `smith-mcp` where reads, leads and notes are enough, and revoke it when it's done with
+4. **Never log or share a token.** A JWT can't be revoked before it expires (24 hours); an API token can
+5. **Set `SECRET_KEY`.** With the default, anyone could forge a JWT: the lab and Andúril refuse to run, and a team server won't start
 
 ---
 
 ## Rate Limiting
 
-**Status:** Planned for v2.2
-
-Future rate limits (per user):
-- Authentication endpoints: 10 requests/minute
-- Job creation: 100 requests/hour
-- Other endpoints: 1000 requests/hour
+There's none, apart from sign-in lockouts: five failed passwords from one address lock that username from that address for 15 minutes, and fifty across all addresses lock it everywhere ([SERVER.md](SERVER.md#how-sign-in-lockouts-work)).
 
 ---
 
 ## Pagination
 
-For list endpoints (e.g., `/api/jobs`):
+Lists that page take `limit` and `offset` and return a `total`:
 
-**Query Parameters:**
-- `limit`: Number of results per page (default: 50, max: 100)
-- `offset`: Number of results to skip (default: 0)
-
-**Response includes:**
-- `total`: Total number of results
-- `limit`: Applied limit
-- `offset`: Applied offset
+| Endpoint | `limit` |
+|---|---|
+| `GET /api/jobs` | default 50, at most 100 |
+| `GET /api/threat-intel/indicators` | default 100, at most 500 |
+| `GET /api/mordor/catalog`, `/api/mordor/datasets` | default 50, at most 200 |
+| `GET /api/jobs/{job_id}/case/rows` | default 100, at most 500 |
 
 **Example:**
 ```
@@ -1544,23 +1296,17 @@ GET /api/jobs?limit=20&offset=40
 
 ## WebSocket Support
 
-**Status:** Planned for v2.2
+Two, both under `/api` and authenticated like the HTTP routes, by the session cookie or a bearer header, never a token in the URL, and refused (code 1008) from a page on an origin the backend doesn't serve:
 
-Real-time job progress updates via WebSocket:
+- `/api/jobs/{job_id}/case/live`: when a case's activity, or its job's status or progress, changes, so a page knows to reload ([Case Browser](#case-browser-and-collaboration))
+- `/api/lab/consoles/{engine}/{name}/ws`: a lab VM's VNC stream, admins only ([Lab](#lab))
 
-```javascript
-const ws = new WebSocket('ws://localhost:5688/ws/jobs/{job_id}');
-
-ws.onmessage = (event) => {
-  const update = JSON.parse(event.data);
-  console.log(`Progress: ${update.progress}%`);
-  console.log(`Status: ${update.status}`);
-};
-```
+Job progress has no socket of its own: poll `GET /api/jobs/{job_id}`.
 
 ---
 
 **For additional support, see:**
+- [SERVER.md](SERVER.md) - Running Rowanholt as a team server: sign-in, users, sharing
 - [SECURITY.md](SECURITY.md) - Security implementation details
 - [QUICKSTART.md](QUICKSTART.md) - Getting started guide
 - [USAGE.md](USAGE.md) - Complete user documentation
@@ -1568,5 +1314,5 @@ ws.onmessage = (event) => {
 ---
 
 **Version:** 2.1.0
-**Last Updated:** 2026-10-22
+**Last Updated:** 2026-11-12
 **License:** See LICENSE file
