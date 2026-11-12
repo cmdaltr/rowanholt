@@ -18,6 +18,7 @@ import signal
 import threading
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from celery import Celery
 from celery.utils.log import get_task_logger
@@ -91,39 +92,68 @@ def _get_image_lock_key(image_path: str) -> str:
     return f"rowanholt:image_lock:{path_hash}"
 
 
-def acquire_image_locks(job_id: str, image_paths: list, timeout: int = 3600, retry_interval: int = 10) -> bool:
+# A lock's value is "<job id>:<when it was taken>", so it says whose it is. Releasing or refreshing
+# one checks the value and acts in one step, in Redis: a GET then DEL could delete a lock that
+# expired in between and was taken by another job, which would then share its image
+_RELEASE_IF_HELD = """
+local value = redis.call('GET', KEYS[1])
+if value and (value == ARGV[1] or (ARGV[2] == 'prefix' and string.sub(value, 1, #ARGV[1]) == ARGV[1])) then
+  return redis.call('DEL', KEYS[1])
+end
+return 0
+"""
+_REFRESH_IF_HELD = """
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  return redis.call('EXPIRE', KEYS[1], ARGV[2])
+end
+return 0
+"""
+
+
+def _release_if_held(client, lock_key: str, value: str, prefix: bool = False) -> bool:
+    """Delete `lock_key` only while its value is still `value` (or, with `prefix`, starts with it)."""
+    return bool(client.eval(_RELEASE_IF_HELD, 1, lock_key, value, "prefix" if prefix else "exact"))
+
+
+def acquire_image_locks(job_id: str, image_paths: list, timeout: int = 3600, retry_interval: int = 10,
+                        held: Optional[dict] = None) -> bool:
     """
     Acquire locks on all image paths. Waits if any image is in use.
 
     Args:
-        job_id: Job ID (used as lock value for identification)
+        job_id: Job ID (the start of each lock's value, so it says whose it is)
         image_paths: List of image paths to lock
         timeout: Lock timeout in seconds (default 1 hour)
         retry_interval: Seconds between retry attempts
+        held: Filled with each lock taken, key to value, as it's taken: what the caller releases.
+            Locks still waited for, another job's, are never in it.
 
     Returns:
-        True if all locks acquired, False if failed
+        True if all locks acquired; False if failed or the job was cancelled while waiting, when
+        the locks it had taken are released (and `held` emptied)
     """
     redis_client = get_redis_client()
-    acquired_locks = []
+    acquired_locks = held if held is not None else {}
 
     try:
         for image_path in image_paths:
             lock_key = _get_image_lock_key(image_path)
             image_name = os.path.basename(image_path)
+            if lock_key in acquired_locks:  # the same image twice: it would wait for itself
+                continue
 
             while True:
                 # Try to acquire the lock using SETNX (set if not exists)
-                # The lock value contains job_id for debugging
+                lock_value = f"{job_id}:{datetime.now().isoformat()}"
                 lock_acquired = redis_client.set(
                     lock_key,
-                    f"{job_id}:{datetime.now().isoformat()}",
+                    lock_value,
                     nx=True,  # Only set if not exists
                     ex=timeout  # Expire after timeout
                 )
 
                 if lock_acquired:
-                    acquired_locks.append(lock_key)
+                    acquired_locks[lock_key] = lock_value
                     logger.info(f"Job {job_id}: Acquired lock on '{image_name}'")
                     break
                 else:
@@ -160,18 +190,22 @@ def acquire_image_locks(job_id: str, image_paths: list, timeout: int = 3600, ret
         return False
 
 
-def release_image_locks(lock_keys: list):
-    """Release image locks."""
-    if not lock_keys:
+def release_image_locks(held: dict):
+    """Release the locks a job took (key to the value it set), each only while it's still that
+    value: one that expired and was taken by another job stays that job's. Empties `held`."""
+    if not held:
         return
 
     redis_client = get_redis_client()
-    for lock_key in lock_keys:
+    for lock_key, value in list(held.items()):
         try:
-            redis_client.delete(lock_key)
-            logger.debug(f"Released lock: {lock_key}")
+            if _release_if_held(redis_client, lock_key, value):
+                logger.debug(f"Released lock: {lock_key}")
+            else:
+                logger.info(f"Lock {lock_key} is no longer this job's: left as it is")
         except Exception as e:
             logger.warning(f"Error releasing lock {lock_key}: {e}")
+    held.clear()
 
 
 def release_image_locks_for_job(job_id: str, source_paths: list):
@@ -186,13 +220,9 @@ def release_image_locks_for_job(job_id: str, source_paths: list):
     for image_path in source_paths:
         lock_key = _get_image_lock_key(image_path)
         try:
-            # Check if this job holds the lock
-            lock_value = redis_client.get(lock_key)
-            if lock_value:
-                lock_str = lock_value.decode() if isinstance(lock_value, bytes) else str(lock_value)
-                if lock_str.startswith(f"{job_id}:"):
-                    redis_client.delete(lock_key)
-                    logger.info(f"Released image lock for job {job_id}: {os.path.basename(image_path)}")
+            # Only while this job holds it: another job may be waiting for, or holding, the same image
+            if _release_if_held(redis_client, lock_key, f"{job_id}:", prefix=True):
+                logger.info(f"Released image lock for job {job_id}: {os.path.basename(image_path)}")
         except Exception as e:
             logger.warning(f"Error releasing lock for {image_path}: {e}")
 
@@ -532,7 +562,7 @@ def _safe_save(job):
         return False
 
 
-def _start_lock_heartbeat(lock_keys, interval=300):
+def _start_lock_heartbeat(held, interval=300):
     """
     Keep image locks alive on a timer. Progress saves can't do it alone: a
     paused job (or a silent stage) writes no output, and the locks would
@@ -542,17 +572,18 @@ def _start_lock_heartbeat(lock_keys, interval=300):
 
     def beat():
         while not stop.wait(interval):
-            _refresh_image_locks(lock_keys)
+            _refresh_image_locks(held)
 
     threading.Thread(target=beat, name="image-lock-heartbeat", daemon=True).start()
     return stop
 
 
-def _refresh_image_locks(lock_keys):
+def _refresh_image_locks(held):
+    """Extend the job's locks (key to value), each only while it's still the job's."""
     try:
         client = get_redis_client()
-        for key in lock_keys:
-            client.expire(key, IMAGE_LOCK_TTL)
+        for key, value in list(held.items()):
+            client.eval(_REFRESH_IF_HELD, 1, key, value, IMAGE_LOCK_TTL)
     except Exception as e:
         logger.warning(f"Could not refresh image locks: {e}")
 
@@ -643,8 +674,9 @@ def start_analysis(self, job_id: str):
         logger.warning(f"Job {job_id} is {job.status.value}, not pending: not started again")
         return
 
-    # Track acquired locks for cleanup
-    acquired_lock_keys = []
+    # The image locks this task took, key to value, filled as each is taken: only these are
+    # released, never one it was still waiting for (another job's)
+    held_locks = {}
     process = None
     spool = None
     lock_heartbeat = None
@@ -661,12 +693,9 @@ def start_analysis(self, job_id: str):
             job.log.append(f"[{datetime.now().isoformat().replace('T', ' ')}] -> Checking image availability...")
             job_storage.save_job(job)
 
-            # Build list of lock keys we need to acquire
-            for image_path in job.source_paths:
-                acquired_lock_keys.append(_get_image_lock_key(image_path))
-
             # Try to acquire all locks (will wait if images are in use)
-            if not acquire_image_locks(job_id, job.source_paths, timeout=7200, retry_interval=10):
+            if not acquire_image_locks(job_id, job.source_paths, timeout=7200, retry_interval=10,
+                                       held=held_locks):
                 # Failed to acquire locks (job was cancelled while waiting)
                 job.status = JobStatus.CANCELLED
                 job.log.append(f"[{datetime.now().isoformat().replace('T', ' ')}] -> Job cancelled while waiting for images")
@@ -674,7 +703,7 @@ def start_analysis(self, job_id: str):
                 job_storage.save_job(job)
                 return
 
-            lock_heartbeat = _start_lock_heartbeat(acquired_lock_keys)
+            lock_heartbeat = _start_lock_heartbeat(held_locks)
 
         # Pending to running in one conditional update: of two tasks given the job, one runs it
         claimed = job_storage.transition(job_id, (JobStatus.PENDING,), JobStatus.RUNNING,
@@ -1205,9 +1234,10 @@ def start_analysis(self, job_id: str):
                     logger.warning(f"Job {job_id}: could not clear its process record: {e}")
 
             # Release image locks
-            if acquired_lock_keys:
-                release_image_locks(acquired_lock_keys)
-                logger.info(f"Job {job_id}: Released {len(acquired_lock_keys)} image lock(s)")
+            if held_locks:
+                count = len(held_locks)
+                release_image_locks(held_locks)
+                logger.info(f"Job {job_id}: Released {count} image lock(s)")
 
             if final_save:
                 job.completed_at = datetime.now()
