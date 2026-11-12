@@ -1,6 +1,7 @@
 """Whether a pending, running or paused job still has a worker (job_liveness.py): the worker's
 heartbeat, the queued marker and the broker's queue, the failing of jobs left by a crash, and what
-GET /api/busy makes of them, over the real backend in server mode.
+GET /api/busy makes of them (running and paused jobs only: a pending job waits out a rebuild in
+Redis's queue), over the real backend in server mode.
 
 Run: python3 -m unittest tests/unit/test_job_liveness.py
 """
@@ -269,22 +270,27 @@ class ReconcileTest(LivenessCase):
         self.assertTrue(self.liveness.check())
         self.assertEqual(self.store.get_job(job_id).status, self.JobStatus.RUNNING)
 
-    def test_a_pending_job_just_queued_is_live(self):
+    def test_a_pending_job_just_queued_is_live_but_not_busy(self):
         job_id = self.job(self.JobStatus.PENDING, task_id="task-just-queued")
         self.lv.mark_queued(job_id, client=self.redis)
         self.wait(self.lv.QUEUED_GRACE - 1)
-        self.assertTrue(self.liveness.check())
+        self.assertFalse(self.liveness.check())
+        self.wait(self.lv.STALE_GRACE)  # the marker has lapsed: first seen with no signal, not failed yet
+        self.liveness.check()
+        self.assertEqual(self.store.get_job(job_id).status, self.JobStatus.PENDING)
 
-    def test_a_pending_job_waiting_in_the_queue_is_live_for_hours(self):
+    def test_a_pending_job_waiting_in_the_queue_is_live_for_hours_and_never_busy(self):
+        # The queue is in Redis, which a rebuild leaves running: holding updates for it held them
+        # for as long as the queue was
         task_id = str(uuid.uuid4())
         job_id = self.job(self.JobStatus.PENDING, task_id=task_id)
         self.broker.lists["celery"] = [kombu_message(str(uuid.uuid4())), kombu_message(task_id)]
         for _ in range(3):
             self.wait(3600)
-            self.assertTrue(self.liveness.check())
+            self.assertFalse(self.liveness.check())
         self.assertEqual(self.store.get_job(job_id).status, self.JobStatus.PENDING)
 
-    def test_a_pending_job_in_a_priority_queue_or_delivered_is_live(self):
+    def test_a_pending_job_in_a_priority_queue_or_delivered_is_live_but_not_busy(self):
         for where in ("priority", "unacked"):
             task_id = str(uuid.uuid4())
             job_id = self.job(self.JobStatus.PENDING, task_id=task_id)
@@ -294,30 +300,48 @@ class ReconcileTest(LivenessCase):
             else:
                 self.broker.hashes["unacked"] = {"tag-1": b'[' + kombu_message(task_id) + b', "", "celery"]'}
             self.wait(self.lv.STALE_GRACE + 1)
-            self.assertTrue(self.liveness.check(), where)
+            self.assertFalse(self.liveness.check(), where)
             self.wait(self.lv.STALE_GRACE + 1)
-            self.assertTrue(self.liveness.check(), where)
+            self.assertFalse(self.liveness.check(), where)
             self.assertEqual(self.store.get_job(job_id).status, self.JobStatus.PENDING, where)
             self.store.set_status(job_id, self.JobStatus.CANCELLED)
 
     def test_a_pending_job_waiting_for_image_locks_has_a_heartbeat(self):
+        # Not busy itself: the job holding the locks it waits for is running, and that one is
         job_id = self.job(self.JobStatus.PENDING, task_id="task-taken")
         self.beat(job_id)
         self.wait(self.lv.STALE_GRACE + 1)
         self.beat(job_id)
+        self.assertFalse(self.liveness.check())
+        self.wait(self.lv.STALE_GRACE + 1)
+        self.beat(job_id)
+        self.liveness.check()
+        self.assertEqual(self.store.get_job(job_id).status, self.JobStatus.PENDING)
+
+    def test_only_the_running_job_beside_a_pending_one_is_busy(self):
+        running, pending = self.job(self.JobStatus.RUNNING), self.job(self.JobStatus.PENDING, task_id="t")
+        self.lv.mark_queued(pending, client=self.redis)
+        self.beat(running)
         self.assertTrue(self.liveness.check())
+        self.store.set_status(running, self.JobStatus.COMPLETED)
+        self.assertFalse(self.liveness.check())
+        self.assertEqual(self.store.get_job(pending).status, self.JobStatus.PENDING)
 
     def test_a_pending_job_with_nothing_queued_is_failed(self):
         job_id = self.job(self.JobStatus.PENDING, task_id=str(uuid.uuid4()))
         self.lv.mark_queued(job_id, client=self.redis)
         self.broker.lists["celery"] = [kombu_message(str(uuid.uuid4()))]  # someone else's
         self.wait(self.lv.QUEUED_GRACE + 1)
-        self.assertTrue(self.liveness.check())
-        self.wait(self.lv.STALE_GRACE)
+        self.assertFalse(self.liveness.check())  # suspect, and never busy
+        self.wait(self.lv.STALE_GRACE - 1)
+        self.liveness.check()
+        self.assertEqual(self.store.get_job(job_id).status, self.JobStatus.PENDING)  # not yet
+        self.wait(1)
         self.assertFalse(self.liveness.check())
         job = self.store.get_job(job_id)
         self.assertEqual(job.status, self.JobStatus.FAILED)
         self.assertEqual(job.error, self.lv.PENDING_REASON)
+        self.assertTrue(job.log[-1].endswith(self.lv.PENDING_REASON))
 
     def test_a_pending_job_with_no_task_id_and_no_marker_is_failed(self):
         job_id = self.job(self.JobStatus.PENDING)
@@ -398,6 +422,21 @@ class BusyEndpointTest(LivenessCase):
         self.wait(self.lv.STALE_GRACE)
         self.assertEqual(self.client.get("/api/busy").json(), {"busy": False})
         self.assertEqual(self.store.get_job(job_id).status, self.JobStatus.FAILED)
+
+    def test_a_queued_job_doesnt_hold_a_rebuild(self):
+        task_id = str(uuid.uuid4())
+        job_id = self.job(self.JobStatus.PENDING, task_id=task_id)
+        self.lv.mark_queued(job_id, client=self.redis)
+        self.assertEqual(self.client.get("/api/busy").json(), {"busy": False})
+        self.broker.lists["celery"] = [kombu_message(task_id)]
+        self.wait(self.lv.QUEUED_GRACE + self.lv.STALE_GRACE)
+        self.assertEqual(self.client.get("/api/busy").json(), {"busy": False})
+        self.assertEqual(self.store.get_job(job_id).status, self.JobStatus.PENDING)
+
+    def test_busy_while_a_paused_job_has_its_heartbeat(self):
+        job_id = self.job(self.JobStatus.PAUSED)
+        self.beat(job_id)
+        self.assertEqual(self.client.get("/api/busy").json(), {"busy": True})
 
     def test_busy_while_the_worker_beats(self):
         job_id = self.job(self.JobStatus.RUNNING)

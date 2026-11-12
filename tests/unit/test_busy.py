@@ -59,7 +59,8 @@ class Checks(BackendCase):
         super().setUpClass()
         cls.busy = cls.main.busy
 
-    def test_jobs_queued_running_or_paused_are_busy(self):
+    def test_pending_running_and_paused_jobs_are_checked(self):
+        # All three are reconciled; only running and paused can be busy (test_job_liveness.py)
         import storage
         from models.job import AnalysisOptions, Job, JobStatus
         folder = tempfile.mkdtemp(prefix="rowanholt-busy-")
@@ -208,15 +209,25 @@ class Endpoint(BackendCase):
 
     def test_busy_with_the_real_jobs_table(self):
         # Jobs here never reach a worker (the queue is a stand-in), so a new one stays pending,
-        # live by its queued marker
+        # live by its queued marker but not busy: it waits out a rebuild in Redis's queue. Once
+        # a worker has it running, with its heartbeat, it is
         from test_job_liveness import FakeRedis
+        from models.job import JobStatus
         import job_liveness
         redis = FakeRedis()
         self.only_jobs()
+        # Jobs other tests left running in this store would still be inside their grace
+        store = self.main.job_storage
+        for stray, _, _ in store.active_jobs(self.main.ACTIVE_JOB_STATUSES):
+            store.set_status(stray, JobStatus.CANCELLED)
         with mock.patch.object(job_liveness, "_client", redis), \
                 mock.patch.object(self.main.job_liveness_check, "_client", lambda: redis):
-            self.create_job(self.alice, "CASE-PENDING")
+            job_id = self.create_job(self.alice, "CASE-PENDING")
+            self.assertEqual(self.client.get("/api/busy").json(), {"busy": False})
+            self.main.job_storage.set_status(job_id, JobStatus.RUNNING)
+            job_liveness.Heartbeat(job_id, client=redis).beat()
             self.assertEqual(self.client.get("/api/busy").json(), {"busy": True})
+            self.main.job_storage.set_status(job_id, JobStatus.CANCELLED)
 
     def test_a_failing_check_counts_as_busy(self):
         self.only_jobs()

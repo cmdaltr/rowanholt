@@ -6,6 +6,13 @@ recreated, the host restarted, the OOM killer) never saves again, so its job sta
 ever, and every `GET /api/busy` after it says busy. This module gives each job a signal that ends
 on its own when nobody is working on it, and fails the jobs whose signal has gone.
 
+Only running and paused jobs count as busy. A pending job is a message in Celery's queue, and the
+queue is in Redis, which a rebuild doesn't recreate (`docker compose up --build` leaves an
+unchanged service alone, and `redis_data` keeps its snapshots if it ever is): the job waits out the
+rebuild and runs on the new worker. Counting pending jobs held updates for as long as the queue was,
+hours behind a long one (Ben, 12 November 2026). Pending jobs are still checked here, so one whose
+message Redis did lose is failed with a reason rather than left pending for ever.
+
 The signals, all in Redis (db 1, beside the image locks):
 
 - A heartbeat for a job a worker has picked up: `Heartbeat`, from the moment `start_analysis`
@@ -236,8 +243,9 @@ class Liveness:
         return live
 
     def check(self) -> bool:
-        """One pass: fail the jobs dead for longer than the grace, and say whether any active job
-        is left that's live, or not yet dead long enough to tell. Raises when the database or
+        """One pass: fail the jobs dead for longer than the grace, and say whether any running or
+        paused job is left that's live, or not yet dead long enough to tell. Pending jobs are
+        reconciled but never busy (the module docstring says why). Raises when the database or
         Redis can't be read, which the busy check counts as busy."""
         with self._lock:
             jobs = self.storage.active_jobs(self.statuses)
@@ -248,13 +256,16 @@ class Liveness:
             now = self._clock()
             busy = False
             for job_id, status, _ in jobs:
+                counts = status != "pending"
                 if live[job_id]:
                     self._missing.pop(job_id, None)
-                    busy = True
+                    busy = busy or counts
                     continue
+                # A running job's heartbeat can vanish with a Redis restart while its worker
+                # carries on, so it stays busy through the grace, until the next refresh
                 since = self._missing.setdefault(job_id, now)
                 if now - since < self.grace:
-                    busy = True
+                    busy = busy or counts
                     continue
                 self._interrupt(job_id, status)
             for job_id in set(self._missing) - {job_id for job_id, _, _ in jobs}:
