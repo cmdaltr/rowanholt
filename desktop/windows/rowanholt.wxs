@@ -199,13 +199,13 @@
         <Control Id="DockerText" Type="Text" X="33" Y="79" Width="320" Height="36" NoPrefix="yes"
                  Text="From docker.com, for you alone. Ticking it accepts Docker's Subscription Service Agreement: free for personal use, education and small businesses; larger organisations need a paid subscription. Turning WSL 2 on asks for administrator rights and a restart." />
 
-        <Control Id="OptionalText" Type="Text" X="20" Y="122" Width="330" Height="11" NoPrefix="yes" Text="{\WixUI_Font_Title}Optional, for Aulë's AI answers" />
+        <Control Id="OptionalText" Type="Text" X="20" Y="122" Width="330" Height="11" NoPrefix="yes" Text="{\WixUI_Font_Title}Optional, for Smith's AI answers" />
         <Control Id="OllamaCheckBox" Type="CheckBox" X="20" Y="134" Width="330" Height="14" Property="INSTALLOLLAMA" CheckBoxValue="1"
                  Text="Ollama, which runs the model on this PC (about 1 GB, from ollama.com)" />
         <Control Id="ModelCheckBox" Type="CheckBox" X="20" Y="149" Width="330" Height="14" Property="INSTALLMODEL" CheckBoxValue="1"
-                 Text="Aulë's model, llama3.2:3b (about 2 GB; needs Ollama)" />
+                 Text="Smith's model, llama3.2:3b (about 2 GB; needs Ollama)" />
         <Control Id="OptionalNote" Type="Text" X="33" Y="165" Width="320" Height="11" NoPrefix="yes"
-                 Text="Without them, Aulë answers from the case files alone." />
+                 Text="Without them, Smith answers from the case files alone." />
 
         <Control Id="DesktopCheckBox" Type="CheckBox" X="20" Y="196" Width="330" Height="14" Property="DESKTOPSHORTCUT" CheckBoxValue="1"
                  Text="Add a Rowanholt shortcut to the &amp;desktop" />

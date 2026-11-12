@@ -279,8 +279,8 @@ function Assert-DockerInstalled {
 }
 
 # ── What Rowanholt needs, and what it can use ─────────────────────────────────
-# Docker Desktop (with WSL 2) runs the stack; Ollama and a model give Aulë its AI answers, and
-# without them Aulë answers from the case files. The MSI's options page records what was ticked
+# Docker Desktop (with WSL 2) runs the stack; Ollama and a model give Smith its AI answers, and
+# without them Smith answers from the case files. The MSI's options page records what was ticked
 # under HKCU\Software\cmdaltr\Rowanholt (InstallDocker, InstallOllama, InstallModel) and the next
 # start installs it, so unticking Launch on the Finish page only puts it off. Downloads come from
 # Docker and Ollama themselves and must carry their Authenticode signature: "latest" has no fixed hash
@@ -290,12 +290,11 @@ $DockerMachineExe = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.ex
 $OllamaExe = Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama.exe'
 $OllamaUrl = 'http://127.0.0.1:11434'
 # The backend's default (ROWANHOLT_MODEL_NAME in docker-compose.yml)
-$AuleModel = 'llama3.2:3b'
+$SmithModel = 'llama3.2:3b'
 $Dependencies = [ordered]@{
     docker = @{ Value = 'InstallDocker'; Name = 'Docker Desktop' }
     ollama = @{ Value = 'InstallOllama'; Name = 'Ollama' }
-    # ë as a code: Windows PowerShell 5.1 reads this file as Windows-1252, not UTF-8
-    model  = @{ Value = 'InstallModel'; Name = "Aul$([char]0xEB)'s model ($AuleModel)" }
+    model  = @{ Value = 'InstallModel'; Name = "Smith's model ($SmithModel)" }
 }
 
 function Get-PendingDependencies {
@@ -441,14 +440,14 @@ function Install-Model($Ui) {
     # Ollama's own API streams the pull's progress as JSON lines
     $request = [Net.WebRequest]::Create("$OllamaUrl/api/pull")
     $request.Method = 'POST'; $request.ContentType = 'application/json'
-    $body = [Text.Encoding]::UTF8.GetBytes((@{ model = $AuleModel; name = $AuleModel; stream = $true } | ConvertTo-Json -Compress))
+    $body = [Text.Encoding]::UTF8.GetBytes((@{ model = $SmithModel; name = $SmithModel; stream = $true } | ConvertTo-Json -Compress))
     $stream = $request.GetRequestStream(); $stream.Write($body, 0, $body.Length); $stream.Close()
     $response = $request.GetResponse()
     try {
         $reader = New-Object IO.StreamReader($response.GetResponseStream())
         while ($null -ne ($line = $reader.ReadLine())) {
             $progress = $line | ConvertFrom-Json
-            if ($progress.error) { throw "Ollama couldn't pull $AuleModel ($($progress.error))" }
+            if ($progress.error) { throw "Ollama couldn't pull $SmithModel ($($progress.error))" }
             if ($progress.total) {
                 Set-Status $Ui 'model' ('Downloading {0:N0} of {1:N0} MB' -f ($progress.completed / 1MB), ($progress.total / 1MB)) ($progress.completed / $progress.total)
             } else {
