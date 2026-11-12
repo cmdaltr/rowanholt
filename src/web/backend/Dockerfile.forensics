@@ -328,4 +328,4 @@ ENV ELROND_OUTPUT="/tmp/elrond/output"
 ENV ELROND_NONINTERACTIVE="1"
 
 # Default command (overridden by docker-compose for celery worker)
-CMD ["celery", "-A", "tasks.celery_app", "worker", "--loglevel=info"]
+CMD ["celery", "-A", "tasks_docker.celery_app", "worker", "--loglevel=info"]

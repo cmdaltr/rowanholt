@@ -27,7 +27,7 @@ A modern web application for the Elrond Digital Forensics Acceleration Suite. Th
 elrond-web/
 ├── backend/           # FastAPI backend
 │   ├── main.py       # API routes
-│   ├── tasks.py      # Celery background tasks
+│   ├── tasks_docker.py # Celery tasks (the worker)
 │   ├── storage.py    # Job persistence
 │   ├── config.py     # Configuration
 │   └── models/       # Data models

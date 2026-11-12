@@ -51,7 +51,7 @@ try:
         FileSystemItem,
     )
     from .storage import JobStorage
-    from .tasks import start_analysis
+    from .tasks_docker import start_analysis
 except ImportError:
     # Fallback for standalone execution
     from config import settings

@@ -41,7 +41,7 @@ def shadowing_imports(path: Path) -> list:
 
 class WorkerImportsTest(unittest.TestCase):
     def test_no_function_shadows_a_module_import(self):
-        for name in ("tasks_docker.py", "tasks.py", "main.py"):
+        for name in ("tasks_docker.py", "main.py"):
             with self.subTest(file=name):
                 self.assertEqual(shadowing_imports(BACKEND / name), [])
 
