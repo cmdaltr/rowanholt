@@ -20,6 +20,7 @@
 - **[CLI.md](CLI.md)** ⭐ - Command-line tools reference (gandalf, elrond, MITRE, cloud, AI, SIEM)
 - **[SECURITY.md](SECURITY.md)** - Security features, sign-in (password, SSO, API tokens; no built-in MFA), best practices
 - **[SMITH.md](SMITH.md)** - Smith, the AI analyst: with Ollama, without it, and the Smith models
+- **[MCP-AND-AGENTS.md](MCP-AND-AGENTS.md)** - Functions, MCP and agents: why Rowanholt has one MCP server, and where agents do and don't fit
 
 ### 📐 Architecture
 
