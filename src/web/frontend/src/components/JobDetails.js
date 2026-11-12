@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { getJob, cancelJob, pauseJob, resumeJob, deleteJob, restartJob, exportSiem, confirmRemoval, cancelRemoval } from '../api';
+import { getJob, cancelJob, pauseJob, resumeJob, deleteJob, restartJob, exportSiem, getSiemExport, confirmRemoval, cancelRemoval } from '../api';
 import { serviceUrl } from '../apiBase';
 import JobSharing from './JobSharing';
 import { statusLabel } from '../jobStatus';
 import { canManage, jobPageActions, restartFresh } from '../jobActions';
+import { exportActive, exportMessage, offersSiemExport } from '../siemExport';
 
 const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
 
@@ -19,6 +20,7 @@ function JobDetails() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showRemovalModal, setShowRemovalModal] = useState(false);
+  const [siemExport, setSiemExport] = useState(null);
 
   // Ask whether to try again when removing the old output failed (its owner or an admin: anyone
   // else it's shared with sees that it's waiting for them)
@@ -37,6 +39,26 @@ function JobDetails() {
     const interval = setInterval(loadJob, 3000);
     return () => clearInterval(interval);
   }, [jobId]);
+
+  // The last SIEM export's record, read when a job that offers one has loaded (so an export
+  // already under way shows after a reload), then every 3 seconds while it's queued or running
+  const offersExport = offersSiemExport(job);
+  const exporting = exportActive(siemExport);
+  const loadSiemExport = useCallback(async () => {
+    try {
+      setSiemExport(await getSiemExport(jobId));
+    } catch (err) {
+      // Status unknown for now (Redis down): keep showing the last answer, and the next poll asks again
+    }
+  }, [jobId]);
+  useEffect(() => {
+    if (offersExport) loadSiemExport();
+  }, [offersExport, loadSiemExport]);
+  useEffect(() => {
+    if (!exporting) return undefined;
+    const interval = setInterval(loadSiemExport, 3000);
+    return () => clearInterval(interval);
+  }, [exporting, loadSiemExport]);
 
   // Auto-scroll to bottom of log when it updates
   useEffect(() => {
@@ -156,20 +178,23 @@ function JobDetails() {
     }
   };
 
+  // Queues the export (202) and shows its record; polling it takes over from there
   const handleExportSiem = async () => {
     setActionLoading(true);
     try {
-      await exportSiem(jobId);
-      // Reload job to get updated logs
+      setSiemExport(await exportSiem(jobId));
+      setError(null);
       await loadJob();
-      alert('SIEM export started! Check the job log for progress.');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to export SIEM data');
-      alert('SIEM export failed: ' + (err.response?.data?.detail || 'Unknown error'));
+      setError(err.response?.data?.detail || 'Failed to start the SIEM export');
+      // 409: one is already queued or running, so show that one
+      if (err.response?.status === 409) await loadSiemExport();
     } finally {
       setActionLoading(false);
     }
   };
+
+  const siemMessage = exportMessage(siemExport);
 
   const getStatusClass = (status) => {
     return `status-badge status-${status.toLowerCase()}`;
@@ -783,6 +808,16 @@ function JobDetails() {
                 )}
               </>
             )}
+            {offersExport && (
+              <button
+                className="secondary"
+                onClick={handleExportSiem}
+                disabled={actionLoading || exporting}
+                title="Index this job's output into the SIEMs its options name (Elrond --Index, in the worker)"
+              >
+                {exporting ? 'Exporting to SIEM...' : 'Export to SIEM'}
+              </button>
+            )}
             {job.status === 'completed' && (
               <Link to={`/jobs/${job.id}/case`}>
                 <button data-guide="job.case">Browse Case</button>
@@ -795,6 +830,12 @@ function JobDetails() {
         </div>
 
         {error && <div className="error">{error}</div>}
+
+        {siemMessage && (
+          <div className={siemMessage.kind} role="status" style={{ marginBottom: '1rem' }}>
+            {siemMessage.text}
+          </div>
+        )}
 
         {!canManage(job) && (
           <div className="info" role="note" style={{ marginBottom: '1rem' }}>

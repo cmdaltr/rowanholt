@@ -139,8 +139,15 @@ export const bulkRestartJobs = async (jobIds, confirm = false, fresh = undefined
   return response.data;
 };
 
+// Queues the export in the worker (202): the answer is its record, state "queued"
 export const exportSiem = async (jobId) => {
   const response = await api.post(`/api/jobs/${jobId}/export-siem`);
+  return response.data;
+};
+
+// The job's last SIEM export: state none, queued, running, succeeded, failed or interrupted
+export const getSiemExport = async (jobId) => {
+  const response = await api.get(`/api/jobs/${jobId}/export-siem`);
   return response.data;
 };
 

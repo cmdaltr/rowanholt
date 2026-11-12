@@ -1,7 +1,7 @@
 // The job page offers its owner's buttons only to its owner (or an admin, or locally): someone a
 // job is shared with sees why, and a restart that keeps the output
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import JobDetails from './JobDetails';
@@ -15,6 +15,7 @@ jest.mock('../api', () => ({
   deleteJob: jest.fn(),
   restartJob: jest.fn(),
   exportSiem: jest.fn(),
+  getSiemExport: jest.fn(),
   confirmRemoval: jest.fn(),
   cancelRemoval: jest.fn(),
   // JobSharing: local mode, so it draws nothing
@@ -72,4 +73,73 @@ test('a failed removal waits for the owner rather than asking them', async () =>
   await show({ ...JOB, status: 'awaiting_confirmation', pending_action, can_manage: false });
   expect(screen.queryByText('Try Again')).not.toBeInTheDocument();
   expect(screen.getByText(/waits for its owner or an admin/)).toBeInTheDocument();
+});
+
+describe('the SIEM export', () => {
+  const COMPLETED = { ...JOB, status: 'completed', progress: 100, can_manage: true, options: { splunk: true, elastic: true } };
+  const QUEUED = { state: 'queued', task_id: 't1', targets: ['Splunk', 'Elastic'], requested_by: 'alice', results: {} };
+
+  afterEach(() => jest.useRealTimers());
+
+  test('is queued, polled while it runs, and its outcome shown', async () => {
+    jest.useFakeTimers();
+    api.getSiemExport.mockResolvedValue({ state: 'none' });
+    await show(COMPLETED);
+    await waitFor(() => expect(api.getSiemExport).toHaveBeenCalledWith('j1'));
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+    api.exportSiem.mockResolvedValue(QUEUED);
+    fireEvent.click(screen.getByText('Export to SIEM'));
+    expect(await screen.findByText(/queued by alice: waiting for the worker/)).toBeInTheDocument();
+    expect(api.exportSiem).toHaveBeenCalledWith('j1');
+    expect(screen.getByText('Exporting to SIEM...')).toBeDisabled();
+
+    api.getSiemExport.mockResolvedValue({ ...QUEUED, state: 'running', phase: 'Elastic', step: 2, steps: 2 });
+    await act(async () => { jest.advanceTimersByTime(3000); });
+    expect(await screen.findByText(/SIEM export running: Elastic \(2 of 2\)/)).toBeInTheDocument();
+
+    api.getSiemExport.mockResolvedValue({
+      ...QUEUED,
+      state: 'succeeded',
+      results: { Splunk: { ok: true, note: 'index=case-1' }, Elastic: { ok: true, total: 4242 } },
+    });
+    await act(async () => { jest.advanceTimersByTime(3000); });
+    const done = await screen.findByText(/SIEM export finished/);
+    expect(done).toHaveTextContent('Splunk (index=case-1); Elastic 4,242 documents');
+    expect(done).toHaveClass('success');
+    expect(screen.getByText('Export to SIEM')).not.toBeDisabled();
+
+    // Finished: no more polling
+    const calls = api.getSiemExport.mock.calls.length;
+    await act(async () => { jest.advanceTimersByTime(9000); });
+    expect(api.getSiemExport.mock.calls.length).toBe(calls);
+  });
+
+  test('a failed target is shown as an error, with why', async () => {
+    api.getSiemExport.mockResolvedValue({
+      ...QUEUED,
+      state: 'failed',
+      results: { Splunk: { ok: false, error: 'Splunk at splunk:8089 is unreachable' }, Elastic: { ok: true } },
+    });
+    await show(COMPLETED);
+    const failed = await screen.findByText(/SIEM export failed/);
+    expect(failed).toHaveTextContent('Splunk: Splunk at splunk:8089 is unreachable; Elastic');
+    expect(failed).toHaveClass('error');
+  });
+
+  test('one already running answers 409, and that one is shown', async () => {
+    api.getSiemExport.mockResolvedValueOnce({ state: 'none' })
+      .mockResolvedValue({ ...QUEUED, state: 'running', phase: 'Splunk', step: 1, steps: 2 });
+    await show(COMPLETED);
+    api.exportSiem.mockRejectedValue({ response: { status: 409, data: { detail: 'A SIEM export is already queued or running for this job' } } });
+    fireEvent.click(await screen.findByText('Export to SIEM'));
+    expect(await screen.findByText('A SIEM export is already queued or running for this job')).toBeInTheDocument();
+    expect(await screen.findByText(/SIEM export running: Splunk \(1 of 2\)/)).toBeInTheDocument();
+  });
+
+  test('is not offered for a job with no SIEM option, or one not completed', async () => {
+    await show({ ...COMPLETED, options: {} });
+    expect(screen.queryByText('Export to SIEM')).not.toBeInTheDocument();
+    expect(api.getSiemExport).not.toHaveBeenCalled();
+  });
 });
