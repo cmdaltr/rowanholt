@@ -37,11 +37,12 @@ const STATUS_RULES = {
   restart: (job) => RESTARTABLE.includes(job.status),
   archive: (job) => !BUSY_STATUSES.includes(job.status) && job.status !== 'archived',
   delete: (job) => !BUSY_STATUSES.includes(job.status),
+  restore: (job) => job.status === 'archived',
   export: () => true,
 };
 
 // Restart and export are open to anyone who can see the job; the rest need its owner or an admin
-const MANAGER_ONLY = ['stop', 'archive', 'delete'];
+const MANAGER_ONLY = ['stop', 'archive', 'restore', 'delete'];
 
 // How a bulk action splits the selection: `eligible` are the jobs it's sent for, `notYours` those
 // skipped because someone else owns them, `wrongStatus` those it can't apply to at all. A restart

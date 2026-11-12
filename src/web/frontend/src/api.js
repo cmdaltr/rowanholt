@@ -124,6 +124,11 @@ export const unarchiveJob = async (jobId) => {
   return response.data;
 };
 
+export const bulkUnarchiveJobs = async (jobIds) => {
+  const response = await api.post('/api/jobs/bulk/unarchive', jobIds);
+  return response.data;
+};
+
 export const bulkArchiveJobs = async (jobIds) => {
   const response = await api.post('/api/jobs/bulk/archive', jobIds);
   return response.data;

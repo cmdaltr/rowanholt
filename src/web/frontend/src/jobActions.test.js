@@ -51,9 +51,18 @@ test('archive and delete follow the same rule; export and restart are open to ev
   expect(restart.keepOutput.map((j) => j.id)).toEqual(['theirs']);
 });
 
+test('restoring from the archive is the owner\'s, and only for archived jobs', () => {
+  const plan = bulkPlan([job('mine', 'archived', true), job('theirs', 'archived', false),
+                         job('live', 'completed', true)], 'restore');
+  expect(plan.eligible.map((j) => j.id)).toEqual(['mine']);
+  expect(plan.notYours.map((j) => j.id)).toEqual(['theirs']);
+  expect(plan.wrongStatus.map((j) => j.id)).toEqual(['live']);
+  expect(skippedNote(plan, 'restore')).toContain("only the job's owner or an admin can restore it");
+});
+
 test('an owner\'s bulk button is offered only when one of the selection is the user\'s', () => {
   const theirs = [job('t1', 'running', false), job('t2', 'completed', false)];
-  for (const action of ['stop', 'archive', 'delete']) {
+  for (const action of ['stop', 'archive', 'restore', 'delete']) {
     expect(bulkOffered(theirs, action)).toBe(false);
     expect(bulkOffered([...theirs, job('m', 'running', true)], action)).toBe(true);
   }

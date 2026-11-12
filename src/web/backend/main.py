@@ -908,6 +908,58 @@ async def bulk_archive_jobs(job_ids: list[str], request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _unarchived_status(job: Job) -> JobStatus:
+    """The status an archived job goes back to. The status before archiving isn't stored, so it's
+    read from what the job holds: an error means it failed, a completion time that it finished.
+    A cancel sets a completion time too, so a cancelled job comes back as completed."""
+    if job.error:
+        return JobStatus.FAILED
+    if job.completed_at:
+        return JobStatus.COMPLETED
+    return JobStatus.CANCELLED
+
+
+@app.post("/api/jobs/bulk/unarchive")
+async def bulk_unarchive_jobs(job_ids: list[str], request: Request):
+    """
+    Restore multiple archived jobs to the job list at once.
+
+    Args:
+        job_ids: List of job IDs to restore
+
+    Returns:
+        Results for each job
+    """
+    try:
+        results = []
+
+        for job_id in job_ids:
+            job = _job_for(request, job_id)
+
+            if not job:
+                results.append({"job_id": job_id, "success": False, "error": "Job not found"})
+                continue
+
+            refusal = _manager_refusal(request, job_id, "restore it from the archive")
+            if refusal:
+                results.append({"job_id": job_id, "success": False, "error": refusal})
+                continue
+
+            if job.status != JobStatus.ARCHIVED:
+                results.append({"job_id": job_id, "success": False, "error": "Job is not archived"})
+                continue
+
+            job.status = _unarchived_status(job)
+            job.log.append(f"[{datetime.now().isoformat()}] Job unarchived by user (bulk operation)")
+            job_storage.save_job(job)
+            results.append({"job_id": job_id, "success": True, "status": job.status.value})
+
+        return {"results": results}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/jobs/bulk/restart")
 async def bulk_restart_jobs(job_ids: list[str], request: Request, fresh: Optional[bool] = None,
                            confirm: bool = False):
@@ -1201,7 +1253,7 @@ async def archive_job(job_id: str, request: Request):
 
 
 @app.post("/api/jobs/{job_id}/unarchive")
-async def unarchive_job(job_id: str):
+async def unarchive_job(job_id: str, request: Request):
     """
     Unarchive a job, restoring it to its previous status.
 
@@ -1217,25 +1269,23 @@ async def unarchive_job(job_id: str):
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
 
+        # Archiving is the owner's or an admin's, so taking it back out is too
+        refusal = _manager_refusal(request, job_id, "restore it from the archive")
+        if refusal:
+            raise HTTPException(status_code=403, detail=refusal)
+
         if job.status != JobStatus.ARCHIVED:
             raise HTTPException(
                 status_code=400,
                 detail="Job is not archived",
             )
 
-        # Determine status to restore to based on job state
-        if job.error:
-            job.status = JobStatus.FAILED
-        elif job.completed_at:
-            job.status = JobStatus.COMPLETED
-        else:
-            job.status = JobStatus.CANCELLED
-
+        job.status = _unarchived_status(job)
         job.log.append(f"[{datetime.now().isoformat()}] Job unarchived by user")
 
         job_storage.save_job(job)
 
-        return job
+        return _with_access([job], request)[0]
 
     except HTTPException:
         raise

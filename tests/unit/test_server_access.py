@@ -319,6 +319,56 @@ class ServerAccessTest(BackendCase):
         self.main.job_storage.save_job(stored)
         self.assertEqual(self.client.post(f"/api/jobs/{job}/archive", headers=self.alice).status_code, 200)
 
+    def test_restoring_from_the_archive_is_the_owners(self):
+        # The Archived Jobs page: archived jobs listed with can_manage, restored one at a time or in
+        # bulk by their owner or an admin only, back to the status their record shows
+        from models.job import JobStatus
+        failed = self.create_job(self.alice, "CASE-ARCHIVE-FAILED")
+        done = self.create_job(self.alice, "CASE-ARCHIVE-DONE")
+        for job in (failed, done):
+            self.client.put(f"/api/jobs/{job}/sharing", headers=self.alice, json={"usernames": ["bob"]})
+            stored = self.main.job_storage.get_job(job)
+            stored.status = JobStatus.ARCHIVED
+            stored.completed_at = stored.created_at
+            stored.error = "Elrond exited 1" if job == failed else None
+            self.main.job_storage.save_job(stored)
+
+        def archived(headers):
+            resp = self.client.get("/api/jobs?status=archived", headers=headers)
+            self.assertEqual(resp.status_code, 200, resp.text)
+            return {job["id"]: job["can_manage"] for job in resp.json()["jobs"]}
+        self.assertEqual({k: v for k, v in archived(self.bob).items() if k in (failed, done)},
+                         {failed: False, done: False})
+        self.assertTrue(archived(self.alice)[failed])
+        self.assertTrue(archived(self.admin)[failed])
+
+        resp = self.client.post(f"/api/jobs/{failed}/unarchive", headers=self.bob)
+        self.assertEqual(resp.status_code, 403, resp.text)
+        self.assertIn("owner or an admin", resp.json()["detail"])
+        [result] = self.client.post("/api/jobs/bulk/unarchive", headers=self.bob, json=[done]).json()["results"]
+        self.assertFalse(result["success"])
+        self.assertIn("owner or an admin", result["error"])
+        self.assertEqual(self.main.job_storage.get_job(done).status, JobStatus.ARCHIVED)
+
+        stranger = self.create_job(self.admin, "CASE-ARCHIVE-ADMINS")
+        results = self.client.post("/api/jobs/bulk/unarchive", headers=self.alice,
+                                   json=[failed, done, done, stranger]).json()["results"]
+        self.assertEqual(results[0], {"job_id": failed, "success": True, "status": "failed"})
+        self.assertEqual(results[1], {"job_id": done, "success": True, "status": "completed"})
+        self.assertEqual(results[2], {"job_id": done, "success": False, "error": "Job is not archived"})
+        self.assertEqual(results[3], {"job_id": stranger, "success": False, "error": "Job not found"})
+        self.assertEqual(self.main.job_storage.get_job(failed).status, JobStatus.FAILED)
+        self.assertNotIn(failed, archived(self.alice))
+        self.assertIn(failed, self.ids(self.alice))
+
+        stored = self.main.job_storage.get_job(done)
+        stored.status = JobStatus.ARCHIVED
+        self.main.job_storage.save_job(stored)
+        resp = self.client.post(f"/api/jobs/{done}/unarchive", headers=self.admin)
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertEqual((resp.json()["status"], resp.json()["can_manage"]), ("completed", True))
+        self.assertEqual(self.client.post(f"/api/jobs/{done}/unarchive", headers=self.alice).status_code, 400)
+
     def test_sharing_with_unknown_user_refused(self):
         job = self.create_job(self.alice, "CASE-ALICE-2")
         resp = self.client.put(f"/api/jobs/{job}/sharing", headers=self.alice, json={"usernames": ["nobody"]})

@@ -1,14 +1,41 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { listJobs } from '../api';
+import { listJobs, bulkUnarchiveJobs, bulkDeleteJobs } from '../api';
+import { bulkOffered, bulkPlan, canManage, skippedNote } from '../jobActions';
 
 const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
+
+// Where a job wrote, as the backend records it (output_removal.recorded_output)
+const outputFolder = (job) => job.destination_path || job.result?.output_directory || null;
+
+// What DELETE /api/jobs/{id} (and bulk/delete) actually removes: the job's row and its owner and
+// sharing row (storage.delete_job). Nothing on disk, and not the case's findings, notes or host
+// assignments, which are keyed by job and left behind. The wording mustn't promise more.
+export const deleteConfirmation = (jobs, plan) => {
+  const n = jobs.length;
+  const folders = jobs.map((job) => `  ${job.case_number}: ${outputFolder(job) || 'no output folder recorded'}`);
+  return [
+    `Permanently delete ${n} archived job${n === 1 ? '' : 's'}? This can't be undone.`,
+    "Rowanholt deletes each job's record (its settings, status, log, owner and sharing), so the job "
+      + 'and its case pages are gone from Rowanholt.',
+    'Nothing on disk is removed. The evidence and the output stay where they are, and the output has '
+      + 'to be removed by hand if it should go:',
+    folders.join('\n'),
+    "The findings, notes and host assignments made on its case stay in Rowanholt's database, but nothing "
+      + `shows them any more.${skippedNote(plan, 'delete')}`,
+  ].join('\n\n');
+};
+
+// "3 jobs", or "1 job"
+const jobsCount = (n) => `${n} job${n === 1 ? '' : 's'}`;
 
 function Archive() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedJobs, setSelectedJobs] = useState([]);
+  const [notice, setNotice] = useState(null);
+  const [working, setWorking] = useState(false);
 
   useEffect(() => {
     loadArchivedJobs();
@@ -16,10 +43,11 @@ function Archive() {
 
   const loadArchivedJobs = async () => {
     try {
-      // TODO: Update API to support archived status
       const data = await listJobs('archived');
       setJobs(data.jobs);
-      setError(null);
+      // A job restored or deleted elsewhere drops out of the selection with the list
+      const listed = new Set(data.jobs.map((job) => job.id));
+      setSelectedJobs((prev) => prev.filter((id) => listed.has(id)));
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to load archived jobs');
     } finally {
@@ -45,24 +73,64 @@ function Archive() {
     );
   };
 
+  // Restore and delete are all this page does, and both are the owner's or an admin's: a job
+  // someone else owns can't be selected at all (the server refuses it anyway)
+  const manageable = jobs.filter(canManage);
+  const selectedJobData = jobs.filter((job) => selectedJobs.includes(job.id));
+
   const handleSelectAll = () => {
-    if (selectedJobs.length === jobs.length) {
+    if (selectedJobs.length === manageable.length) {
       setSelectedJobs([]);
     } else {
-      setSelectedJobs(jobs.map(job => job.id));
+      setSelectedJobs(manageable.map(job => job.id));
     }
   };
 
-  const handleBulkRestore = () => {
-    alert('Restore functionality will be implemented');
+  // Sends the eligible jobs, then says how many it did and why any weren't, in the page's own
+  // messages; the list is reloaded either way, so it shows what the server now holds
+  const runBulk = async (plan, send, done, verb) => {
+    const byId = Object.fromEntries(jobs.map((job) => [job.id, job]));
+    setWorking(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await send(plan.eligible.map((job) => job.id));
+      const results = response.results || [];
+      const succeeded = results.filter((r) => r.success).length;
+      const failed = results.filter((r) => !r.success);
+      if (succeeded) setNotice(`${done} ${jobsCount(succeeded)}.${skippedNote(plan, verb)}`);
+      else if (plan.notYours.length) setNotice(skippedNote(plan, verb).trim());
+      if (failed.length) {
+        setError(`Couldn't ${verb} ${jobsCount(failed.length)}: `
+          + failed.map((r) => `${byId[r.job_id]?.case_number || r.job_id} (${r.error})`).join('; '));
+      }
+    } catch (err) {
+      setError(err.response?.data?.detail || `Failed to ${verb} the selected jobs`);
+    } finally {
+      await loadArchivedJobs();
+      setWorking(false);
+    }
+  };
+
+  const handleBulkRestore = async () => {
+    const plan = bulkPlan(selectedJobData, 'restore');
+    if (!plan.eligible.length) {
+      setError(`None of the selected jobs can be restored.${skippedNote(plan, 'restore')}`);
+      return;
+    }
+    await runBulk(plan, bulkUnarchiveJobs, 'Restored to Jobs:', 'restore');
   };
 
   const handleBulkDelete = async () => {
-    if (!window.confirm(`Are you sure you want to permanently delete ${selectedJobs.length} archived job(s)?`)) {
+    const plan = bulkPlan(selectedJobData, 'delete');
+    if (!plan.eligible.length) {
+      setError(`None of the selected jobs can be deleted.${skippedNote(plan, 'delete')}`);
       return;
     }
-    alert('Permanent delete functionality will be implemented');
-    setSelectedJobs([]);
+    if (!window.confirm(deleteConfirmation(plan.eligible, plan))) {
+      return;
+    }
+    await runBulk(plan, bulkDeleteJobs, 'Deleted the records of', 'delete');
   };
 
   if (loading) {
@@ -93,10 +161,11 @@ function Archive() {
           <Link to="/jobs">
             <button>← Back to Jobs</button>
           </Link>
-          {selectedJobs.length > 0 && (
+          {(bulkOffered(selectedJobData, 'restore') || bulkOffered(selectedJobData, 'delete')) && (
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button
                 onClick={() => handleBulkRestore()}
+                disabled={working}
                 style={{
                   padding: '0.5rem 1rem',
                   background: 'rgba(107, 142, 63, 0.3)',
@@ -110,6 +179,7 @@ function Archive() {
               </button>
               <button
                 onClick={() => handleBulkDelete()}
+                disabled={working}
                 style={{
                   padding: '0.5rem 1rem',
                   background: '#8b4513',
@@ -125,7 +195,8 @@ function Archive() {
           )}
         </div>
 
-        {error && <div className="error">{error}</div>}
+        {error && <div className="error" role="alert">{error}</div>}
+        {notice && <div className="success" role="status">{notice}</div>}
 
         {jobs.length === 0 ? (
           <div className="empty-state">
@@ -140,12 +211,15 @@ function Archive() {
               <thead>
                 <tr>
                   <th style={{ width: '5%' }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedJobs.length === jobs.length && jobs.length > 0}
-                      onChange={handleSelectAll}
-                      style={{ cursor: 'pointer' }}
-                    />
+                    {manageable.length > 0 && (
+                      <input
+                        type="checkbox"
+                        aria-label="Select all"
+                        checked={selectedJobs.length === manageable.length}
+                        onChange={handleSelectAll}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    )}
                   </th>
                   <th style={{ width: '25%' }}>Case Number</th>
                   <th style={{ width: '15%' }}>Status</th>
@@ -158,12 +232,15 @@ function Archive() {
                 {jobs.map(job => (
                   <tr key={job.id}>
                     <td>
-                      <input
-                        type="checkbox"
-                        checked={selectedJobs.includes(job.id)}
-                        onChange={() => handleSelectJob(job.id)}
-                        style={{ cursor: 'pointer' }}
-                      />
+                      {canManage(job) && (
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${job.case_number}`}
+                          checked={selectedJobs.includes(job.id)}
+                          onChange={() => handleSelectJob(job.id)}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      )}
                     </td>
                     <td>
                       <Link to={`/jobs/${job.id}`}>
