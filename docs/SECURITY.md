@@ -14,7 +14,23 @@ There are three ways in, and no others:
 - **Single sign-on (OIDC)**: any OpenID Connect identity provider (Entra ID, Okta, Keycloak), set up in [SERVER.md](SERVER.md#single-sign-on); roles can follow an IdP group.
 - **API tokens**: for scripts and Smith's MCP server ([API Tokens](#api-tokens-team-server) below).
 
-**Rowanholt has no built-in MFA.** There's no TOTP, no backup codes and no second step at sign-in. (`auth/routes.py` holds MFA routes from an earlier design, but the backend doesn't mount it, and the user store has nowhere to keep a second factor.) A team server should get MFA from its identity provider: sign people in through SSO, require MFA there (Entra ID Conditional Access, Okta's sign-on policies, Keycloak's OTP), and set `ROWANHOLT_LOCAL_LOGIN=false` so that only admins keep a password, as a break-glass way in. Those admin passwords are a single factor: keep them long, few and out of daily use.
+### Multi-Factor Authentication
+
+A team server's password accounts can add a second factor: a code from an authenticator app (TOTP), set up under Account → Security ([USAGE.md](USAGE.md#multi-factor-authentication)). The code is `auth/mfa.py`, with its routes in `auth/routes_simple.py`.
+
+- **TOTP**: RFC 6238, HMAC-SHA1, 30-second steps, 6 digits, one step either side of now accepted. A step that's been used can't be used again by that account (the last one is kept in the account, and claimed in Redis so two requests racing with one code can't both win).
+- **Enrolment**: the server makes a 160-bit secret and returns it as an `otpauth://` URI, a QR code (an SVG drawn by the server, so the browser needs no QR library and the secret goes nowhere else) and text to type in. Nothing changes until a code from it is confirmed. Setting up a new authenticator while MFA is on needs a current code first, and the new secret replaces the old only when it's confirmed.
+- **The secret at rest**: Fernet-encrypted in the user store, with a key derived by HKDF-SHA256 from the server's `SECRET_KEY` (label `rowanholt mfa totp secret v1`). The API never returns it after enrolment. Changing `SECRET_KEY` makes stored secrets unreadable: those accounts need an admin's reset.
+- **Backup codes**: ten, made when MFA goes on and shown once, each `XXXXX-XXXXX` from an unambiguous alphabet (49 random bits). Stored as HMAC-SHA256 under another derived key rather than bcrypt: they're random, not chosen by a person, so a slow hash adds nothing a key doesn't, and a sign-in checks up to ten. Each signs in once; Account shows how many are left and makes ten new ones (replacing the rest) for a current authenticator code.
+- **Sign-in**: with MFA on, a right password doesn't sign in. `POST /api/auth/login` answers with a challenge, valid for five minutes, which only `POST /api/auth/login/mfa` takes, with a code or a backup code; it's signed with its own derived key, isn't a JWT or an API token, signs in once, and goes stale if the password changes. Wrong codes count towards the same lockout as wrong passwords, and a right password doesn't reset the count while the second factor is outstanding.
+- **Turning it off**: the account's password and a current code (or a backup code). An admin can turn it off for someone who has lost both (`DELETE /api/auth/users/{id}/mfa`, or `rowanholt server users mfa-reset <username>` on the server); they set it up again from Account.
+- **Requiring it**: `ROWANHOLT_REQUIRE_MFA=true` ([CONFIG.md](CONFIG.md)) signs a password user without MFA in only to set it up: every other route answers 403 until they have, and turning it off isn't offered (an admin's reset still is).
+- **What it doesn't cover**: single sign-on accounts get MFA from the identity provider (Entra ID Conditional Access, Okta's sign-on policies, Keycloak's OTP), so Account says so rather than offering enrolment. API tokens are the non-interactive way in and need no second factor; they can't set up or change MFA. On an analyst's own machine (no server mode) there's no sign-in for it to protect, and Account says MFA applies to a team server's sign-in.
+- **The audit log**: every MFA event is a row in `audit_logs` (resource type `user`): `mfa_enabled`, `mfa_reenrolled`, `mfa_disabled`, `mfa_backup_code_used`, `mfa_backup_codes_regenerated`, `mfa_failed` (with the stage: sign-in, enrolment, disable…) and `mfa_admin_reset`.
+
+With single sign-on, `ROWANHOLT_LOCAL_LOGIN=false` leaves passwords to admins as a break-glass way in: give those admins MFA too, or keep their passwords long, few and out of daily use.
+
+(`auth/routes.py` holds MFA routes from an earlier design, for a database user model that doesn't exist; the backend doesn't mount it.)
 
 ### Password Security
 
@@ -91,7 +107,7 @@ There are three ways in, and no others:
 - **Key Derivation**: PBKDF2-HMAC-SHA256
   - **Iterations**: 100,000
   - **Salt**: Application-specific (should be unique per deployment)
-- **Use Cases**: none in this build. The helpers (`auth/security_utils.py`) serve only the unmounted MFA code in `auth/routes.py`
+- **Use Cases**: none in this build. The helpers (`auth/security_utils.py`) serve only the unmounted MFA code in `auth/routes.py`; built-in MFA's TOTP secrets use HKDF and Fernet in `auth/mfa.py` ([Multi-Factor Authentication](#multi-factor-authentication))
 
 ### Key Management
 - **Secret Key**: Loaded from `settings.secret_key`
@@ -228,7 +244,7 @@ allowed_origins = [
 ### Brute Force Attacks
 - ⚠️ TODO: Rate limiting on login
 - ✅ Account lockout after repeated failed sign-ins ([SERVER.md](SERVER.md#how-sign-in-lockouts-work))
-- ⚠️ No built-in MFA: require it at the identity provider and sign in through SSO ([Signing In](#signing-in))
+- ✅ MFA (TOTP and backup codes) for password accounts, required with `ROWANHOLT_REQUIRE_MFA=true`; single sign-on accounts get it from the identity provider ([Multi-Factor Authentication](#multi-factor-authentication))
 
 ### Session Hijacking
 - ✅ Secure token generation
@@ -245,7 +261,7 @@ allowed_origins = [
 
 ### Critical (Must Do)
 - [ ] Change default admin password
-- [ ] Sign people in through SSO, with MFA required at the identity provider, and `ROWANHOLT_LOCAL_LOGIN=false` (Rowanholt has no MFA of its own)
+- [ ] Require MFA: `ROWANHOLT_REQUIRE_MFA=true` for password accounts, and for single sign-on, MFA at the identity provider (with `ROWANHOLT_LOCAL_LOGIN=false` if passwords should be for admins only)
 - [ ] Set strong `SECRET_KEY` environment variable
 - [ ] Enable HTTPS and secure cookies
 - [ ] Use strong database credentials
@@ -311,6 +327,7 @@ pip install --upgrade -r requirements/web.txt
 
 ## Version History
 
+- **12 November 2026**: built-in MFA for password accounts (TOTP, backup codes, admins' reset, `ROWANHOLT_REQUIRE_MFA`)
 - **v2.1.0**: Added input sanitization and admin controls (MFA routes were written too, but never mounted)
 - **v2.0.0**: Initial authentication system
 - **v1.0.0**: No authentication (development only)

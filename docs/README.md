@@ -18,7 +18,7 @@
 
 - **[API.md](API.md)** ⭐ - Complete REST API documentation with examples
 - **[CLI.md](CLI.md)** ⭐ - Command-line tools reference (gandalf, elrond, MITRE, cloud, AI, SIEM)
-- **[SECURITY.md](SECURITY.md)** - Security features, sign-in (password, SSO, API tokens; no built-in MFA), best practices
+- **[SECURITY.md](SECURITY.md)** - Security features, sign-in (password with optional TOTP MFA and backup codes, SSO, API tokens), best practices
 - **[SMITH.md](SMITH.md)** - Smith, the AI analyst: with Ollama, without it, and the Smith models
 
 ### 📐 Architecture

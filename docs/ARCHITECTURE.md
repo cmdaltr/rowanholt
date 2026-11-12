@@ -980,7 +980,7 @@ Layer 6: Authentication & Authorization
 │ • Password Hashing (bcrypt)                              │
 │ • Session Timeout                                        │
 │ • Single Sign-On (OIDC); MFA at the identity provider    │
-│ • No built-in MFA                                        │
+│ • TOTP MFA and backup codes for password accounts        │
 └──────────────────────────────────────────────────────────┘
 
 Layer 5: API Security

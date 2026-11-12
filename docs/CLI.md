@@ -39,7 +39,7 @@ It follows its own link back to the repository, so moving the clone means runnin
 | `rowanholt start \| stop \| restart \| status [--testing] [--logs]` | The Docker stack (`--testing` leaves out Splunk and Elastic) |
 | `rowanholt start --progress[=zenity]` | The same, reporting progress and an ETA learnt from earlier starts (what the desktop apps show) |
 | `rowanholt server init <hostname> [--tls internal\|<email>\|files]` | Turns this install into a team server; `start`, `stop` and `status` then use the server profile (`--server` forces it). See `docs/SERVER.md` |
-| `rowanholt server users <list\|add\|password\|role\|disable\|enable>` | A server's accounts |
+| `rowanholt server users <list\|add\|password\|role\|disable\|enable\|mfa-reset>` | A server's accounts (`mfa-reset`: a lost authenticator) |
 | `rowanholt server licence <show\|install FILE --accept-terms "Name <email>"\|remove>` | A server's licence (docs/LICENSING_MODEL.md) |
 | `rowanholt server ca` | Prints the root certificate clients trust when the server uses Caddy's own CA |
 | `rowanholt gandalf [bash\|python] <args>` | `gandalf.sh` (the default) or `gandalf.py` |
