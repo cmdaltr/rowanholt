@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "web" / "ba
 
 import storage  # noqa: E402
 
-HEAD = "e8c3a1f5b927"  # the newest file in src/web/backend/alembic/versions
+HEAD = "a6d3f9b2c418"  # the newest file in src/web/backend/alembic/versions
 
 
 def heads(url: str) -> list:
@@ -130,6 +130,45 @@ class MigrationTest(unittest.TestCase):
         self.assertEqual((heads(url), scopes()), (["d5a2e8f1c693"], ["aule-mcp", "full"]))
         migrate(command.upgrade, "head")
         self.assertEqual((heads(url), scopes()), ([HEAD], ["smith-mcp", "full"]))
+
+    def test_archive_state_columns_upgrade_downgrade_and_upgrade_again(self):
+        """a6d3f9b2c418 adds archived_at and archived_from to jobs; downgrading drops them and keeps
+        the jobs, and upgrading again puts them back, empty."""
+        from alembic import command
+        from alembic.config import Config
+        url = self.url("archive-state")
+        storage.JobStorage(url)
+        engine = create_engine(url)
+        config = Config()
+        config.set_main_option("script_location", str(Path(storage.__file__).resolve().parent / "alembic"))
+        config.attributes["target_metadata"] = storage.Base.metadata
+
+        def migrate(step, revision: str) -> None:
+            with engine.begin() as connection:
+                config.attributes["connection"] = connection
+                step(config, revision)
+
+        def columns() -> set:
+            return {c["name"] for c in inspect(engine).get_columns("jobs")} & {"archived_at", "archived_from"}
+
+        self.assertEqual((heads(url), columns()), ([HEAD], {"archived_at", "archived_from"}))
+        with engine.begin() as connection:
+            connection.execute(text(
+                "INSERT INTO jobs (id, case_number, source_paths, options, status, progress, created_at, "
+                "archived_at, archived_from) VALUES ('j1', 'CASE01', '[]', '{}', 'archived', 100, "
+                "'2026-11-01 10:00:00', '2026-11-12 09:00:00', 'cancelled')"))
+        jobs = storage.JobStorage(url)
+        self.assertEqual(jobs.get_job("j1").archived_from.value, "cancelled")
+
+        migrate(command.downgrade, "e8c3a1f5b927")
+        self.assertEqual((heads(url), columns()), (["e8c3a1f5b927"], set()))
+        with engine.connect() as connection:
+            self.assertEqual(connection.execute(text("SELECT status FROM jobs WHERE id = 'j1'")).scalar(), "archived")
+
+        migrate(command.upgrade, "head")
+        self.assertEqual((heads(url), columns()), ([HEAD], {"archived_at", "archived_from"}))
+        job = storage.JobStorage(url).get_job("j1")
+        self.assertEqual((job.status.value, job.archived_at, job.archived_from), ("archived", None, None))
 
     def test_models_match_the_migrations(self):
         from alembic.autogenerate import compare_metadata

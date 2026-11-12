@@ -50,6 +50,9 @@ class JobModel(Base):
     created_at = Column(DateTime, default=datetime.now, index=True)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
+    # When it was archived, and the status it had then, to go back to (migration a6d3f9b2c418)
+    archived_at = Column(DateTime, nullable=True)
+    archived_from = Column(String, nullable=True)
 
 
 class JobAccessModel(Base):
@@ -251,6 +254,8 @@ class JobStorage:
             created_at=job_model.created_at,
             started_at=job_model.started_at,
             completed_at=job_model.completed_at,
+            archived_at=job_model.archived_at,
+            archived_from=job_model.archived_from,
         )
 
     def save_job(self, job: Job) -> None:
@@ -287,6 +292,8 @@ class JobStorage:
                     created_at=job.created_at,
                     started_at=job.started_at,
                     completed_at=job.completed_at,
+                    archived_at=job.archived_at,
+                    archived_from=job.archived_from.value if job.archived_from else None,
                 )
                 session.add(job_model)
 
@@ -315,6 +322,8 @@ class JobStorage:
         row.created_at = job.created_at
         row.started_at = job.started_at
         row.completed_at = job.completed_at
+        row.archived_at = job.archived_at
+        row.archived_from = job.archived_from.value if job.archived_from else None
 
     def save_worker_job(self, job: Job) -> None:
         """The worker's save of the job it's running: a full save, as save_job, unless the job was

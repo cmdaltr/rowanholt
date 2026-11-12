@@ -124,3 +124,14 @@ test('a confirmed delete goes to the bulk route and the list is reloaded', async
   expect(await screen.findByRole('status')).toHaveTextContent('Deleted the records of 1 job.');
   expect(await screen.findByText('No archived jobs found.')).toBeInTheDocument();
 });
+
+test('the Archived column shows when each job was archived, as the Created column shows its dates', async () => {
+  // archived_at comes from the job (jobs.archived_at, set by archive); a job archived before it
+  // was kept has none
+  const archivedAt = '2026-11-12T10:30:00';
+  await show([job('a', { archived_at: archivedAt }), job('b')]);
+  const cells = (caseNumber) => screen.getByText(caseNumber).closest('tr').querySelectorAll('td');
+  expect(cells('CASE-a')[4]).toHaveTextContent(new Date(archivedAt).toLocaleString());
+  expect(cells('CASE-a')[3]).toHaveTextContent(new Date('2026-11-12T09:00:00').toLocaleString());
+  expect(cells('CASE-b')[4]).toHaveTextContent('N/A');
+});

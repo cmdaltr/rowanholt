@@ -448,13 +448,15 @@ Each job has every field in [Get Job Details](#get-job-details) (shortened here)
   "created_at": "2025-01-15T12:00:00",
   "started_at": "2025-01-15T12:00:01",
   "completed_at": null,
+  "archived_at": null,
+  "archived_from": null,
   "owner": "alice",
   "shared_with": ["bob"],
   "can_manage": true
 }
 ```
 
-`log` is a list of strings. `options` has every field listed under [Create Job](#create-job). `pending_action` is set only while the job is `awaiting_confirmation` ([Removing a job's old output](#removing-a-jobs-old-output)). `can_manage`: as in [List Jobs](#list-jobs).
+`log` is a list of strings. `options` has every field listed under [Create Job](#create-job). `pending_action` is set only while the job is `awaiting_confirmation` ([Removing a job's old output](#removing-a-jobs-old-output)). `archived_at` and `archived_from` are set only while the job is `archived`: when, and the status [Unarchive](#unarchive-job) restores (both `null` for a job archived before 12 November 2026). `can_manage`: as in [List Jobs](#list-jobs).
 
 **Errors:**
 - `404 Not Found`: Job not found or unauthorized access
@@ -622,14 +624,14 @@ It's deleted without following symbolic links or crossing onto another device, a
 
 **Endpoint:** `POST /api/jobs/{job_id}/archive`
 
-**Description:** Set a job `archived`, with a line in its log. Nothing else changes: the previous status isn't kept, and [Unarchive](#unarchive-job) works it out again.
+**Description:** Set a job `archived`, with a line in its log, and keep when (`archived_at`, in the job's responses) and the status it had (`archived_from`), which [Unarchive](#unarchive-job) restores.
 
 **Authentication:** In server mode, the job's owner or an admin.
 
 **Path Parameters:**
 - `job_id`: UUID of the job
 
-**Response:** `200 OK` with the job, `"status": "archived"`.
+**Response:** `200 OK` with the job, `"status": "archived"` and `archived_at` set.
 
 **Errors:**
 - `400 Bad Request`: the job is pending, running, paused or removing, or already archived
@@ -642,7 +644,7 @@ It's deleted without following symbolic links or crossing onto another device, a
 
 **Endpoint:** `POST /api/jobs/{job_id}/unarchive`
 
-**Description:** Restore an archived job: to `failed` if it has an error, `completed` if it has a completion time, `cancelled` if it has neither.
+**Description:** Restore an archived job to the status it had when it was archived (`archived_from`), and clear `archived_at` and `archived_from`. A job archived before these were kept (migration `a6d3f9b2c418`, 12 November 2026) has no `archived_from`, and goes back to `failed` if it has an error, `completed` if it has a completion time, `cancelled` if it has neither (so a cancelled one comes back `completed`, since a cancel sets a completion time).
 
 **Authentication:** In server mode, the job's owner or an admin.
 
@@ -752,7 +754,7 @@ A job the caller can't see comes back `Job not found`; one they see but don't ma
 - **cancel**: as the single cancel, marked first, then stopped; a job that had already finished or failed is left alone, not stopped, and reported with `success: false`
 - **delete**: as the single delete (the case's rows go with the job, nothing on disk is removed, the audit log records each); `Cannot delete running job` for a pending, running, paused or removing one
 - **archive**: `Cannot archive running job` for a pending, running, paused or removing one; `Already archived`
-- **unarchive**: `Job is not archived`; on success the result's `status` is the status restored
+- **unarchive**: `Job is not archived`; on success the result's `status` is the status restored, as the single unarchive restores it
 
 ---
 

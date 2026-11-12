@@ -142,6 +142,10 @@ class Job(BaseModel):
     created_at: datetime = Field(default_factory=datetime.now)
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+    # Set while it's archived: when, and the status it goes back to on a restore (None for a job
+    # archived before these were kept: main._unarchived_status reads it from the job instead)
+    archived_at: Optional[datetime] = None
+    archived_from: Optional[JobStatus] = None
     # From the job_access table, filled in by the API (server mode)
     owner: Optional[str] = Field(None, description="Username of the job's creator")
     shared_with: list[str] = Field(default_factory=list, description="Usernames it's shared with")

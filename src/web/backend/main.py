@@ -898,8 +898,7 @@ async def bulk_archive_jobs(job_ids: list[str], request: Request):
                 results.append({"job_id": job_id, "success": False, "error": "Already archived"})
                 continue
 
-            job.status = JobStatus.ARCHIVED
-            job.log.append(f"[{datetime.now().isoformat()}] Job archived by user (bulk operation)")
+            _archive(job, "Job archived by user (bulk operation)")
             job_storage.save_job(job)
             results.append({"job_id": job_id, "success": True})
 
@@ -909,15 +908,34 @@ async def bulk_archive_jobs(job_ids: list[str], request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _archive(job: Job, log_line: str) -> None:
+    """Archive the job (the caller saves it), keeping when, and the status to restore."""
+    job.archived_from = job.status
+    job.archived_at = datetime.now()
+    job.status = JobStatus.ARCHIVED
+    job.log.append(f"[{datetime.now().isoformat()}] {log_line}")
+
+
 def _unarchived_status(job: Job) -> JobStatus:
-    """The status an archived job goes back to. The status before archiving isn't stored, so it's
-    read from what the job holds: an error means it failed, a completion time that it finished.
-    A cancel sets a completion time too, so a cancelled job comes back as completed."""
+    """The status an archived job goes back to: the one it had when it was archived. A job
+    archived before that was kept (migration a6d3f9b2c418) has none, so its status is read from
+    what it holds: an error means it failed, a completion time that it finished. A cancel sets a
+    completion time too, so such a cancelled job comes back as completed."""
+    if job.archived_from and job.archived_from != JobStatus.ARCHIVED:
+        return job.archived_from
     if job.error:
         return JobStatus.FAILED
     if job.completed_at:
         return JobStatus.COMPLETED
     return JobStatus.CANCELLED
+
+
+def _unarchive(job: Job, log_line: str) -> None:
+    """Restore the job from the archive (the caller saves it), with its archive state cleared."""
+    job.status = _unarchived_status(job)
+    job.archived_at = None
+    job.archived_from = None
+    job.log.append(f"[{datetime.now().isoformat()}] {log_line}")
 
 
 @app.post("/api/jobs/bulk/unarchive")
@@ -950,8 +968,7 @@ async def bulk_unarchive_jobs(job_ids: list[str], request: Request):
                 results.append({"job_id": job_id, "success": False, "error": "Job is not archived"})
                 continue
 
-            job.status = _unarchived_status(job)
-            job.log.append(f"[{datetime.now().isoformat()}] Job unarchived by user (bulk operation)")
+            _unarchive(job, "Job unarchived by user (bulk operation)")
             job_storage.save_job(job)
             results.append({"job_id": job_id, "success": True, "status": job.status.value})
 
@@ -1239,9 +1256,7 @@ async def archive_job(job_id: str, request: Request):
                 detail="Job is already archived",
             )
 
-        # Update job status to archived
-        job.status = JobStatus.ARCHIVED
-        job.log.append(f"[{datetime.now().isoformat()}] Job archived by user")
+        _archive(job, "Job archived by user")
 
         job_storage.save_job(job)
 
@@ -1281,8 +1296,7 @@ async def unarchive_job(job_id: str, request: Request):
                 detail="Job is not archived",
             )
 
-        job.status = _unarchived_status(job)
-        job.log.append(f"[{datetime.now().isoformat()}] Job unarchived by user")
+        _unarchive(job, "Job unarchived by user")
 
         job_storage.save_job(job)
 
