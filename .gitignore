@@ -194,3 +194,9 @@ licences/
 *licence-signing.key
 *.lic.key
 *.licence
+
+# Claude Code session artefacts: command-audit logs and session notes stay on this machine
+.claude/logs/
+.claude/snapshots/
+# The older copies OneDrive leaves beside a file when it re-fetches it
+*.fetch
