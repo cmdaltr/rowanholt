@@ -15,13 +15,13 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 try:
     from .config import settings
     from . import busy  # GET /api/busy, the homelab's question before a rebuild
     from . import job_liveness  # Whether a pending, running or paused job has a worker
+    from . import siem_export  # A completed job's manual SIEM export, run in the worker
     from .auth import access
     from .auth.users import load_users
     from .auth.routes_simple import router as auth_router  # Simple file-based auth
@@ -57,6 +57,7 @@ except ImportError:
     from config import settings
     import busy  # GET /api/busy, the homelab's question before a rebuild
     import job_liveness  # Whether a pending, running or paused job has a worker
+    import siem_export  # A completed job's manual SIEM export, run in the worker
     from auth import access
     from auth.users import load_users
     from auth.routes_simple import router as auth_router  # Simple file-based auth
@@ -1333,79 +1334,94 @@ async def unarchive_job(job_id: str, request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/jobs/{job_id}/export-siem")
-async def trigger_siem_export(job_id: str):
-    """
-    Manually trigger SIEM export for a completed job.
+# An export a worker is running: its heartbeat (siem_export). A queued one isn't busy: like a
+# pending job, it waits out a rebuild in Redis's queue
+busy.register("siem-exports", siem_export.running)
 
-    This is useful for jobs that completed before automatic SIEM export was implemented,
-    or to re-run SIEM export if it failed.
+
+def _export_folder(job: Job) -> Path:
+    """The completed job's output folder, which --Index reads; HTTPException when it's unknown or gone."""
+    if job.destination_path:
+        folder = Path(job.destination_path)
+    elif job.result and job.result.get("output_directory"):
+        folder = Path(job.result["output_directory"])
+    else:
+        raise HTTPException(status_code=400, detail="Cannot determine output directory for job")
+    if not folder.exists():
+        raise HTTPException(status_code=400, detail=f"Output directory does not exist: {folder}")
+    return folder
+
+
+@app.post("/api/jobs/{job_id}/export-siem", status_code=202)
+async def trigger_siem_export(job_id: str, request: Request) -> dict:
+    """
+    Queue the SIEM export of a completed job: Elrond's --Index of its output into the targets its
+    options name, in the worker, which has Elrond and the SIEMs' network and credentials. Answers
+    at once with the task; GET this path for its progress and outcome.
 
     Args:
         job_id: Job ID to export
+        request: The caller (whoever can see the job; the access middleware has checked)
 
     Returns:
-        Export status
+        The queued export's record
     """
     # The house pattern: a package import under the tests' and tools' `backend.main`, a top-level
-    # one under `uvicorn main:app`, as the image runs it (a bare relative import failed there)
+    # one under `uvicorn main:app`, as the image runs it
     try:
-        from .tasks import run_siem_export
+        from .tasks_docker import export_siem
     except ImportError:
-        from tasks import run_siem_export
+        from tasks_docker import export_siem
 
-    job = None
+    job = job_storage.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.status != JobStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="Can only export SIEM data for completed jobs")
+    names = siem_export.targets(job.options)
+    if not names:
+        raise HTTPException(status_code=400, detail="Job does not have SIEM export enabled")
+    _export_folder(job)
+
+    user = access.current_user(request)
+    task_id = str(uuid.uuid4())
     try:
-        job = job_storage.get_job(job_id)
+        record = siem_export.claim(job_id, task_id, names, user.get("username") or "local")
+    except Exception as exc:  # Redis down: nothing is queued, so say so rather than pretend
+        raise HTTPException(status_code=503, detail=f"Can't record the export (Redis): {exc}")
+    if record is None:
+        raise HTTPException(status_code=409, detail="A SIEM export is already queued or running for this job")
+    try:
+        export_siem.apply_async(args=[job_id], task_id=task_id)
+    except Exception as exc:
+        siem_export.drop(job_id, task_id)
+        raise HTTPException(status_code=503, detail=f"Can't queue the export: {exc}")
+    # A conditional append, not a full save: the row's other columns stay as the worker left them
+    job_storage.transition(job_id, (JobStatus.COMPLETED,), JobStatus.COMPLETED,
+                           log_line=f"SIEM export into {', '.join(names)} queued by {user.get('username') or 'local'}")
+    job_storage.audit("job.siem_export", {"id": user.get("id"), "username": user.get("username")},
+                      _client_ip(request), resource_id=job_id, targets=names)
+    return siem_export.status(job_id)
 
-        if not job:
-            raise HTTPException(status_code=404, detail="Job not found")
 
-        if job.status != JobStatus.COMPLETED:
-            raise HTTPException(status_code=400, detail="Can only export SIEM data for completed jobs")
+@app.get("/api/jobs/{job_id}/export-siem")
+async def siem_export_status(job_id: str) -> dict:
+    """
+    The job's last SIEM export: `state` none, queued, running (with the target it's on), succeeded
+    or failed (with each target's outcome and counts), or interrupted (its worker died).
 
-        # Check if SIEM options are enabled
-        opts = job.options
-        if not (opts.splunk or opts.elastic or opts.navigator):
-            raise HTTPException(status_code=400, detail="Job does not have SIEM export enabled")
+    Args:
+        job_id: Job ID
 
-        # Get output directory
-        if job.destination_path:
-            dest_dir = Path(job.destination_path)
-        elif job.result and job.result.get("output_directory"):
-            dest_dir = Path(job.result["output_directory"])
-        else:
-            raise HTTPException(status_code=400, detail="Cannot determine output directory for job")
-
-        if not dest_dir.exists():
-            raise HTTPException(status_code=400, detail=f"Output directory does not exist: {dest_dir}")
-
-        # Log the manual export trigger
-        job.log.append(f"[{datetime.now().isoformat()}] -> Manual SIEM export triggered by user")
-        job.log.append(f"[{datetime.now().isoformat()}] -> ")
-        job.log.append(f"[{datetime.now().isoformat()}] -> ======== COMMENCING SIEM EXPORT ========")
-        job.log.append(f"[{datetime.now().isoformat()}] -> ")
-        job_storage.save_job(job)
-
-        # Run SIEM export, in the thread pool: it takes minutes, and on the event loop it would
-        # stall every other request, /api/busy among them, which would then time out and read as idle
-        logger = logging.getLogger(__name__)
-        await run_in_threadpool(run_siem_export, job, dest_dir, logger)
-
-        job.log.append(f"[{datetime.now().isoformat()}] -> ")
-        job.log.append(f"[{datetime.now().isoformat()}] -> ======== SIEM EXPORT COMPLETED ========")
-        job.log.append(f"[{datetime.now().isoformat()}] -> ")
-        job_storage.save_job(job)
-
-        return {"success": True, "message": "SIEM export completed successfully"}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        if job:
-            job.log.append(f"[{datetime.now().isoformat()}] -> ❌ Manual SIEM export failed: {e}")
-            job_storage.save_job(job)
-        raise HTTPException(status_code=500, detail=str(e))
+    Returns:
+        The export's record
+    """
+    if not job_storage.get_job(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    try:
+        return siem_export.status(job_id)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Can't read the export's state (Redis): {exc}")
 
 
 @app.get("/api/jobs/{job_id}/navigator")

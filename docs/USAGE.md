@@ -319,10 +319,11 @@ cat /output/CASE-001/*/artefacts/plaso_timeline.jsonl | head
 
 ### Export to Splunk and Elasticsearch
 
-SIEM export runs inside Elrond, not as a separate tool. Enable Splunk, Elastic and Navigator on the job, or re-run the export for a completed job:
+SIEM export runs inside Elrond, not as a separate tool. Enable Splunk, Elastic and Navigator on the job, or export a completed job again (the job page's **Export to SIEM**, or the API). The export is queued in the worker, which runs Elrond's `--Index` of the job's output; poll its status for progress and each target's outcome:
 
 ```bash
-curl -X POST http://localhost:5688/api/jobs/{job_id}/export-siem
+curl -X POST http://localhost:5688/api/jobs/{job_id}/export-siem   # 202, state "queued"
+curl http://localhost:5688/api/jobs/{job_id}/export-siem           # running, then succeeded or failed
 ```
 
 From the CLI, add `--Splunk --Elastic --Navigator` to the Elrond command. Start the services first with `docker compose --profile siem up -d`.

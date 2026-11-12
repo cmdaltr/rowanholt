@@ -738,7 +738,7 @@ There is no standalone SIEM exporter. Splunk, Elastic, OpenSearch and Timesketch
 python3 src/analysis/elrond.py CASE-001 /evidence /output/CASE-001 --Collect --Process --Analysis --Splunk --Elastic --Navigator
 ```
 
-or for a completed web job with `POST /api/jobs/{job_id}/export-siem`. Start the services first with `docker compose --profile siem up -d`; Elrond fails fast if a requested SIEM is unreachable.
+or for a completed web job with `POST /api/jobs/{job_id}/export-siem`, which runs this `--Index` in the worker (`docs/API.md`). Start the services first with `docker compose --profile siem up -d`; Elrond fails fast if a requested SIEM is unreachable.
 
 | Variable | Used for |
 |---|---|

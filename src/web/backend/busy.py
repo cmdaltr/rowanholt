@@ -117,8 +117,8 @@ def _celery_result(task_id: str) -> object:
 
 
 # Mutating API requests being handled: uploads (evidence helpers, threat intelligence, symbol
-# tables, logos) stream for as long as the file takes, and a manual SIEM export runs inside its
-# request
+# tables, logos) stream for as long as the file takes. (A manual SIEM export runs in the worker
+# and registers its own check, siem-exports, in main.py.)
 requests_in_flight = Counter()
 # Mordor dataset downloads, which run in a background task after their request has answered
 downloads = Counter()
