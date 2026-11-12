@@ -719,7 +719,7 @@ Case data itself stays in case directories on disk; nothing in Postgres copies e
 │   ├── GET    /                      List all jobs
 │   ├── POST   /                      Create new job
 │   ├── GET    /{job_id}              Get job details
-│   ├── PATCH  /{job_id}              Update job
+│   ├── PATCH  /{job_id}              Note in the job's log
 │   ├── DELETE /{job_id}              Delete job
 │   ├── POST   /{job_id}/start        Start job
 │   ├── POST   /{job_id}/stop         Stop running job

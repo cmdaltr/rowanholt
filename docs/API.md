@@ -699,6 +699,27 @@ Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, whic
 
 ---
 
+### Add a Note to a Job's Log
+
+**Endpoint:** `PATCH /api/jobs/{job_id}`
+
+**Description:** Add a note to the job's log, recorded as `Note from <username>: …` on one line, and in the audit log as `job.note_added`. Only the job's owner or an admin may; the people it's shared with get `403`. Nothing else can be changed here: `status`, `progress`, `result` and `error` are the worker's, and the job's status changes through its own routes (cancel, pause, resume, restart, archive, unarchive, confirm-removal, cancel-removal), which do what a status change needs. Until 12 November 2026 this route set any of them for anyone who could see the job.
+
+**Request Body:**
+```json
+{"log_message": "Imaged from the second drive"}
+```
+
+**Response:** `200 OK` with the job
+
+**Errors:**
+- `403 Forbidden`: not the job's owner or an admin
+- `404 Not Found`: Job not found
+- `409 Conflict`: the job changed status while the note was added; try again
+- `422 Unprocessable Entity`: no note, a note over 2,000 characters, or any other field
+
+---
+
 ### Delete Job
 
 **Endpoint:** `DELETE /api/jobs/{job_id}`

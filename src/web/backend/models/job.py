@@ -7,7 +7,7 @@ Database models for analysis jobs and results.
 from datetime import datetime
 from enum import Enum
 from typing import Optional, Dict, Any, List
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
 
 class JobStatus(str, Enum):
@@ -152,13 +152,29 @@ class Job(BaseModel):
         }
 
 
+# Set by the worker or a job's own routes, never through PATCH: `status` would skip what cancel,
+# pause and the removal routes do (kill the process group, release the image locks, audit), and
+# `result` names the output folder a removal and the SIEM export fall back on
+WORKER_FIELDS = ("status", "progress", "result", "error")
+
+
 class JobUpdate(BaseModel):
-    """Job update request."""
-    status: Optional[JobStatus] = None
-    progress: Optional[int] = Field(None, ge=0, le=100)
-    log_message: Optional[str] = None
-    result: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+    """What a client may change through `PATCH /api/jobs/{id}`: a note added to the job's log,
+    by its owner or an admin. Status changes go through the job's own routes."""
+    model_config = ConfigDict(extra="forbid")
+
+    log_message: str = Field(..., min_length=1, max_length=2000)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _refuse_worker_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            taken = [name for name in WORKER_FIELDS if name in data]
+            if taken:
+                raise ValueError(
+                    f"{', '.join(taken)} can't be set by a client: they're the worker's. Change a job's "
+                    "status with POST /api/jobs/{id}/cancel, pause, resume, restart, archive or unarchive")
+        return data
 
 
 class JobListResponse(BaseModel):

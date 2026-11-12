@@ -664,53 +664,40 @@ async def get_job(job_id: str, log_limit: int = Query(100, description="Max log 
 
 
 @app.patch("/api/jobs/{job_id}", response_model=Job)
-async def update_job(job_id: str, update: JobUpdate):
+async def update_job(job_id: str, update: JobUpdate, request: Request):
     """
-    Update job status and progress.
+    Add a note to a job's log: its owner or an admin, as for deleting or archiving it.
+
+    Nothing else is changed here. The status, progress, result and error are the worker's, and a
+    status set here would skip what the job's own routes do (killing the process group, releasing
+    image locks, auditing a removal): `JobUpdate` refuses them with 422. The note goes in with
+    `JobStorage.transition` on the status the job has, so it neither overwrites the worker's latest
+    log and progress (as a full save would) nor lands on a job that moved on meanwhile (409).
 
     Args:
         job_id: Job ID
-        update: Job update request
+        update: The note
+        request: The caller
 
     Returns:
-        Updated job
+        The job, with the note in its log
     """
-    try:
-        job = job_storage.get_job(job_id)
-
-        if not job:
-            raise HTTPException(status_code=404, detail="Job not found")
-
-        # Update job fields
-        if update.status:
-            job.status = update.status
-
-            if update.status == JobStatus.RUNNING and not job.started_at:
-                job.started_at = datetime.now()
-            elif update.status in [JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED]:
-                job.completed_at = datetime.now()
-
-        if update.progress is not None:
-            job.progress = update.progress
-
-        if update.log_message:
-            job.log.append(f"[{datetime.now().isoformat()}] {update.log_message}")
-
-        if update.result:
-            job.result = update.result
-
-        if update.error:
-            job.error = update.error
-
-        # Save updated job
-        job_storage.save_job(job)
-
-        return job
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    job = job_storage.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    refusal = _manager_refusal(request, job_id, "add to its log")
+    if refusal:
+        raise HTTPException(status_code=403, detail=refusal)
+    user = access.current_user(request)
+    # One line: a newline in the note could pass for an entry of the job's own
+    note = " ".join(update.log_message.split())
+    saved = job_storage.transition(job_id, (job.status,), job.status,
+                                   log_line=f"Note from {user.get('username')}: {note}")
+    if saved is None:
+        raise HTTPException(status_code=409, detail="The job changed while the note was added; try again")
+    job_storage.audit("job.note_added", {"id": user.get("id"), "username": user.get("username")},
+                      _client_ip(request), resource_id=job_id)
+    return _with_access([saved])[0]
 
 
 @app.delete("/api/jobs/{job_id}")

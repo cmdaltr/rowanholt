@@ -654,6 +654,54 @@ class RemovalApiTest(BackendCase):
         self.assertEqual(self.client.post("/api/jobs/bulk/cancel", headers=both, json=[]).status_code, 200)
 
 
+@unittest.skipIf(TestClient is None, "backend requirements (fastapi) not installed")
+class JobUpdateTest(BackendCase):
+    """PATCH /api/jobs/{id}: a note in the log from the owner or an admin, and nothing a worker sets."""
+
+    def setUp(self):
+        super().setUp()
+        self.job = self.create_job(self.alice, f"CASE-PATCH-{uuid.uuid4().hex[:6]}")
+        self.client.put(f"/api/jobs/{self.job}/sharing", headers=self.alice, json={"usernames": ["bob"]})
+
+    def patch(self, headers, body):
+        return self.client.patch(f"/api/jobs/{self.job}", headers=headers, json=body)
+
+    def test_the_people_a_job_is_shared_with_cant_change_it(self):
+        resp = self.patch(self.bob, {"log_message": "seen"})
+        self.assertEqual(resp.status_code, 403, resp.text)
+        self.assertIn("owner or an admin", resp.json()["detail"])
+        self.assertFalse(any("seen" in line for line in self.main.job_storage.get_job(self.job).log))
+
+    def test_the_owner_and_an_admin_add_a_note(self):
+        before = self.main.job_storage.get_job(self.job)
+        resp = self.patch(self.alice, {"log_message": "Imaged from\nthe second drive"})
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertEqual(self.patch(self.admin, {"log_message": "Checked"}).status_code, 200)
+        job = self.main.job_storage.get_job(self.job)
+        self.assertEqual(job.status, before.status)
+        self.assertTrue(any(line.endswith("Note from alice: Imaged from the second drive") for line in job.log))
+        self.assertTrue(any(line.endswith("Note from admin: Checked") for line in job.log))
+        self.assertEqual([r["username"] for r in self.main.job_storage.audit_records(self.job, "job.note_added")],
+                         ["alice", "admin"])
+
+    def test_what_the_worker_sets_is_refused_even_to_an_admin(self):
+        for body in ({"status": "completed"}, {"status": "running"}, {"status": "removing"},
+                     {"status": "awaiting_confirmation"}, {"status": "failed"}, {"status": "cancelled"},
+                     {"progress": 100, "log_message": "done"}, {"error": "x"},
+                     {"result": {"output_directory": str(self.evidence)}}, {"log_message": ""}, {}):
+            for headers in (self.alice, self.admin):
+                resp = self.patch(headers, body)
+                self.assertEqual(resp.status_code, 422, f"{body}: {resp.text}")
+        job = self.main.job_storage.get_job(self.job)
+        self.assertEqual(job.status, JobStatus.PENDING)
+        self.assertIsNone(job.result)
+        self.assertFalse(self.main.job_storage.audit_records(self.job, "job.note_added"))
+
+    def test_a_note_on_a_job_that_moved_on_is_409(self):
+        with mock.patch.object(self.main.job_storage, "transition", return_value=None):
+            self.assertEqual(self.patch(self.alice, {"log_message": "late"}).status_code, 409)
+
+
 class ComposeTest(unittest.TestCase):
     """Outside server mode nothing is published beyond this machine: the API (open without sign-in),
     Postgres, Redis, the frontend's dev server, Splunk, Elastic, Kibana and the Navigator."""
