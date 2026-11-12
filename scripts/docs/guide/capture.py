@@ -80,6 +80,13 @@ def prepare(page, page_id: str) -> None:
         page.wait_for_timeout(1500)  # the case number is checked against existing cases
         page.check("input[name=analysisMode][value=local]")
         page.wait_for_timeout(800)
+    elif page_id == "smith":
+        # A case chosen: its quick actions and questions only appear once there is one
+        picker = page.locator("[data-guide='smith.case'] select")
+        values = picker.locator("option").evaluate_all("os => os.map(o => o.value).filter(Boolean)")
+        if values:
+            picker.select_option(values[0])
+            page.wait_for_timeout(1500)
     elif page_id == "case":
         # A table open, and the host list held to the height of a laptop screen: in the tall window
         # it would otherwise run to 80vh and push Findings, Notes and Activity out of the photograph
@@ -139,6 +146,11 @@ def capture(args: argparse.Namespace) -> None:
             "localStorage.setItem('rowanholt.offeredAt', String(Date.now()));"
             + (f"localStorage.setItem('access_token', {json.dumps(token)});" if token else "")
             + (f"localStorage.setItem('user', {json.dumps(json.dumps(user))});" if user else ""))
+        if args.username:
+            # The session cookie too, as a sign-in in the browser sets it: some pages fetch with the
+            # cookie alone (Smith's case list), and without it they show an empty install
+            context.request.post(f"{args.api}/api/auth/login",
+                                 form={"username": args.username, "password": os.environ.get("ROWANHOLT_PASSWORD", "")})
         page = context.new_page()
         for page_id, route, sections in guide_pages():
             if args.only and page_id not in args.only:
@@ -150,6 +162,10 @@ def capture(args: argparse.Namespace) -> None:
                 route = route.replace(":first", job_id)
             if page_id == "job":
                 as_team_server(page, job_id, True)
+            if page_id == "account":
+                # The guide is public: the install's own tokens (names, prefixes, when used) stay out
+                page.route("**/api/auth/tokens", lambda r: r.fulfill(json={"tokens": []})
+                           if r.request.method == "GET" else r.continue_())
             page.goto(f"{args.url}{route}", wait_until="networkidle")
             page.wait_for_timeout(1500)
             prepare(page, page_id)
@@ -166,6 +182,8 @@ def capture(args: argparse.Namespace) -> None:
             }""", sections)
             if page_id == "job":
                 as_team_server(page, job_id, False)
+            if page_id == "account":
+                page.unroute("**/api/auth/tokens")
             if not found or len(found) < len(earlier.get(page_id, {}).get("boxes", {})):
                 print(f"  {page_id}: {len(found)} sections on the page now, fewer than before: kept the earlier photograph")
                 continue

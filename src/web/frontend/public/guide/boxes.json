@@ -2,7 +2,7 @@
  "home": {
   "image": "home.jpg",
   "width": 1440,
-  "height": 1460,
+  "height": 1479,
   "boxes": {
    "home.hero": [
     30,
@@ -12,13 +12,13 @@
    ],
    "home.journeys": [
     30,
-    385,
+    404,
     1379,
     437
    ],
    "home.mordor": [
     30,
-    875,
+    894,
     1379,
     561
    ]
@@ -300,13 +300,13 @@
  "account": {
   "image": "account.jpg",
   "width": 1440,
-  "height": 532,
+  "height": 560,
   "boxes": {
    "account.settings": [
     30,
     24,
     1379,
-    484
+    512
    ]
   }
  },
@@ -351,7 +351,7 @@
     30,
     24,
     1379,
-    1852
+    1877
    ]
   }
  }
