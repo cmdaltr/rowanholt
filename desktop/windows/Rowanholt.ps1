@@ -769,15 +769,29 @@ function Read-Evidence([string]$Dir) {
     return @(Get-Content $file | Where-Object { $_ -match '^\s+source: "(.+)"$' } | ForEach-Object { $Matches[1].Replace('/', '\') } | Select-Object -Unique)
 }
 
+function Add-EvidenceRow([string]$Folder) {
+    # Name (the key) is the Windows folder; the second column is the containers' path for it
+    $row = New-Object System.Windows.Forms.ListViewItem($Folder)
+    $row.Name = $Folder
+    [void]$row.SubItems.Add((ConvertTo-ContainerPath $Folder))
+    [void]$script:EvidenceList.Items.Add($row)
+}
+
 function Select-Evidence([string[]]$Current) {
     # @{ Action = 'next' or 'back'; Folders }
     $body = Show-Page 'Evidence folders' 'Optional: folders of disk images, memory dumps and Gandalf archives.' -Back 'Back'
-    Add-Text $body ("Docker Desktop runs Rowanholt's containers inside WSL 2, a small Linux virtual machine, and " +
-        'they see only the folders listed here. Each appears inside under /mnt: D:\Cases is /mnt/d/Cases, the ' +
-        "path to give Elrond. The web app can only read them; Elrond's worker can also write there.") 14 -Height 64
-    $script:EvidenceList = New-Object System.Windows.Forms.ListBox
-    $script:EvidenceList.SetBounds(24, 86, 420, 140); $script:EvidenceList.IntegralHeight = $false
-    foreach ($folder in $Current) { [void]$script:EvidenceList.Items.Add($folder) }
+    Add-Text $body ("Choose folders on this PC that hold evidence. Rowanholt's containers run in WSL 2, the small " +
+        'Linux virtual machine inside Docker Desktop, and can see only the folders listed here. Inside Rowanholt ' +
+        "each has a Linux path, shown beside it: that's the path to give Elrond. The web app can only read them; " +
+        "Elrond's worker can also write there.") 14 -Height 64
+    # Two columns: the Windows folder you chose, and where the containers see it
+    $script:EvidenceList = New-Object System.Windows.Forms.ListView
+    $script:EvidenceList.View = 'Details'; $script:EvidenceList.FullRowSelect = $true
+    $script:EvidenceList.HeaderStyle = 'Nonclickable'; $script:EvidenceList.MultiSelect = $false
+    $script:EvidenceList.SetBounds(24, 86, 420, 140)
+    [void]$script:EvidenceList.Columns.Add('Folder on this PC', 200)
+    [void]$script:EvidenceList.Columns.Add('In Rowanholt', 196)
+    foreach ($folder in $Current) { Add-EvidenceRow $folder }
     $add = New-Object System.Windows.Forms.Button
     $add.Text = 'Add...'; $add.SetBounds(452, 86, 84, 28)
     $remove = New-Object System.Windows.Forms.Button
@@ -789,16 +803,16 @@ function Select-Evidence([string[]]$Current) {
         if (-not $folder) { return }
         if ($folder -notmatch '^[A-Za-z]:\\') {
             $script:EvidenceProblem.Text = 'Choose a folder on a lettered drive (C:\..., D:\...): Docker Desktop shares drives, not network paths.'
-        } elseif (-not $script:EvidenceList.Items.Contains($folder)) {
-            [void]$script:EvidenceList.Items.Add($folder); $script:EvidenceProblem.Text = ''
+        } elseif (-not $script:EvidenceList.Items.ContainsKey($folder)) {
+            Add-EvidenceRow $folder; $script:EvidenceProblem.Text = ''
         }
     })
-    $remove.Add_Click({ if ($script:EvidenceList.SelectedIndex -ge 0) { $script:EvidenceList.Items.RemoveAt($script:EvidenceList.SelectedIndex) } })
+    $remove.Add_Click({ foreach ($row in @($script:EvidenceList.SelectedItems)) { $script:EvidenceList.Items.Remove($row) } })
     Add-Text $body ('Anything not listed, other drives and external disks included, is invisible to Rowanholt. ' +
         'Change the list any time with Set Up Rowanholt in the Start menu.') 236 -Height 40 -Muted
     $action = Wait-Page
     if ($action -ne 'next' -and $action -ne 'back') { exit 1 }
-    return @{ Action = $action; Folders = @($script:EvidenceList.Items | ForEach-Object { "$_" }) }
+    return @{ Action = $action; Folders = @($script:EvidenceList.Items | ForEach-Object { $_.Name }) }
 }
 
 function Invoke-Setup {
