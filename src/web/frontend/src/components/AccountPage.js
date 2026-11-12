@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { listApiTokens, createApiToken, revokeApiToken } from '../api';
 import { CSRF_HEADERS } from '../apiBase';
+import MfaPanels from './MfaPanels';
 
 const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
 
 const AccountPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout, isAuthenticated } = useAuth();
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState('profile');
+  // Tab state: sign-in sends someone a server requires MFA of straight to Security
+  const [activeTab, setActiveTab] = useState(location.state?.tab || 'profile');
 
   // Profile state
   const [displayName, setDisplayName] = useState('');
@@ -21,10 +23,6 @@ const AccountPage = () => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-
-  // MFA state
-  const [mfaEnabled, setMfaEnabled] = useState(false);
-  const [showMfaSetup, setShowMfaSetup] = useState(false);
 
   // Long-lived tokens for scripts and Smith's MCP server (auth/tokens.py)
   const [generatedToken, setGeneratedToken] = useState('');
@@ -37,7 +35,6 @@ const AccountPage = () => {
   // Messages
   const [profileMessage, setProfileMessage] = useState({ type: '', text: '' });
   const [passwordMessage, setPasswordMessage] = useState({ type: '', text: '' });
-  const [mfaMessage, setMfaMessage] = useState({ type: '', text: '' });
   const [tokenMessage, setTokenMessage] = useState({ type: '', text: '' });
   const [integrationMessage, setIntegrationMessage] = useState({ type: '', text: '' });
 
@@ -45,7 +42,6 @@ const AccountPage = () => {
     if (user) {
       setDisplayName(user.display_name || user.username || '');
       setEmail(user.email || '');
-      setMfaEnabled(user.mfa_enabled || false);
     }
   }, [user]);
 
@@ -142,35 +138,6 @@ const AccountPage = () => {
       }
     } catch (error) {
       setPasswordMessage({ type: 'error', text: 'Failed to change password. This feature requires backend support.' });
-    }
-  };
-
-  const handleToggleMfa = async () => {
-    setMfaMessage({ type: '', text: '' });
-
-    if (!mfaEnabled) {
-      setShowMfaSetup(true);
-      setMfaMessage({ type: 'info', text: 'MFA setup requires backend implementation. Coming soon.' });
-    } else {
-      try {
-        const token = localStorage.getItem('access_token');
-        const response = await fetch('/api/auth/mfa/disable', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            ...CSRF_HEADERS
-          }
-        });
-
-        if (response.ok) {
-          setMfaEnabled(false);
-          setMfaMessage({ type: 'success', text: 'MFA disabled successfully.' });
-        } else {
-          setMfaMessage({ type: 'error', text: 'Failed to disable MFA.' });
-        }
-      } catch (error) {
-        setMfaMessage({ type: 'error', text: 'MFA management requires backend support.' });
-      }
     }
   };
 
@@ -531,59 +498,7 @@ const AccountPage = () => {
               <div style={{ backgroundColor: '#3f4b2a' }}></div>
 
               {/* Right side - MFA and Backup Codes */}
-              <div>
-                <h3 style={{ marginBottom: '1.5rem' }}>Multi-Factor Authentication</h3>
-
-                {mfaMessage.text && (
-                  <div className={`alert-${mfaMessage.type}`}>
-                    {mfaMessage.text}
-                  </div>
-                )}
-
-                <p style={{ marginBottom: '1rem', color: '#a09580', fontSize: '0.9rem' }}>
-                  Add an extra layer of security to your account using an authenticator app.
-                </p>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-                  <span>Status:</span>
-                  <span className={mfaEnabled ? 'status-badge status-completed' : 'status-badge status-pending'}>
-                    {mfaEnabled ? 'Enabled' : 'Disabled'}
-                  </span>
-                  <button
-                    onClick={handleToggleMfa}
-                    className={mfaEnabled ? 'secondary' : ''}
-                    style={{ marginLeft: 'auto' }}
-                  >
-                    {mfaEnabled ? 'Disable MFA' : 'Enable MFA'}
-                  </button>
-                </div>
-
-                {showMfaSetup && !mfaEnabled && (
-                  <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
-                    <p style={{ color: '#66d9ef', fontSize: '0.9rem' }}>
-                      MFA setup will display a QR code here for authenticator apps like Google Authenticator or Authy.
-                    </p>
-                  </div>
-                )}
-
-                <h4 style={{ color: '#f0dba5', marginBottom: '1rem', marginTop: '3rem', paddingTop: '3rem', borderTop: '1px solid #3f4b2a' }}>Backup Codes</h4>
-
-                <p style={{ marginBottom: '1rem', color: '#a09580', fontSize: '0.9rem' }}>
-                  Generate backup codes to access your account if you lose your authenticator device.
-                </p>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <span>Remaining codes:</span>
-                  <span className="status-badge status-pending">0 / 10</span>
-                  <button
-                    onClick={() => setMfaMessage({ type: 'info', text: 'Backup codes require backend implementation. Coming soon.' })}
-                    disabled={!mfaEnabled}
-                    style={{ marginLeft: 'auto' }}
-                  >
-                    Generate
-                  </button>
-                </div>
-              </div>
+              <MfaPanels />
             </div>
           )}
 
