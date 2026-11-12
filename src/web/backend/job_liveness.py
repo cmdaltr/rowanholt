@@ -132,8 +132,11 @@ class Heartbeat:
     and a key that lapses for a moment comes back on the next refresh, well inside STALE_GRACE."""
 
     def __init__(self, job_id: str, client=None, interval: float = HEARTBEAT_INTERVAL,
-                 ttl: int = HEARTBEAT_TTL) -> None:
+                 ttl: int = HEARTBEAT_TTL, key: str | None = None) -> None:
         self.job_id = job_id
+        # Another key for work on a job that isn't its run (siem_export's), so it never reads as
+        # the job's own heartbeat
+        self.key = key or heartbeat_key(job_id)
         self._client = client
         self.interval = interval
         self.ttl = ttl
@@ -145,7 +148,7 @@ class Heartbeat:
     def beat(self) -> bool:
         """Set the key afresh (SET, not EXPIRE, so a key lost with a Redis restart comes back)."""
         try:
-            (self._client or _redis()).set(heartbeat_key(self.job_id), self._value, ex=self.ttl)
+            (self._client or _redis()).set(self.key, self._value, ex=self.ttl)
             return True
         except Exception as exc:  # noqa: BLE001 - see the class docstring
             logger.warning("Job %s: heartbeat not refreshed: %s", self.job_id, exc)
@@ -169,7 +172,7 @@ class Heartbeat:
         if self._thread is not None:
             self._thread.join(timeout=5)
         try:
-            (self._client or _redis()).delete(heartbeat_key(self.job_id))
+            (self._client or _redis()).delete(self.key)
         except Exception as exc:  # noqa: BLE001 - it expires by itself within HEARTBEAT_TTL
             logger.warning("Job %s: heartbeat not removed: %s", self.job_id, exc)
 

@@ -31,6 +31,7 @@ from models.job import JobStatus, PendingAction
 import backup_secrets
 import job_liveness
 import output_removal
+import siem_export
 
 # Initialize Celery
 celery_app = Celery(
@@ -649,6 +650,122 @@ def fetch_sample(self, sample_id: str) -> dict:
         return {"ok": True, "output": "Ready: " + ", ".join(p.name for p in found)}
     except (samples.SampleError, OSError) as exc:
         return {"ok": False, "output": str(exc)}
+
+
+def _case_folder(job) -> Path | None:
+    """The job's output folder as the worker sees it, where the route found it: its destination,
+    else the folder its result names."""
+    folder = job.destination_path or (job.result or {}).get("output_directory")
+    return Path(translate_path_for_worker(str(folder))) if folder else None
+
+
+@celery_app.task(bind=True)
+def export_siem(self, job_id: str) -> dict:
+    """A completed job's manual SIEM export (POST /api/jobs/{id}/export-siem): Elrond's --Index
+    of its output into the targets its options name, the same code a run with those options ends
+    with. The export's state is siem_export's record in Redis; the job's log gets its notable lines
+    through JobStorage.transition, one conditional update each, so the worker-owned columns are
+    never rewritten from a stale copy. Returns the final record."""
+    task_id = self.request.id
+    record = siem_export.read(job_id)
+    # Only the export the backend claimed for this task, and only once: a re-delivered message
+    # finds it running or finished and leaves it alone
+    if not record or record.get("task_id") != task_id or record.get("state") != siem_export.QUEUED:
+        logger.warning(f"Job {job_id}: SIEM export task {task_id} isn't the queued export; not run")
+        return {"state": "skipped"}
+    # GET /api/busy counts this heartbeat, and the status endpoint reads its absence as a dead worker
+    alive = job_liveness.Heartbeat(job_id, key=siem_export.heartbeat_key(job_id)).start()
+    try:
+        return _run_siem_export(job_id, task_id, record["targets"])
+    except Exception as exc:  # whatever happened, the record must say it ended
+        logger.exception(f"Job {job_id}: SIEM export failed")
+        final = {"state": siem_export.FAILED, "error": str(exc), "finished_at": _stamp()}
+        siem_export.update(job_id, task_id, **final)
+        _export_log(job_id, f"SIEM export failed: {exc}")
+        return final
+    finally:
+        alive.stop()
+
+
+def _export_log(job_id: str, line: str) -> bool:
+    """One line in a completed job's log, only while it's still completed; False once it has moved
+    on (restarted, archived, deleted)."""
+    return job_storage.transition(job_id, (JobStatus.COMPLETED,), JobStatus.COMPLETED, log_line=line) is not None
+
+
+def _run_siem_export(job_id: str, task_id: str, names: list) -> dict:
+    started = {"state": siem_export.RUNNING, "started_at": _stamp()}
+    siem_export.update(job_id, task_id, **started)
+
+    def fail(reason: str) -> dict:
+        final = {"state": siem_export.FAILED, "error": reason, "finished_at": _stamp()}
+        siem_export.update(job_id, task_id, **final)
+        _export_log(job_id, f"SIEM export failed: {reason}")
+        return final
+
+    job = job_storage.get_job(job_id)
+    if job is None or job.status != JobStatus.COMPLETED:
+        return fail("the job is no longer completed")
+    case_dir = _case_folder(job)
+    if case_dir is None or not case_dir.is_dir():
+        return fail(f"its output folder {case_dir} isn't there")
+    elrond_path = os.environ.get("ELROND_HOME", "/opt/elrond-src")
+    elrond_script = Path(elrond_path) / "elrond.py"
+    if not elrond_script.exists():
+        return fail(f"Elrond isn't at {elrond_script} (ELROND_HOME)")
+
+    cmd = siem_export.index_command(str(elrond_script), job.case_number, str(case_dir), names)
+    _export_log(job_id, f"SIEM export started: Elrond --Index into {', '.join(names)}")
+    logger.info(f"Job {job_id}: {' '.join(cmd)}")
+    # As start_analysis runs Elrond, so --Index reads the same SPLUNK_*, ELASTICSEARCH_*,
+    # OPENSEARCH_* and TIMESKETCH_* settings a run with these options would
+    env = os.environ.copy()
+    env["PYTHONPATH"] = f"{elrond_path}:{env.get('PYTHONPATH', '')}"
+    env["ELROND_HOME"] = elrond_path
+    env["ELROND_OUTPUT"] = str(settings.output_dir)
+    env["ELROND_NONINTERACTIVE"] = "1"
+    env["PYTHONUNBUFFERED"] = "1"
+
+    progress = siem_export.Progress(names)
+    moved_on = False
+    log_path = case_dir / siem_export.LOG_FILE
+    with open(log_path, "a", encoding="utf-8") as full_log:
+        full_log.write(f"\n===== {_stamp()} SIEM export into {', '.join(names)} =====\n")
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                                   bufsize=1, cwd=str(case_dir), env=env, start_new_session=True)
+        try:
+            for raw in process.stdout:
+                full_log.write(raw)
+                before = (progress.phase, len(progress.hosts))
+                notable = progress.feed(raw)
+                if (progress.phase, len(progress.hosts)) != before:
+                    siem_export.update(job_id, task_id, hosts=progress.hosts, **progress.step())
+                if notable and not _export_log(job_id, notable):
+                    # The output Elrond is reading may be about to be replaced: stop it
+                    moved_on = True
+                    break
+        finally:
+            if moved_on:
+                _stop_process_group(process)
+            process.wait()
+    if moved_on:
+        return fail("the job was restarted, archived or deleted while it exported; export it again once it's completed")
+
+    results = progress.results(process.returncode)
+    if results.get("Elastic", {}).get("ok"):
+        count = siem_export.elastic_count(job.case_number)
+        if count is not None:
+            results["Elastic"]["total"] = count
+    if results.get("Splunk", {}).get("ok"):
+        # Splunk is given monitors on the case's files and restarted; it reads them itself afterwards
+        results["Splunk"]["note"] = f"Splunk reads the case's files itself after its restart: index={job.case_number.lower()}"
+    failed = [name for name, result in results.items() if not result["ok"]]
+    final = {"state": siem_export.FAILED if failed else siem_export.SUCCEEDED, "results": results,
+             "hosts": progress.hosts, "phase": None, "returncode": process.returncode,
+             "error": progress.error if failed else None, "finished_at": _stamp()}
+    siem_export.update(job_id, task_id, **final)
+    _export_log(job_id, siem_export.summary(final))
+    return final
 
 
 @celery_app.task(bind=True)
