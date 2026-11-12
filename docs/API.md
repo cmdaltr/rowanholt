@@ -762,7 +762,7 @@ A job the caller can't see comes back `Job not found`; one they see but don't ma
 
 **Endpoint:** `GET /api/fs/browse`
 
-**Description:** List a folder on the backend, for choosing images. The path is resolved and must start with one of the allowed folders (a prefix match, unlike the folder-boundary check job paths get). macOS metadata files (`._*`, `.DS_Store`) are left out; entries that can't be read are skipped and counted.
+**Description:** List a folder on the backend, for choosing images. The path must be one of the allowed folders or inside one, checked as job paths are: a folder boundary, not a prefix (`/tmp/rowanholtX` isn't inside `/tmp/rowanholt`), with no `..` and no symbolic link below the allowed folder (`403` otherwise). macOS metadata files (`._*`, `.DS_Store`) are left out; entries that can't be read are skipped and counted.
 
 **Authentication:** In server mode, anyone signed in.
 
@@ -787,7 +787,7 @@ Folders come first, then files, by name; `..` leads when there's a parent. `is_i
 
 **Errors:**
 - `400 Bad Request`: not a folder
-- `403 Forbidden`: outside the allowed folders, or permission denied
+- `403 Forbidden`: outside the allowed folders, a `..` or a symbolic link in the path, or permission denied
 - `404 Not Found`: Path does not exist
 
 ---

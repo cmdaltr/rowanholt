@@ -327,21 +327,13 @@ async def browse_filesystem(path: str = Query("/", description="Path to browse")
         FileSystemBrowseResponse with items, current path, and any permission warnings
     """
     try:
-        # Security: Only allow browsing specific paths
+        # The check job paths get (output_removal.contained), not a string prefix, which let
+        # /tmp/rowanholtX through as inside /tmp/rowanholt and followed links planted below an
+        # allowed folder. An allowed folder itself may be listed, as a source may be one.
         try:
-            path_obj = Path(path).resolve()
-        except OSError:
-            raise HTTPException(status_code=404, detail="Path not found")
-        allowed = any(
-            str(path_obj).startswith(allowed_path)
-            for allowed_path in settings.allowed_paths
-        )
-
-        if not allowed:
-            raise HTTPException(
-                status_code=403,
-                detail=f"Access denied. Allowed paths: {settings.allowed_paths}",
-            )
+            path_obj = output_removal.contained(path, settings.allowed_paths, allow_root=True)
+        except output_removal.PathRefused as exc:
+            raise HTTPException(status_code=403, detail=f"Access denied: {exc}")
 
         if not path_obj.exists():
             raise HTTPException(status_code=404, detail="Path not found")

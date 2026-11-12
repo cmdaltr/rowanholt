@@ -97,10 +97,12 @@ def sanitize_path(path: str, allowed_prefixes: List[str]) -> Optional[str]:
     except (ValueError, OSError):
         return None
 
-    # Check if path starts with any allowed prefix
+    # Inside an allowed folder by whole folder names: a string prefix would take /tmp/rowanholtX
+    # as inside /tmp/rowanholt. (Nothing mounted calls this; requests' paths go through
+    # output_removal.contained, which also refuses symbolic links below the allowed folder.)
     for prefix in allowed_prefixes:
         abs_prefix = os.path.abspath(prefix)
-        if abs_path.startswith(abs_prefix):
+        if abs_path == abs_prefix or abs_path.startswith(abs_prefix.rstrip(os.sep) + os.sep):
             return abs_path
 
     return None
