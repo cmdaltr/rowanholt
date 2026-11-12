@@ -248,19 +248,278 @@ function Set-Server {
     Set-Content -Path $ServerFile -Value $server -Encoding ASCII
 }
 
+function Get-DockerDesktop {
+    # Per-user (Docker's default since 4.83, no administrator needed) or all-users
+    foreach ($exe in $DockerUserExe, $DockerMachineExe) { if (Test-Path $exe) { return $exe } }
+    return $null
+}
+
+function Add-DockerToPath {
+    # A Docker Desktop installed since this process started isn't on its PATH yet
+    if (Get-Command docker -ErrorAction SilentlyContinue) { return }
+    $desktop = Get-DockerDesktop
+    if ($desktop) { $env:Path = (Join-Path (Split-Path $desktop) 'resources\bin') + ";$env:Path" }
+}
+
 function Test-DockerInstalled {
-    return (Test-Path (Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe')) -or
-           [bool](Get-Command docker -ErrorAction SilentlyContinue)
+    return [bool](Get-DockerDesktop) -or [bool](Get-Command docker -ErrorAction SilentlyContinue)
 }
 
 function Assert-DockerInstalled {
-    if (Test-DockerInstalled) { return }
+    if (Test-DockerInstalled) { Add-DockerToPath; return }
     $answer = Show-Message ("Rowanholt runs as a set of Docker containers, and Docker Desktop isn't installed.`n`n" +
-        "Install Docker Desktop (it needs WSL 2), start it once, then open Rowanholt from the Start menu.`n`n" +
-        "Docker Desktop is free for personal use and small businesses; larger organisations need a paid subscription.`n`n" +
-        'Open the Docker Desktop download page?') 'YesNo' 'Warning'
-    if ($answer -eq 'Yes') { Start-Process 'https://www.docker.com/products/docker-desktop/' }
-    exit 1
+        "Install it now? Rowanholt downloads it from docker.com, checks it's signed by Docker and installs it " +
+        "for you alone (no administrator rights; turning on WSL 2, if it's off, asks for them).`n`n" +
+        "Installing it accepts Docker's Subscription Service Agreement: free for personal use, education and " +
+        'small businesses; larger organisations need a paid subscription.') 'YesNo' 'Question'
+    if ($answer -ne 'Yes') { exit 1 }
+    $result = Install-Dependencies @('docker')
+    if ($result.Restart -or -not (Test-DockerInstalled)) { exit 1 }
+    Add-DockerToPath
+}
+
+# ── What Rowanholt needs, and what it can use ─────────────────────────────────
+# Docker Desktop (with WSL 2) runs the stack; Ollama and a model give Aulë its AI answers, and
+# without them Aulë answers from the case files. The MSI's options page records what was ticked
+# under HKCU\Software\cmdaltr\Rowanholt (InstallDocker, InstallOllama, InstallModel) and the next
+# start installs it, so unticking Launch on the Finish page only puts it off. Downloads come from
+# Docker and Ollama themselves and must carry their Authenticode signature: "latest" has no fixed hash
+$AppKey = 'HKCU:\Software\cmdaltr\Rowanholt'
+$DockerUserExe = Join-Path $env:LOCALAPPDATA 'Programs\DockerDesktop\Docker Desktop.exe'
+$DockerMachineExe = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'
+$OllamaExe = Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama.exe'
+$OllamaUrl = 'http://127.0.0.1:11434'
+# The backend's default (ROWANHOLT_MODEL_NAME in docker-compose.yml)
+$AuleModel = 'llama3.2:3b'
+$Dependencies = [ordered]@{
+    docker = @{ Value = 'InstallDocker'; Name = 'Docker Desktop' }
+    ollama = @{ Value = 'InstallOllama'; Name = 'Ollama' }
+    # ë as a code: Windows PowerShell 5.1 reads this file as Windows-1252, not UTF-8
+    model  = @{ Value = 'InstallModel'; Name = "Aul$([char]0xEB)'s model ($AuleModel)" }
+}
+
+function Get-PendingDependencies {
+    $values = Get-ItemProperty -Path $AppKey -ErrorAction SilentlyContinue
+    if (-not $values) { return @() }
+    return @($Dependencies.Keys | Where-Object { $values.($Dependencies[$_].Value) -eq 1 })
+}
+
+function Clear-PendingDependencies([string[]]$Items) {
+    foreach ($item in $Items) {
+        Remove-ItemProperty -Path $AppKey -Name $Dependencies[$item].Value -ErrorAction SilentlyContinue
+    }
+}
+
+function Test-WslFeatures {
+    # Win32_OptionalFeature answers without administrator rights; Get-WindowsOptionalFeature doesn't
+    $on = @(Get-CimInstance Win32_OptionalFeature -Filter "InstallState = 1" -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -in 'Microsoft-Windows-Subsystem-Linux', 'VirtualMachinePlatform' })
+    return $on.Count -eq 2
+}
+
+function Test-Virtualisation {
+    # With Windows' own hypervisor running (WSL on), the processor reports its virtualisation as off
+    $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
+    if ($cpu.VirtualizationFirmwareEnabled) { return $true }
+    return (Test-WslFeatures) -and (Get-CimInstance Win32_ComputerSystem).HypervisorPresent
+}
+
+function Test-Ollama {
+    try { Invoke-RestMethod -Uri "$OllamaUrl/api/version" -TimeoutSec 2 | Out-Null; return $true } catch { return $false }
+}
+
+function Step-Gui { [System.Windows.Forms.Application]::DoEvents() }
+
+function Assert-NotCancelled { if ($script:DependenciesCancelled) { throw 'Cancelled' } }
+
+function Set-Status($Ui, [string]$Item, [string]$Text, [double]$Fraction = -1) {
+    $Ui.Rows[$Item].Text = $Text
+    $Ui.Detail.Text = "$($Dependencies[$Item].Name): $Text"
+    if ($Fraction -lt 0) { $Ui.Bar.Style = 'Marquee' } else {
+        $Ui.Bar.Style = 'Continuous'; $Ui.Bar.Value = [int][math]::Min(1000, 1000 * $Fraction)
+    }
+    Step-Gui
+}
+
+function Save-Download($Ui, [string]$Item, [string]$Url, [string]$Path) {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    $response = [Net.WebRequest]::Create($Url).GetResponse()
+    try {
+        $total = $response.ContentLength
+        $in = $response.GetResponseStream(); $out = [IO.File]::Create($Path)
+        try {
+            $buffer = New-Object byte[] 262144; $done = 0L; $shown = [DateTime]::MinValue
+            while (($n = $in.Read($buffer, 0, $buffer.Length)) -gt 0) {
+                $out.Write($buffer, 0, $n); $done += $n
+                if (((Get-Date) - $shown).TotalMilliseconds -ge 250) {
+                    $shown = Get-Date
+                    $text = if ($total -gt 0) { 'Downloading {0:N0} of {1:N0} MB' -f ($done / 1MB), ($total / 1MB) } else { 'Downloading {0:N0} MB' -f ($done / 1MB) }
+                    Set-Status $Ui $Item $text $(if ($total -gt 0) { $done / $total } else { -1 })
+                    Assert-NotCancelled
+                }
+            }
+        } finally { $out.Dispose(); $in.Dispose() }
+    } finally { $response.Dispose() }
+}
+
+function Assert-Signed([string]$Path, [string]$Publisher) {
+    $signature = Get-AuthenticodeSignature -FilePath $Path
+    if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch "O=`"?$([regex]::Escape($Publisher))") {
+        Remove-Item $Path -Force -ErrorAction SilentlyContinue
+        throw "the download isn't signed by $Publisher ($($signature.Status)), so it wasn't run"
+    }
+}
+
+function Wait-Exit($Process) {
+    $null = $Process.Handle  # without it, ExitCode stays empty once the process has gone
+    while (-not $Process.HasExited) { Start-Sleep -Milliseconds 200; Step-Gui }
+    return $Process.ExitCode
+}
+
+function Install-Wsl($Ui) {
+    Set-Status $Ui 'docker' 'Turning on WSL 2 (Windows asks for administrator rights)'
+    $command = 'foreach ($f in ''Microsoft-Windows-Subsystem-Linux'', ''VirtualMachinePlatform'') { ' +
+        '& dism.exe /online /enable-feature /featurename:$f /all /norestart /quiet; if ($LASTEXITCODE -notin 0, 3010) { exit $LASTEXITCODE } }'
+    try {
+        $p = Start-Process (Join-Path $PSHOME 'powershell.exe') -Verb RunAs -WindowStyle Hidden -PassThru `
+            -ArgumentList '-NoProfile', '-Command', $command
+    } catch {
+        throw 'WSL 2 needs administrator rights to turn on, and Windows was told no'
+    }
+    $code = Wait-Exit $p
+    if ($code -ne 0 -or -not (Test-WslFeatures)) { throw "turning on WSL 2 failed (DISM exit $code)" }
+}
+
+function Install-Docker($Ui, $Result) {
+    if (Get-DockerDesktop) { Set-Status $Ui 'docker' 'Already installed' 1; return }
+    if (-not (Test-Virtualisation)) {
+        throw ("this PC's processor virtualisation is off, and WSL 2 needs it: turn on VT-x / AMD-V (SVM) in the " +
+               "firmware settings, or for a virtual machine, nested virtualisation in its hypervisor")
+    }
+    if (-not (Test-WslFeatures)) { Install-Wsl $Ui; $Result.Restart = $true }
+    $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'amd64' }
+    $installer = Join-Path $env:TEMP 'Docker Desktop Installer.exe'
+    Save-Download $Ui 'docker' "https://desktop.docker.com/win/main/$arch/Docker%20Desktop%20Installer.exe" $installer
+    Set-Status $Ui 'docker' 'Checking the signature'
+    Assert-Signed $installer 'Docker Inc'
+    Set-Status $Ui 'docker' 'Installing (a few minutes)'
+    $code = Wait-Exit (Start-Process $installer -PassThru -ArgumentList 'install', '--user', '--quiet', '--accept-license')
+    Remove-Item $installer -Force -ErrorAction SilentlyContinue
+    if ($code -ne 0 -or -not (Get-DockerDesktop)) { throw "Docker's installer failed (exit $code)" }
+    Set-Status $Ui 'docker' $(if ($Result.Restart) { 'Installed: restart Windows to finish' } else { 'Installed' }) 1
+}
+
+function Start-Ollama($Ui, [string]$Item) {
+    if (Test-Ollama) { return }
+    Set-Status $Ui $Item 'Starting Ollama'
+    $app = Join-Path (Split-Path $OllamaExe) 'ollama app.exe'
+    if (Test-Path $app) { Start-Process $app } else { Start-Process $OllamaExe -ArgumentList 'serve' -WindowStyle Hidden }
+    for ($i = 0; $i -lt 60; $i++) {
+        if (Test-Ollama) { return }
+        Start-Sleep -Milliseconds 500; Step-Gui
+    }
+    throw "Ollama didn't start ($OllamaUrl isn't answering)"
+}
+
+function Install-Ollama($Ui) {
+    if (Test-Path $OllamaExe) { Set-Status $Ui 'ollama' 'Already installed' 1; return }
+    $installer = Join-Path $env:TEMP 'OllamaSetup.exe'
+    Save-Download $Ui 'ollama' 'https://ollama.com/download/OllamaSetup.exe' $installer
+    Set-Status $Ui 'ollama' 'Checking the signature'
+    Assert-Signed $installer 'Ollama'
+    Set-Status $Ui 'ollama' 'Installing'
+    $code = Wait-Exit (Start-Process $installer -PassThru -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-')
+    Remove-Item $installer -Force -ErrorAction SilentlyContinue
+    if ($code -ne 0 -or -not (Test-Path $OllamaExe)) { throw "Ollama's installer failed (exit $code)" }
+    Start-Ollama $Ui 'ollama'
+    Set-Status $Ui 'ollama' 'Installed' 1
+}
+
+function Install-Model($Ui) {
+    if (-not (Test-Path $OllamaExe) -and -not (Test-Ollama)) { throw "Ollama isn't installed, and the model needs it" }
+    Start-Ollama $Ui 'model'
+    # Ollama's own API streams the pull's progress as JSON lines
+    $request = [Net.WebRequest]::Create("$OllamaUrl/api/pull")
+    $request.Method = 'POST'; $request.ContentType = 'application/json'
+    $body = [Text.Encoding]::UTF8.GetBytes((@{ model = $AuleModel; name = $AuleModel; stream = $true } | ConvertTo-Json -Compress))
+    $stream = $request.GetRequestStream(); $stream.Write($body, 0, $body.Length); $stream.Close()
+    $response = $request.GetResponse()
+    try {
+        $reader = New-Object IO.StreamReader($response.GetResponseStream())
+        while ($null -ne ($line = $reader.ReadLine())) {
+            $progress = $line | ConvertFrom-Json
+            if ($progress.error) { throw "Ollama couldn't pull $AuleModel ($($progress.error))" }
+            if ($progress.total) {
+                Set-Status $Ui 'model' ('Downloading {0:N0} of {1:N0} MB' -f ($progress.completed / 1MB), ($progress.total / 1MB)) ($progress.completed / $progress.total)
+            } else {
+                Set-Status $Ui 'model' $progress.status
+            }
+            Assert-NotCancelled
+        }
+    } finally { $response.Dispose() }
+    Set-Status $Ui 'model' 'Ready' 1
+}
+
+function Install-Dependencies([string[]]$Items) {
+    # One window for all of them, in order; one failing doesn't stop the rest. Returns
+    # @{ Failed; Restart }, Restart when WSL 2 was just turned on
+    $result = @{ Failed = @(); Restart = $false }
+    $height = 40 + 30 * $Items.Count + 70
+    $form = New-SetupForm 'Installing what Rowanholt needs' 'Downloaded from Docker and Ollama, and checked against their signatures.' $height
+    $form.AcceptButton.Visible = $false
+    $script:DependenciesCancelled = $false
+    $form.CancelButton.DialogResult = 'None'
+    $form.CancelButton.Add_Click({ $script:DependenciesCancelled = $true })
+    $form.Add_FormClosing({ param($s, $e) if (-not $script:DependenciesDone) { $script:DependenciesCancelled = $true; $e.Cancel = $true } })
+    $script:DependenciesDone = $false
+    $ui = @{ Rows = @{} }
+    $y = 84
+    foreach ($item in $Items) {
+        $name = New-Object System.Windows.Forms.Label
+        $name.Text = $Dependencies[$item].Name; $name.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 9)
+        $name.SetBounds(28, $y, 190, 22); $form.Controls.Add($name)
+        $status = New-Object System.Windows.Forms.Label
+        $status.Text = 'Waiting'; $status.ForeColor = [System.Drawing.Color]::FromArgb(96, 96, 96)
+        $status.SetBounds(220, $y, 280, 22); $form.Controls.Add($status)
+        $ui.Rows[$item] = $status
+        $y += 30
+    }
+    $ui.Bar = New-Object System.Windows.Forms.ProgressBar
+    $ui.Bar.SetBounds(28, $y + 12, 464, 18); $ui.Bar.Maximum = 1000; $ui.Bar.MarqueeAnimationSpeed = 30
+    $ui.Detail = New-Object System.Windows.Forms.Label
+    $ui.Detail.SetBounds(28, $y + 36, 464, 36); $ui.Detail.ForeColor = [System.Drawing.Color]::FromArgb(96, 96, 96)
+    $form.Controls.AddRange(@($ui.Bar, $ui.Detail))
+    $form.Show(); Step-Gui
+
+    foreach ($item in $Items) {
+        if ($script:DependenciesCancelled) { $ui.Rows[$item].Text = 'Cancelled'; $result.Failed += $item; continue }
+        try {
+            switch ($item) {
+                'docker' { Install-Docker $ui $result }
+                'ollama' { Install-Ollama $ui }
+                'model'  { Install-Model $ui }
+            }
+        } catch {
+            $result.Failed += $item
+            $ui.Rows[$item].Text = 'Not installed'
+            $ui.Detail.Text = "$($Dependencies[$item].Name): $($_.Exception.Message)"
+            $ui.Bar.Style = 'Continuous'; $ui.Bar.Value = 0
+            Step-Gui
+            if ($_.Exception.Message -ne 'Cancelled') { Start-Sleep -Seconds 3 }
+        }
+    }
+    Clear-PendingDependencies $Items
+    $script:DependenciesDone = $true
+    $form.Close()
+
+    $lines = @()
+    foreach ($item in $Items) { $lines += "$($Dependencies[$item].Name): $($ui.Rows[$item].Text)" }
+    if ($result.Failed -and -not $script:DependenciesCancelled) { $lines += '', "The last problem: $($ui.Detail.Text)" }
+    if ($result.Failed -contains 'docker') { $lines += '', 'Set Up Rowanholt in the Start menu offers Docker Desktop again.' }
+    if ($result.Restart) { $lines += '', 'Restart Windows to finish turning on WSL 2, then open Rowanholt from the Start menu.' }
+    $icon = if ($result.Failed) { 'Warning' } else { 'Information' }
+    Show-Message ($lines -join "`n") 'OK' $icon | Out-Null
+    return $result
 }
 
 function Expand-Bundle([string]$Target) {
@@ -395,13 +654,14 @@ function Test-Docker {
 }
 
 function Wait-Docker {
+    Add-DockerToPath
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
         throw 'The docker command isn''t on PATH. Install Docker Desktop and retry.'
     }
     if (Test-Docker) { return }
-    $desktop = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'
-    if (-not (Test-Path $desktop)) {
-        throw "Docker isn't running and Docker Desktop isn't installed at $desktop. Start Docker and retry."
+    $desktop = Get-DockerDesktop
+    if (-not $desktop) {
+        throw "Docker isn't running and Docker Desktop isn't installed in $(Split-Path $DockerUserExe) or $(Split-Path $DockerMachineExe). Start Docker and retry."
     }
     Write-Host 'Starting Docker Desktop...'
     # Its own CLI starts the engine without the dashboard; older versions don't have it
@@ -717,6 +977,12 @@ try {
         Write-Host "Rowanholt $($latest.version) is available (you have $(Get-AppVersion)): $($latest.url)"
         if (-not $Check) { Start-AppUpdate $latest.tag -Foreground }
         exit 0
+    }
+    # What the MSI's options page ticked, before setup asks anything
+    $pending = @(Get-PendingDependencies)
+    if ($pending.Count) {
+        $installed = Install-Dependencies $pending
+        if ($installed.Restart) { exit 0 }
     }
     if ($Setup) {
         if ((Get-SavedServer) -and $script:ServerManaged) {

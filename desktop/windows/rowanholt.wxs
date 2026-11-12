@@ -34,8 +34,25 @@
     <Property Id="ARPPRODUCTICON" Value="rowanholt.ico" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/cmdaltr/rowanholt" />
     <Property Id="ARPHELPLINK" Value="https://github.com/cmdaltr/rowanholt/issues" />
-    <!-- The wizard's shortcuts page ticks it; msiexec /i Rowanholt-....msi DESKTOPSHORTCUT=1 does too -->
+    <!-- The wizard's options page ticks it; msiexec /i Rowanholt-....msi DESKTOPSHORTCUT=1 does too -->
     <Property Id="DESKTOPSHORTCUT" Secure="yes" />
+
+    <!-- What else to install, from the options page (or INSTALLDOCKER=1 and so on on msiexec's command
+         line): recorded under HKCU\Software\cmdaltr\Rowanholt for the launcher, which downloads and
+         installs them on its next start and clears the values. Docker Desktop is ticked when neither
+         its per-user nor its all-users install is there; only in the wizard, so a /passive install
+         (install.ps1, CI) never queues a download nobody asked for -->
+    <Property Id="DOCKERFOUND">
+      <RegistrySearch Id="DockerPerUser" Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\Docker Desktop" Name="DisplayName" Type="raw" />
+    </Property>
+    <Property Id="DOCKERFOUNDALLUSERS">
+      <RegistrySearch Id="DockerAllUsers" Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Docker Desktop" Name="DisplayName" Type="raw" Bitness="always64" />
+    </Property>
+    <SetProperty Id="DOCKERFOUND" Value="[DOCKERFOUNDALLUSERS]" After="AppSearch" Sequence="first" Condition="DOCKERFOUNDALLUSERS AND NOT DOCKERFOUND" />
+    <Property Id="INSTALLDOCKER" Secure="yes" />
+    <Property Id="INSTALLOLLAMA" Secure="yes" />
+    <Property Id="INSTALLMODEL" Secure="yes" />
+    <SetProperty Id="INSTALLDOCKER" Value="1" After="SetDOCKERFOUND" Sequence="ui" Condition="NOT DOCKERFOUND AND NOT Installed" />
 
     <!-- Double-clicked, it's the wizard most Windows installers show (WixUI_Rowanholt below), with
          the Elastic License to accept; install.ps1's /passive shows none, and using the software
@@ -123,6 +140,16 @@
                   Arguments="-NoProfile -ExecutionPolicy Bypass -File &quot;[WindowsDir]Rowanholt.ps1&quot;"
                   WorkingDirectory="INSTALLFOLDER" Icon="rowanholt.ico" />
       </Component>
+      <!-- What the options page ticked; the launcher removes each value once it has tried -->
+      <Component Id="WantDocker" Directory="INSTALLFOLDER" Condition="INSTALLDOCKER = 1">
+        <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="InstallDocker" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+      <Component Id="WantOllama" Directory="INSTALLFOLDER" Condition="INSTALLOLLAMA = 1">
+        <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="InstallOllama" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+      <Component Id="WantModel" Directory="INSTALLFOLDER" Condition="INSTALLMODEL = 1">
+        <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="InstallModel" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
       <!-- Clears HKCU\Software\cmdaltr\Rowanholt on uninstall once its values are gone -->
       <Component Id="RegistryKey" Directory="INSTALLFOLDER">
         <RegistryKey Root="HKCU" Key="Software\cmdaltr\Rowanholt" ForceDeleteOnUninstall="yes">
@@ -133,7 +160,7 @@
   </Package>
 
   <!-- WixUI_InstallDir's pages without its folder page (the folder is fixed: the launcher, the
-       update check and uninstall.ps1 all look for it there), and a shortcuts page in its place.
+       update check and uninstall.ps1 all look for it there), and an options page in its place.
        Repair and Remove from Settings > Apps go through the maintenance pages as usual -->
   <Fragment>
     <UI Id="WixUI_Rowanholt">
@@ -152,7 +179,7 @@
       <DialogRef Id="ResumeDlg" />
       <DialogRef Id="UserExit" />
 
-      <Dialog Id="ShortcutsDlg" Width="370" Height="270" Title="[ProductName] Setup">
+      <Dialog Id="OptionsDlg" Width="370" Height="270" Title="[ProductName] Setup">
         <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="&amp;Next" />
         <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="&amp;Back" />
         <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="Cancel">
@@ -161,11 +188,26 @@
         <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
         <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
         <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
-        <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Shortcuts" />
-        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="Where to find Rowanholt once it's installed." />
-        <Control Id="StartMenuText" Type="Text" X="20" Y="60" Width="330" Height="30" NoPrefix="yes"
-                 Text="The Start menu gets Rowanholt, Stop Rowanholt and Set Up Rowanholt (where it runs, its folder and evidence)." />
-        <Control Id="DesktopCheckBox" Type="CheckBox" X="20" Y="98" Width="330" Height="17" Property="DESKTOPSHORTCUT" CheckBoxValue="1"
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="220" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Choose what to install" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="Ticked items are downloaded and installed when Rowanholt first opens." />
+
+        <Control Id="NeededText" Type="Text" X="20" Y="52" Width="330" Height="11" NoPrefix="yes" Text="{\WixUI_Font_Title}To run Rowanholt on this PC" />
+        <Control Id="DockerCheckBox" Type="CheckBox" X="20" Y="64" Width="130" Height="14" Property="INSTALLDOCKER" CheckBoxValue="1"
+                 Text="Docker Desktop and WSL 2" DisableCondition="DOCKERFOUND" EnableCondition="NOT DOCKERFOUND" />
+        <Control Id="DockerFoundText" Type="Text" X="152" Y="66" Width="150" Height="11" NoPrefix="yes" Text="(already installed)"
+                 ShowCondition="DOCKERFOUND" HideCondition="NOT DOCKERFOUND" />
+        <Control Id="DockerText" Type="Text" X="33" Y="79" Width="320" Height="36" NoPrefix="yes"
+                 Text="From docker.com, for you alone. Ticking it accepts Docker's Subscription Service Agreement: free for personal use, education and small businesses; larger organisations need a paid subscription. Turning WSL 2 on asks for administrator rights and a restart." />
+
+        <Control Id="OptionalText" Type="Text" X="20" Y="122" Width="330" Height="11" NoPrefix="yes" Text="{\WixUI_Font_Title}Optional, for Aulë's AI answers" />
+        <Control Id="OllamaCheckBox" Type="CheckBox" X="20" Y="134" Width="330" Height="14" Property="INSTALLOLLAMA" CheckBoxValue="1"
+                 Text="Ollama, which runs the model on this PC (about 1 GB, from ollama.com)" />
+        <Control Id="ModelCheckBox" Type="CheckBox" X="20" Y="149" Width="330" Height="14" Property="INSTALLMODEL" CheckBoxValue="1"
+                 Text="Aulë's model, llama3.2:3b (about 2 GB; needs Ollama)" />
+        <Control Id="OptionalNote" Type="Text" X="33" Y="165" Width="320" Height="11" NoPrefix="yes"
+                 Text="Without them, Aulë answers from the case files alone." />
+
+        <Control Id="DesktopCheckBox" Type="CheckBox" X="20" Y="196" Width="330" Height="14" Property="DESKTOPSHORTCUT" CheckBoxValue="1"
                  Text="Add a Rowanholt shortcut to the &amp;desktop" />
       </Dialog>
 
@@ -177,12 +219,12 @@
       <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="Installed AND PATCH" />
 
       <Publish Dialog="LicenseAgreementDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
-      <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="ShortcutsDlg" Condition="LicenseAccepted = &quot;1&quot;" />
+      <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="OptionsDlg" Condition="LicenseAccepted = &quot;1&quot;" />
 
-      <Publish Dialog="ShortcutsDlg" Control="Back" Event="NewDialog" Value="LicenseAgreementDlg" />
-      <Publish Dialog="ShortcutsDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="OptionsDlg" Control="Back" Event="NewDialog" Value="LicenseAgreementDlg" />
+      <Publish Dialog="OptionsDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" />
 
-      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ShortcutsDlg" Order="1" Condition="NOT Installed" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="OptionsDlg" Order="1" Condition="NOT Installed" />
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" Condition="Installed AND NOT PATCH" />
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2" Condition="Installed AND PATCH" />
 
