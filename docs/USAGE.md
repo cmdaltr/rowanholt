@@ -210,7 +210,18 @@ python3 tests/scripts/run_test.py --cancel {job_id}
 
 Cancelling leaves the tool Elrond was running (foremost, yara, Plaso) alive in the worker, still holding the image mount. See [TEST_RUNNER_GUIDE.md](../tests/docs/TEST_RUNNER_GUIDE.md#cleaning-up-after-a-cancel) for clean-up.
 
-A job in `awaiting_confirmation` can only be cancelled with `POST /api/jobs/{job_id}/cancel-sudo`.
+A job in `awaiting_confirmation` can only be ended with `POST /api/jobs/{job_id}/cancel-removal`.
+
+### Fresh Output and the Old Output Folder
+
+A restart with fresh output (a completed job's default) and a new job with **overwrite** both remove the job's old output folder first. The worker removes only Rowanholt's own output for that job: a folder its marker (`.rowanholt-output`) or, for older output, its job log and record say is the job's, inside the allowed folders, holding no evidence, no other job's output and no mount. Anything else is refused and the job fails with the reason; the folder is left as it is. To replace someone else's output you must own the job it came from, or be an admin. Every removal is in the audit log.
+
+If the removal fails part way (a file in use, permissions), the job waits in `awaiting_confirmation` and the job page asks **Try Again** or **Give Up**. Trying again is the owner's or an admin's: the job shows **Removing old output** while the worker removes it, then runs. Give up and the job fails with its old output kept.
+
+```bash
+curl -X POST http://localhost:5688/api/jobs/{job_id}/confirm-removal \
+  -H "Authorization: Bearer YOUR_TOKEN"     # 202: the job is now "removing"
+```
 
 ### Restart Failed Job
 

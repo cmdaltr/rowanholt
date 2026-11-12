@@ -32,7 +32,7 @@
 
 The backend mounts the simple file-based auth router (`src/web/backend/auth/routes_simple.py`, users in `USERS_FILE`, default `/app/data/users.json`). It provides `register`, `login`, `guest`, `logout`, a stub `me` and a stub `forgot-password`. The MFA, password-reset and admin endpoints below are implemented in `auth/routes.py`, which is not mounted.
 
-No job, file-system, AI or Mordor endpoint checks the token or cookie, so anyone who can reach port 5688 can submit, read, cancel and delete jobs. Keep the API on localhost or behind a reverse proxy that authenticates.
+No job, file-system, AI or Mordor endpoint checks the token or cookie, so anyone who can reach port 5688 can submit, read, cancel and delete jobs. Keep the API on localhost or behind a reverse proxy that authenticates. The local stack publishes it on `127.0.0.1:5688` only (as it does Postgres and Redis); a team server (`ROWANHOLT_SERVER_MODE`) publishes nothing but its proxy and signs in every route.
 
 ---
 
@@ -41,6 +41,10 @@ No job, file-system, AI or Mordor endpoint checks the token or cookie, so anyone
 All authenticated endpoints require either:
 - **Bearer Token** in `Authorization` header: `Authorization: Bearer <token>`
 - **HTTP-only cookie** set during login
+
+#### Cross-site requests: the `X-Rowanholt` header
+
+A state-changing request (anything but GET, HEAD and OPTIONS) under `/api` that the session cookie signs in must send `X-Rowanholt: 1`, or it's refused with `403`. The web app's API client sends it on every request. The cookie is `SameSite=Lax`, which stops other sites but not the same site, and `ts.net` is a public suffix: every app on one tailnet (`*.<tailnet>.ts.net`) is the same site, and its pages' requests carry Rowanholt's cookie. A page on another origin can't add a custom header without the API's CORS allowing it, so the header proves the request came from Rowanholt's own pages. A request with a bearer token doesn't need it (a browser never sends one by itself): API tokens, the MCP server and scripts are unaffected, and so are requests with no credentials at all (a local stack's scripts).
 
 ### Register New User
 
@@ -577,9 +581,15 @@ There is no MFA step in the mounted auth router.
 | Detection | `extract_iocs` + `iocs_file` and `ioc_system_volume` (a macOS image's sealed system volume too: `--iocsSystemVolume` in [CLI.md](CLI.md)), `keywords` + `keywords_file`, `yara` + `yara_dir`, `misplaced_binaries`, `masquerading`, `clamav` |
 | Hashing | `hash_collected`, `hash_all`, `nsrl` |
 | Output | `splunk`, `elastic`, `navigator`, `archive`, `delete`, `save_template` |
-| Job control | `force_overwrite` (remove an existing `destination_path`), `debug` (verbose job log) |
+| Job control | `force_overwrite` (replace an existing output folder: see below), `debug` (verbose job log) |
+
+`replaces_output_of` and `output_marker` are the API's own: whatever a request sends is replaced.
 
 Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, which becomes `/tmp/elrond/output/…`. Host paths under `/Volumes` work because both containers mount `/Volumes` at the same path.
+
+**Paths.** Every source and the destination must be inside one of the allowed folders (this OS's defaults and `ROWANHOLT_EVIDENCE_PATHS`): a folder boundary, not a prefix (`/tmp/rowanholtX` isn't inside `/tmp/rowanholt`), with no `..` and no symbolic link below the allowed folder (`403` otherwise). A source may be a whole allowed folder; the destination may be neither an allowed folder nor above one. Without `destination_path`, the output goes beside the first source as before (`<folder>/<case>` for a folder, `<parent>/<case>` for a file or a Gandalf acquisitions folder), and that's checked the same way. The destination is refused (`409`) when it would hold evidence (any job's source), is where Elrond mounts images (`/mnt/elrond_mount*` and the like), or is at, in or around the output of a job that's still going.
+
+**An output folder that's already there.** Without `force_overwrite`: `400` with `[Errno 17] File exists: '<path>'` (the web app then offers to overwrite). With it, the folder is replaced only if it's Rowanholt's output: the `.rowanholt-output` marker the worker writes when it creates a job's output folder, or, for output from before the marker (12 November 2026), the recorded output of an older job with its `rowanholt_job.log` in it. That job must be one the caller owns (or the caller an admin; only an admin for a job since deleted) and must not still be going. Anything else is never removed: `409` (not Rowanholt's, or still going) or `403` (someone else's), and the request is recorded in the audit log (`output.removal_requested`). The removal itself happens in the worker, which checks it all again first: see [Removing a job's old output](#removing-a-jobs-old-output).
 
 **Response:** `201 Created`
 ```json
@@ -623,7 +633,7 @@ Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, whic
 **Authentication:** Not enforced in the current build (see [Authentication Status](#authentication-status))
 
 **Query Parameters:**
-- `status` (optional): Filter by status (pending, running, awaiting_confirmation, completed, failed, cancelled, archived)
+- `status` (optional): Filter by status (pending, running, paused, awaiting_confirmation, removing, completed, failed, cancelled, archived)
 - `limit` (optional): Number of results (default: 50, max: 100)
 - `offset` (optional): Pagination offset (default: 0)
 - `case_number` (optional): Filter by case number
@@ -725,36 +735,54 @@ Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, whic
 **Response:** `200 OK` with the updated job object (`"status": "cancelled"`).
 
 **Errors:**
-- `400 Bad Request`: Job is not pending or running. A job in `awaiting_confirmation` must be cancelled with `cancel-sudo`.
+- `400 Bad Request`: Job is not pending, running or paused. A job in `awaiting_confirmation` is given up with `cancel-removal`; one that's `removing` can't be cancelled (the worker finishes or fails it).
 - `404 Not Found`: Job not found
 
 ---
 
-### Confirm Directory Removal
+### Removing a job's old output
 
-**Endpoint:** `POST /api/jobs/{job_id}/confirm-sudo`
+A fresh run (`force_overwrite` on a new job, a restart with `fresh=true`, a completed job's restart by default) removes the job's output folder before Elrond runs. The worker does it, in its own container, and only after checking (`src/web/backend/output_removal.py`):
 
-**Description:** When a job is submitted with `force_overwrite` and the worker cannot remove the existing destination directory (error or timeout), the job stops in `awaiting_confirmation`. Confirming removes the directory with sudo and starts the job again as a new Celery task.
+- the folder comes from the job record (its recorded destination), never from a request or the pending action, and is inside the allowed folders as above, and not one of them;
+- it's this job's output: its `.rowanholt-output` marker names the job (or the job the API checked it may replace), or, from before the marker, it's the job's own recorded destination with a `rowanholt_job.log`;
+- nothing in it is evidence (any job's source), an allowed folder, another job's output or a mount point (an image Elrond mounted, a bind mount, another device), compared by path and again by device and inode, so a hard link or another spelling of the same folder doesn't hide one;
+- no job that's still going writes at, in or around it.
 
-**Response:** `200 OK` with the updated job object.
+It's deleted without following symbolic links or crossing onto another device, and must be gone afterwards. Each removal is recorded in the audit log (`audit_logs`, as licence and brand changes are): `output.removed` with the files and bytes, `output.removal_refused` or `output.removal_failed` with the reason. The job's own log is in the folder being removed, so the audit log is the record that lasts. A refusal fails the job with the reason (trying again can't help); a removal that fails part way (a busy file, permissions) stops the job in `awaiting_confirmation`, with `pending_action` (`action_type` `remove_output`, `target_path`, `message`).
+
+### Confirm Removing the Old Output Again
+
+**Endpoint:** `POST /api/jobs/{job_id}/confirm-removal` (`confirm-sudo`, its name until 12 November 2026, still answers; nothing was ever escalated)
+
+**Description:** Try the failed removal again. The job moves from `awaiting_confirmation` to `removing` in one conditional update, the confirmation is recorded in the audit log (`output.removal_confirmed`: who, from which address, which folder), and the worker's `remove_output` task is queued. The worker checks and removes the folder as above; removed, the job is `pending` again and its run queued; not, the job fails with the reason (no second confirmation).
+
+**Authentication:** In server mode, the job's owner or an admin; not the people it's shared with.
+
+**Response:** `202 Accepted` with the job, `"status": "removing"`. Follow it with `GET /api/jobs/{job_id}`.
 
 **Errors:**
-- `400 Bad Request`: Job is not awaiting confirmation
+- `403 Forbidden`: Not the job's owner or an admin
 - `404 Not Found`: Job not found
+- `409 Conflict`: Job is not awaiting confirmation (another confirmation got there first, or it moved on)
+- `503 Service Unavailable`: The task couldn't be queued; the job is failed with `Not queued: <error>`
 
 ---
 
-### Cancel Directory Removal
+### Give Up Removing the Old Output
 
-**Endpoint:** `POST /api/jobs/{job_id}/cancel-sudo`
+**Endpoint:** `POST /api/jobs/{job_id}/cancel-removal` (`cancel-sudo` still answers)
 
-**Description:** Decline the directory removal for a job in `awaiting_confirmation`. The job is marked failed with "Directory removal cancelled by user". This is the only way to cancel a job in that state.
+**Description:** Give up the removal for a job in `awaiting_confirmation`: the job fails, its old output stays as it is, and it's recorded in the audit log (`output.removal_cancelled`). This is the only way to end a job in that state.
 
-**Response:** `200 OK` with the updated job object.
+**Authentication:** In server mode, the job's owner or an admin.
+
+**Response:** `200 OK` with the updated job object (`"status": "failed"`).
 
 **Errors:**
-- `400 Bad Request`: Job is not awaiting confirmation
+- `403 Forbidden`: Not the job's owner or an admin
 - `404 Not Found`: Job not found
+- `409 Conflict`: Job is not awaiting confirmation
 
 ---
 
@@ -1220,6 +1248,7 @@ The test lab (`lab/`) from the browser: Linux targets, Tart and UTM VMs, Gandalf
 | `downloads` | a Mordor dataset download is running in the background |
 | `side-tasks` | a sample fetch or symbol table build queued in the worker hasn't finished (forgotten after six hours with no result) |
 | `telemetry-build` | the Mordor telemetry update is running |
+| `removals` | the worker is removing a job's old output (`removing`), its task waiting in the queue or its heartbeat beating; a removal whose worker died is failed after the same grace, with its own reason (registered by `removal_routes.py`) |
 
 A check that fails (the database unreachable, say) counts as busy. A job awaiting confirmation isn't busy: it waits on a person, in the database. Lab runs aren't counted: they run on the host, through the lab agent, which a rebuild doesn't touch.
 
@@ -1239,7 +1268,7 @@ The two reasons a user sees:
 - *Interrupted: the worker running this job stopped without finishing it (killed, or its container or the host restarted). Its output so far is kept; restart the job to run it again.*
 - *Interrupted: this job was queued, but its task is no longer in the queue and no worker picked it up (the worker or Redis restarted first). Restart the job to run it.*
 
-A job whose task can't be queued at all (Redis down when it's created, restarted or confirmed after a sudo removal) is failed there and then with `Not queued: <error>`, and the request returns `500`.
+A job whose task can't be queued at all (Redis down when it's created or restarted) is failed there and then with `Not queued: <error>`, and the request returns `500`; a confirmed removal that can't be queued returns `503`, with the job failed the same way.
 
 **Authentication:** None, in server mode too. The answer is the one bit; which checks said busy goes to the backend's log, never to the caller.
 
