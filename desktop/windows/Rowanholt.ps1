@@ -416,16 +416,34 @@ function Test-DockerInstalled {
 }
 
 function Assert-DockerInstalled {
-    if (Test-DockerInstalled) { Add-DockerToPath; return }
-    $body = Show-Page 'Docker Desktop is needed' 'Rowanholt runs as a set of containers in Docker Desktop.' -Next 'Install it'
-    Add-Text $body ("Docker Desktop isn't installed. Rowanholt can install it now: downloaded from docker.com, " +
-        "checked against Docker's signature and installed for you alone, without administrator rights. If " +
-        'WSL 2 is off, turning it on asks for administrator rights and a restart.') 20 -Height 64
-    Add-Text $body ("Installing it accepts Docker's Subscription Service Agreement: free for personal use, education " +
-        'and small businesses; larger organisations need a paid subscription.') 96 -Height 44 -Muted
-    if ((Wait-Page) -ne 'next') { exit 1 }
-    $result = Install-Dependencies @('docker')
-    if ($result.Restart -or -not (Test-DockerInstalled)) { Close-Wizard; exit 1 }
+    # Docker Desktop and the WSL 2 it runs on: a page offering whatever's missing. A Docker that's
+    # already answering is enough, whatever it runs on
+    Add-DockerToPath
+    if ((Get-Command docker -ErrorAction SilentlyContinue) -and (Test-Docker)) { return }
+    $missing = @()
+    if (-not (Test-WslReady)) { $missing += 'wsl' }
+    if (-not (Test-DockerInstalled)) { $missing += 'docker' }
+    if (-not $missing) { return }
+    $names = ($missing | ForEach-Object { $Dependencies[$_].Name }) -join ' and '
+    $verb = if ($missing.Count -gt 1) { 'are' } else { 'is' }
+    $body = Show-Page "$names $verb needed" 'Rowanholt runs as a set of containers in Docker Desktop, on WSL 2.' -Next 'Install'
+    $text = @()
+    if ($missing -contains 'wsl') {
+        $text += ("WSL 2 isn't installed. Rowanholt can install it: Microsoft's latest release from GitHub, checked " +
+                  "against Microsoft's signature. It needs administrator rights, and a restart if Windows' WSL features were off.")
+    }
+    if ($missing -contains 'docker') {
+        $text += ("Docker Desktop isn't installed. Rowanholt can install it: downloaded from docker.com, checked against " +
+                  "Docker's signature and installed for you alone, without administrator rights.")
+    }
+    Add-Text $body ($text -join "`n`n") 20 -Height 120
+    if ($missing -contains 'docker') {
+        Add-Text $body ("Installing Docker Desktop accepts Docker's Subscription Service Agreement: free for personal use, " +
+            'education and small businesses; larger organisations need a paid subscription.') 150 -Height 44 -Muted
+    }
+    if ((Wait-Page) -ne 'next') { Close-Wizard; exit 1 }
+    $result = Install-Dependencies $missing
+    if ($result.Restart -or $result.Failed) { Close-Wizard; exit 1 }
     Add-DockerToPath
 }
 
@@ -442,7 +460,9 @@ $OllamaExe = Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama.exe'
 $OllamaUrl = 'http://127.0.0.1:11434'
 # The backend's default (ROWANHOLT_MODEL_NAME in docker-compose.yml)
 $SmithModel = 'llama3.2:3b'
+# WSL 2 comes with Docker Desktop's tick: Docker Desktop needs it, and installs fine without it
 $Dependencies = [ordered]@{
+    wsl    = @{ Value = 'InstallDocker'; Name = 'WSL 2' }
     docker = @{ Value = 'InstallDocker'; Name = 'Docker Desktop' }
     ollama = @{ Value = 'InstallOllama'; Name = 'Ollama' }
     model  = @{ Value = 'InstallModel'; Name = "Smith's model ($SmithModel)" }
@@ -518,6 +538,14 @@ function Test-WslFeatures {
     return $on.Count -eq 2
 }
 
+function Test-WslPackage {
+    # Since WSL 2.0 Windows' own wsl.exe is a stub: the kernel and the service are a package of their
+    # own (Microsoft's MSI, or the Store's), installed into Program Files\WSL
+    return Test-Path (Join-Path $env:ProgramFiles 'WSL\wsl.exe')
+}
+
+function Test-WslReady { return (Test-WslFeatures) -and (Test-WslPackage) }
+
 function Test-Virtualisation {
     # With Windows' own hypervisor running (WSL on), the processor reports its virtualisation as off
     $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
@@ -581,27 +609,55 @@ function Wait-Exit($Process) {
     return $Process.ExitCode
 }
 
-function Install-Wsl($Ui) {
-    Set-Status $Ui 'docker' 'Turning on WSL 2 (Windows asks for administrator rights)'
-    $command = 'foreach ($f in ''Microsoft-Windows-Subsystem-Linux'', ''VirtualMachinePlatform'') { ' +
-        '& dism.exe /online /enable-feature /featurename:$f /all /norestart /quiet; if ($LASTEXITCODE -notin 0, 3010) { exit $LASTEXITCODE } }'
-    try {
-        $p = Start-Process (Join-Path $PSHOME 'powershell.exe') -Verb RunAs -WindowStyle Hidden -PassThru `
-            -ArgumentList '-NoProfile', '-Command', $command
-    } catch {
-        throw 'WSL 2 needs administrator rights to turn on, and Windows was told no'
-    }
-    $code = Wait-Exit $p
-    if ($code -ne 0 -or -not (Test-WslFeatures)) { throw "turning on WSL 2 failed (DISM exit $code)" }
-}
-
-function Install-Docker($Ui, $Result) {
-    if (Get-DockerDesktop) { Set-Status $Ui 'docker' 'Already installed' 1; return }
+function Install-Wsl($Ui, $Result) {
+    if (Test-WslReady) { Set-Status $Ui 'wsl' 'Already installed' 1; return }
     if (-not (Test-Virtualisation)) {
         throw ("this PC's processor virtualisation is off, and WSL 2 needs it: turn on VT-x / AMD-V (SVM) in the " +
                "firmware settings, or for a virtual machine, nested virtualisation in its hypervisor")
     }
-    if (-not (Test-WslFeatures)) { Install-Wsl $Ui; $Result.Restart = $true }
+    $features = -not (Test-WslFeatures)
+    $msi = $null
+    if (-not (Test-WslPackage)) {
+        Set-Status $Ui 'wsl' 'Finding the latest WSL release'
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/microsoft/WSL/releases/latest' -Headers @{ 'User-Agent' = 'Rowanholt' } -TimeoutSec 20
+        $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'x64' }
+        $asset = @($release.assets | Where-Object { $_.name -match "^wsl\..+\.$arch\.msi$" })[0]
+        if (-not $asset) { throw "WSL's release $($release.tag_name) has no $arch installer" }
+        $msi = Join-Path $env:TEMP $asset.name
+        Save-Download $Ui 'wsl' $asset.browser_download_url $msi
+        Set-Status $Ui 'wsl' 'Checking the signature'
+        Assert-Signed $msi 'Microsoft Corporation'
+    }
+    # The features and the package under one UAC prompt: a script run elevated, then removed
+    Set-Status $Ui 'wsl' 'Installing (Windows asks for administrator rights)'
+    $lines = @()
+    if ($features) {
+        $lines += 'foreach ($f in ''Microsoft-Windows-Subsystem-Linux'', ''VirtualMachinePlatform'') { & dism.exe /online /enable-feature /featurename:$f /all /norestart /quiet; if ($LASTEXITCODE -notin 0, 3010) { exit $LASTEXITCODE } }'
+    }
+    if ($msi) {
+        $lines += "`$p = Start-Process msiexec.exe -ArgumentList '/i', '`"$msi`"', '/quiet', '/norestart' -Wait -PassThru; if (`$p.ExitCode -notin 0, 3010) { exit `$p.ExitCode }"
+    }
+    $elevated = Join-Path $env:TEMP 'rowanholt-wsl.ps1'
+    Set-Content -Path $elevated -Value ($lines -join "`r`n") -Encoding ASCII
+    try {
+        $p = Start-Process (Join-Path $PSHOME 'powershell.exe') -Verb RunAs -WindowStyle Hidden -PassThru `
+            -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$elevated`""
+    } catch {
+        Remove-Item $elevated -ErrorAction SilentlyContinue
+        if ($msi) { Remove-Item $msi -ErrorAction SilentlyContinue }
+        throw 'WSL 2 needs administrator rights to install, and Windows was told no'
+    }
+    $code = Wait-Exit $p
+    Remove-Item $elevated -ErrorAction SilentlyContinue
+    if ($msi) { Remove-Item $msi -ErrorAction SilentlyContinue }
+    if (-not (Test-WslReady)) { throw "installing WSL 2 failed (exit $code)" }
+    if ($features) { $Result.Restart = $true }
+    Set-Status $Ui 'wsl' $(if ($features) { 'Installed: restart Windows to finish' } else { 'Installed' }) 1
+}
+
+function Install-Docker($Ui, $Result) {
+    if (Get-DockerDesktop) { Set-Status $Ui 'docker' 'Already installed' 1; return }
     $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'amd64' }
     $installer = Join-Path $env:TEMP 'Docker Desktop Installer.exe'
     Save-Download $Ui 'docker' "https://desktop.docker.com/win/main/$arch/Docker%20Desktop%20Installer.exe" $installer
@@ -612,7 +668,7 @@ function Install-Docker($Ui, $Result) {
     Remove-Item $installer -Force -ErrorAction SilentlyContinue
     # Judged by what's there: Process.ExitCode can come back empty for a process that has gone
     if (-not (Get-DockerDesktop)) { throw "Docker's installer failed (exit $code)" }
-    Set-Status $Ui 'docker' $(if ($Result.Restart) { 'Installed: restart Windows to finish' } else { 'Installed' }) 1
+    Set-Status $Ui 'docker' 'Installed' 1
 }
 
 function Start-Ollama($Ui, [string]$Item) {
@@ -684,6 +740,7 @@ function Install-Dependencies([string[]]$Items) {
         if ($cancelled) { $ui.Status[$item] = 'Cancelled'; $ui.Rows[$item].Text = 'Cancelled'; $result.Failed += $item; continue }
         try {
             switch ($item) {
+                'wsl'    { Install-Wsl $ui $result }
                 'docker' { Install-Docker $ui $result }
                 'ollama' { Install-Ollama $ui }
                 'model'  { Install-Model $ui }
@@ -1293,6 +1350,7 @@ try {
     Update-Copy
 
     if (-not (Test-Frontend)) {
+        Assert-DockerInstalled
         $script:Journey = New-Journey 'warm'
         Show-Journey $script:Journey
         Wait-Docker
