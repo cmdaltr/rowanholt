@@ -8,7 +8,7 @@
 <div align="center">
   <i>rowan + Old English holt: the rowan wood</i><br><br>
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Licence](https://img.shields.io/badge/licence-Elastic%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)]()
 </div>

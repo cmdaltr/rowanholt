@@ -1,13 +1,13 @@
 # Licensing model
 
-ostraka, Shikari and Rowanholt share one licensing model (Ben, 11 November 2026). The first part of
+Ostraka, Shikari and Rowanholt share one licensing model (Ben, 11 November 2026). The first part of
 this file is that shared specification, kept identical in each product's `docs/LICENSING_MODEL.md`;
 the second is Rowanholt's own split. The reference implementation of the licence line is
 `samarkand.licence`, in the samarkand package all three products depend on. The canonical copy of
 the shared part, the issued licences and the prompts for applying it are in the private
 `cmdaltr/licensing` repo.
 
-## Shared across ostraka, Shikari and Rowanholt
+## Shared across Ostraka, Shikari and Rowanholt
 
 ### Code licence and notices
 
@@ -41,16 +41,19 @@ differs:
 | `automation` | Pro | Signed webhooks: the product calls the customer's systems when something happens. Checked when a webhook is sent, so one configured on Free is kept but doesn't fire |
 | `managed-service` | Services | The right in `COMMERCIAL-LICENSE.md` section 3 to run the product for clients. Not a switch |
 
-Webhooks work the same everywhere, sent by `samarkand.webhooks` (the reference for them): an
-admin registers a URL and the events it wants; each delivery is a POST of
-`{"event", "sent_at", "data"}` (`sent_at` ISO 8601 in UTC) with `X-<Product>-Event` and, when the
-webhook has a secret, `X-<Product>-Signature: sha256=<hex HMAC-SHA256 of the raw body>`; three tries
-with backoff; the last 20 deliveries kept per webhook for the admin page. Webhook bodies pass the same masking as the
-product's other outward messages.
+Webhooks work the same everywhere, through `samarkand.webhooks` (the reference for them): an admin
+registers a URL and the events it wants; each delivery is a POST of `{"event", "sent_at", "data"}`
+(`sent_at` ISO 8601 in UTC) with `X-<Product>-Event` and, when the webhook has a secret,
+`X-<Product>-Signature: sha256=<hex HMAC-SHA256 of the raw body>`; three tries with backoff; the
+last 20 deliveries kept per webhook for the admin page; https anywhere, plain http only to this
+machine or a private address, never a link-local address or credentials in the URL, and redirects
+not followed. Webhook bodies pass the same masking as the product's other outward messages.
 
 ### The licence
 
-One line: `<product>-licence-1.<payload>.<signature>`.
+One line: `<product>-licence-1.<payload>.<signature>`, read and checked by `samarkand.licence` (the
+reference for it, with its test vectors), which each product binds with its own id, public keys and
+free seat number. samarkand has no signing code: issuing stays in each product's admin script.
 
 - `payload` is base64url (no padding) of canonical JSON: sorted keys, compact separators.
 - `signature` is Ed25519, base64url, over the ASCII bytes of `<product>-licence-1.<payload>`, so
@@ -67,7 +70,7 @@ One line: `<product>-licence-1.<payload>.<signature>`.
 - `COMMERCIAL-LICENSE.md` states its version on the line after its title (`**Version 1.0**, date`).
   The licensor is "Ben Smith, trading as cmdaltr (cmdaltr.com)" until there's a company. An order
   wins over the terms, the terms over ELv2.
-- The product ships a copy of the terms where its server can read them (ostraka:
+- The product ships a copy of the terms where its server can read them (Ostraka:
   `backend/ostraka/legal/`), and a test keeps the copy identical to the root file.
 - **Installing a licence needs an admin to accept the current terms on the licensee's behalf.** The
   admin page checks the licence first (showing the licensee, edition, seats and dates), shows the
@@ -123,8 +126,8 @@ One line: `<product>-licence-1.<payload>.<signature>`.
 
 ### Individual to each product
 
-Where the licence is stored (ostraka: its database; a product without one: a file); the free seat
-number; what a client's brand attaches to (ostraka: an incident); which events send webhooks; how
+Where the licence is stored (Ostraka: its database; a product without one: a file); the free seat
+number; what a client's brand attaches to (Ostraka: an incident); which events send webhooks; how
 "an admin" is spotted for the seat rule.
 
 ## Rowanholt's split
@@ -172,9 +175,9 @@ Single sign-on stays free because gating it would sign people out, which the sha
   reason; nobody already in is ever disabled.
 - **Report branding.** A brand is a name, a primary and optional secondary colour, "Prepared for",
   and up to three logos (cover, header, client), managed by admins on the Branding page
-  (`/api/brands`, `branding_routes.py`). Uploads are cleaned as ostraka's: PNG or JPEG only, refused
+  (`/api/brands`, `branding_routes.py`). Uploads are cleaned as Ostraka's: PNG or JPEG only, refused
   past 4096 × 4096 pixels before decoding, redrawn as a fresh PNG (`branding.clean_logo`, Pillow).
-  The palette is derived as ostraka's: headings darkened to 4.5:1 on the page, the rest from the
+  The palette is derived as Ostraka's: headings darkened to 4.5:1 on the page, the rest from the
   primary's hue (`src/analysis/rowanholt/report/theme.py`, stdlib, as the report package must be).
   Which brand a report gets is decided when the Word report is built (`case_routes.full_report`,
   `branding.brand_for`): the case's brand under `has("brand-library")`, else the installation's under

@@ -62,8 +62,8 @@ Elastic License 2.0 also forbids); or try to recover any signing key.
 
 A licence runs from the first day in its key to the last. After the last day, the paid edition keeps
 working for 30 days' grace; after that the installation returns to the Free edition. Nothing is
-deleted and nobody is deactivated when that happens, but no one new can be added past the Free limit.
-A key with no end date doesn't expire.
+deleted and nobody is deactivated when that happens, but no one new can be added past the Free limit
+and reports return to the standard style. A key with no end date doesn't expire.
 
 Either party may end a licence for material breach not put right within 30 days of written notice.
 Section 3's permission ends with the licence.
