@@ -40,7 +40,6 @@ import logging
 import os
 import re
 import uuid
-from dataclasses import dataclass, fields
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -57,6 +56,7 @@ from samarkand.licence import (  # noqa: F401 (re-exported: callers use licence.
     REPORT_BRANDING,
     WILDCARD,
     Edition,
+    Licence,
     LicenceProblem,
     Standing,
     check_installable,
@@ -80,13 +80,6 @@ TERMS = Path(__file__).parent / "legal" / "COMMERCIAL-LICENSE.md"
 PUBLIC_KEYS: Tuple[str, ...] = ("4a048df1b8382979b9fad6c665efd29c21df4528c65df35ccd62fa0ae2f47f6d",)
 
 
-@dataclass(frozen=True)
-class Licence(shared.Licence):
-    """samarkand's licence, for Rowanholt unless it names another product."""
-
-    product: str = PRODUCT
-
-
 @lru_cache(maxsize=8)
 def _rules_for(keys: Tuple[str, ...], free_seats: int) -> shared.Rules:
     return shared.Rules(PRODUCT, keys, free_seats, NAME)
@@ -106,8 +99,7 @@ def sign(private_key: "Ed25519PrivateKey", licence: shared.Licence) -> str:
 
 def parse(text: str) -> Licence:
     """A licence, once its signature checks out against one of PUBLIC_KEYS. Raises LicenceProblem."""
-    read = rules().parse(text)
-    return Licence(**{f.name: getattr(read, f.name) for f in fields(read)})
+    return rules().parse(text)
 
 
 def standing(licence: Optional[shared.Licence], now: Optional[datetime] = None) -> Standing:

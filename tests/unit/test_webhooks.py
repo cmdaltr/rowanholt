@@ -65,7 +65,8 @@ class WebhookTest(BackendCase):
 
     def licensed(self, edition="pro", expires=date(2099, 12, 31)):
         L = self.licence
-        line = L.sign(self.key, L.Licence(L.new_id(), "Northwind Ltd", L.Edition(edition), 10, date(2026, 11, 11), expires))
+        line = L.sign(self.key, L.rules().licence(L.new_id(), "Northwind Ltd", L.Edition(edition), 10,
+                                                  date(2026, 11, 11), expires))
         L.record_install(line, accepted_by="u1", accepted_by_name="Ada Admin <ada@example.org>")
 
     def hook(self, events=("job.completed", "job.failed", "finding.confirmed", "report.ready"), secret="s3cret"):

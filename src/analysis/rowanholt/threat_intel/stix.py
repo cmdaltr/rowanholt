@@ -5,7 +5,8 @@ python-stix2's loaders, because vendor exports carry custom properties the stric
 It gives each value with the groups and techniques its own STIX relationships ('indicates',
 'related-to', 'uses') link it to; here those become the ten columns, an indicator falling back to the
 bundle's only intrusion set when it has exactly one, and never to every technique in the bundle. Only
-objects with an id are read: one without can't be referred to, so it gives no row and links nothing.
+objects with an id are read (samarkand's skip_without_id): one without can't be referred to, so it
+gives no row and links nothing.
 
 An indicator's valid_until and confidence (and valid_from or created, as first seen) come back
 beside the rows, keyed by Indicator.key(), for the backend's threat_intel_validity
@@ -30,11 +31,6 @@ TAXII_USER_AGENT = "Rowanholt (TAXII 2.1 client)"
 
 class IntelFormatError(ValueError):
     """The document isn't the format it was read as."""
-
-
-class TaxiiError(OSError):
-    """The TAXII server refused or couldn't be reached (samarkand's TaxiiProblem, with its message),
-    as the OSError the routes answer 502 to."""
 
 
 def _load(data: Union[str, bytes, dict, list]):
@@ -87,7 +83,7 @@ def parse_stix_bundle_with_validity(data: Union[str, bytes, dict, list],
     if not isinstance(objects, list):
         raise IntelFormatError("not a STIX bundle: no 'objects' list")
     try:
-        parsed = shared.parse([o for o in objects if isinstance(o, dict) and isinstance(o.get("id"), str) and o["id"]])
+        parsed = shared.parse(objects, skip_without_id=True)
     except shared.NotABundle as exc:
         raise IntelFormatError(str(exc)) from exc
     report = parsed.reports[0] if parsed.reports else None
@@ -131,12 +127,9 @@ def fetch_taxii(collection_url: str, username: str = "", password: str = "", add
     """Every STIX object in a TAXII 2.1 collection, following its pagination (samarkand.taxii).
     collection_url is the collection's base (.../collections/<id>/); added_after (ISO 8601) fetches
     only what's new. Redirects aren't followed, so the credentials go only to the URL given. Raises
-    TaxiiError."""
-    try:
-        return taxii.fetch_objects(collection_url, username=username, password=password, added_after=added_after,
-                                   limit=limit, timeout=timeout, user_agent=TAXII_USER_AGENT)
-    except taxii.TaxiiProblem as exc:
-        raise TaxiiError(str(exc)) from exc
+    taxii.TaxiiProblem, an OSError, which the routes answer 502 to."""
+    return taxii.fetch_objects(collection_url, username=username, password=password, added_after=added_after,
+                               limit=limit, timeout=timeout, user_agent=TAXII_USER_AGENT)
 
 
 def import_taxii(collection_url: str, username: str = "", password: str = "", added_after: str = "",

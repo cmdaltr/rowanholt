@@ -67,7 +67,7 @@ class LicenceApiTest(BackendCase):
         self.users.save_users(users)
 
     def line(self, edition="pro", seats=10, expires=date(2099, 12, 31), product="rowanholt", **extra):
-        return self.licence.sign(self.key, self.licence.Licence(
+        return self.licence.sign(self.key, self.licence.rules().licence(
             self.licence.new_id(), "Northwind Ltd", self.licence.Edition(edition), seats, date(2026, 11, 11),
             expires, product=product, **extra))
 

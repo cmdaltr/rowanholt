@@ -78,6 +78,25 @@ def test_stix_bundle_links_each_indicator_to_its_own_group_and_technique():
     assert found["a" * 64].threat_group == "" and "powershell -enc AAA" in found
 
 
+def test_stix_objects_without_an_id_are_left_out():
+    """samarkand's skip_without_id, in place of Rowanholt's own filter: an id-less indicator gives no
+    row, an id-less relationship links nothing and an id-less group isn't counted."""
+    bundle = {"type": "bundle", "id": "bundle--2", "objects": [
+        {"type": "intrusion-set", "id": "intrusion-set--1", "name": "APT34"},
+        {"type": "intrusion-set", "name": "Not counted"},
+        {"type": "attack-pattern", "id": "attack-pattern--1", "name": "Web Protocols",
+         "external_references": [{"source_name": "mitre-attack", "external_id": "T1071.001"}]},
+        {"type": "indicator", "id": "indicator--1", "pattern": "[domain-name:value = 'c2.example.test']"},
+        {"type": "indicator", "pattern": "[domain-name:value = 'no-id.example.test']"},
+        {"type": "relationship", "relationship_type": "indicates", "source_ref": "indicator--1",
+         "target_ref": "attack-pattern--1"},
+        "not an object",
+    ]}
+    (c2,) = parse_stix_bundle(bundle)
+    # APT34 is the only group once the id-less one is left out; the id-less relationship gives no technique
+    assert (c2.evidential_element, c2.threat_group, c2.technique_id) == ("c2.example.test", "APT34", "")
+
+
 def mitresaw_csv(path, rows):
     with open(path, "w", newline="") as out:
         writer = csv.writer(out)

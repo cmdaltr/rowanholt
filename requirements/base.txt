@@ -4,4 +4,4 @@ openpyxl>=3.0.0,<4.0.0
 pyyaml>=5.4,<7.0
 python-dateutil>=2.8.0
 tabulate>=0.8.9
-samarkand==0.1.0  # STIX and TAXII for --threatIntel, Navigator layers: the suite's shared wire formats
+samarkand==0.1.1  # STIX and TAXII for --threatIntel, Navigator layers: the suite's shared wire formats

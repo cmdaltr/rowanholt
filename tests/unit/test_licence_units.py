@@ -33,7 +33,7 @@ def at(day: date, hour: int = 12) -> datetime:
 
 
 def lic(edition="pro", seats=10, expires=date(2027, 11, 30), **extra):
-    return licence.Licence("lic_test", "Northwind Ltd", licence.Edition(edition), seats, TODAY, expires, **extra)
+    return licence.rules().licence("lic_test", "Northwind Ltd", licence.Edition(edition), seats, TODAY, expires, **extra)
 
 
 def users(active: int, disabled: int = 0) -> dict:

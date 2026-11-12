@@ -95,8 +95,8 @@ class BrandingTest(BackendCase):
 
     def licensed(self, edition):
         L = self.licence
-        line = L.sign(self.key, L.Licence(L.new_id(), "Northwind Ltd", L.Edition(edition), 10, date(2026, 11, 11),
-                                          date(2099, 12, 31)))
+        line = L.sign(self.key, L.rules().licence(L.new_id(), "Northwind Ltd", L.Edition(edition), 10,
+                                                  date(2026, 11, 11), date(2099, 12, 31)))
         L.record_install(line, accepted_by="u1", accepted_by_name="Ada Admin <ada@example.org>")
 
     # ---- cleaning an upload ----
