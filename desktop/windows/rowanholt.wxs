@@ -34,14 +34,22 @@
     <Property Id="ARPPRODUCTICON" Value="rowanholt.ico" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/cmdaltr/rowanholt" />
     <Property Id="ARPHELPLINK" Value="https://github.com/cmdaltr/rowanholt/issues" />
-    <!-- ARPNOMODIFY (no Modify in Settings > Apps) comes with WixUI_Minimal, which defines it -->
-    <!-- msiexec /i Rowanholt-....msi DESKTOPSHORTCUT=1 adds a desktop shortcut too -->
+    <!-- The wizard's shortcuts page ticks it; msiexec /i Rowanholt-....msi DESKTOPSHORTCUT=1 does too -->
     <Property Id="DESKTOPSHORTCUT" Secure="yes" />
 
-    <!-- Double-clicked, it shows the Elastic License to accept; install.ps1's /passive shows none,
-         and using the software is accepting it (README) -->
+    <!-- Double-clicked, it's the wizard most Windows installers show (WixUI_Rowanholt below), with
+         the Elastic License to accept; install.ps1's /passive shows none, and using the software
+         is accepting it (README). build-msi.ps1 draws the banner and side panel -->
     <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenceRtf)" />
-    <ui:WixUI Id="WixUI_Minimal" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(var.BannerBmp)" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(var.DialogBmp)" />
+    <UIRef Id="WixUI_Rowanholt" />
+
+    <!-- The Finish page's "Launch Rowanholt": the Start menu shortcut's command, not waited for -->
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch Rowanholt" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <CustomAction Id="LaunchRowanholt" Directory="INSTALLFOLDER" Return="asyncNoWait"
+                  ExeCommand="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;[WindowsDir]Rowanholt.ps1&quot;" />
 
     <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="ProgramsDir" Name="Programs">
@@ -123,4 +131,66 @@
       </Component>
     </Feature>
   </Package>
+
+  <!-- WixUI_InstallDir's pages without its folder page (the folder is fixed: the launcher, the
+       update check and uninstall.ps1 all look for it there), and a shortcuts page in its place.
+       Repair and Remove from Settings > Apps go through the maintenance pages as usual -->
+  <Fragment>
+    <UI Id="WixUI_Rowanholt">
+      <TextStyle Id="WixUI_Font_Normal" FaceName="Segoe UI" Size="9" />
+      <TextStyle Id="WixUI_Font_Bigger" FaceName="Segoe UI" Size="12" />
+      <TextStyle Id="WixUI_Font_Title" FaceName="Segoe UI" Size="9" Bold="yes" />
+      <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
+      <Property Id="ARPNOMODIFY" Value="1" />
+
+      <DialogRef Id="ErrorDlg" />
+      <DialogRef Id="FatalError" />
+      <DialogRef Id="FilesInUse" />
+      <DialogRef Id="MsiRMFilesInUse" />
+      <DialogRef Id="PrepareDlg" />
+      <DialogRef Id="ProgressDlg" />
+      <DialogRef Id="ResumeDlg" />
+      <DialogRef Id="UserExit" />
+
+      <Dialog Id="ShortcutsDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="&amp;Next" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="&amp;Back" />
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="Cancel">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Shortcuts" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="Where to find Rowanholt once it's installed." />
+        <Control Id="StartMenuText" Type="Text" X="20" Y="60" Width="330" Height="30" NoPrefix="yes"
+                 Text="The Start menu gets Rowanholt, Stop Rowanholt and Set Up Rowanholt (where it runs, its folder and evidence)." />
+        <Control Id="DesktopCheckBox" Type="CheckBox" X="20" Y="98" Width="330" Height="17" Property="DESKTOPSHORTCUT" CheckBoxValue="1"
+                 Text="Add a Rowanholt shortcut to the &amp;desktop" />
+      </Dialog>
+
+      <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999" />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchRowanholt"
+               Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
+
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="LicenseAgreementDlg" Condition="NOT Installed" />
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="Installed AND PATCH" />
+
+      <Publish Dialog="LicenseAgreementDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
+      <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="ShortcutsDlg" Condition="LicenseAccepted = &quot;1&quot;" />
+
+      <Publish Dialog="ShortcutsDlg" Control="Back" Event="NewDialog" Value="LicenseAgreementDlg" />
+      <Publish Dialog="ShortcutsDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" />
+
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ShortcutsDlg" Order="1" Condition="NOT Installed" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" Condition="Installed AND NOT PATCH" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2" Condition="Installed AND PATCH" />
+
+      <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" />
+    </UI>
+    <UIRef Id="WixUI_Common" />
+  </Fragment>
 </Wix>

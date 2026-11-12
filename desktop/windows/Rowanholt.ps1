@@ -92,9 +92,90 @@ function Get-SavedServer {
     return ''
 }
 
+# ── Windows' own look ─────────────────────────────────────────────────────────
+# Without visual styles WinForms draws Windows 95's buttons, and without DPI awareness Windows
+# stretches the dialogs into blurred text on a scaled display. The console is hidden while
+# setup's dialogs are up: it has nothing to show until the stack starts or files are copied
+Add-Type -Namespace Rowanholt -Name Native -MemberDefinition @'
+[DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();
+[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+[DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+[DllImport("kernel32.dll")] public static extern uint GetConsoleProcessList(uint[] list, uint count);
+'@
+$script:GuiReady = $false
+
+function Initialize-Gui {
+    if ($script:GuiReady) { return }
+    Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+    [Rowanholt.Native]::SetProcessDPIAware() | Out-Null
+    [System.Windows.Forms.Application]::EnableVisualStyles()
+    $script:GuiReady = $true
+}
+
+function Hide-Console {
+    # Only a console of its own (the shortcut's): run from someone's terminal, that terminal stays
+    if ([Rowanholt.Native]::GetConsoleProcessList((New-Object uint[] 4), 4) -ne 1) { return }
+    [Rowanholt.Native]::ShowWindow([Rowanholt.Native]::GetConsoleWindow(), 0) | Out-Null
+}
+function Show-Console { [Rowanholt.Native]::ShowWindow([Rowanholt.Native]::GetConsoleWindow(), 5) | Out-Null }
+
 function Show-Message([string]$Text, [string]$Buttons = 'OK', [string]$Icon = 'Information') {
-    Add-Type -AssemblyName System.Windows.Forms
+    Initialize-Gui
     return [string][System.Windows.Forms.MessageBox]::Show($Text, 'Rowanholt', $Buttons, $Icon)
+}
+
+function New-SetupForm([string]$Heading, [string]$Subheading, [int]$BodyHeight) {
+    # A wizard page as the MSI's are: white header with the icon, the body, Next and Cancel.
+    # Laid out at 96 DPI; AutoScaleMode Dpi scales it to the display's
+    Initialize-Gui
+    $form = New-Object System.Windows.Forms.Form
+    $form.AutoScaleDimensions = New-Object System.Drawing.SizeF(96, 96)
+    $form.AutoScaleMode = 'Dpi'
+    $form.Font = New-Object System.Drawing.Font('Segoe UI', 9)
+    $form.Text = 'Set up Rowanholt'
+    $form.FormBorderStyle = 'FixedDialog'; $form.MaximizeBox = $false; $form.MinimizeBox = $false
+    $form.StartPosition = 'CenterScreen'; $form.ShowInTaskbar = $true
+    $form.ClientSize = New-Object System.Drawing.Size(520, (64 + 1 + $BodyHeight + 1 + 52))
+    $form.Add_Shown({ $this.Activate() })
+    $iconFile = Join-Path $AppDir 'desktop\icons\rowanholt.ico'
+
+    $header = New-Object System.Windows.Forms.Panel
+    $header.SetBounds(0, 0, 520, 64); $header.BackColor = [System.Drawing.Color]::White
+    $title = New-Object System.Windows.Forms.Label
+    $title.Text = $Heading; $title.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 11)
+    $title.SetBounds(20, 12, 420, 22)
+    $sub = New-Object System.Windows.Forms.Label
+    $sub.Text = $Subheading; $sub.ForeColor = [System.Drawing.Color]::FromArgb(90, 90, 90)
+    $sub.SetBounds(20, 36, 420, 20)
+    $header.Controls.AddRange(@($title, $sub))
+    if (Test-Path $iconFile) {
+        $form.Icon = New-Object System.Drawing.Icon($iconFile)
+        $picture = New-Object System.Windows.Forms.PictureBox
+        $picture.Image = (New-Object System.Drawing.Icon($iconFile, 48, 48)).ToBitmap()
+        $picture.SizeMode = 'Zoom'; $picture.SetBounds(460, 10, 44, 44)
+        $header.Controls.Add($picture)
+    }
+    $form.Controls.Add($header)
+    foreach ($y in 64, (65 + $BodyHeight)) {
+        $line = New-Object System.Windows.Forms.Panel
+        $line.SetBounds(0, $y, 520, 1); $line.BackColor = [System.Drawing.Color]::FromArgb(218, 218, 218)
+        $form.Controls.Add($line)
+    }
+
+    $buttonsY = 66 + $BodyHeight + 13
+    $ok = New-Object System.Windows.Forms.Button
+    $ok.Text = 'Next'; $ok.DialogResult = 'OK'; $ok.SetBounds(316, $buttonsY, 92, 28)
+    $cancel = New-Object System.Windows.Forms.Button
+    $cancel.Text = 'Cancel'; $cancel.DialogResult = 'Cancel'; $cancel.SetBounds(416, $buttonsY, 92, 28)
+    $form.Controls.AddRange(@($ok, $cancel)); $form.AcceptButton = $ok; $form.CancelButton = $cancel
+    return $form
+}
+
+function Add-FormText($Form, [string]$Text, [int]$X, [int]$Y, [int]$Width, [int]$Height, [switch]$Muted) {
+    $label = New-Object System.Windows.Forms.Label
+    $label.Text = $Text; $label.SetBounds($X, $Y, $Width, $Height)
+    if ($Muted) { $label.ForeColor = [System.Drawing.Color]::FromArgb(96, 96, 96) }
+    $Form.Controls.Add($label)
 }
 
 function Test-Copy([string]$Dir) {
@@ -116,37 +197,29 @@ function ConvertTo-ServerUrl([string]$Text, [switch]$AllowHttp) {
 
 function Select-Mode {
     # Where Rowanholt runs: 0 here (unpacked), 1 a copy already here, 2 a team server; $null cancelled
-    Add-Type -AssemblyName System.Windows.Forms
-    $form = New-Object System.Windows.Forms.Form
-    $form.Text = 'Set up Rowanholt'
-    $form.FormBorderStyle = 'FixedDialog'; $form.MaximizeBox = $false; $form.MinimizeBox = $false
-    $form.StartPosition = 'CenterScreen'; $form.ClientSize = New-Object System.Drawing.Size(520, 230)
-    $iconFile = Join-Path $AppDir 'desktop\icons\rowanholt.ico'
-    if (Test-Path $iconFile) { $form.Icon = New-Object System.Drawing.Icon($iconFile) }
-    $label = New-Object System.Windows.Forms.Label
-    $label.Text = "Where does Rowanholt run?`n`nA server needs nothing here but a window onto it: no Docker, no evidence, no 70 MB of files."
-    $label.SetBounds(16, 12, 490, 60)
-    $form.Controls.Add($label)
-    $options = @("Install Rowanholt $(Get-AppVersion) on this PC (needs Docker Desktop)",
-                 'Use a copy I already have (a git clone, for instance)',
-                 "Connect to my team's Rowanholt server")
+    $form = New-SetupForm 'Where should Rowanholt run?' 'You can change this later with Set Up Rowanholt in the Start menu.' 210
+    $options = @(
+        @('On this PC', "Rowanholt $(Get-AppVersion) runs here in Docker Desktop, and your evidence stays on this PC."),
+        @('From a copy I already have', 'A Rowanholt folder that is already on this PC, such as a git clone.'),
+        @("On my team's server", "Opens your team's Rowanholt in a window. Nothing else is installed or run here.")
+    )
+    $bold = New-Object System.Drawing.Font('Segoe UI Semibold', 9)
     $radios = for ($i = 0; $i -lt $options.Count; $i++) {
+        $y = 82 + 64 * $i
         $radio = New-Object System.Windows.Forms.RadioButton
-        $radio.Text = $options[$i]; $radio.SetBounds(24, 78 + 28 * $i, 480, 24); $radio.Checked = ($i -eq 0)
-        $form.Controls.Add($radio); $radio
+        $radio.Text = $options[$i][0]; $radio.Font = $bold
+        $radio.SetBounds(28, $y, 460, 24); $radio.Checked = ($i -eq 0)
+        $form.Controls.Add($radio)
+        Add-FormText $form $options[$i][1] 46 ($y + 24) 450 34 -Muted
+        $radio
     }
-    $ok = New-Object System.Windows.Forms.Button
-    $ok.Text = 'Next'; $ok.DialogResult = 'OK'; $ok.SetBounds(330, 190, 85, 28)
-    $cancel = New-Object System.Windows.Forms.Button
-    $cancel.Text = 'Cancel'; $cancel.DialogResult = 'Cancel'; $cancel.SetBounds(421, 190, 85, 28)
-    $form.Controls.AddRange(@($ok, $cancel)); $form.AcceptButton = $ok; $form.CancelButton = $cancel
     if ($form.ShowDialog() -ne 'OK') { return $null }
     for ($i = 0; $i -lt $radios.Count; $i++) { if ($radios[$i].Checked) { return $i } }
     return 0
 }
 
 function Select-Folder([string]$Description, [string]$Start) {
-    Add-Type -AssemblyName System.Windows.Forms
+    Initialize-Gui
     $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
     $dialog.Description = $Description
     $dialog.ShowNewFolderButton = $true
@@ -156,10 +229,16 @@ function Select-Folder([string]$Description, [string]$Start) {
 }
 
 function Set-Server {
-    Add-Type -AssemblyName Microsoft.VisualBasic
-    $typed = [Microsoft.VisualBasic.Interaction]::InputBox(
-        "Your team's Rowanholt server.`n`nIts address, e.g. rowanholt.example.org. If Edge warns about its certificate, ask the server's admin for its root certificate.",
-        'Set up Rowanholt', (Get-SavedServer))
+    $form = New-SetupForm "Your team's Rowanholt server" 'Rowanholt opens it in its own window.' 150
+    Add-FormText $form 'Server address:' 28 84 460 20
+    $box = New-Object System.Windows.Forms.TextBox
+    $box.SetBounds(28, 106, 464, 24); $box.Text = (Get-SavedServer)
+    $form.Controls.Add($box)
+    Add-FormText $form ("For example rowanholt.example.org. If Edge warns about the server's certificate, " +
+        "ask its admin for the root certificate.") 28 142 464 40 -Muted
+    $form.Add_Shown({ $box.Focus() })
+    if ($form.ShowDialog() -ne 'OK') { exit 1 }
+    $typed = $box.Text
     if (-not $typed) { exit 1 }
     $server = ConvertTo-ServerUrl $typed
     if (-not $server) {
@@ -186,6 +265,7 @@ function Assert-DockerInstalled {
 
 function Expand-Bundle([string]$Target) {
     New-Item -ItemType Directory -Force -Path $Target | Out-Null
+    Show-Console
     Write-Host "Copying Rowanholt $(Get-AppVersion) into $Target..."
     # Windows 10 and 11 ship bsdtar; .env, docker-compose.local.yml and cases aren't in the tarball, so they're kept
     & (Join-Path $env:SystemRoot 'System32\tar.exe') -xzf $Bundled -C $Target --strip-components 1
@@ -398,6 +478,7 @@ function Get-Median([double[]]$Values) {
 }
 
 function New-Journey([string]$Kind) {
+    Show-Console
     $base = if ($Kind -like 'cold*') { $Defaults.cold } else { $Defaults.warm }
     $history = @()
     if (Test-Path $HistoryFile) {
@@ -575,9 +656,11 @@ function Start-AppUpdate([string]$Tag, [switch]$Foreground) {
 
 function Show-UpdateNotice($Latest) {
     # Update, Later (until the next start) or Skip this version (until a newer one)
-    Add-Type -AssemblyName System.Windows.Forms
+    Initialize-Gui
     $form = New-Object System.Windows.Forms.Form
-    $form.Text = 'Rowanholt'; $form.Width = 440; $form.Height = 170; $form.StartPosition = 'CenterScreen'
+    $form.AutoScaleDimensions = New-Object System.Drawing.SizeF(96, 96); $form.AutoScaleMode = 'Dpi'
+    $form.Font = New-Object System.Drawing.Font('Segoe UI', 9)
+    $form.Text = 'Rowanholt'; $form.ClientSize = New-Object System.Drawing.Size(440, 132); $form.StartPosition = 'CenterScreen'
     $form.FormBorderStyle = 'FixedDialog'; $form.MaximizeBox = $false; $form.TopMost = $true
     $label = New-Object System.Windows.Forms.Label
     $label.Text = "Rowanholt $($Latest.version) is available (you have $(Get-AppVersion)).`n`nUpdate downloads it, checks it against the release's SHA256SUMS and installs it."
@@ -625,6 +708,8 @@ function Open-Window {
 }
 
 try {
+    # -Stop and -Update only write to the console; everything else starts with setup's dialogs or nothing
+    if (-not ($Stop -or $Update)) { Hide-Console }
     if ($Update) {
         if (-not $Packaged) { Write-Host "This is a checkout's launcher: update it with git pull."; exit 0 }
         $latest = Get-LatestRelease
@@ -719,6 +804,7 @@ try {
     Open-Window
     Invoke-UpdateCheck
 } catch {
+    Show-Console
     Write-Host ''
     Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
     Read-Host 'Press Enter to close'
