@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { getJob, cancelJob, pauseJob, resumeJob, deleteJob, restartJob, exportSiem, confirmSudo, cancelSudo } from '../api';
+import { getJob, cancelJob, pauseJob, resumeJob, deleteJob, restartJob, exportSiem, confirmRemoval, cancelRemoval } from '../api';
 import { serviceUrl } from '../apiBase';
 import JobSharing from './JobSharing';
+import { statusLabel } from '../jobStatus';
 
 const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
 
@@ -16,14 +17,14 @@ function JobDetails() {
   const logEndRef = useRef(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showSudoModal, setShowSudoModal] = useState(false);
+  const [showRemovalModal, setShowRemovalModal] = useState(false);
 
-  // Auto-show sudo modal when job is awaiting confirmation
+  // Ask whether to try again when removing the old output failed
   useEffect(() => {
     if (job?.status === 'awaiting_confirmation' && job?.pending_action) {
-      setShowSudoModal(true);
+      setShowRemovalModal(true);
     } else {
-      setShowSudoModal(false);
+      setShowRemovalModal(false);
     }
   }, [job?.status, job?.pending_action]);
 
@@ -126,27 +127,27 @@ function JobDetails() {
     }
   };
 
-  const handleSudoConfirm = async () => {
-    setShowSudoModal(false);
+  const handleRemovalConfirm = async () => {
+    setShowRemovalModal(false);
     setActionLoading(true);
     try {
-      await confirmSudo(jobId);
+      await confirmRemoval(jobId);
       await loadJob();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to confirm sudo action');
+      setError(err.response?.data?.detail || 'Failed to retry removing the old output');
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleSudoCancel = async () => {
-    setShowSudoModal(false);
+  const handleRemovalCancel = async () => {
+    setShowRemovalModal(false);
     setActionLoading(true);
     try {
-      await cancelSudo(jobId);
+      await cancelRemoval(jobId);
       await loadJob();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to cancel sudo action');
+      setError(err.response?.data?.detail || 'Failed to give up removing the old output');
     } finally {
       setActionLoading(false);
     }
@@ -580,8 +581,8 @@ function JobDetails() {
         </div>
       )}
 
-      {/* Sudo Confirmation Modal */}
-      {showSudoModal && job?.pending_action && (
+      {/* Removing the old output failed: try again? */}
+      {showRemovalModal && job?.pending_action && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -609,7 +610,7 @@ function JobDetails() {
               fontSize: '1.5rem',
               textAlign: 'center'
             }}>
-              🔐 Elevated Permissions Required
+              Removing the Old Output Failed
             </h3>
             <p style={{
               color: '#f0dba5',
@@ -642,7 +643,7 @@ function JobDetails() {
               textAlign: 'center',
               fontWeight: 'bold'
             }}>
-              ⚠️ This will run: sudo rm -rf on the above path
+              Trying again removes this job's old output folder, after the same checks: only Rowanholt's own output for this job, never evidence or another job's
             </p>
             <div style={{
               display: 'flex',
@@ -650,7 +651,7 @@ function JobDetails() {
               justifyContent: 'center'
             }}>
               <button
-                onClick={handleSudoCancel}
+                onClick={handleRemovalCancel}
                 disabled={actionLoading}
                 style={{
                   padding: '0.75rem 1.5rem',
@@ -672,10 +673,10 @@ function JobDetails() {
                   e.target.style.background = 'rgba(107, 142, 63, 0.3)';
                 }}
               >
-                Cancel
+                Give Up
               </button>
               <button
-                onClick={handleSudoConfirm}
+                onClick={handleRemovalConfirm}
                 disabled={actionLoading}
                 style={{
                   padding: '0.75rem 1.5rem',
@@ -697,7 +698,7 @@ function JobDetails() {
                   e.target.style.background = 'rgba(255, 152, 0, 0.3)';
                 }}
               >
-                {actionLoading ? 'Processing...' : 'Confirm Sudo'}
+                {actionLoading ? 'Processing...' : 'Try Again'}
               </button>
             </div>
           </div>
@@ -784,6 +785,13 @@ function JobDetails() {
         </div>
 
         {error && <div className="error">{error}</div>}
+
+        {job.status === 'removing' && (
+          <div className="info" role="status" style={{ marginBottom: '1rem', color: '#ff9800' }}>
+            The worker is removing this job's old output. The job runs as soon as it's gone; if it can't be
+            removed, the job fails and its log says why.
+          </div>
+        )}
 
         {/* Row 1: Case # | Duration | Destination */}
         <div data-guide="job.info" className="job-info-grid" style={{ display: 'grid', gridTemplateColumns: '0.5fr 0.5fr 2fr', gap: '1rem', marginBottom: '1rem' }}>
@@ -913,7 +921,7 @@ function JobDetails() {
                   fontWeight: 600
                 }}
               >
-                {job.status}
+                {statusLabel(job.status)}
               </span>
             </div>
             <h3 style={{ margin: 0 }}>Job Log ({job.log.length} entries)</h3>

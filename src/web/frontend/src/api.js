@@ -89,13 +89,15 @@ export const restartJob = async (jobId, confirm = false) => {
   return response.data;
 };
 
-export const confirmSudo = async (jobId) => {
-  const response = await api.post(`/api/jobs/${jobId}/confirm-sudo`);
+// A failed removal of the job's old output: try again (202, the job is then `removing` while the
+// worker removes it) or give up (the job fails and its old output stays)
+export const confirmRemoval = async (jobId) => {
+  const response = await api.post(`/api/jobs/${jobId}/confirm-removal`);
   return response.data;
 };
 
-export const cancelSudo = async (jobId) => {
-  const response = await api.post(`/api/jobs/${jobId}/cancel-sudo`);
+export const cancelRemoval = async (jobId) => {
+  const response = await api.post(`/api/jobs/${jobId}/cancel-removal`);
   return response.data;
 };
 

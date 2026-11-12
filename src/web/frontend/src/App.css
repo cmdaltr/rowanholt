@@ -3518,3 +3518,14 @@ a.mt-pill-link:hover { border-color: #66d9ef; }
 .licence-notice {
   color: #df514e;
 }
+
+/* The worker removing a job's old output after a confirmed retry */
+.status-removing {
+  background: rgba(255, 152, 0, 0.2);
+  color: #ff9800;
+}
+
+.status-awaiting_confirmation {
+  background: rgba(255, 152, 0, 0.2);
+  color: #ff9800;
+}

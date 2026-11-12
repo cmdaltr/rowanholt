@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BUSY_STATUSES, STATUS_FILTERS, STOPPABLE_STATUSES, statusLabel } from '../jobStatus';
 import { Link } from 'react-router-dom';
 import { listJobs, bulkDeleteJobs, bulkArchiveJobs, bulkRestartJobs, bulkCancelJobs, countFindings } from '../api';
 
@@ -25,6 +26,7 @@ function JobList() {
   // Status priority for sorting (lower number = higher priority)
   const statusPriority = {
     'awaiting_confirmation': 0,
+    'removing': 1,
     'running': 1,
     'paused': 1,
     'failed': 2,
@@ -109,7 +111,7 @@ function JobList() {
   const handleBulkDelete = async () => {
     // Check if any selected jobs can actually be deleted
     const selectedJobData = jobs.filter(job => selectedJobs.includes(job.id));
-    const deletableJobs = selectedJobData.filter(job => job.status !== 'pending' && job.status !== 'running' && job.status !== 'paused');
+    const deletableJobs = selectedJobData.filter(job => !BUSY_STATUSES.includes(job.status));
 
     if (deletableJobs.length === 0) {
       setErrorModalData({
@@ -207,7 +209,7 @@ function JobList() {
   const handleBulkArchive = async () => {
     // Check if any selected jobs can actually be archived
     const selectedJobData = jobs.filter(job => selectedJobs.includes(job.id));
-    const archivableJobs = selectedJobData.filter(job => job.status !== 'pending' && job.status !== 'running' && job.status !== 'paused' && job.status !== 'archived');
+    const archivableJobs = selectedJobData.filter(job => !BUSY_STATUSES.includes(job.status) && job.status !== 'archived');
 
     if (archivableJobs.length === 0) {
       setErrorModalData({
@@ -315,7 +317,7 @@ function JobList() {
   const handleBulkStop = async () => {
     // Check if any selected jobs can actually be stopped
     const selectedJobData = jobs.filter(job => selectedJobs.includes(job.id));
-    const stoppableJobs = selectedJobData.filter(job => job.status === 'pending' || job.status === 'running' || job.status === 'paused');
+    const stoppableJobs = selectedJobData.filter(job => STOPPABLE_STATUSES.includes(job.status));
 
     if (stoppableJobs.length === 0) {
       setErrorModalData({
@@ -606,12 +608,9 @@ function JobList() {
               onChange={(e) => setStatusFilter(e.target.value || null)}
             >
               <option value="">All</option>
-              <option value="pending">Pending</option>
-              <option value="running">Running</option>
-              <option value="paused">Paused</option>
-              <option value="completed">Completed</option>
-              <option value="failed">Failed</option>
-              <option value="cancelled">Cancelled</option>
+              {STATUS_FILTERS.map((status) => (
+                <option key={status} value={status}>{statusLabel(status)}</option>
+              ))}
             </select>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -834,7 +833,7 @@ function JobList() {
                     </td>
                     <td>
                       <span className={getStatusClass(job.status)}>
-                        {job.status.replace(/_/g, ' ')}
+                        {statusLabel(job.status)}
                       </span>
                     </td>
                     <td>
