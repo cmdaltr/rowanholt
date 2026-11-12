@@ -138,6 +138,8 @@ function New-SetupForm([string]$Heading, [string]$Subheading, [int]$BodyHeight) 
     $form.ClientSize = New-Object System.Drawing.Size(520, (64 + 1 + $BodyHeight + 1 + 52))
     $form.Add_Shown({ $this.Activate() })
     $iconFile = Join-Path $AppDir 'desktop\icons\rowanholt.ico'
+    # The PNG, not the .ico: Icon.ToBitmap garbles an .ico's PNG-compressed sizes into noise
+    $pngFile = Join-Path $AppDir 'desktop\icons\rowanholt.png'
 
     $header = New-Object System.Windows.Forms.Panel
     $header.SetBounds(0, 0, 520, 64); $header.BackColor = [System.Drawing.Color]::White
@@ -148,10 +150,10 @@ function New-SetupForm([string]$Heading, [string]$Subheading, [int]$BodyHeight) 
     $sub.Text = $Subheading; $sub.ForeColor = [System.Drawing.Color]::FromArgb(90, 90, 90)
     $sub.SetBounds(20, 36, 420, 20)
     $header.Controls.AddRange(@($title, $sub))
-    if (Test-Path $iconFile) {
-        $form.Icon = New-Object System.Drawing.Icon($iconFile)
+    if (Test-Path $iconFile) { $form.Icon = New-Object System.Drawing.Icon($iconFile) }
+    if (Test-Path $pngFile) {
         $picture = New-Object System.Windows.Forms.PictureBox
-        $picture.Image = (New-Object System.Drawing.Icon($iconFile, 48, 48)).ToBitmap()
+        $picture.Image = [System.Drawing.Image]::FromFile($pngFile)
         $picture.SizeMode = 'Zoom'; $picture.SetBounds(460, 10, 44, 44)
         $header.Controls.Add($picture)
     }
@@ -295,6 +297,26 @@ $Dependencies = [ordered]@{
     docker = @{ Value = 'InstallDocker'; Name = 'Docker Desktop' }
     ollama = @{ Value = 'InstallOllama'; Name = 'Ollama' }
     model  = @{ Value = 'InstallModel'; Name = "Smith's model ($SmithModel)" }
+}
+
+# Something to read while the downloads run, from the web app's own guide (src/web/frontend/src/guide)
+$GuideCards = @(
+    @('Rowanholt', 'Acquisition, analysis and an analyst to ask, in one place: Gandalf collects, Elrond analyses, and Smith answers questions about a case from its files.'),
+    @('Gandalf: acquisition', 'Collects artefacts from live hosts, locally, over SSH or over PowerShell Remoting, in order of volatility, and logs the SHA-256 of every file it takes. Elrond checks each one against that log before using it.'),
+    @('Elrond: analysis', 'Turns disk images, memory images, Gandalf archives, network evidence and datasets into timelines, CSVs and ATT&CK mappings. Brisk for triage; Exhaustive when the case matters more than the clock.'),
+    @('Several hosts, one case', 'Analyse hosts together and Elrond stacks them: with three or more hosts of one OS, what is rare across them stands out, persistence first.'),
+    @('The case browser', "Every host's artefacts, read-only and filterable. Flag a row as a finding, assign hosts to analysts and keep case notes; the report puts confirmed findings first."),
+    @('Smith', 'Ask about a case in plain English. Answers cite the rows they rest on, and each cited row can be flagged as a lead. Without a model, Smith still answers fixed questions: hosts, techniques, persistence, logins, IOCs.'),
+    @('Pippin: threat intelligence', 'Indicators from STIX/TAXII feeds, MITRESaw and your own imports. Elrond matches cases against them, and expired indicators drop out of matching.'),
+    @('Mordor Recordings', 'Recorded attack telemetry: which logs record each ATT&CK technique, from public labs and your own. Look here before writing a detection.'),
+    @('Your evidence stays put', "Evidence folders are mounted read-only for the web app: D:\Cases appears inside Rowanholt as /mnt/d/Cases. Set Up Rowanholt in the Start menu changes them later.")
+)
+
+function Show-GuideCard($Ui, [int]$Index) {
+    $Ui.Card = ($Index + $GuideCards.Count) % $GuideCards.Count
+    $Ui.CardTitle.Text = $GuideCards[$Ui.Card][0]
+    $Ui.CardText.Text = $GuideCards[$Ui.Card][1]
+    $Ui.CardCount.Text = "$($Ui.Card + 1) of $($GuideCards.Count)"
 }
 
 function Get-PendingDependencies {
@@ -463,8 +485,8 @@ function Install-Dependencies([string[]]$Items) {
     # One window for all of them, in order; one failing doesn't stop the rest. Returns
     # @{ Failed; Restart }, Restart when WSL 2 was just turned on
     $result = @{ Failed = @(); Restart = $false }
-    $height = 40 + 30 * $Items.Count + 70
-    $form = New-SetupForm 'Installing what Rowanholt needs' 'Downloaded from Docker and Ollama, and checked against their signatures.' $height
+    $height = 40 + 30 * $Items.Count + 70 + 150
+    $form = New-SetupForm 'Finishing the install' 'Installing what you chose in the installer, straight from Docker and Ollama.' $height
     $form.AcceptButton.Visible = $false
     $script:DependenciesCancelled = $false
     $form.CancelButton.DialogResult = 'None'
@@ -488,6 +510,32 @@ function Install-Dependencies([string[]]$Items) {
     $ui.Detail = New-Object System.Windows.Forms.Label
     $ui.Detail.SetBounds(28, $y + 36, 464, 36); $ui.Detail.ForeColor = [System.Drawing.Color]::FromArgb(96, 96, 96)
     $form.Controls.AddRange(@($ui.Bar, $ui.Detail))
+
+    # The guide: ‹ › to flick through, and it moves on by itself every 12 seconds
+    $card = New-Object System.Windows.Forms.Panel
+    $card.SetBounds(28, $y + 84, 464, 136); $card.BackColor = [System.Drawing.Color]::White
+    $card.BorderStyle = 'FixedSingle'
+    $ui.CardTitle = New-Object System.Windows.Forms.Label
+    $ui.CardTitle.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 10); $ui.CardTitle.SetBounds(14, 10, 430, 22)
+    $ui.CardText = New-Object System.Windows.Forms.Label
+    $ui.CardText.SetBounds(14, 36, 434, 64)
+    $ui.CardCount = New-Object System.Windows.Forms.Label
+    $ui.CardCount.ForeColor = [System.Drawing.Color]::FromArgb(96, 96, 96); $ui.CardCount.SetBounds(14, 106, 200, 20)
+    $back = New-Object System.Windows.Forms.Button
+    $back.Text = [string][char]0x2039; $back.SetBounds(372, 102, 34, 26)
+    $next = New-Object System.Windows.Forms.Button
+    $next.Text = [string][char]0x203A; $next.SetBounds(412, 102, 34, 26)
+    $card.Controls.AddRange(@($ui.CardTitle, $ui.CardText, $ui.CardCount, $back, $next))
+    $form.Controls.Add($card)
+    $script:GuideUi = $ui
+    $script:GuideTimer = New-Object System.Windows.Forms.Timer
+    $script:GuideTimer.Interval = 12000
+    $script:GuideTimer.Add_Tick({ Show-GuideCard $script:GuideUi ($script:GuideUi.Card + 1) })
+    # A click restarts the 12 seconds, so a card being read isn't swapped out under the reader
+    $back.Add_Click({ Show-GuideCard $script:GuideUi ($script:GuideUi.Card - 1); $script:GuideTimer.Stop(); $script:GuideTimer.Start() })
+    $next.Add_Click({ Show-GuideCard $script:GuideUi ($script:GuideUi.Card + 1); $script:GuideTimer.Stop(); $script:GuideTimer.Start() })
+    Show-GuideCard $ui 0
+    $script:GuideTimer.Start()
     $form.Show(); Step-Gui
 
     foreach ($item in $Items) {
@@ -508,6 +556,7 @@ function Install-Dependencies([string[]]$Items) {
         }
     }
     Clear-PendingDependencies $Items
+    $script:GuideTimer.Stop()
     $script:DependenciesDone = $true
     $form.Close()
 
