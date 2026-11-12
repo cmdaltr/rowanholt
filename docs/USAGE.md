@@ -138,21 +138,11 @@ curl -X POST http://localhost:5688/api/auth/register \
   }'
 ```
 
-> MFA, password reset and the admin user screens below depend on `auth/routes.py`, which the backend does not mount in the current build (it uses the simple file-based router). See [API.md](API.md#authentication-status).
+> The password reset and admin user screens below depend on `auth/routes.py`, which the backend does not mount in the current build (it uses the simple file-based router). See [API.md](API.md#authentication-status).
 
-### Enable Multi-Factor Authentication (MFA)
+### Multi-Factor Authentication
 
-**For Your Account:**
-1. Click your profile → Security
-2. Click "Enable MFA"
-3. Scan QR code with authenticator app
-4. Enter verification code
-5. Save backup codes securely!
-
-**For Other Users (Admin):**
-1. Navigate to Admin → Users
-2. Select user
-3. Click "Reset MFA" to disable (emergency)
+Rowanholt has no built-in MFA: no authenticator codes, no backup codes and no second step at sign-in. It signs people in with a password, with single sign-on (OIDC), or with an API token, and nothing else. On a team server, get MFA from your identity provider: set up [single sign-on](SERVER.md#single-sign-on), require MFA at the provider, and set `ROWANHOLT_LOCAL_LOGIN=false` so that only admins keep a password, for break-glass use. The Account page's MFA panel doesn't work: there's nothing behind it. See [SECURITY.md](SECURITY.md#signing-in).
 
 ### Reset User Password (Admin)
 
@@ -363,23 +353,9 @@ curl http://localhost:5688/api/jobs \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-### Login with MFA
+### Sign-in and MFA
 
-> Not available in the current build: the mounted auth router has no MFA step.
-
-```bash
-# Step 1: Login (returns temp_token if MFA enabled)
-TEMP_TOKEN=$(curl -s -X POST http://localhost:5688/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "user@example.com", "password": "password"}' \
-  | jq -r '.temp_token')
-
-# Step 2: Verify MFA code
-TOKEN=$(curl -s -X POST http://localhost:5688/api/auth/mfa/verify \
-  -H "Content-Type: application/json" \
-  -d '{"temp_token": "'$TEMP_TOKEN'", "code": "123456"}' \
-  | jq -r '.access_token')
-```
+`/api/auth/login` takes a password and answers with a token; there's no MFA step. Users who sign in with single sign-on get their MFA from the identity provider, and scripts use an API token (Account → API tokens) instead of a password.
 
 ---
 
@@ -405,7 +381,7 @@ TOKEN=$(curl -s -X POST http://localhost:5688/api/auth/mfa/verify \
 ### Security
 
 1. **Change default password** immediately
-2. **Enable MFA** for all admin accounts
+2. **Require MFA at your identity provider** and sign in through SSO: Rowanholt has none of its own
 3. **Use HTTPS** in production (configure reverse proxy)
 4. **Limit allowed_paths** to necessary directories only
 5. **Regular backups** of database and configuration
@@ -414,9 +390,8 @@ TOKEN=$(curl -s -X POST http://localhost:5688/api/auth/mfa/verify \
 
 1. **Use meaningful case numbers** (e.g., CASE-2025-001)
 2. **Document analysis options** used for each case
-3. **Save backup codes** when enabling MFA
-4. **Check logs** if job fails
-5. **Export results** to SIEM for long-term storage
+3. **Check logs** if job fails
+4. **Export results** to SIEM for long-term storage
 
 ---
 

@@ -227,7 +227,7 @@ redis:
 
 #### Important (Should Do)
 
-- [ ] **Enable MFA**: Require MFA for admin accounts
+- [ ] **Require MFA at the identity provider**: Rowanholt has no MFA of its own; sign people in through single sign-on ([SERVER.md](SERVER.md#single-sign-on)) and set `ROWANHOLT_LOCAL_LOGIN=false`
 - [ ] **Configure allowed_paths**: Limit file system access
 - [ ] **Set up backups**: Regular database backups
 - [ ] **Configure logging**: Centralized log collection

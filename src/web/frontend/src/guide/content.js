@@ -365,7 +365,7 @@ export const GUIDE_PAGES = [
       {
         id: 'account.settings',
         title: 'Account settings',
-        what: 'Profile, API tokens for scripting against Rowanholt, password, multi-factor authentication, the AI service and SIEM connections.',
+        what: 'Profile, API tokens for scripting against Rowanholt, password, the AI service and SIEM connections. Rowanholt has no built-in multi-factor authentication: on a team server it comes from your identity provider, through single sign-on.',
         who: 'Every user; API tokens for those automating Rowanholt.',
         when: 'Changing the first password you were given (do this first), or wiring Rowanholt into your own scripts.',
       },

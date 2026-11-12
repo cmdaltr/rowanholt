@@ -188,6 +188,8 @@ ROWANHOLT_LOCAL_LOGIN=false          # optional: SSO only; admins keep a passwor
 
 The ID token is verified against the issuer's published keys, its audience and the sign-in's nonce. Users are matched on issuer and subject, so a renamed account stays the same Rowanholt user; the first sign-in creates them. With `OIDC_ADMIN_GROUP` set, the role follows the group at every sign-in. Entra ID puts group object IDs in the `groups` claim (enable it under Token configuration); Okta and Keycloak need a groups claim mapper.
 
+Rowanholt has no MFA of its own, so require it at the identity provider (Entra ID Conditional Access, Okta's sign-on policies, Keycloak's OTP): with `ROWANHOLT_LOCAL_LOGIN=false`, only admins' break-glass passwords sign in without it.
+
 ## Licence
 
 A team server runs the Free edition, up to 4 accounts that can sign in, until a licence is installed; Pro and Services raise that to the licence's seats, and Services adds the right to run Rowanholt for clients ([COMMERCIAL-LICENSE.md](../COMMERCIAL-LICENSE.md)). Local mode needs no licence. Admins install one from the **Licence** page (beside Aragorn): paste the line, check it, read the terms, tick to accept them for the licensee, install. From the host:

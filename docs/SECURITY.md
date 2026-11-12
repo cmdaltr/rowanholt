@@ -6,20 +6,15 @@ Rowanholt implements comprehensive security measures to protect sensitive forens
 
 ## Authentication & Authorization
 
-### Multi-Factor Authentication (MFA)
+### Signing In
 
-#### TOTP (Time-based One-Time Password)
-- **Implementation**: PyOTP library for RFC 6238 compliance
-- **Storage**: TOTP secrets are encrypted using Fernet (AES-128)
-- **QR Code Setup**: Users can scan QR codes with authenticator apps (Google Authenticator, Authy, etc.)
-- **Time Window**: 30-second validity window with 1-step tolerance for clock skew
+There are three ways in, and no others:
 
-#### Backup Codes
-- **Generation**: 10 cryptographically secure backup codes per user
-- **Format**: 8-character alphanumeric codes (XXXX-XXXX)
-- **Storage**: Hashed using bcrypt before encryption
-- **Single-Use**: Codes are removed after successful verification
-- **Regeneration**: Users can regenerate backup codes with MFA verification
+- **Password**: accounts in the user store (`auth/users.py`, a JSON file), made by an admin on a team server; there's no open sign-up there.
+- **Single sign-on (OIDC)**: any OpenID Connect identity provider (Entra ID, Okta, Keycloak), set up in [SERVER.md](SERVER.md#single-sign-on); roles can follow an IdP group.
+- **API tokens**: for scripts and Smith's MCP server ([API Tokens](#api-tokens-team-server) below).
+
+**Rowanholt has no built-in MFA.** There's no TOTP, no backup codes and no second step at sign-in. (`auth/routes.py` holds MFA routes from an earlier design, but the backend doesn't mount it, and the user store has nowhere to keep a second factor.) A team server should get MFA from its identity provider: sign people in through SSO, require MFA there (Entra ID Conditional Access, Okta's sign-on policies, Keycloak's OTP), and set `ROWANHOLT_LOCAL_LOGIN=false` so that only admins keep a password, as a break-glass way in. Those admin passwords are a single factor: keep them long, few and out of daily use.
 
 ### Password Security
 
@@ -30,10 +25,9 @@ Rowanholt implements comprehensive security measures to protect sensitive forens
 - **Max Length**: 72 bytes (bcrypt limitation)
 
 #### Password Requirements
-- Minimum 8 characters
-- Validated on both frontend and backend
-- Password reset requires email verification
-- All user sessions invalidated on password change
+- At least 12 characters on a team server (checked by the backend)
+- No password reset by email: an admin sets a new one (`rowanholt server users password <user>`, or `/api/auth/users`)
+- Failed sign-ins lock the username ([SERVER.md](SERVER.md#how-sign-in-lockouts-work))
 
 ### Session Management
 
@@ -97,10 +91,7 @@ Rowanholt implements comprehensive security measures to protect sensitive forens
 - **Key Derivation**: PBKDF2-HMAC-SHA256
   - **Iterations**: 100,000
   - **Salt**: Application-specific (should be unique per deployment)
-- **Use Cases**:
-  - MFA TOTP secrets
-  - Hashed backup codes
-  - Any PII in future features
+- **Use Cases**: none in this build. The helpers (`auth/security_utils.py`) serve only the unmounted MFA code in `auth/routes.py`
 
 ### Key Management
 - **Secret Key**: Loaded from `settings.secret_key`
@@ -113,11 +104,9 @@ Rowanholt implements comprehensive security measures to protect sensitive forens
 1. **ADMIN**: Full system access
    - User management
    - Password resets for other users
-   - MFA disable for emergency access
    - Account enable/disable
 2. **USER**: Standard access
    - Job creation/management
-   - MFA setup
    - Profile management
 3. **GUEST**: Limited access
    - Read-only browsing
@@ -184,7 +173,6 @@ allowed_origins = [
 **TODO**: Add rate limiting middleware
 - Login attempts: 5 per minute
 - Registration: 3 per hour
-- MFA attempts: 10 per minute
 - API calls: 100 per minute per user
 
 ### Request Size Limits
@@ -201,8 +189,6 @@ allowed_origins = [
 ### Security Events Logged
 - Login attempts (success/failure)
 - Password changes
-- Password reset requests
-- MFA enable/disable
 - Admin actions
 - Account lockouts
 
@@ -241,8 +227,8 @@ allowed_origins = [
 
 ### Brute Force Attacks
 - ⚠️ TODO: Rate limiting on login
-- ⚠️ TODO: Account lockout after N failed attempts
-- ✅ MFA provides additional layer
+- ✅ Account lockout after repeated failed sign-ins ([SERVER.md](SERVER.md#how-sign-in-lockouts-work))
+- ⚠️ No built-in MFA: require it at the identity provider and sign in through SSO ([Signing In](#signing-in))
 
 ### Session Hijacking
 - ✅ Secure token generation
@@ -259,6 +245,7 @@ allowed_origins = [
 
 ### Critical (Must Do)
 - [ ] Change default admin password
+- [ ] Sign people in through SSO, with MFA required at the identity provider, and `ROWANHOLT_LOCAL_LOGIN=false` (Rowanholt has no MFA of its own)
 - [ ] Set strong `SECRET_KEY` environment variable
 - [ ] Enable HTTPS and secure cookies
 - [ ] Use strong database credentials
@@ -324,6 +311,6 @@ pip install --upgrade -r requirements/web.txt
 
 ## Version History
 
-- **v2.1.0**: Added MFA, input sanitization, admin controls
+- **v2.1.0**: Added input sanitization and admin controls (MFA routes were written too, but never mounted)
 - **v2.0.0**: Initial authentication system
 - **v1.0.0**: No authentication (development only)

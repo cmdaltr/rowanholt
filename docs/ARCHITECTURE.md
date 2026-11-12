@@ -979,7 +979,8 @@ Layer 6: Authentication & Authorization
 │ • Role-Based Access Control (RBAC)                       │
 │ • Password Hashing (bcrypt)                              │
 │ • Session Timeout                                        │
-│ • Multi-Factor Authentication (Future)                   │
+│ • Single Sign-On (OIDC); MFA at the identity provider    │
+│ • No built-in MFA                                        │
 └──────────────────────────────────────────────────────────┘
 
 Layer 5: API Security
