@@ -26,17 +26,18 @@ Before installing Rowanholt, ensure you have:
 - **Git** - For cloning the repository
 - **Python 3.10+** - For running the installer and test scripts
 - **Docker** or **OrbStack** - For running Rowanholt containers
-- **At least 10GB free disk space** - For Docker images and containers
-- **At least 12GB RAM** - Recommended 16GB for full stack, 10GB minimum for testing mode
+- **16 GB of RAM, 4 cores and 60 GB free disk space** - See the table below
 
-### Recommended System Specs
+### System Requirements
 
-| Component | Minimum | Recommended |
-|-----------|---------|-------------|
-| RAM | 10GB | 16GB+ |
-| CPU | 4 cores | 8+ cores |
-| Disk | 10GB | 50GB+ |
-| OS | macOS 12+, Ubuntu 20.04+, Windows 10+ | Latest versions |
+| | Minimum | Recommended |
+|---|---|---|
+| **Memory** | 16 GB | 32 GB, and for the SIEM profile |
+| **Processor** | 4 cores, with hardware virtualisation on (Windows and macOS run Docker in a VM) | 8 cores or more |
+| **Free disk space** | 60 GB on the drive that holds Docker's data, on an SSD | 200 GB or more on an SSD, plus room for evidence and cases |
+| **OS** | Windows 10 or 11 (64-bit) with WSL 2, macOS 12+, Ubuntu 20.04+ | Latest versions |
+
+Why these numbers, and what `rowanholt start` checks: [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md#️-system-requirements).
 
 ### Platform Notes
 
@@ -121,7 +122,7 @@ The installer will:
 **Recommendation:**
 - **macOS users**: **Use OrbStack** (best performance, no bugs)
 - **Linux/Windows users**: Use Docker Desktop 4.51.0
-- **16GB RAM or less**: Use OrbStack or Testing Mode
+- **16 GB of RAM**: Use OrbStack or Testing Mode
 
 #### What Happens During Image Path Configuration
 
@@ -344,7 +345,7 @@ docker run --rm -v C:/your/image/path:/data:ro alpine ls -lh /data
 
 ### Step 6: Start Rowanholt in Testing Mode
 
-For first-time users or systems with 16GB RAM or less, use **Testing Mode**:
+For first-time users or machines with 16 GB of RAM, use **Testing Mode**:
 
 ```bash
 ./scripts/start-testing-mode.sh
@@ -537,7 +538,7 @@ docker compose down
 ./scripts/start-testing-mode.sh
 
 # Increase Docker memory allocation:
-# Docker Desktop → Settings → Resources → Memory → 10GB or more
+# Docker Desktop → Settings → Resources → Memory → 10 GB or more (16 GB with the SIEM profile)
 ```
 
 ### Job Stuck

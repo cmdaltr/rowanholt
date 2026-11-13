@@ -21,7 +21,7 @@ Server mode is the backend setting `ROWANHOLT_SERVER_MODE`, which `deploy/server
 
 ## Setting up
 
-Requirements: a Linux host with Docker Engine and Compose 2.24 or later, and a DNS name for it. Ubuntu 24.04 and Rocky 9 with SELinux enforcing, each with Docker's own packages, are the tested shapes (both run end to end on 9 November 2026); Rocky, RHEL and Alma 9 need the steps in [Rocky, RHEL and Alma](#rocky-rhel-and-alma) first, and Windows Server runs it in WSL 2 ([Windows Server](#windows-server)).
+Requirements: a Linux host with Docker Engine and Compose 2.24 or later, and a DNS name for it; 16 GB of memory, 4 cores and 60 GB free at least, 32 GB and 8 cores when several jobs run at once ([REQUIREMENTS.md](REQUIREMENTS.md#️-system-requirements)). Ubuntu 24.04 and Rocky 9 with SELinux enforcing, each with Docker's own packages, are the tested shapes (both run end to end on 9 November 2026); Rocky, RHEL and Alma 9 need the steps in [Rocky, RHEL and Alma](#rocky-rhel-and-alma) first, and Windows Server runs it in WSL 2 ([Windows Server](#windows-server)).
 
 ```bash
 git clone https://github.com/cmdaltr/rowanholt.git && cd rowanholt
