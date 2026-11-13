@@ -34,14 +34,34 @@
     <Property Id="ARPPRODUCTICON" Value="rowanholt.ico" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/cmdaltr/rowanholt" />
     <Property Id="ARPHELPLINK" Value="https://github.com/cmdaltr/rowanholt/issues" />
-    <!-- ARPNOMODIFY (no Modify in Settings > Apps) comes with WixUI_Minimal, which defines it -->
-    <!-- msiexec /i Rowanholt-....msi DESKTOPSHORTCUT=1 adds a desktop shortcut too -->
+    <!-- The wizard's shortcuts page ticks it; msiexec /i Rowanholt-....msi DESKTOPSHORTCUT=1 does too -->
     <Property Id="DESKTOPSHORTCUT" Secure="yes" />
 
-    <!-- Double-clicked, it shows the Elastic License to accept; install.ps1's /passive shows none,
-         and using the software is accepting it (README) -->
+    <!-- What else to install is setup's question now (the launcher's What Rowanholt needs page, which
+         sees what's installed and offers Keep, Install or Reinstall clean). For a scripted install,
+         msiexec's INSTALLDOCKER=1 (WSL 2 and Docker Desktop), INSTALLAI=1 (Ollama and Smith's model;
+         INSTALLOLLAMA and INSTALLMODEL apart) and INSTALLCLEAN=1 (remove both first) still queue them
+         under HKCU\Software\cmdaltr\Rowanholt for the launcher's next start, which clears each value -->
+    <Property Id="INSTALLDOCKER" Secure="yes" />
+    <Property Id="INSTALLOLLAMA" Secure="yes" />
+    <Property Id="INSTALLMODEL" Secure="yes" />
+    <Property Id="INSTALLAI" Secure="yes" />
+    <Property Id="INSTALLCLEAN" Secure="yes" />
+
+    <!-- Double-clicked, it's the wizard most Windows installers show (WixUI_Rowanholt below), with
+         the Elastic License to accept; install.ps1's /passive shows none, and using the software
+         is accepting it (README). build-msi.ps1 draws the banner and side panel -->
     <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenceRtf)" />
-    <ui:WixUI Id="WixUI_Minimal" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(var.BannerBmp)" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(var.DialogBmp)" />
+    <UIRef Id="WixUI_Rowanholt" />
+
+    <!-- The Finish page's "Open Rowanholt": the Start menu shortcut's command, not waited for; its
+         first run is setup, in the Rowanholt window -->
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Open Rowanholt" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <CustomAction Id="LaunchRowanholt" Directory="INSTALLFOLDER" Return="asyncNoWait"
+                  ExeCommand="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;[WindowsDir]Rowanholt.ps1&quot;" />
 
     <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="ProgramsDir" Name="Programs">
@@ -83,6 +103,11 @@
         <File Id="RowanholtIco" Source="$(var.Root)\desktop\icons\rowanholt.ico" Name="rowanholt.ico" />
         <RemoveFolder Id="RemoveIconsDir" On="uninstall" />
       </Component>
+      <!-- The launcher's windows show the PNG: .NET garbles an .ico's PNG-compressed sizes -->
+      <Component Id="IconPng" Directory="IconsDir" Guid="6C1D2F0B-8E3A-4B57-9D21-3F6A0E7B5C84">
+        <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="IconPng" Type="integer" Value="1" KeyPath="yes" />
+        <File Id="RowanholtPng" Source="$(var.Root)\desktop\icons\rowanholt.png" Name="rowanholt.png" />
+      </Component>
       <!-- install.ps1 and uninstall.ps1 travel with the app, as Shikari's seed\ does: upgrade or remove
            it without the repository -->
       <Component Id="Seed" Directory="SeedDir" Guid="23E53571-9291-4BD0-A7CB-6A545FCA8413">
@@ -115,6 +140,19 @@
                   Arguments="-NoProfile -ExecutionPolicy Bypass -File &quot;[WindowsDir]Rowanholt.ps1&quot;"
                   WorkingDirectory="INSTALLFOLDER" Icon="rowanholt.ico" />
       </Component>
+      <!-- What msiexec's properties queued; the launcher removes each value once it has tried -->
+      <Component Id="WantDocker" Directory="INSTALLFOLDER" Condition="INSTALLDOCKER = 1">
+        <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="InstallDocker" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+      <Component Id="WantClean" Directory="INSTALLFOLDER" Condition="INSTALLCLEAN = 1">
+        <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="CleanFirst" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+      <Component Id="WantOllama" Directory="INSTALLFOLDER" Condition="INSTALLOLLAMA = 1 OR INSTALLAI = 1">
+        <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="InstallOllama" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+      <Component Id="WantModel" Directory="INSTALLFOLDER" Condition="INSTALLMODEL = 1 OR INSTALLAI = 1">
+        <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="InstallModel" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
       <!-- Clears HKCU\Software\cmdaltr\Rowanholt on uninstall once its values are gone -->
       <Component Id="RegistryKey" Directory="INSTALLFOLDER">
         <RegistryKey Root="HKCU" Key="Software\cmdaltr\Rowanholt" ForceDeleteOnUninstall="yes">
@@ -123,4 +161,68 @@
       </Component>
     </Feature>
   </Package>
+
+  <!-- WixUI_InstallDir's pages without its folder page (the folder is fixed: the launcher, the
+       update check and uninstall.ps1 all look for it there), and a shortcuts page in its place.
+       Repair and Remove from Settings > Apps go through the maintenance pages as usual -->
+  <Fragment>
+    <UI Id="WixUI_Rowanholt">
+      <TextStyle Id="WixUI_Font_Normal" FaceName="Segoe UI" Size="9" />
+      <TextStyle Id="WixUI_Font_Bigger" FaceName="Segoe UI" Size="12" />
+      <TextStyle Id="WixUI_Font_Title" FaceName="Segoe UI" Size="9" Bold="yes" />
+      <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
+      <Property Id="ARPNOMODIFY" Value="1" />
+
+      <DialogRef Id="ErrorDlg" />
+      <DialogRef Id="FatalError" />
+      <DialogRef Id="FilesInUse" />
+      <DialogRef Id="MsiRMFilesInUse" />
+      <DialogRef Id="PrepareDlg" />
+      <DialogRef Id="ProgressDlg" />
+      <DialogRef Id="ResumeDlg" />
+      <DialogRef Id="UserExit" />
+
+      <Dialog Id="ShortcutsDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="&amp;Next" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="&amp;Back" />
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="Cancel">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="220" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Shortcuts" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="Where to find Rowanholt once it's installed." />
+        <Control Id="StartMenuText" Type="Text" X="20" Y="58" Width="330" Height="22" NoPrefix="yes"
+                 Text="The Start menu gets Rowanholt, Stop Rowanholt and Set Up Rowanholt." />
+        <Control Id="DesktopCheckBox" Type="CheckBox" X="20" Y="86" Width="330" Height="14" Property="DESKTOPSHORTCUT" CheckBoxValue="1"
+                 Text="Add a Rowanholt shortcut to the &amp;desktop" />
+        <Control Id="NextText" Type="Text" X="20" Y="120" Width="330" Height="40" NoPrefix="yes"
+                 Text="When Rowanholt first opens, it asks where it runs and sets up what it needs on this PC: Docker Desktop and WSL 2, and if you want them, Ollama and Smith's model." />
+      </Dialog>
+
+      <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999" />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchRowanholt"
+               Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
+
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="LicenseAgreementDlg" Condition="NOT Installed" />
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="Installed AND PATCH" />
+
+      <Publish Dialog="LicenseAgreementDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
+      <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="ShortcutsDlg" Condition="LicenseAccepted = &quot;1&quot;" />
+
+      <Publish Dialog="ShortcutsDlg" Control="Back" Event="NewDialog" Value="LicenseAgreementDlg" />
+      <Publish Dialog="ShortcutsDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" />
+
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ShortcutsDlg" Order="1" Condition="NOT Installed" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" Condition="Installed AND NOT PATCH" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2" Condition="Installed AND PATCH" />
+
+      <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" />
+    </UI>
+    <UIRef Id="WixUI_Common" />
+  </Fragment>
 </Wix>
