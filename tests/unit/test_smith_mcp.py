@@ -84,12 +84,15 @@ class SmithMcpTest(BackendCase):
             "1,2.0,process,x7kq.exe,1,4,WS01,\"rare, generated name\",prefetch.csv,X7KQ.EXE\n")
         return job
 
-    def test_the_old_package_names_are_the_same_server(self):
-        # MCP hosts configured before the analyst was Smith run python3 -m aule_mcp.server (Aulë) or
-        # python3 -m eru_mcp.server (Eru)
+    def test_the_old_package_name_is_the_same_server(self):
+        # MCP hosts configured while the analyst was Eru run python3 -m eru_mcp.server
         import importlib
-        self.assertIs(importlib.import_module("aule_mcp.server"), smith_mcp)
         self.assertIs(importlib.import_module("eru_mcp.server"), smith_mcp)
+
+    def test_aule_mcp_is_gone(self):
+        import importlib
+        with self.assertRaises(ModuleNotFoundError):
+            importlib.import_module("aule_mcp")
 
     def test_tools_are_phase_one_and_read_only(self):
         async def run():
