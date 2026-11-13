@@ -120,6 +120,14 @@ code, pre, kbd, samp { font-family: var(--font-mono); letter-spacing: 0; }
 }
 .nav-menu:hover .nav-menu__items,
 .nav-menu:focus-within .nav-menu__items { display: block; }
+.nav-menu:hover .nav-menu__items--list,
+.nav-menu:focus-within .nav-menu__items--list { display: flex; flex-direction: column; }
+.nav-menu__items--list a {
+  background: #2b2f1c;
+  border: 1px solid #4c3a1b;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+}
+.nav-menu__items--list a + a { margin-top: -1px; }
 .nav-menu__items .nav-guide {
   background: #2b2f1c;
   border: 1px solid #4c3a1b;
@@ -129,9 +137,14 @@ code, pre, kbd, samp { font-family: var(--font-mono); letter-spacing: 0; }
 /* The logo on every other page goes home */
 .App:not(.App--home) img.hero-image { cursor: pointer; }
 
-@media (max-width: 1000px) {
+/* A laptop-width window (Windows at 125-150% scaling is often 1100-1300px): the links don't
+   wrap, so each group would otherwise grow past its column and scroll the whole page sideways */
+@media (max-width: 1400px) {
   .App-header nav { grid-template-columns: 1fr 8rem 1fr; }
   .nav-left, .nav-right { gap: 0; }
+  .App-header nav .nav-left > a,
+  .App-header nav .nav-right > a,
+  .App-header nav .nav-menu > a { padding-left: 0.4rem; padding-right: 0.4rem; }
 }
 
 .App-header nav a {

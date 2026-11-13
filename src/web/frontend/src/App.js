@@ -41,13 +41,18 @@ function Navigation({ onGuide, serverMode }) {
         <Link to="/gandalf">Gandalf</Link>
         <Link to="/elrond">Elrond</Link>
         <Link to="/pippin">Pippin</Link>
-        <Link to="/aragorn">Aragorn</Link>
-        {/* The licence and what it turns on: a team server's admins, or the analyst in local mode */}
-        {serverMode != null && managesLicence(user, serverMode) && <>
-          <Link to="/licence">Licence</Link>
-          <Link to="/branding">Branding</Link>
-          <Link to="/webhooks">Webhooks</Link>
-        </>}
+        {/* The licence and what it turns on, in a menu under Aragorn so the bar fits: a team
+            server's admins, or the analyst in local mode */}
+        <div className="nav-menu">
+          <Link to="/aragorn">Aragorn</Link>
+          {serverMode != null && managesLicence(user, serverMode) && (
+            <div className="nav-menu__items nav-menu__items--list">
+              <Link to="/licence">Licence</Link>
+              <Link to="/branding">Branding</Link>
+              <Link to="/webhooks">Webhooks</Link>
+            </div>
+          )}
+        </div>
         <Link to="/ai">Smith</Link>
       </div>
       {/* Mordor opens the right: the datasets sit beside the jobs they feed */}

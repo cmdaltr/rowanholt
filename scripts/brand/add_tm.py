@@ -67,7 +67,7 @@ def add_tm(source: Path, dest: Path) -> None:
     ImageDraw.Draw(im).text((x, y), "™", font=font, fill=colour + (255,),
                             stroke_width=stroke, stroke_fill=(48, 32, 8, 255))
     dest.parent.mkdir(parents=True, exist_ok=True)
-    im.convert("RGB").save(dest, optimize=True)
+    im.save(dest, optimize=True)  # RGBA: the logo's background is transparent
 
 
 def main() -> None:
