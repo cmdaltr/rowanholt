@@ -87,12 +87,14 @@ docker-compose logs -f backend
 
 ### System Requirements
 
-| Component | Minimum | Recommended |
-|-----------|---------|-------------|
-| **RAM** | 10GB | 16GB+ |
-| **CPU** | 4 cores | 8+ cores |
-| **Disk** | 10GB | 50GB+ |
-| **OS** | macOS 12+, Ubuntu 20.04+, Windows 10+ | Latest versions |
+| | Minimum | Recommended |
+|---|---|---|
+| **Memory** | 16 GB | 32 GB, and for the SIEM profile |
+| **Processor** | 4 cores, with hardware virtualisation on (Windows and macOS run Docker in a VM) | 8 cores or more |
+| **Free disk space** | 60 GB on the drive that holds Docker's data, on an SSD | 200 GB or more on an SSD, plus room for evidence and cases |
+| **OS** | Windows 10 or 11 (64-bit) with WSL 2, macOS 12+, Ubuntu 20.04+ | Latest versions |
+
+Why these numbers, and what the launchers check: [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md#️-system-requirements).
 
 **Supported Platforms:**
 - macOS (Apple Silicon & Intel)

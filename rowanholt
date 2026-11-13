@@ -247,6 +247,7 @@ stack() {
             echo "Starting Rowanholt..."
             prepare_app_copy
             $SERVER && remove_renamed_containers
+            check_resources || exit 1
             compose_cmd up -d $BUILD_FLAG || exit 1
             [ -n "$BUILD_FLAG" ] && printf '%s\n' "$BUILT_VERSION" > "$ROOT/.rowanholt-built"
             print_urls
@@ -346,6 +347,23 @@ not_migrated() {
         return 0
     fi
     return 1
+}
+
+# The machine against docs/REQUIREMENTS.md (src/common/resources.py): stops under the floors,
+# 30 GB free only when there are images to build; warns under the minimums. start --progress
+# runs the same check itself
+check_resources() {
+    progress_python || return 0
+    local building=() image
+    if [ -n "$BUILD_FLAG" ]; then
+        building=(--building)
+    else
+        while read -r image; do
+            [ -n "$image" ] || continue
+            docker image inspect "$image" &>/dev/null || { building=(--building); break; }
+        done < <(compose_cmd config --images 2>/dev/null)
+    fi
+    "$PYTHON" "$ROOT/src/common/resources.py" "${building[@]}"
 }
 
 # start --progress: src/common/startup_progress.py wakes Docker, starts the stack and

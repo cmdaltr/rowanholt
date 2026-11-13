@@ -2,18 +2,22 @@
 
 ## 🛠️ System Requirements
 
-### Minimum Requirements
-- **OS**: Linux (Ubuntu 20.04+), macOS (11+), or Windows 10/11 with WSL2
-- **CPU**: 4 cores recommended (2 cores minimum)
-- **RAM**: 8GB minimum (16GB+ recommended for memory analysis)
-- **Storage**: 50GB free space minimum (500GB+ for large cases)
-- **Python**: 3.10 or higher
+These figures are the same everywhere they're quoted (README.md, INSTALL.md, desktop/README.md) and are the ones the launchers check.
 
-### Recommended Requirements
-- **CPU**: 8+ cores
-- **RAM**: 32GB+ (for processing large memory dumps)
-- **Storage**: 1TB+ SSD (fast I/O for timeline generation)
-- **GPU**: Optional, for AI-powered analysis acceleration
+| | Minimum | Recommended |
+|---|---|---|
+| **Memory** | 16 GB | 32 GB, and for the SIEM profile |
+| **Processor** | 4 cores, with hardware virtualisation on (Windows and macOS run Docker in a VM) | 8 cores or more |
+| **Free disk space** | 60 GB on the drive that holds Docker's data, on an SSD | 200 GB or more on an SSD, plus room for evidence and cases |
+| **OS** | Windows 10 or 11 (64-bit) with WSL 2, macOS 12+, Ubuntu 20.04+ | Latest versions |
+
+**Memory.** The core stack's containers are capped at about 10 GB between them, most of it the worker's 8 GB for Volatility and Plaso. Docker Desktop on Windows gives its Linux VM half the PC's memory by default, and the OS, the browser and Ollama with Smith's model (about 3 GB) need the rest. On 8 GB, a Windows PC hung while Docker unpacked the images. The SIEM profile (Splunk, Elastic, Kibana, the Navigator) adds 8 GB or more: give Docker 16 GB with it up, so 32 GB on the machine. Large memory images want 32 GB whatever the profile.
+
+**Disk.** A first start builds three images (about 3.5 GB) and BuildKit's cache beside them, which together took Docker's data disk to 20 GB on Windows. Docker Desktop and WSL take a few GB more, and Smith's model 2 GB. Each case's output, timelines and CSVs included, comes on top, on the drive its output folder is on.
+
+**What the launchers check.** `rowanholt start`, the desktop apps' starts and the Windows app's What Rowanholt needs page check the machine (`src/common/resources.py`; the Windows launcher holds the same numbers). They stop under 8 GB of memory, or under 30 GB free where Docker keeps its data when there are images to build (a first start, or the rebuild after an update), and warn under the minimums above. `ROWANHOLT_SKIP_CHECKS=1` turns the stops into warnings.
+
+A team server needs the same as a desktop for a handful of analysts; give it 32 GB and 8 cores when several jobs run at once ([SERVER.md](SERVER.md)).
 
 ---
 

@@ -30,6 +30,9 @@ import urllib.request
 from pathlib import Path
 from typing import Dict, List, Optional
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import resources  # noqa: E402
+
 PHASES = ["docker", "images", "containers", "ui"]
 # Seconds, until this machine has history of its own
 DEFAULTS = {
@@ -290,6 +293,13 @@ def main(argv: List[str]) -> int:
             fresh.started, fresh.phase_started = journey.started, journey.phase_started
             journey = reporter.journey = fresh
         builds = len(missing) if missing else 0
+        found = resources.check_here(cold)
+        for text in found.stops:
+            reporter.line(f"Error: {text}")
+        for text in found.warnings:
+            reporter.line(f"Warning: {text}")
+        if found.stops:
+            return 1
         if missing:
             reporter.line(f"{len(missing)} image(s) to fetch or build: the first start takes a while.")
         journey.enter("images")

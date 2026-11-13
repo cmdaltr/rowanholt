@@ -557,6 +557,42 @@ function Test-Virtualisation {
     return (Test-WslFeatures) -and (Get-CimInstance Win32_ComputerSystem).HypervisorPresent
 }
 
+# This PC against docs/REQUIREMENTS.md, the numbers src/common/resources.py holds for macOS and
+# Linux: stop under 8 GB of memory, or under 30 GB free on Docker's drive when there are images to
+# build (the build and its cache took 20 GB); warn under 16 GB, 4 processors or 60 GB free.
+# ROWANHOLT_SKIP_CHECKS=1 makes the stops warnings
+$MemoryFloorGB = 8; $MemoryMinGB = 16; $CoresMin = 4; $DiskFloorGB = 30; $DiskMinGB = 60
+
+function Get-Resources {
+    # Docker Desktop keeps its disks under %LOCALAPPDATA%\Docker\wsl unless moved
+    $pc = Get-CimInstance Win32_ComputerSystem
+    $drive = (Split-Path -Qualifier $env:LOCALAPPDATA).TrimEnd(':')
+    $free = (Get-PSDrive $drive -ErrorAction SilentlyContinue).Free
+    return [pscustomobject]@{
+        MemoryGB = [int][math]::Round($pc.TotalPhysicalMemory / 1GB); Cores = [int]$pc.NumberOfLogicalProcessors
+        Drive = "${drive}:"; FreeGB = $(if ($null -ne $free) { [int][math]::Floor($free / 1GB) } else { $null })
+    }
+}
+
+function Test-Resources($R, [bool]$Building) {
+    $stops = @(); $warnings = @()
+    if ($R.MemoryGB -lt $MemoryFloorGB) {
+        $stops += "This PC has $($R.MemoryGB) GB of memory; Rowanholt needs at least $MemoryMinGB GB and won't start on less than $MemoryFloorGB GB."
+    } elseif ($R.MemoryGB -lt $MemoryMinGB) {
+        $warnings += "This PC has $($R.MemoryGB) GB of memory; Rowanholt needs $MemoryMinGB GB. Building the images or analysing a memory image may run out."
+    }
+    if ($R.Cores -lt $CoresMin) { $warnings += "This PC has $($R.Cores) processors; Rowanholt needs $CoresMin. Expect it to be slow." }
+    if ($null -ne $R.FreeGB) {
+        if ($Building -and $R.FreeGB -lt $DiskFloorGB) {
+            $stops += "$($R.FreeGB) GB is free on $($R.Drive); building Rowanholt's images needs at least $DiskFloorGB GB ($DiskMinGB GB with room for cases). Free some space and open Rowanholt again."
+        } elseif ($R.FreeGB -lt $DiskMinGB) {
+            $warnings += "$($R.FreeGB) GB is free on $($R.Drive); Rowanholt needs $DiskMinGB GB with room for cases."
+        }
+    }
+    if ($env:ROWANHOLT_SKIP_CHECKS -eq '1') { $warnings = $stops + $warnings; $stops = @() }
+    return [pscustomobject]@{ Stops = $stops; Warnings = $warnings }
+}
+
 function Test-Ollama {
     try { Invoke-RestMethod -Uri "$OllamaUrl/api/version" -TimeoutSec 2 | Out-Null; return $true } catch { return $false }
 }
@@ -715,6 +751,8 @@ function Select-Components {
     $state = Get-ComponentState
     $body = Show-Page 'What Rowanholt needs' "What's on this PC, and what to do with it." -Back 'Back'
     $green = [System.Drawing.Color]::FromArgb(24, 120, 60)
+    $resources = Get-Resources
+    $found = Test-Resources $resources $true
 
     # Docker Desktop and WSL 2
     Add-Text $body 'Docker Desktop and WSL 2' 14 -Width 230 -Bold
@@ -770,9 +808,22 @@ function Select-Components {
     Add-Text $body ("Installing Docker Desktop accepts Docker's Subscription Service Agreement: free for personal use, " +
         'education and small businesses; larger organisations need a paid subscription.') 274 -Height 40 -Muted
 
+    # This PC, against what Rowanholt needs: green, amber when under a minimum, red under a floor
+    $pcLine = New-Object System.Windows.Forms.Label
+    $pcLine.Text = "This PC: $($resources.MemoryGB) GB memory (needs $MemoryMinGB), $($resources.Cores) processors (needs $CoresMin), " +
+        "$($resources.FreeGB) GB free on $($resources.Drive) (needs $DiskMinGB)"
+    $pcLine.SetBounds(24, 316, 512, 20)
+    $pcLine.ForeColor = if ($found.Stops.Count) { [System.Drawing.Color]::FromArgb(176, 32, 32) }
+        elseif ($found.Warnings.Count) { [System.Drawing.Color]::FromArgb(160, 90, 0) } else { $green }
+    $body.Controls.Add($pcLine)
+
     $action = Wait-Page
     if ($action -eq 'back') { return 'back' }
     if ($action -ne 'next') { Close-Wizard; exit 1 }
+    if ($found.Stops.Count) {
+        Show-Problem "This PC can't run Rowanholt yet" (($found.Stops + $found.Warnings) -join "`r`n`r`n")
+        exit 1
+    }
     $items = @()
     if ($dockerClean.Checked) { $items += 'cleandocker' }
     if ($aiClean.Checked) { $items += 'cleanai' }
@@ -1267,8 +1318,11 @@ function Show-Journey($J) {
     $remaining = $current + $later
     $elapsed = ((Get-Date) - $J.Started).TotalSeconds
     $fraction = [math]::Min(0.99, $elapsed / [math]::Max(1, $elapsed + $remaining))
-    # Just the time left in the header: where Gandalf has got to is the macOS app's picture, not this one's
-    $script:Wizard.Sub.Text = if ($remaining -lt 45) { 'Less than a minute left' } elseif ($remaining -lt 90) { 'About a minute left' } else { "About $([math]::Round($remaining / 60)) minutes left" }
+    # Just the time left in the header: where Gandalf has got to is the macOS app's picture, not this one's.
+    # A step well past its estimate (a slow disk, a busy machine) says so: a time left that never moves
+    # reads as a hang
+    $overrun = $inPhase -gt [math]::Max(60, $expected * 1.5)
+    $script:Wizard.Sub.Text = if ($overrun) { "Taking longer than expected; still working ($([math]::Round($inPhase / 60)) min on this step)" } elseif ($remaining -lt 45) { 'Less than a minute left' } elseif ($remaining -lt 90) { 'About a minute left' } else { "About $([math]::Round($remaining / 60)) minutes left" }
     $script:Progress.Bar.Style = 'Continuous'; $script:Progress.Bar.Value = [int](1000 * $fraction)
     if ($J.Phase -ne $script:ShownPhase -or $J.Detail) {
         $script:ShownPhase = $J.Phase
@@ -1548,6 +1602,8 @@ try {
             $fresh.PhaseStarted = $script:Journey.PhaseStarted
             $script:Journey = $fresh
         }
+        $found = Test-Resources (Get-Resources) ($kind -eq 'cold')
+        if ($found.Stops.Count) { throw ($found.Stops -join ' ') }
         if ($missing.Count) { Write-Step "$($missing.Count) images to fetch or build: the first start takes a while" }
         else { Write-Step 'Starting the containers' }
         Enter-Phase $script:Journey 'images'
