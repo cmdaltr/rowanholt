@@ -101,6 +101,17 @@ free seat number. samarkand has no signing code: issuing stays in each product's
 - `.gitignore` covers `licences/`, `*licence-signing-key*`, `*licence-signing.key`, `*.lic.key` and
   `*.licence`. Never commit a private key or an issued licence.
 
+**Where each product's key lives.** The private key is only on the licensor's machine, so keep an
+encrypted copy somewhere else: without it no new licence can be signed, and replacing it means
+shipping a new public key. Before signing with a key, check that `sign_licence.py public` prints the
+product's `PUBLIC_KEYS` entry.
+
+| Product | Private key (`<PRODUCT>_LICENCE_KEY`) | Public key (`PUBLIC_KEYS`) |
+|---|---|---|
+| Ostraka | `~/.config/ostraka/licence-signing.key` | `backend/ostraka/licence.py`: `cf9e0496…40cb1f` |
+| Rowanholt | `~/.config/rowanholt/licence-signing.key` | `src/web/backend/licence.py`: `4a048df1…f47f6d` |
+| Shikari | `~/.config/shikari/licence-signing-key.pem` | `shikari/licensing.py`: `e499f52e…ecb282` |
+
 ### Behaviour
 
 - **Entitlements:** the edition's own features, plus any the licence lists; `*` grants every
