@@ -1267,8 +1267,11 @@ function Show-Journey($J) {
     $remaining = $current + $later
     $elapsed = ((Get-Date) - $J.Started).TotalSeconds
     $fraction = [math]::Min(0.99, $elapsed / [math]::Max(1, $elapsed + $remaining))
-    # Just the time left in the header: where Gandalf has got to is the macOS app's picture, not this one's
-    $script:Wizard.Sub.Text = if ($remaining -lt 45) { 'Less than a minute left' } elseif ($remaining -lt 90) { 'About a minute left' } else { "About $([math]::Round($remaining / 60)) minutes left" }
+    # Just the time left in the header: where Gandalf has got to is the macOS app's picture, not this one's.
+    # A step well past its estimate (a slow disk, a busy machine) says so: a time left that never moves
+    # reads as a hang
+    $overrun = $inPhase -gt [math]::Max(60, $expected * 1.5)
+    $script:Wizard.Sub.Text = if ($overrun) { "Taking longer than expected; still working ($([math]::Round($inPhase / 60)) min on this step)" } elseif ($remaining -lt 45) { 'Less than a minute left' } elseif ($remaining -lt 90) { 'About a minute left' } else { "About $([math]::Round($remaining / 60)) minutes left" }
     $script:Progress.Bar.Style = 'Continuous'; $script:Progress.Bar.Value = [int](1000 * $fraction)
     if ($J.Phase -ne $script:ShownPhase -or $J.Detail) {
         $script:ShownPhase = $J.Phase
