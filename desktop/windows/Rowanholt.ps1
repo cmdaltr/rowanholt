@@ -1179,12 +1179,39 @@ function Test-Frontend {
     }
 }
 
-function Test-Docker {
-    # Windows PowerShell turns a native command's redirected stderr into a terminating
-    # error under 'Stop', so the probe runs under 'Continue'
+function Test-Docker([int]$Seconds = 20) {
+    # docker info, given $Seconds: an engine that's wedged (Docker Desktop open, its WSL VM gone)
+    # doesn't fail, it hangs, so the probe is killed when its time is up
+    $docker = (Get-Command docker -ErrorAction SilentlyContinue).Source
+    if (-not $docker) { return $false }
+    $info = New-Object System.Diagnostics.ProcessStartInfo $docker, 'info --format "{{.ServerVersion}}"'
+    $info.UseShellExecute = $false; $info.CreateNoWindow = $true
+    $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
+    $probe = [System.Diagnostics.Process]::Start($info)
+    $probe.StandardOutput.ReadToEndAsync() | Out-Null; $probe.StandardError.ReadToEndAsync() | Out-Null
+    if (-not $probe.WaitForExit($Seconds * 1000)) {
+        try { $probe.Kill() } catch { }
+        return $false
+    }
+    return $probe.ExitCode -eq 0
+}
+
+function Test-DockerDesktopRunning {
+    return [bool](Get-Process 'com.docker.backend' -ErrorAction SilentlyContinue)
+}
+
+function Restart-DockerEngine {
+    # Docker Desktop open with an engine that never answers: its WSL VM has gone (seen when Windows'
+    # Hyper-V worker crashed under it). Quitting it and shutting WSL down brings the engine back;
+    # the containers come back by their restart policies
+    Write-Step 'Restarting Docker Desktop'
+    Get-Process 'Docker Desktop', 'com.docker.backend', 'com.docker.build' -ErrorAction SilentlyContinue |
+        Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 3
     $ErrorActionPreference = 'Continue'
-    docker info *> $null
-    return $LASTEXITCODE -eq 0
+    & wsl.exe --shutdown *> $null
+    $ErrorActionPreference = 'Stop'
+    Start-Process (Get-DockerDesktop) -WindowStyle Hidden
 }
 
 function Wait-Docker {
@@ -1197,22 +1224,39 @@ function Wait-Docker {
     if (-not $desktop) {
         throw "Docker isn't running and Docker Desktop isn't installed in $(Split-Path $DockerUserExe) or $(Split-Path $DockerMachineExe). Start Docker and retry."
     }
-    Write-Step 'Starting Docker Desktop'
-    # Its own CLI starts the engine without the dashboard; older versions don't have it
-    $ErrorActionPreference = 'Continue'
-    docker desktop start --detach *> $null
-    if ($LASTEXITCODE -ne 0) { Start-Process $desktop -WindowStyle Hidden }
-    $ErrorActionPreference = 'Stop'
-    for ($i = 0; $i -lt 120; $i++) {
-        Start-Sleep -Seconds 2
-        if ($script:Journey) { Show-Journey $script:Journey }
-        if (Test-Docker) { Write-Step 'Docker started'; return }
+    if (Test-DockerDesktopRunning) {
+        Write-Step 'Waiting for Docker'
+    } else {
+        Write-Step 'Starting Docker Desktop'
+        # Its own CLI starts the engine without the dashboard; older versions don't have it
+        $ErrorActionPreference = 'Continue'
+        docker desktop start --detach *> $null
+        if ($LASTEXITCODE -ne 0) { Start-Process $desktop -WindowStyle Hidden }
+        $ErrorActionPreference = 'Stop'
+    }
+    # Up to 4 minutes; after 90 seconds of Docker Desktop running without an engine that answers,
+    # offer to restart it, once (it stops every app's containers, not only Rowanholt's)
+    $started = Get-Date; $restarted = $false
+    while (((Get-Date) - $started).TotalSeconds -lt 240) {
+        for ($i = 0; $i -lt 10; $i++) { if ($script:Journey) { Show-Journey $script:Journey }; Start-Sleep -Milliseconds 200 }
+        if (Test-Docker 10) { Write-Step 'Docker started'; return }
+        if (-not $restarted -and ((Get-Date) - $started).TotalSeconds -ge 90 -and (Test-DockerDesktopRunning)) {
+            $answer = Show-Message ("Docker Desktop is open, but its engine isn't answering.`r`n`r`n" +
+                "Restart Docker Desktop? Any other app's containers stop and start again with it.") 'YesNo' 'Warning'
+            if ($answer -ne 'Yes') {
+                throw "Docker Desktop is open but its engine isn't answering. Quit Docker Desktop from its tray icon, then open Rowanholt again."
+            }
+            Restart-DockerEngine
+            $started = Get-Date; $restarted = $true
+        }
     }
     if (-not (Test-WslReady)) {
         throw "Docker Desktop didn't start: WSL 2, which it runs on, isn't fully installed. Open Rowanholt again and it offers to install it."
     }
+    if ($restarted) {
+        throw "Docker Desktop didn't come back after a restart. Restart Windows, then open Rowanholt again."
+    }
     throw "Docker Desktop didn't start within 4 minutes. Open Docker Desktop from the Start menu to see what it says, then open Rowanholt again."
-
 }
 
 function Get-ComposeFiles {
