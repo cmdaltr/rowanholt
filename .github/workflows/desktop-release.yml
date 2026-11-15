@@ -1,6 +1,6 @@
 # Builds the desktop app for macOS (.dmg), Windows (.msi) and Debian/Ubuntu (.deb), each
 # carrying the source tree at this commit. A v* tag attaches them to a draft release;
-# a manual run leaves them as workflow artifacts.
+# a manual run leaves the MSI as a workflow artifact (rowanholt-msi, kept 3 days) to test.
 #
 # Signing is optional and switches on with these secrets:
 #   macOS:   MACOS_CERTIFICATE_P12 (base64 Developer ID Application .p12), MACOS_CERTIFICATE_PASSWORD,
@@ -187,6 +187,13 @@ jobs:
           key: source-${{ github.run_id }}
           enableCrossOsArchive: true
           fail-on-cache-miss: true
+      # Windows PowerShell's parser, which the launcher runs under; nothing below runs the launcher
+      - name: Parse the launcher
+        shell: powershell
+        run: |
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("$PWD\desktop\windows\Rowanholt.ps1", [ref]$null, [ref]$errors) | Out-Null
+          if ($errors) { $errors | ForEach-Object { Write-Host "::error::$($_.Extent.StartLineNumber): $($_.Message)" }; exit 1 }
       # WiX pinned, so a release builds with the toolset it was tested with
       - name: WiX Toolset
         shell: pwsh
@@ -241,6 +248,14 @@ jobs:
           $left = @($expected | Where-Object { Test-Path $_ })
           if ($left) { throw "Left behind: $($left -join ', ')" }
           if (@($installer.RelatedProducts('{2960092C-3402-4618-A64F-289055BDD7C2}')).Count) { throw 'Still registered with Windows Installer' }
+      # A manual run's MSI, to download and try before a tag (gh run download -n rowanholt-msi);
+      # small and short-lived, so it barely touches the account's artifact storage
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          name: rowanholt-msi
+          path: dist/*.msi
+          retention-days: 3
       - uses: actions/cache/save@v4
         with:
           path: dist

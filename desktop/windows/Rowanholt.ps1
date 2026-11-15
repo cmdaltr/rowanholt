@@ -1170,13 +1170,31 @@ function Update-Copy {
 
 # ── Running it ────────────────────────────────────────────────────────────────
 function Test-Frontend {
+    # Docker publishes the port on 127.0.0.1 only. 'localhost' tries ::1 first, and Windows retries a
+    # refused loopback connection for about 2 s, which used up the old 2 s timeout every time
+    $probe = $Url -replace '^http://localhost:', 'http://127.0.0.1:'
     try {
-        Invoke-WebRequest -Uri $Url -Method Head -TimeoutSec 2 -UseBasicParsing | Out-Null
+        Invoke-WebRequest -Uri $probe -Method Head -TimeoutSec 5 -UseBasicParsing | Out-Null
         return $true
     } catch {
         # Any HTTP answer, even an error status, means the frontend is listening
         return $null -ne $_.Exception.Response
     }
+}
+
+# Why the frontend can't answer yet, or $null while it may still be compiling
+function Get-FrontendProblem {
+    if (-not (Test-Docker)) {
+        return 'Docker Desktop stopped while Rowanholt was starting. Open Docker Desktop to see why, then open Rowanholt again.'
+    }
+    $ErrorActionPreference = 'Continue'
+    $state = docker inspect -f '{{.State.Status}} {{.State.OOMKilled}} {{.RestartCount}}' rowanholt-frontend 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $state) { return "The frontend container (rowanholt-frontend) doesn't exist. Try 'docker compose ps -a' in $Root." }
+    $status, $oom, $restarts = "$state".Trim() -split ' '
+    if ($status -eq 'running' -and [int]$restarts -lt 3) { return $null }
+    $logs = (docker logs --tail 15 rowanholt-frontend 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    $why = if ($oom -eq 'true') { 'ran out of memory' } elseif ($status -eq 'running') { "restarted $restarts times" } else { "is $status" }
+    return "The frontend container $why.`n`n$logs"
 }
 
 function Test-Docker {
@@ -1614,7 +1632,13 @@ try {
         }
         Enter-Phase $script:Journey 'ui'
         $deadline = (Get-Date).AddMinutes(15)
+        $checked = Get-Date
         while (-not (Test-Frontend)) {
+            if (((Get-Date) - $checked).TotalSeconds -ge 20) {
+                $checked = Get-Date
+                $problem = Get-FrontendProblem
+                if ($problem) { throw $problem }
+            }
             if ((Get-Date) -gt $deadline) {
                 throw "The stack started but nothing answered on $Url. Try 'docker compose ps' in $Root."
             }
