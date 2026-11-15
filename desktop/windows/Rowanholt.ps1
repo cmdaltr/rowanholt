@@ -1194,7 +1194,11 @@ function Get-FrontendProblem {
     $status, $oom, $restarts = "$state".Trim() -split ' '
     if ($status -eq 'running' -and [int]$restarts -lt 3) { return $null }
     $logs = (docker logs --tail 15 rowanholt-frontend 2>&1 | ForEach-Object { "$_" }) -join "`n"
-    $why = if ($oom -eq 'true') { 'ran out of memory' } elseif ($status -eq 'running') { "restarted $restarts times" } else { "is $status" }
+    $why = if ($oom -eq 'true') { 'ran out of memory' }
+           elseif ($status -eq 'running') { "restarted $restarts times" }
+           elseif ($status -eq 'exited') { 'has stopped' }
+           elseif ($status -eq 'created') { "was created but didn't start" }
+           else { "is $status" }
     return "The frontend container $why.`n`n$logs"
 }
 
@@ -1414,7 +1418,14 @@ function Invoke-ComposeUp($J, [string[]]$Extra, [int]$Builds) {
         Pop-Location
     }
     if ($code -ne 0) {
-        throw "docker compose up exited with status $code. Its last lines (all of it is in $log):`n`n$($tail.ToArray() -join "`n")"
+        $lines = $tail.ToArray() -join "`n"
+        # A known Docker Desktop fault: after it's stopped and started, its link to the Windows drives
+        # can break, and every container with a folder from them fails until Docker Desktop restarts
+        $hint = if ($lines -match 'mnt/host/\w+: file exists') {
+            "Docker Desktop has lost track of this PC's drives, which happens after it's stopped and " +
+            "started. Restart it (right-click its icon by the clock > Restart), then open Rowanholt again.`n`n"
+        } else { '' }
+        throw "${hint}docker compose up exited with status $code. Its last lines (all of it is in $log):`n`n$lines"
     }
 }
 
@@ -1561,7 +1572,7 @@ function Watch-Window {
             'and settings are kept. Keep it running to come back to it: open Rowanholt again, or stop it ' +
             'later with Stop Rowanholt in the Start menu.') 20 -Height 64
         if (Test-StackBusy) {
-            Add-Text $body 'A job is running: stopping Rowanholt now interrupts it.' 96 -Bold
+            Add-Text $body 'Rowanholt is busy with a job, an upload or a download: stopping it now interrupts that.' 96 -Height 36 -Bold
         }
         if ((Wait-Page) -ne 'next') { Close-Wizard; return }
 
