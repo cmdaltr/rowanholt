@@ -1378,11 +1378,17 @@ function Invoke-ComposeUp($J, [string[]]$Extra, [int]$Builds) {
     $ErrorActionPreference = 'Continue'
     $files = Get-ComposeFiles
     $steps = @{}
+    # The whole output goes to compose.log, and its last lines into the error if 'up' fails
+    $log = Join-Path $State 'compose.log'
+    Set-Content -Path $log -Value "$((Get-Date).ToString('s')) docker compose up -d $($Extra -join ' ')" -ErrorAction SilentlyContinue
+    $tail = New-Object System.Collections.Generic.Queue[string]
     Push-Location $Root
     try {
         # --progress plain: BuildKit's step counts, to pace a build by
         docker compose --progress plain @files up -d @Extra 2>&1 | ForEach-Object {
             $line = "$_"
+            Add-Content -Path $log -Value $line -ErrorAction SilentlyContinue
+            if ($line.Trim()) { $tail.Enqueue($line.Trim()); if ($tail.Count -gt 12) { [void]$tail.Dequeue() } }
             if ($line -match $StepLine -and [int]$Matches[3] -gt 0) {
                 $service = $Matches[1]; $n = [int]$Matches[2]; $m = [int]$Matches[3]
                 $before = if ($steps.ContainsKey($service)) { $steps[$service][0] } else { 0 }
@@ -1404,7 +1410,9 @@ function Invoke-ComposeUp($J, [string[]]$Extra, [int]$Builds) {
     } finally {
         Pop-Location
     }
-    if ($code -ne 0) { throw "docker compose up exited with status $code" }
+    if ($code -ne 0) {
+        throw "docker compose up exited with status $code. Its last lines (all of it is in $log):`n`n$($tail.ToArray() -join "`n")"
+    }
 }
 
 # ── Updates (the MSI's app) ───────────────────────────────────────────────────
@@ -1654,6 +1662,19 @@ try {
     }
     Update-Copy
 
+    # One start at a time: a second launch (a double-click) waits for the first, then finds the
+    # frontend answering and only opens a window, instead of a second 'up' racing the first
+    $starting = New-Object System.Threading.Mutex($false, 'Local\RowanholtStart')
+    try { $ours = $starting.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $ours = $true }
+    if (-not $ours) {
+        Show-Page 'Rowanholt is starting' 'Another Rowanholt window is starting it; this one opens when it has.' -Next '' | Out-Null
+        while (-not $ours) {
+            Assert-NotCancelled
+            Step-Gui
+            try { $ours = $starting.WaitOne(200) } catch [System.Threading.AbandonedMutexException] { $ours = $true }
+        }
+    }
+
     if (-not (Test-Frontend)) {
         Assert-DockerInstalled
         $script:Journey = New-Journey 'warm'
@@ -1694,6 +1715,7 @@ try {
         }
         Complete-Journey $script:Journey
     }
+    $starting.ReleaseMutex()
     Close-Wizard
     Open-Window
     Invoke-UpdateCheck
