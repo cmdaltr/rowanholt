@@ -1514,6 +1514,54 @@ function Invoke-UpdateCheck {
     if ($latest) { Show-UpdateNotice $latest }
 }
 
+# The window's browser processes: our own profile's, so everyday Edge and Chrome windows don't count
+function Get-WindowProcesses {
+    $filter = "Name = 'msedge.exe' OR Name = 'chrome.exe'"
+    return @(Get-CimInstance Win32_Process -Filter $filter -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -and $_.CommandLine.Contains($BrowserProfile) })
+}
+
+function Test-StackBusy {
+    # The backend's own answer (GET /api/busy, no sign-in): a job running, paused or being removed
+    try {
+        $answer = Invoke-RestMethod -Uri 'http://127.0.0.1:5688/api/busy' -TimeoutSec 5 -UseBasicParsing
+        return $answer.busy -eq $true
+    } catch {
+        return $false
+    }
+}
+
+function Watch-Window {
+    # When the last Rowanholt window closes, offer to stop the stack. Only the launcher that opened
+    # the first window watches: opening Rowanholt again while it's open just adds a window
+    $mutex = New-Object System.Threading.Mutex($false, 'Local\RowanholtWindowWatch')
+    try { $watching = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $watching = $true }
+    if (-not $watching) { return }
+    try {
+        # Give the browser time to start; if its processes never show, there's nothing to watch
+        $seen = $false
+        for ($i = 0; $i -lt 15 -and -not $seen; $i++) { Start-Sleep -Seconds 1; $seen = (Get-WindowProcesses).Count -gt 0 }
+        if (-not $seen) { return }
+        while ((Get-WindowProcesses).Count) { Start-Sleep -Seconds 2 }
+        if (-not (Test-Docker)) { return }
+
+        $body = Show-Page "Rowanholt's window is closed" 'Its containers are still running in Docker.' -Next 'Stop Rowanholt' -Back 'Keep it running' -Cancel ''
+        Add-Text $body ('Stop Rowanholt to give back the memory and CPU its containers use; your cases, evidence ' +
+            'and settings are kept. Keep it running to come back to it: open Rowanholt again, or stop it ' +
+            'later with Stop Rowanholt in the Start menu.') 20 -Height 64
+        if (Test-StackBusy) {
+            Add-Text $body 'A job is running: stopping Rowanholt now interrupts it.' 96 -Bold
+        }
+        if ((Wait-Page) -ne 'next') { Close-Wizard; return }
+
+        Show-Page 'Stopping Rowanholt' 'Stopping its containers; this takes a few seconds.' -Next '' -Cancel '' | Out-Null
+        Invoke-Compose @('down', '--remove-orphans') | Out-Null
+        Close-Wizard
+    } finally {
+        $mutex.ReleaseMutex()
+    }
+}
+
 function Open-Window {
     # Edge ships with Windows 10 and 11; Chrome is the fallback, then the default browser
     $browsers = @(
@@ -1649,6 +1697,7 @@ try {
     Close-Wizard
     Open-Window
     Invoke-UpdateCheck
+    Watch-Window
 } catch {
     $message = $_.Exception.Message
     if ($message -eq 'Cancelled') { Close-Wizard; exit 1 }
