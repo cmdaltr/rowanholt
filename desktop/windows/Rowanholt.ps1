@@ -1663,12 +1663,12 @@ try {
         if ($Server) { $Url = $Server; Close-Wizard; Open-Window; Invoke-UpdateCheck }
         exit 0
     }
-    Update-Copy
-
     # One start at a time: a second launch (a double-click) waits for the first, then finds the
-    # frontend answering and only opens a window, instead of a second 'up' racing the first
+    # frontend answering and only opens a window, instead of a second 'up' racing the first. The
+    # first one has answered the update offer, so a launch that waited doesn't ask it again
     $starting = New-Object System.Threading.Mutex($false, 'Local\RowanholtStart')
     try { $ours = $starting.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $ours = $true }
+    $waited = -not $ours
     if (-not $ours) {
         Show-Page 'Rowanholt is starting' 'Another Rowanholt window is starting it; this one opens when it has.' -Next '' | Out-Null
         while (-not $ours) {
@@ -1677,6 +1677,7 @@ try {
             try { $ours = $starting.WaitOne(200) } catch [System.Threading.AbandonedMutexException] { $ours = $true }
         }
     }
+    if (-not $waited) { Update-Copy }
 
     if (-not (Test-Frontend)) {
         Assert-DockerInstalled
