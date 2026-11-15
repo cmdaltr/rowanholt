@@ -238,7 +238,8 @@ function Show-Problem([string]$Title, [string]$Text) {
     $body = Show-Page $Title 'Rowanholt stopped here.' -Next 'Close' -Cancel ''
     $box = New-Object System.Windows.Forms.TextBox
     $box.Multiline = $true; $box.ReadOnly = $true; $box.BorderStyle = 'None'; $box.ScrollBars = 'Vertical'
-    $box.BackColor = $script:Wizard.Form.BackColor; $box.SetBounds(24, 20, 512, 290); $box.Text = $Text
+    $box.BackColor = $script:Wizard.Form.BackColor; $box.SetBounds(24, 20, 512, 290)
+    $box.Text = $Text -replace "(?<!`r)`n", "`r`n"  # a TextBox breaks lines on CRLF only
     $body.Controls.Add($box)
     Wait-Page | Out-Null
     Close-Wizard
@@ -836,7 +837,7 @@ function Select-Components {
 
 function Register-Resume {
     # The next sign-in carries on where this one stopped: RunOnce runs it once, then forgets it
-    $command = "`"$(Join-Path $PSHOME 'powershell.exe')`" -NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`""
+    $command = "`"$env:SystemRoot\System32\conhost.exe`" --headless `"$(Join-Path $PSHOME 'powershell.exe')`" -NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`""
     Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce' -Name 'Rowanholt' -Value $command
 }
 
@@ -1387,6 +1388,8 @@ function Invoke-ComposeUp($J, [string[]]$Extra, [int]$Builds) {
         # --progress plain: BuildKit's step counts, to pace a build by
         docker compose --progress plain @files up -d @Extra 2>&1 | ForEach-Object {
             $line = "$_"
+            # Windows PowerShell wraps each stderr line in an ErrorRecord; a blank one prints as its type
+            if ($line -eq 'System.Management.Automation.RemoteException') { $line = '' }
             Add-Content -Path $log -Value $line -ErrorAction SilentlyContinue
             if ($line.Trim()) { $tail.Enqueue($line.Trim()); if ($tail.Count -gt 12) { [void]$tail.Dequeue() } }
             if ($line -match $StepLine -and [int]$Matches[3] -gt 0) {

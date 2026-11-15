@@ -61,7 +61,7 @@
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Open Rowanholt" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <CustomAction Id="LaunchRowanholt" Directory="INSTALLFOLDER" Return="asyncNoWait"
-                  ExeCommand="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;[WindowsDir]Rowanholt.ps1&quot;" />
+                  ExeCommand="&quot;[System64Folder]conhost.exe&quot; --headless &quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;[WindowsDir]Rowanholt.ps1&quot;" />
 
     <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="ProgramsDir" Name="Programs">
@@ -118,10 +118,11 @@
       </Component>
       <Component Id="StartMenu" Directory="ProgramMenuFolder">
         <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="StartMenu" Type="integer" Value="1" KeyPath="yes" />
-        <!-- The console shows the road to Rowanholt while the stack starts, then closes -->
+        <!-- Through conhost headless: where Windows Terminal is the default terminal, the launcher
+             can't hide a console Terminal shows, so it never gets one. Stop writes to its console -->
         <Shortcut Id="RowanholtShortcut" Name="Rowanholt" Description="Rowanholt DFIR platform"
-                  Target="[System64Folder]WindowsPowerShell\v1.0\powershell.exe"
-                  Arguments="-NoProfile -ExecutionPolicy Bypass -File &quot;[WindowsDir]Rowanholt.ps1&quot;"
+                  Target="[System64Folder]conhost.exe"
+                  Arguments="--headless &quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;[WindowsDir]Rowanholt.ps1&quot;"
                   WorkingDirectory="INSTALLFOLDER" Icon="rowanholt.ico" />
         <Shortcut Id="StopShortcut" Name="Stop Rowanholt" Description="Stop Rowanholt's containers"
                   Target="[System64Folder]WindowsPowerShell\v1.0\powershell.exe"
@@ -129,15 +130,15 @@
                   WorkingDirectory="INSTALLFOLDER" Icon="rowanholt.ico" Show="minimized" />
         <!-- Setup was the installer's pages; it's the launcher's now, and this runs it again -->
         <Shortcut Id="SetupShortcut" Name="Set Up Rowanholt" Description="Choose where Rowanholt runs, its folder and evidence"
-                  Target="[System64Folder]WindowsPowerShell\v1.0\powershell.exe"
-                  Arguments="-NoProfile -ExecutionPolicy Bypass -File &quot;[WindowsDir]Rowanholt.ps1&quot; -Setup"
+                  Target="[System64Folder]conhost.exe"
+                  Arguments="--headless &quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;[WindowsDir]Rowanholt.ps1&quot; -Setup"
                   WorkingDirectory="INSTALLFOLDER" Icon="rowanholt.ico" />
       </Component>
       <Component Id="DesktopShortcut" Directory="DesktopFolder" Condition="DESKTOPSHORTCUT = 1">
         <RegistryValue Root="HKCU" Key="Software\cmdaltr\Rowanholt" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
         <Shortcut Id="RowanholtDesktop" Name="Rowanholt" Description="Rowanholt DFIR platform"
-                  Target="[System64Folder]WindowsPowerShell\v1.0\powershell.exe"
-                  Arguments="-NoProfile -ExecutionPolicy Bypass -File &quot;[WindowsDir]Rowanholt.ps1&quot;"
+                  Target="[System64Folder]conhost.exe"
+                  Arguments="--headless &quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;[WindowsDir]Rowanholt.ps1&quot;"
                   WorkingDirectory="INSTALLFOLDER" Icon="rowanholt.ico" />
       </Component>
       <!-- What msiexec's properties queued; the launcher removes each value once it has tried -->

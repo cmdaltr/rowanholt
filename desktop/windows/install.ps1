@@ -35,8 +35,14 @@ $Icon = Join-Path $Root 'desktop\icons\rowanholt.ico'
 $Shell = New-Object -ComObject WScript.Shell
 foreach ($link in $Shortcuts.Keys) {
     $shortcut = $Shell.CreateShortcut($link)
-    $shortcut.TargetPath = Join-Path $PSHOME 'powershell.exe'
-    $shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$Launcher`" $($Shortcuts[$link])".TrimEnd()
+    $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$Launcher`" $($Shortcuts[$link])".TrimEnd()
+    if ($Shortcuts[$link] -eq '-Stop') {
+        $shortcut.TargetPath = Join-Path $PSHOME 'powershell.exe'; $shortcut.Arguments = $arguments
+    } else {
+        # No console: Windows Terminal would show one the launcher can't hide (see rowanholt.wxs)
+        $shortcut.TargetPath = "$env:SystemRoot\System32\conhost.exe"
+        $shortcut.Arguments = "--headless `"$(Join-Path $PSHOME 'powershell.exe')`" $arguments"
+    }
     $shortcut.WorkingDirectory = $Root
     $shortcut.IconLocation = "$Icon,0"
     # The console shows the road to Rowanholt while the stack starts, then closes

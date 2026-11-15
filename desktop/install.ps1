@@ -152,7 +152,7 @@ try {
     Write-Host ("  Rowanholt is installed ({0}m {1}s). Open it from the Start menu." -f [math]::Floor($took.TotalMinutes), $took.Seconds) -ForegroundColor Green
     Write-Host "  The first start asks where Rowanholt runs, then builds its images: a while the first time; after that, a minute." -ForegroundColor DarkGray
     if ($Launch -and $launcher) {
-        Start-Process (Join-Path $PSHOME "powershell.exe") -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$launcher`""
+        Start-Process "$env:SystemRoot\System32\conhost.exe" -ArgumentList "--headless", "`"$(Join-Path $PSHOME 'powershell.exe')`"", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$launcher`"""
     }
 }
 finally {
