@@ -187,13 +187,18 @@ jobs:
           key: source-${{ github.run_id }}
           enableCrossOsArchive: true
           fail-on-cache-miss: true
-      # Windows PowerShell's parser, which the launcher runs under; nothing below runs the launcher
-      - name: Parse the launcher
+      # Windows PowerShell's parser, which the scripts run under: nothing below runs the launcher,
+      # and a parse error in the installers should fail here, by name, not mid-install
+      - name: Parse the PowerShell scripts
         shell: powershell
         run: |
-          $errors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile("$PWD\desktop\windows\Rowanholt.ps1", [ref]$null, [ref]$errors) | Out-Null
-          if ($errors) { $errors | ForEach-Object { Write-Host "::error::$($_.Extent.StartLineNumber): $($_.Message)" }; exit 1 }
+          $failed = $false
+          foreach ($file in Get-ChildItem desktop -Recurse -Filter *.ps1) {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$null, [ref]$errors) | Out-Null
+            foreach ($e in $errors) { Write-Host "::error file=$($file.Name)::$($e.Extent.StartLineNumber): $($e.Message)"; $failed = $true }
+          }
+          if ($failed) { exit 1 }
       # WiX pinned, so a release builds with the toolset it was tested with
       - name: WiX Toolset
         shell: pwsh
