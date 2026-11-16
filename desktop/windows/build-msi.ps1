@@ -39,6 +39,8 @@ try {
     # WixUI shows the licence as RTF: the plain text, escaped, a paragraph break per line
     $text = [IO.File]::ReadAllText((Join-Path $Root 'LICENSE'))
     $escaped = $text.Replace('\', '\\').Replace('{', '\{').Replace('}', '\}') -replace "`r?`n", "\par`r`n"
+    # Anything past ASCII (the licence's ’) as RTF's \u, a signed 16-bit code, or the ASCII file turns it into ?
+    $escaped = [regex]::Replace($escaped, '[^\x00-\x7F]', { param($m) $c = [int][char]$m.Value; if ($c -gt 32767) { $c -= 65536 }; "\u$($c)?" })
     $rtf = Join-Path $work 'LICENSE.rtf'
     [IO.File]::WriteAllText($rtf, "{\rtf1\ansi\deff0{\fonttbl{\f0 Consolas;}}\f0\fs18 $escaped}", [Text.Encoding]::ASCII)
 

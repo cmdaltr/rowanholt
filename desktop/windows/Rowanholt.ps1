@@ -101,6 +101,8 @@ Add-Type -Namespace Rowanholt -Name Native -MemberDefinition @'
 [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
 [DllImport("kernel32.dll")] public static extern uint GetConsoleProcessList(uint[] list, uint count);
+[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+[DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
 '@
 $script:GuiReady = $false
 
@@ -150,8 +152,10 @@ function Get-Wizard {
     $header = New-Object System.Windows.Forms.Panel
     $header.SetBounds(0, 0, 560, 64); $header.BackColor = [System.Drawing.Color]::White
     $title = New-Object System.Windows.Forms.Label
+    $title.UseMnemonic = $false
     $title.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 11); $title.SetBounds(20, 12, 470, 22)
     $sub = New-Object System.Windows.Forms.Label
+    $sub.UseMnemonic = $false
     $sub.ForeColor = [System.Drawing.Color]::FromArgb(90, 90, 90); $sub.SetBounds(20, 36, 470, 22)
     $header.Controls.AddRange(@($title, $sub))
     if (Test-Path $pngFile) {
@@ -220,6 +224,8 @@ function Close-Wizard {
 
 function Add-Text($Body, [string]$Text, [int]$Y, [int]$Height = 20, [int]$X = 24, [int]$Width = 512, [switch]$Muted, [switch]$Bold) {
     $label = New-Object System.Windows.Forms.Label
+    # Every label shows & as it is (ATT&CK, a folder's name), not as an access key
+    $label.UseMnemonic = $false
     $label.Text = $Text; $label.SetBounds($X, $Y, $Width, $Height)
     if ($Muted) { $label.ForeColor = [System.Drawing.Color]::FromArgb(96, 96, 96) }
     if ($Bold) { $label.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 9) }
@@ -228,6 +234,7 @@ function Add-Text($Body, [string]$Text, [int]$Y, [int]$Height = 20, [int]$X = 24
 
 function New-ErrorLabel($Body, [int]$Y, [int]$Height = 36) {
     $label = New-Object System.Windows.Forms.Label
+    $label.UseMnemonic = $false
     $label.ForeColor = [System.Drawing.Color]::FromArgb(176, 32, 32); $label.SetBounds(24, $Y, 512, $Height)
     $Body.Controls.Add($label)
     return $label
@@ -255,6 +262,7 @@ function Show-ProgressPage([string]$Title, [string]$Subtitle, $Rows) {
         foreach ($key in $Rows.Keys) {
             Add-Text $body $Rows[$key] $y -Width 200 -Bold
             $status = New-Object System.Windows.Forms.Label
+            $status.UseMnemonic = $false
             $status.Text = 'Waiting'; $status.ForeColor = [System.Drawing.Color]::FromArgb(96, 96, 96)
             $status.SetBounds(230, $y, 306, 20); $body.Controls.Add($status)
             $ui.Rows[$key] = $status
@@ -265,6 +273,7 @@ function Show-ProgressPage([string]$Title, [string]$Subtitle, $Rows) {
     $ui.Bar = New-Object System.Windows.Forms.ProgressBar
     $ui.Bar.SetBounds(24, $y, 512, 18); $ui.Bar.Maximum = 1000; $ui.Bar.MarqueeAnimationSpeed = 30; $ui.Bar.Style = 'Marquee'
     $ui.Detail = New-Object System.Windows.Forms.Label
+    $ui.Detail.UseMnemonic = $false
     $ui.Detail.SetBounds(24, $y + 24, 512, 36); $ui.Detail.ForeColor = [System.Drawing.Color]::FromArgb(96, 96, 96)
     $body.Controls.AddRange(@($ui.Bar, $ui.Detail))
     Add-GuideCard $body ($y + 68)
@@ -494,10 +503,13 @@ function Add-GuideCard($Body, [int]$Y) {
     $card.SetBounds(24, $Y, 512, [math]::Min(136, 330 - $Y)); $card.BackColor = [System.Drawing.Color]::White
     $card.BorderStyle = 'FixedSingle'
     $ui.CardTitle = New-Object System.Windows.Forms.Label
+    $ui.CardTitle.UseMnemonic = $false
     $ui.CardTitle.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 10); $ui.CardTitle.SetBounds(14, 10, 480, 22)
     $ui.CardText = New-Object System.Windows.Forms.Label
+    $ui.CardText.UseMnemonic = $false
     $ui.CardText.SetBounds(14, 36, 482, 62)
     $ui.CardCount = New-Object System.Windows.Forms.Label
+    $ui.CardCount.UseMnemonic = $false
     $ui.CardCount.ForeColor = [System.Drawing.Color]::FromArgb(96, 96, 96); $ui.CardCount.SetBounds(14, 104, 200, 20)
     $back = New-Object System.Windows.Forms.Button
     $back.Text = [string][char]0x2039; $back.SetBounds(420, 100, 34, 26)
@@ -761,6 +773,7 @@ function Select-Components {
     $parts += $(if ($state.Docker) { "Docker Desktop $($state.DockerVersion)".Trim() } else { 'Docker Desktop missing' })
     $parts += $(if ($state.Wsl) { "WSL $($state.WslVersion)".Trim() } else { 'WSL missing' })
     $dockerStatus = New-Object System.Windows.Forms.Label
+    $dockerStatus.UseMnemonic = $false
     $dockerStatus.Text = $parts -join ', '; $dockerStatus.TextAlign = 'TopRight'; $dockerStatus.SetBounds(256, 14, 280, 20)
     if ($state.Docker -and $state.Wsl) { $dockerStatus.ForeColor = $green }
     $body.Controls.Add($dockerStatus)
@@ -779,6 +792,7 @@ function Select-Components {
     # Smith's AI answers
     Add-Text $body "Smith's AI answers (optional)" 100 -Width 230 -Bold
     $aiStatus = New-Object System.Windows.Forms.Label
+    $aiStatus.UseMnemonic = $false
     $aiStatus.Text = $(if ($state.Ollama -and $state.Model) { "Ollama $($state.OllamaVersion), Smith's model".Trim() } elseif ($state.Ollama) { "Ollama $($state.OllamaVersion); model missing" } else { 'Not installed' })
     $aiStatus.TextAlign = 'TopRight'; $aiStatus.SetBounds(256, 100, 280, 20)
     if ($state.Ollama -and $state.Model) { $aiStatus.ForeColor = $green }
@@ -811,6 +825,7 @@ function Select-Components {
 
     # This PC, against what Rowanholt needs: green, amber when under a minimum, red under a floor
     $pcLine = New-Object System.Windows.Forms.Label
+    $pcLine.UseMnemonic = $false
     $pcLine.Text = "This PC: $($resources.MemoryGB) GB memory (needs $MemoryMinGB), $($resources.Cores) processors (needs $CoresMin), " +
         "$($resources.FreeGB) GB free on $($resources.Drive) (needs $DiskMinGB)"
     $pcLine.SetBounds(24, 316, 512, 20)
@@ -874,7 +889,28 @@ function Install-Wsl($Ui, $Result) {
     finally { if ($msi) { Remove-Item $msi -ErrorAction SilentlyContinue } }
     if (-not (Test-WslReady)) { throw "installing WSL 2 failed (exit $code)" }
     if ($features) { $Result.Restart = $true }
+    # WSL's own welcome window opens at the next sign-in until this is set, on top of Rowanholt's
+    New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss' -Force -ErrorAction SilentlyContinue | Out-Null
+    Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss' -Name 'OOBEComplete' -Value 1 -Type DWord -ErrorAction SilentlyContinue
     Set-Status $Ui 'wsl' $(if ($features) { 'Installed: restart Windows to finish' } else { 'Installed' }) 1
+}
+
+function Hide-DockerDashboard {
+    # A Docker Desktop this setup installed starts at sign-in (its Run key) and from Rowanholt without
+    # opening its dashboard and welcome tour over Rowanholt's window. Its own settings, as its
+    # Settings > General would write them; anything else in the file is kept
+    $file = Join-Path $env:APPDATA 'Docker\settings-store.json'
+    try {
+        $settings = if (Test-Path $file) { Get-Content $file -Raw | ConvertFrom-Json } else { New-Object PSObject }
+        foreach ($name in 'OpenUIOnStartupDisabled', 'DisplayedOnboarding') {
+            $settings | Add-Member -NotePropertyName $name -NotePropertyValue $true -Force
+        }
+        New-Item -ItemType Directory -Force -Path (Split-Path $file) | Out-Null
+        # No byte-order mark: Windows PowerShell's UTF8 writes one
+        [IO.File]::WriteAllText($file, ($settings | ConvertTo-Json), (New-Object Text.UTF8Encoding($false)))
+    } catch {
+        Write-ComponentLog "docker: couldn't turn off its dashboard at start: $($_.Exception.Message)"
+    }
 }
 
 function Install-Docker($Ui, $Result) {
@@ -889,6 +925,7 @@ function Install-Docker($Ui, $Result) {
     Remove-Item $installer -Force -ErrorAction SilentlyContinue
     # Judged by what's there: Process.ExitCode can come back empty for a process that has gone
     if (-not (Get-DockerDesktop)) { throw "Docker's installer failed (exit $code)" }
+    Hide-DockerDashboard
     Set-Status $Ui 'docker' 'Installed' 1
 }
 
@@ -1107,30 +1144,44 @@ function Invoke-Setup {
     # Returns the copy to run, or $null when it's a server now. Back goes to the previous page
     $saved = if (Test-Path $RootFile) { (Get-Content $RootFile -Raw).Trim() } else { '' }
     $current = if (Get-SavedServer) { 2 } elseif ($saved -and $saved -ne $AppCopy) { 1 } else { 0 }
+    # The answers from before the restart WSL 2 needs ("1|D:\rowanholt"): the sign-in after it carries on
+    # from the evidence page instead of asking them again
+    $resumed = (Get-ItemProperty -Path $AppKey -ErrorAction SilentlyContinue).ResumeSetup
+    Remove-ItemProperty -Path $AppKey -Name 'ResumeSetup' -ErrorAction SilentlyContinue
     while ($true) {
-        $mode = Select-Mode $current
-        if ($null -eq $mode) { exit 1 }
-        $current = $mode
-        if ($mode -eq 2) {
-            if ((Set-Server) -eq 'back') { continue }
-            return $null
-        }
-        if ($mode -eq 1) {
-            $dir = Select-ExistingCopy $(if ($saved -ne $AppCopy) { $saved } else { '' })
-            if (-not $dir) { continue }
+        if ($resumed -match '^(?<mode>[01])\|(?<dir>.+)$' -and (Test-DockerInstalled) -and (Test-WslReady) -and
+            ($Matches.mode -eq '0' -or (Test-Copy $Matches.dir))) {
+            $mode = [int]$Matches.mode; $dir = $Matches.dir; $current = $mode; $resumed = $null
         } else {
-            $dir = $AppCopy
-            if ((Test-Path $dir) -and -not (Test-Copy $dir)) {
-                Show-Problem "Rowanholt can't use its folder" "$dir already exists and isn't Rowanholt. Rename or move that folder, then open Rowanholt again."
-                exit 1
+            $resumed = $null
+            $mode = Select-Mode $current
+            if ($null -eq $mode) { exit 1 }
+            $current = $mode
+            if ($mode -eq 2) {
+                if ((Set-Server) -eq 'back') { continue }
+                return $null
             }
-        }
-        $items = Select-Components
-        if ($items -eq 'back') { continue }
-        if ($items.Count) {
-            $result = Install-Dependencies $items
-            if ($result.Restart) { exit 0 }
-            if (-not (Test-DockerInstalled) -or -not (Test-WslReady)) { Close-Wizard; exit 1 }
+            if ($mode -eq 1) {
+                $dir = Select-ExistingCopy $(if ($saved -ne $AppCopy) { $saved } else { '' })
+                if (-not $dir) { continue }
+            } else {
+                $dir = $AppCopy
+                if ((Test-Path $dir) -and -not (Test-Copy $dir)) {
+                    Show-Problem "Rowanholt can't use its folder" "$dir already exists and isn't Rowanholt. Rename or move that folder, then open Rowanholt again."
+                    exit 1
+                }
+            }
+            $items = Select-Components
+            if ($items -eq 'back') { continue }
+            if ($items.Count) {
+                # Saved first: a restart starts five seconds after its button, while this waits on the page
+                New-Item -Path $AppKey -Force -ErrorAction SilentlyContinue | Out-Null
+                Set-ItemProperty -Path $AppKey -Name 'ResumeSetup' -Value "$mode|$dir"
+                $result = Install-Dependencies $items
+                if ($result.Restart) { exit 0 }
+                Remove-ItemProperty -Path $AppKey -Name 'ResumeSetup' -ErrorAction SilentlyContinue
+                if (-not (Test-DockerInstalled) -or -not (Test-WslReady)) { Close-Wizard; exit 1 }
+            }
         }
         Add-DockerToPath
         $evidence = Select-Evidence (Read-Evidence $dir)
@@ -1508,6 +1559,7 @@ function Show-UpdateNotice($Latest) {
     $form.Text = 'Rowanholt'; $form.ClientSize = New-Object System.Drawing.Size(440, 132); $form.StartPosition = 'CenterScreen'
     $form.FormBorderStyle = 'FixedDialog'; $form.MaximizeBox = $false; $form.TopMost = $true
     $label = New-Object System.Windows.Forms.Label
+    $label.UseMnemonic = $false
     $label.Text = "Rowanholt $($Latest.version) is available (you have $(Get-AppVersion)).`n`nUpdate downloads it, checks it against the release's SHA256SUMS and installs it."
     $label.SetBounds(12, 10, 410, 70)
     $form.Controls.Add($label)
@@ -1543,6 +1595,18 @@ function Get-WindowProcesses {
         Where-Object { $_.CommandLine -and $_.CommandLine.Contains($BrowserProfile) })
 }
 
+function Show-OpenWindow {
+    # Rowanholt's window, if it's open, brought forward (restored if minimised): $true if there was one
+    foreach ($process in Get-WindowProcesses) {
+        $handle = (Get-Process -Id $process.ProcessId -ErrorAction SilentlyContinue).MainWindowHandle
+        if (-not $handle -or $handle -eq [IntPtr]::Zero) { continue }
+        if ([Rowanholt.Native]::IsIconic($handle)) { [void][Rowanholt.Native]::ShowWindow($handle, 9) }
+        [void][Rowanholt.Native]::SetForegroundWindow($handle)
+        return $true
+    }
+    return $false
+}
+
 function Test-StackBusy {
     # The backend's own answer (GET /api/busy, no sign-in): a job running, paused or being removed
     try {
@@ -1555,7 +1619,7 @@ function Test-StackBusy {
 
 function Watch-Window {
     # When the last Rowanholt window closes, offer to stop the stack. Only the launcher that opened
-    # the first window watches: opening Rowanholt again while it's open just adds a window
+    # the window watches: opening Rowanholt again while it's open brings that window forward
     $mutex = New-Object System.Threading.Mutex($false, 'Local\RowanholtWindowWatch')
     try { $watching = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $watching = $true }
     if (-not $watching) { return }
@@ -1637,6 +1701,9 @@ try {
             exit 0
         }
     }
+
+    # Opening Rowanholt while its window is open brings that window forward instead of adding another
+    if (-not $Stop -and (Show-OpenWindow)) { exit 0 }
 
     $Server = Get-SavedServer
     if ($Server) {
