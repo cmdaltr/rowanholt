@@ -1519,6 +1519,12 @@ function Invoke-ComposeUp($J, [string[]]$Extra, [int]$Builds) {
         $hint = if ($lines -match 'mnt/host/\w+: file exists') {
             "Docker Desktop has lost track of this PC's drives, which happens after it's stopped and " +
             "started. Restart it (right-click its icon by the clock > Restart), then open Rowanholt again.`n`n"
+        } elseif (Select-String -Path $log -Quiet -Pattern 'is not valid yet', 'Not live until', 'certificate has expired or is not yet valid') {
+            # A clock that's behind: package lists and certificates look like they're from the future.
+            # Found earlier in the build than its last lines, so the whole log is searched
+            "This PC's clock is wrong ($((Get-Date).ToString('d MMMM yyyy HH:mm'))), so the downloads the build needs " +
+            "look invalid. Set the time automatically (Settings > Time & language > Date & time > Sync now), " +
+            "then open Rowanholt again.`n`n"
         } else { '' }
         throw "${hint}docker compose up exited with status $code. Its last lines (all of it is in $log):`n`n$lines"
     }
