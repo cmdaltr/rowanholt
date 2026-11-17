@@ -177,7 +177,7 @@ write_evidence() {
 setup() {
     local root="" choice target folders=()
     if has_zenity; then
-        choice="$(zenity --list --radiolist --title="Set up Rowanholt" --width=560 --height=300 \
+        choice="$(zenity --list --radiolist --title="Set up Rowanholt" --width=560 --height=340 \
             --text="Where does Rowanholt run?" --column="" --column="Option" \
             TRUE "Install Rowanholt $(app_version) on this computer" \
             FALSE "Use a copy I already have (a git clone, for instance)" \
@@ -212,7 +212,7 @@ setup() {
     fi
 
     if has_zenity && zenity --question --title=Rowanholt --width=440 --ok-label="Choose folders" --cancel-label=Skip \
-        --text="Mount folders of evidence (disk images, memory dumps, Gandalf archives) into Rowanholt at the same paths?\n\nOptional: run Set Up Rowanholt again to change them." 2>/dev/null; then
+        --text="Mount folders of evidence (disk images, memory dumps, Custodian archives) into Rowanholt at the same paths?\n\nOptional: run Set Up Rowanholt again to change them." 2>/dev/null; then
         local picked
         picked="$(zenity --file-selection --directory --multiple --separator=$'\n' --title="Evidence folders" 2>/dev/null)" || true
         while IFS= read -r line; do [ -n "$line" ] && folders+=("$line"); done <<< "$picked"
@@ -374,7 +374,7 @@ if ! up; then
         # The road to Rowanholt: phases and an ETA from this machine's earlier starts
         "$ROOT/rowanholt" start --progress=zenity 2>&1 | tee -a "$LOG" |
             zenity --progress --title="The road to Rowanholt" --width=480 --auto-close --no-cancel \
-                --text="Gandalf sets out from the Shire" --percentage=0 2>/dev/null
+                --text="Starting Rowanholt" --percentage=0 2>/dev/null
         status=${PIPESTATUS[0]}
     else
         notify "Starting the Docker stack…"

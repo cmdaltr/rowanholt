@@ -263,7 +263,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         }
     }
 
-    /// The journey page: Gandalf on the road to Rowanholt while the stack starts
+    /// The start page: progress and the time left while the stack starts
     /// (journey.html), or plain words for stopping and connecting
     func showSplash() {
         show(.splash)

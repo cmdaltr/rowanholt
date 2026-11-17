@@ -84,8 +84,6 @@ cp "$HERE/setup.html" "$HERE/journey.html" "$BUNDLE/Contents/Resources/"
 cp "$ROOT/LICENSE" "$BUNDLE/Contents/Resources/LICENSE"
 # desktop/install.sh and desktop/uninstall.sh (the release installer, not desktop/linux/install.sh) side by side, so an installed app can upgrade (--clean) or remove itself
 cp "$ROOT/desktop/install.sh" "$ROOT/desktop/uninstall.sh" "$BUNDLE/Contents/Resources/"
-# The journey's map: the Shire to the Misty Mountains, cut from the Middle-earth map
-sips -c 300 520 --cropOffset 150 120 "$ROOT/docs/images/middle_earth.png" --out "$BUNDLE/Contents/Resources/journey.png" >/dev/null
 
 cat > "$BUNDLE/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>

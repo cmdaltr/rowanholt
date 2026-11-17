@@ -18,9 +18,8 @@
     unpacked (.rowanholt-version) gets a .env with its own SECRET_KEY on first start and
     an image rebuild after each upgrade.
 
-    While the stack starts, the console shows the road to Rowanholt: the phase, where
-    Gandalf has got to, and an ETA from this PC's earlier starts (the same history
-    format and estimate as src/common/startup_progress.py on macOS and Linux).
+    While the stack starts, the window shows the phase and an ETA from this PC's earlier
+    starts (the same history format and estimate as src/common/startup_progress.py on macOS and Linux).
 #>
 [CmdletBinding()]
 param(
@@ -484,14 +483,14 @@ $Dependencies = [ordered]@{
 
 # Something to read while the downloads run, from the web app's own guide (src/web/frontend/src/guide)
 $GuideCards = @(
-    @('Rowanholt', 'Acquisition, analysis and an analyst to ask, in one place: Gandalf collects, Elrond analyses, and Smith answers questions about a case from its files.'),
-    @('Gandalf: acquisition', 'Collects artefacts from live hosts, locally, over SSH or over PowerShell Remoting, in order of volatility, and logs the SHA-256 of every file it takes. Elrond checks each one against that log before using it.'),
-    @('Elrond: analysis', 'Turns disk images, memory images, Gandalf archives, network evidence and datasets into timelines, CSVs and ATT&CK mappings. Brisk for triage; Exhaustive when the case matters more than the clock.'),
-    @('Several hosts, one case', 'Analyse hosts together and Elrond stacks them: with three or more hosts of one OS, what is rare across them stands out, persistence first.'),
+    @('Rowanholt', 'Acquisition, analysis and an analyst to ask, in one place: Custodian collects, Ledger analyses, and Smith answers questions about a case from its files.'),
+    @('Custodian: acquisition', 'Collects artefacts from live hosts, locally, over SSH or over PowerShell Remoting, in order of volatility, and logs the SHA-256 of every file it takes. Ledger checks each one against that log before using it.'),
+    @('Ledger: analysis', 'Turns disk images, memory images, Custodian archives, network evidence and datasets into timelines, CSVs and ATT&CK mappings. Brisk for triage; Exhaustive when the case matters more than the clock.'),
+    @('Several hosts, one case', 'Analyse hosts together and Ledger stacks them: with three or more hosts of one OS, what is rare across them stands out, persistence first.'),
     @('The case browser', "Every host's artefacts, read-only and filterable. Flag a row as a finding, assign hosts to analysts and keep case notes; the report puts confirmed findings first."),
     @('Smith', 'Ask about a case in plain English. Answers cite the rows they rest on, and each cited row can be flagged as a lead. Without a model, Smith still answers fixed questions: hosts, techniques, persistence, logins, IOCs.'),
-    @('Pippin: threat intelligence', 'Indicators from STIX/TAXII feeds, MITRESaw and your own imports. Elrond matches cases against them, and expired indicators drop out of matching.'),
-    @('Mordor Recordings', 'Recorded attack telemetry: which logs record each ATT&CK technique, from public labs and your own. Look here before writing a detection.'),
+    @('Lookout: threat intelligence', 'Indicators from STIX/TAXII feeds, MITRESaw and your own imports. Ledger matches cases against them, and expired indicators drop out of matching.'),
+    @('Crucible Recordings', 'Recorded attack telemetry: which logs record each ATT&CK technique, from public labs and your own. Look here before writing a detection.'),
     @('Your evidence stays put', "Evidence folders are mounted read-only for the web app: D:\Cases appears inside Rowanholt as /mnt/d/Cases. Set Up Rowanholt in the Start menu changes them later.")
 )
 
@@ -1104,11 +1103,11 @@ function Add-EvidenceRow([string]$Folder) {
 
 function Select-Evidence([string[]]$Current) {
     # @{ Action = 'next' or 'back'; Folders }
-    $body = Show-Page 'Evidence folders' 'Optional: folders of disk images, memory dumps and Gandalf archives.' -Back 'Back'
+    $body = Show-Page 'Evidence folders' 'Optional: folders of disk images, memory dumps and Custodian archives.' -Back 'Back'
     Add-Text $body ("Choose folders on this PC that hold evidence. Rowanholt's containers run in WSL 2, the small " +
         'Linux virtual machine inside Docker Desktop, and can see only the folders listed here. Inside Rowanholt ' +
-        "each has a Linux path, shown beside it: that's the path to give Elrond. The web app can only read them; " +
-        "Elrond's worker can also write there.") 14 -Height 64
+        "each has a Linux path, shown beside it: that's the path to give Ledger. The web app can only read them; " +
+        "Ledger's worker can also write there.") 14 -Height 64
     # Two columns: the Windows folder you chose, and where the containers see it
     $script:EvidenceList = New-Object System.Windows.Forms.ListView
     $script:EvidenceList.View = 'Details'; $script:EvidenceList.FullRowSelect = $true
@@ -1378,7 +1377,7 @@ $Defaults = @{
     warm = @{ docker = 20; images = 4; containers = 12; ui = 45 }
     cold = @{ docker = 20; images = 900; containers = 25; ui = 90 }
 }
-$Messages = @{ docker = 'Waking Docker'; images = 'Forging the images'; containers = 'Raising the halls'; ui = 'Opening the doors' }
+$Messages = @{ docker = 'Starting Docker'; images = 'Building images'; containers = 'Starting services'; ui = 'Opening Rowanholt' }
 $HistoryFile = Join-Path $State 'start-history.jsonl'
 # BuildKit's step lines with --progress plain: '#12 [worker 5/31] RUN ...' (startup_progress.py's STEP)
 $StepLine = '^#\d+ \[([\w.-]+)(?:\s+[\w.-]+)?\s+(\d+)/(\d+)\]'
@@ -1436,7 +1435,7 @@ function Show-Journey($J) {
     $remaining = $current + $later
     $elapsed = ((Get-Date) - $J.Started).TotalSeconds
     $fraction = [math]::Min(0.99, $elapsed / [math]::Max(1, $elapsed + $remaining))
-    # Just the time left in the header: where Gandalf has got to is the macOS app's picture, not this one's.
+    # Just the time left in the header, as on macOS and Linux.
     # A step well past its estimate (a slow disk, a busy machine) says so: a time left that never moves
     # reads as a hang
     $overrun = $inPhase -gt [math]::Max(60, $expected * 1.5)
