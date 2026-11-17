@@ -4,7 +4,6 @@ function OptionsPanel({ options, onChange, disabled = false, hasImages = false, 
   const [currentStep, setCurrentStep] = useState(0);
   const [operationMode, setOperationMode] = useState(''); // 'gandalf' or 'local'
   const [eta, setEta] = useState(0);
-  const [gollumStep, setGollumStep] = useState(null); // Which step Gollum appears on
   const [savedTemplates, setSavedTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [pendingTemplateNav, setPendingTemplateNav] = useState(false);
@@ -324,18 +323,6 @@ function OptionsPanel({ options, onChange, disabled = false, hasImages = false, 
 
       if (nextStep < filteredSteps.length) {
         setCurrentStep(nextStep);
-
-        // Randomly spawn Gollum on steps 3-6 (indices 2-5) when moving forward
-        if (nextStep >= 2 && nextStep <= 5 && Math.random() < 0.5) {
-          // 50% chance Gollum appears
-          const gollumAppears = Math.floor(Math.random() * 4) + 2; // Random step between 2-5
-          setGollumStep(gollumAppears);
-
-          // Remove Gollum after 3 seconds
-          setTimeout(() => {
-            setGollumStep(null);
-          }, 3000);
-        }
       }
     }
   };
@@ -493,21 +480,15 @@ function OptionsPanel({ options, onChange, disabled = false, hasImages = false, 
         {filteredSteps.map((step, index) => {
           const disabled = isStepDisabled(step);
           const isClickable = !disabled && index <= currentStep;
-          const hasGollum = gollumStep === index;
 
           return (
             <div
               key={step.key}
-              className={`wizard-step ${index === currentStep ? 'active' : ''} ${index < currentStep ? 'completed' : ''} ${disabled ? 'disabled' : ''} ${isClickable ? 'clickable' : ''} ${hasGollum ? 'has-gollum' : ''}`}
+              className={`wizard-step ${index === currentStep ? 'active' : ''} ${index < currentStep ? 'completed' : ''} ${disabled ? 'disabled' : ''} ${isClickable ? 'clickable' : ''}`}
               onClick={() => handleStepClick(index)}
             >
               <div className="wizard-step-number">{index + 1}</div>
               <div className="wizard-step-title">{step.title}</div>
-              {hasGollum && (
-                <div className="gollum-emoji">
-                  <span role="img" aria-label="Gollum">🧟</span>
-                </div>
-              )}
             </div>
           );
         })}

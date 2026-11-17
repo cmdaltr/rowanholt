@@ -1507,9 +1507,9 @@ table input[type="checkbox"] {
   padding: 1rem 0;
 }
 
-/* Shire Hut at the beginning - above the line */
+/* The evidence at the beginning - above the line */
 .wizard-steps::before {
-  content: '🛖';
+  content: '💾';
   position: absolute;
   top: -12px;
   left: 0;
@@ -1519,10 +1519,10 @@ table input[type="checkbox"] {
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
 }
 
-/* Path from Shire to Mordor - jagged winding path using SVG background */
+/* The path from the evidence to the case: a winding line, rowan green to gold */
 .wizard-steps {
   background-image:
-    url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 40" preserveAspectRatio="none"><defs><linearGradient id="pathGradient" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:%238abf4d"/><stop offset="15%" style="stop-color:%23c3e88d"/><stop offset="30%" style="stop-color:%23b8914d"/><stop offset="45%" style="stop-color:%236b7a5e"/><stop offset="60%" style="stop-color:%238b7355"/><stop offset="75%" style="stop-color:%235a4a3a"/><stop offset="90%" style="stop-color:%233a2a1a"/><stop offset="100%" style="stop-color:%238b0000"/></linearGradient></defs><path d="M 0 20 Q 50 15, 100 22 T 200 18 T 300 23 T 400 19 T 500 21 T 600 17 T 700 22 T 800 18 T 900 20 T 1000 20" stroke="url(%23pathGradient)" stroke-width="3" fill="none"/></svg>');
+    url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 40" preserveAspectRatio="none"><defs><linearGradient id="pathGradient" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:%238abf4d"/><stop offset="50%" style="stop-color:%23c3e88d"/><stop offset="100%" style="stop-color:%23c9a44c"/></linearGradient></defs><path d="M 0 20 Q 50 15, 100 22 T 200 18 T 300 23 T 400 19 T 500 21 T 600 17 T 700 22 T 800 18 T 900 20 T 1000 20" stroke="url(%23pathGradient)" stroke-width="3" fill="none"/></svg>');
   background-position: 0 20px;
   background-size: 100% 20px;
   background-repeat: no-repeat;
@@ -1541,9 +1541,9 @@ table input[type="checkbox"] {
   filter: brightness(1.8) saturate(1.5) drop-shadow(0 2px 8px rgba(255, 215, 0, 0.8));
 }
 
-/* Mount Doom volcano at the end - above the line */
+/* The finished case at the end - above the line */
 .wizard-steps > :last-child::before {
-  content: '🌋';
+  content: '📑';
   position: absolute;
   top: -28px;
   right: -20px;
@@ -1589,41 +1589,6 @@ table input[type="checkbox"] {
 
 .wizard-step.clickable:hover .wizard-step-title {
   color: #f0dba5;
-}
-
-/* Gollum appears randomly */
-.gollum-emoji {
-  position: absolute;
-  top: -35px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 2rem;
-  z-index: 3;
-  animation: gollumAppear 0.5s ease-out, gollumBreathe 1s ease-in-out infinite;
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.8));
-}
-
-@keyframes gollumAppear {
-  0% {
-    opacity: 0;
-    transform: translateX(-50%) scale(0.5) rotate(-10deg);
-  }
-  50% {
-    transform: translateX(-50%) scale(1.2) rotate(5deg);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(-50%) scale(1) rotate(0deg);
-  }
-}
-
-@keyframes gollumBreathe {
-  0%, 100% {
-    transform: translateX(-50%) translateY(0px);
-  }
-  50% {
-    transform: translateX(-50%) translateY(-3px);
-  }
 }
 
 .wizard-step-number {
