@@ -216,6 +216,21 @@ def missing_images(compose: List[str]) -> List[str]:
     return missing
 
 
+def build_log_line(text: str, logged: set) -> Optional[str]:
+    """A BuildKit line as the log shows it: a step the first time it appears, or an error."""
+    match = STEP.match(text)
+    if match:
+        key = match.groups()
+        if key in logged:
+            return None
+        logged.add(key)
+        rest = text[match.end():].strip()
+        return f"{match.group(1)} {match.group(2)}/{match.group(3)}: {rest}"[:160]
+    if re.match(r"^#\d+ ERROR\b", text) or " ERROR: " in text:
+        return text[:300]
+    return None
+
+
 def compose_up(compose: List[str], build: bool, journey: Journey, reporter: Reporter, builds: int) -> int:
     up = ["up", "-d"] + (["--build"] if build else [])
     if compose[0] == "docker-compose":
@@ -224,6 +239,7 @@ def compose_up(compose: List[str], build: bool, journey: Journey, reporter: Repo
         # --progress plain: BuildKit's step counts ([service n/m]) to pace a build by
         cmd = compose[:2] + ["--progress", "plain"] + compose[2:] + up
     steps: Dict[str, tuple] = {}
+    logged: set = set()
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
     for raw in proc.stdout:
         text = raw.rstrip("\n")
@@ -237,7 +253,12 @@ def compose_up(compose: List[str], build: bool, journey: Journey, reporter: Repo
                 journey.build_fraction = min(1.0, done / max(builds, len(steps), 1))
                 journey.detail = f"{len(steps)} of {max(builds, len(steps))} images under way"
         if text.startswith("#"):
-            continue  # BuildKit's step chatter stays out of the log
+            # BuildKit's chatter stays out of the log, but each step is named once as it starts
+            # (a long build otherwise looks stuck) and its errors come through as they happen
+            line = build_log_line(text, logged)
+            if line:
+                reporter.line(line)
+            continue
         if journey.phase == "images" and re.search(r"\b(Creating|Created|Starting|Started|Recreate|Running)\b", text):
             journey.enter("containers")
         reporter.line(text)

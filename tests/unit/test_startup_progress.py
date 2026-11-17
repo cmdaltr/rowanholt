@@ -104,6 +104,16 @@ class JourneyTest(unittest.TestCase):
         self.assertEqual(sp.eta_text(60), "About a minute left")
         self.assertEqual(sp.eta_text(300), "About 5 minutes left")
 
+    def test_the_log_names_each_build_step_once_and_every_error(self):
+        seen = set()
+        lines = ["#14 [celery-worker  7/21] RUN pip install -r requirements.txt",
+                 "#14 [celery-worker  7/21] RUN pip install -r requirements.txt",
+                 "#14 1.234 Collecting fastapi", "#14 DONE 12.3s",
+                 '#22 ERROR: process "/bin/sh -c apt-get update" did not complete']
+        self.assertEqual([sp.build_log_line(t, seen) for t in lines],
+                         ["celery-worker 7/21: RUN pip install -r requirements.txt", None, None, None,
+                          '#22 ERROR: process "/bin/sh -c apt-get update" did not complete'])
+
     def test_build_step_lines(self):
         match = sp.STEP.match("#14 [celery-worker  7/21] RUN pip install -r requirements.txt")
         self.assertEqual(match.groups(), ("celery-worker", "7", "21"))
