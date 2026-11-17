@@ -61,7 +61,7 @@ function Navigation({ onGuide, serverMode }) {
         <Link to="/jobs">Jobs</Link>
         <div className="nav-menu">
           <Link to="/help">About</Link>
-          <div className="nav-menu__items">
+          <div className="nav-menu__items nav-menu__items--list">
             <button type="button" className="nav-guide" onClick={onGuide} title="The guide and a tip">Guide</button>
             <Link to="/help#licence" title="The Elastic License 2.0 Rowanholt is under">Licence</Link>
           </div>
@@ -118,7 +118,7 @@ function AppContent() {
         backgroundAttachment: 'fixed',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
-        backgroundColor: 'rgba(15, 15, 35, 0.72)',
+        backgroundColor: 'rgba(30, 33, 18, 0.72)',
         backgroundBlendMode: 'multiply',
       }}
     >

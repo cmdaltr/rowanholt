@@ -11,7 +11,7 @@
   --hp-muted: #a9a58f;
   --hp-line: #3f4b2a;
   --hp-panel: rgba(14, 16, 9, 0.9);
-  --hp-navy: #16162b;
+  --hp-navy: #282a17;
 }
 
 .help-page header h2 { margin-bottom: 0.6rem; }
@@ -214,7 +214,7 @@
   display: flex;
   flex-direction: column;
   background: var(--hp-navy);
-  border: 1px solid #2a2a5a;
+  border: 1px solid #50562e;
   border-top: 3px solid var(--tone);
   border-radius: 8px;
   padding: 0.85rem 0.9rem 1rem;
@@ -351,8 +351,8 @@
 .hp-issues { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
 .hp-issue {
   min-width: 0;
-  background: rgba(22, 22, 43, 0.75);
-  border: 1px solid #2a2a5a;
+  background: rgba(40, 42, 23, 0.75);
+  border: 1px solid #50562e;
   border-left: 3px solid var(--hp-copper);
   border-radius: 8px;
   padding: 1.1rem 1.25rem 0.4rem;

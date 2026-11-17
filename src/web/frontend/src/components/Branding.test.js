@@ -49,7 +49,7 @@ test('a brand is added and chosen for the installation', async () => {
   render(<Branding />);
   fireEvent.change(await screen.findByLabelText('New brand name'), { target: { value: 'House' } });
   await act(async () => { fireEvent.click(screen.getByText('Add')); });
-  expect(api.addBrand).toHaveBeenCalledWith({ name: 'House', primary: '#1f3a5f' });
+  expect(api.addBrand).toHaveBeenCalledWith({ name: 'House', primary: '#2f3b1d' });
 
   expect(await screen.findByTestId('brand-b1')).toBeInTheDocument();
   await act(async () => {

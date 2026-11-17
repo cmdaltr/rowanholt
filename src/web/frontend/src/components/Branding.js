@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import PageHero from './PageHero';
 import {
   addBrand, chooseInstallationBrand, clearBrandLogo, deleteBrand, editBrand, getBrandLogo, getBrands, uploadBrandLogo,
 } from '../api';
@@ -118,7 +119,7 @@ function Brand({ brand, installation, onChanged, onDeleted }) {
 
 function AddBrand({ onAdded }) {
   const [name, setName] = useState('');
-  const [primary, setPrimary] = useState('#1f3a5f');
+  const [primary, setPrimary] = useState('#2f3b1d');
   const [error, setError] = useState(null);
 
   const add = async (e) => {
@@ -144,7 +145,7 @@ function AddBrand({ onAdded }) {
   );
 }
 
-export default function Branding({ serverMode = true }) {
+function BrandingBody({ serverMode = true }) {
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -196,6 +197,16 @@ export default function Branding({ serverMode = true }) {
           onChanged={load} onDeleted={load} />
       ))}
       <AddBrand onAdded={load} />
+    </div>
+  );
+}
+
+// The logo and title every page opens with, over the page's states (loading and refused included)
+export default function Branding(props) {
+  return (
+    <div className="journey-detail">
+      <PageHero title="Branding">The colours and logos on the Word report.</PageHero>
+      <BrandingBody {...props} />
     </div>
   );
 }

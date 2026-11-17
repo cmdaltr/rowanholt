@@ -19,7 +19,7 @@
   gap: 0.25rem 1rem;
   padding-bottom: 0.6rem;
   margin-bottom: 0.9rem;
-  border-bottom: 1px solid #2a2a5a;
+  border-bottom: 1px solid #50562e;
 }
 .pippin .pippin-head h3 { margin: 0; }
 .pippin .pippin-meta { color: #9a9ab0; font-size: 0.95rem; }
@@ -52,18 +52,18 @@
 .pippin button.pippin-quiet {
   background: transparent;
   color: #d8d4c4;
-  border: 1px solid #3a3a6a;
+  border: 1px solid #636a3a;
 }
 .pippin button.pippin-quiet:hover { background: rgba(102, 217, 239, 0.08); border-color: #66d9ef; box-shadow: none; transform: none; }
 .pippin button.pippin-danger { background: transparent; color: #ed5565; border: 1px solid rgba(237, 85, 101, 0.45); }
 .pippin button.pippin-danger:hover { background: rgba(237, 85, 101, 0.12); box-shadow: none; transform: none; }
 .pippin button.pippin-quiet:disabled,
-.pippin button.pippin-danger:disabled { background: transparent; color: #555; border-color: #2a2a4a; }
+.pippin button.pippin-danger:disabled { background: transparent; color: #555; border-color: #464a2a; }
 
 /* Sources and Import side by side when there's room */
 .pippin .pippin-pair {
   display: grid;
-  grid-template-columns: minmax(18rem, 1fr) minmax(26rem, 2fr);
+  grid-template-columns: minmax(14.4rem, 0.8fr) minmax(26rem, 2.2fr);
   gap: 1.75rem;
   align-items: start;
 }
@@ -77,7 +77,7 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 0;
-  border-bottom: 1px solid #23234a;
+  border-bottom: 1px solid #424726;
 }
 .pippin .pippin-sources li:last-child { border-bottom: none; }
 .pippin .pippin-sources li.is-current .pippin-source-name { color: #c3e88d; }
@@ -119,7 +119,7 @@
   min-width: 4.2rem;
   text-align: center;
   padding: 0.1rem 0.45rem;
-  border: 1px solid #3a3a6a;
+  border: 1px solid #636a3a;
   border-radius: 4px;
   font-size: 0.8rem;
   color: #66d9ef;
@@ -128,7 +128,7 @@
 .pippin .pippin-formats dd { margin: 0; color: #d8d4c4; }
 .pippin .pippin-formats dd code { font-size: 0.85em; color: #e6db74; }
 
-.pippin .pippin-subsection { margin-top: 1.4rem; padding-top: 1.1rem; border-top: 1px solid #2a2a5a; }
+.pippin .pippin-subsection { margin-top: 1.4rem; padding-top: 1.1rem; border-top: 1px solid #50562e; }
 .pippin .pippin-taxii {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -167,8 +167,8 @@
   flex-wrap: wrap;
   padding: 0.6rem 0.75rem;
   margin-bottom: 0.25rem;
-  background: rgba(10, 10, 24, 0.55);
-  border: 1px solid #2a2a5a;
+  background: rgba(21, 22, 12, 0.55);
+  border: 1px solid #50562e;
   border-radius: 6px;
 }
 .pippin .pippin-filter label {
@@ -210,7 +210,7 @@
 .pippin table.pippin-table td {
   padding: 0.75rem;
   vertical-align: top;
-  border-bottom: 1px solid #262650;
+  border-bottom: 1px solid #484d29;
   line-height: 1.4;
   overflow-wrap: anywhere;
   min-width: 0;
@@ -275,7 +275,7 @@
   .pippin table.pippin-table td { display: block; width: auto; }
   .pippin table.pippin-table thead,
   .pippin table.pippin-table colgroup { display: none; }
-  .pippin table.pippin-table tr { padding: 0.6rem 0; border-bottom: 1px solid #2a2a5a; }
+  .pippin table.pippin-table tr { padding: 0.6rem 0; border-bottom: 1px solid #50562e; }
   .pippin table.pippin-table td { border: none; padding: 0.3rem 0.25rem; }
   .pippin table.pippin-table td[data-label]::before {
     content: attr(data-label);

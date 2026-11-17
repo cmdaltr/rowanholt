@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import PageHero from './PageHero';
 import { addWebhook, deleteWebhook, editWebhook, getWebhooks, testWebhook } from '../api';
 import { managesLicence } from './Licence';
 
@@ -123,7 +124,7 @@ function Webhook({ hook, sending, onChanged, onDeleted }) {
   );
 }
 
-export default function Webhooks({ serverMode = true }) {
+function WebhooksBody({ serverMode = true }) {
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [secret, setSecret] = useState(null); // the new webhook's, shown once
@@ -174,6 +175,16 @@ export default function Webhooks({ serverMode = true }) {
         <Webhook key={hook.id} hook={hook} sending={data.sending} onChanged={load} onDeleted={load} />
       ))}
       <AddWebhook events={data.events} onAdded={added} />
+    </div>
+  );
+}
+
+// The logo and title every page opens with, over the page's states (loading and refused included)
+export default function Webhooks(props) {
+  return (
+    <div className="journey-detail">
+      <PageHero title="Webhooks">Where Rowanholt tells other systems that a job has finished or failed.</PageHero>
+      <WebhooksBody {...props} />
     </div>
   );
 }

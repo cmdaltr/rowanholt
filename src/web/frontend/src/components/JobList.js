@@ -415,7 +415,7 @@ function JobList() {
           zIndex: 9999
         }}>
           <div style={{
-            background: 'linear-gradient(135deg, rgba(15, 15, 35, 0.98) 0%, rgba(25, 25, 45, 0.98) 100%)',
+            background: 'linear-gradient(135deg, rgba(30, 33, 18, 0.98) 0%, rgba(42, 45, 25, 0.98) 100%)',
             border: '2px solid rgba(240, 219, 165, 0.5)',
             borderRadius: '8px',
             padding: '2rem',
@@ -544,7 +544,7 @@ function JobList() {
           zIndex: 9999
         }}>
           <div style={{
-            background: 'linear-gradient(135deg, rgba(15, 15, 35, 0.98) 0%, rgba(25, 25, 45, 0.98) 100%)',
+            background: 'linear-gradient(135deg, rgba(30, 33, 18, 0.98) 0%, rgba(42, 45, 25, 0.98) 100%)',
             border: '2px solid rgba(240, 219, 165, 0.5)',
             borderRadius: '8px',
             padding: '2rem',

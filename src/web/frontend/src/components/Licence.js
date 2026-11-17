@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import PageHero from './PageHero';
 import { checkLicence, getLicence, getLicenceTerms, installLicence, removeLicence } from '../api';
 
 // The licence (docs/LICENSING_MODEL.md): admins see the edition and, on a team server, the places
@@ -114,7 +115,7 @@ function Install({ onInstalled }) {
 // as nobody, and whom the backend treats as the admin)
 export const managesLicence = (user, serverMode) => serverMode === false || user?.role === 'admin';
 
-export default function Licence({ serverMode = true }) {
+function LicenceBody({ serverMode = true }) {
   const { user } = useAuth();
   const [licence, setLicence] = useState(null);
   const [error, setError] = useState(null);
@@ -185,6 +186,16 @@ export function LicenceNotice({ serverMode }) {
     <div className="licence-banner" role="alert">
       The Rowanholt licence for {licence.licensee} ran out on {day(licence.expires)} and stops on {day(licence.grace_ends)}.
       {' '}Install a renewed licence from the Licence page.
+    </div>
+  );
+}
+
+// The logo and title every page opens with, over the page's states (loading and refused included)
+export default function Licence(props) {
+  return (
+    <div className="journey-detail">
+      <PageHero title="Licence">The edition this Rowanholt runs as, and the licence that sets it.</PageHero>
+      <LicenceBody {...props} />
     </div>
   );
 }

@@ -509,7 +509,7 @@ function NewAnalysis() {
           zIndex: 9999
         }}>
           <div style={{
-            background: 'linear-gradient(135deg, rgba(15, 15, 35, 0.98) 0%, rgba(25, 25, 45, 0.98) 100%)',
+            background: 'linear-gradient(135deg, rgba(30, 33, 18, 0.98) 0%, rgba(42, 45, 25, 0.98) 100%)',
             border: '2px solid rgba(240, 219, 165, 0.5)',
             borderRadius: '8px',
             padding: '2rem',
@@ -619,7 +619,7 @@ function NewAnalysis() {
           zIndex: 9999
         }}>
           <div style={{
-            background: 'linear-gradient(135deg, rgba(15, 15, 35, 0.98) 0%, rgba(25, 25, 45, 0.98) 100%)',
+            background: 'linear-gradient(135deg, rgba(30, 33, 18, 0.98) 0%, rgba(42, 45, 25, 0.98) 100%)',
             border: '2px solid rgba(240, 219, 165, 0.5)',
             borderRadius: '8px',
             padding: '2rem',
@@ -742,7 +742,7 @@ function NewAnalysis() {
           zIndex: 9999
         }}>
           <div style={{
-            background: 'linear-gradient(135deg, rgba(15, 15, 35, 0.98) 0%, rgba(25, 25, 45, 0.98) 100%)',
+            background: 'linear-gradient(135deg, rgba(30, 33, 18, 0.98) 0%, rgba(42, 45, 25, 0.98) 100%)',
             border: '2px solid rgba(240, 219, 165, 0.5)',
             borderRadius: '8px',
             padding: '2rem',
@@ -813,7 +813,7 @@ function NewAnalysis() {
                         padding: '0.6rem 1rem',
                         borderRadius: '4px',
                         border: '1px solid #3f4b2a',
-                        background: 'rgba(15, 15, 35, 0.8)',
+                        background: 'rgba(30, 33, 18, 0.8)',
                         color: '#f0dba5',
                       }}>
                         <span style={{
@@ -1175,7 +1175,7 @@ function NewAnalysis() {
               {/* Mordor: Dropdown of downloaded datasets */}
               {analysisMode === 'mordor' && (
                 <div style={{
-                  background: 'rgba(15, 15, 35, 0.6)',
+                  background: 'rgba(30, 33, 18, 0.6)',
                   border: '1px solid rgba(240, 219, 165, 0.3)',
                   borderRadius: '6px',
                   padding: '1rem'
@@ -1200,7 +1200,7 @@ function NewAnalysis() {
                         width: '100%',
                         padding: '0.75rem',
                         fontSize: '1rem',
-                        background: 'rgba(15, 15, 35, 0.8)',
+                        background: 'rgba(30, 33, 18, 0.8)',
                         border: '1px solid rgba(240, 219, 165, 0.3)',
                         borderRadius: '4px',
                         color: '#f0dba5'
@@ -1225,7 +1225,7 @@ function NewAnalysis() {
               {/* Cloud: URL input for S3/Azure */}
               {analysisMode === 'cloud' && (
                 <div style={{
-                  background: 'rgba(15, 15, 35, 0.6)',
+                  background: 'rgba(30, 33, 18, 0.6)',
                   border: '1px solid rgba(240, 219, 165, 0.3)',
                   borderRadius: '6px',
                   padding: '1rem'
@@ -1243,7 +1243,7 @@ function NewAnalysis() {
                       width: '100%',
                       padding: '0.75rem',
                       fontSize: '1rem',
-                      background: 'rgba(15, 15, 35, 0.8)',
+                      background: 'rgba(30, 33, 18, 0.8)',
                       border: '1px solid rgba(240, 219, 165, 0.3)',
                       borderRadius: '4px',
                       color: '#f0dba5'
@@ -1257,7 +1257,7 @@ function NewAnalysis() {
                         borderRadius: '4px',
                         fontSize: '0.8rem',
                         background: cloudUrl.startsWith('s3://') ? 'rgba(255, 153, 0, 0.2)' :
-                                   cloudUrl.includes('blob.core.windows.net') ? 'rgba(0, 120, 212, 0.2)' :
+                                   cloudUrl.includes('blob.core.windows.net') ? 'rgba(129, 138, 74, 0.2)' :
                                    'rgba(240, 219, 165, 0.2)',
                         color: cloudUrl.startsWith('s3://') ? '#ff9900' :
                                cloudUrl.includes('blob.core.windows.net') ? '#0078d4' :
@@ -1279,7 +1279,7 @@ function NewAnalysis() {
             <div className="form-group">
               <label>Loaded Configuration</label>
               <div style={{
-                background: 'rgba(15, 15, 35, 0.6)',
+                background: 'rgba(30, 33, 18, 0.6)',
                 border: '1px solid rgba(167, 219, 108, 0.3)',
                 borderRadius: '6px',
                 padding: '1rem'

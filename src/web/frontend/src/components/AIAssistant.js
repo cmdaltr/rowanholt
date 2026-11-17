@@ -425,7 +425,7 @@ function AIAssistant() {
                 width: '100%',
                 padding: '0.75rem 1rem',
                 height: '48px',
-                background: 'rgba(15, 15, 35, 0.6)',
+                background: 'rgba(30, 33, 18, 0.6)',
                 border: '1px solid rgba(240, 219, 165, 0.3)',
                 borderRadius: '4px',
                 color: '#f0dba5',
@@ -737,7 +737,7 @@ function AIAssistant() {
             style={{
               flex: 1,
               padding: '0.75rem 1rem',
-              background: 'rgba(15, 15, 35, 0.6)',
+              background: 'rgba(30, 33, 18, 0.6)',
               border: '1px solid rgba(240, 219, 165, 0.3)',
               borderRadius: '4px',
               color: '#f0dba5',

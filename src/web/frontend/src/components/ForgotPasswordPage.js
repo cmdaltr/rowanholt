@@ -102,7 +102,7 @@ const ForgotPasswordPage = () => {
       </div>
 
       <div className="card alert-info" style={{ marginTop: '2rem' }}>
-        <h4 style={{ marginTop: 0, color: '#93c5fd' }}>Note</h4>
+        <h4 style={{ marginTop: 0, color: '#c3e88d' }}>Note</h4>
         <p style={{ fontSize: '0.9rem', marginBottom: 0 }}>
           Email functionality is currently under development. In production, the reset token will be sent to your email.
           For now, check the server logs for the reset token.
