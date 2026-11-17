@@ -130,6 +130,25 @@ class JourneyTest(unittest.TestCase):
         self.assertIn("#30", tails)
         self.assertNotIn("#31", tails)
 
+    def test_cached_steps_are_no_work(self):
+        pace = sp.BuildPace(1)
+        for n in range(1, 11):  # an update's rebuild: the first ten of 21 steps are cached
+            pace.feed(f"#{n} [celery-worker {n}/21] RUN step {n}")
+            pace.feed(f"#{n} CACHED")
+        self.assertEqual(pace.fraction(), 0.0)
+        pace.feed("#11 [celery-worker 11/21] RUN apt-get install -y python3.12")
+        self.assertAlmostEqual(pace.fraction(), 1 / 11)
+        pace.feed("#11 2.104 Get:1 http://archive.ubuntu.com/ubuntu jammy InRelease")
+        self.assertAlmostEqual(pace.fraction(), 1 / 11)
+
+    def test_a_fully_cached_image_is_done(self):
+        pace = sp.BuildPace(2)
+        for n in (1, 2):
+            pace.feed(f"#{n} [frontend {n}/2] RUN npm ci")
+            pace.feed(f"#{n} CACHED")
+        pace.feed("#9 [backend 1/4] FROM python:3.10-slim")
+        self.assertAlmostEqual(pace.fraction(), (1.0 + 0.25) / 2)
+
     def test_build_step_lines(self):
         match = sp.STEP.match("#14 [celery-worker  7/21] RUN pip install -r requirements.txt")
         self.assertEqual(match.groups(), ("celery-worker", "7", "21"))

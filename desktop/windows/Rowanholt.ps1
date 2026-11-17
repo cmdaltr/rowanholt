@@ -1500,7 +1500,9 @@ function Invoke-ComposeUp($J, [string[]]$Extra, [int]$Builds) {
     # Native output through the pipeline: 'Continue', or Windows PowerShell stops on stderr
     $ErrorActionPreference = 'Continue'
     $files = Get-ComposeFiles
-    $steps = @{}
+    # A cached step is no work, so it counts on neither side (startup_progress.BuildPace): an
+    # update's rebuild, its early steps cached, otherwise read as nearly done for half an hour
+    $steps = @{}; $cached = @{}; $ids = @{}
     # The whole output goes to compose.log, and its last lines into the error if 'up' fails
     $log = Join-Path $State 'compose.log'
     Set-Content -Path $log -Value "$((Get-Date).ToString('s')) docker compose up -d $($Extra -join ' ')" -ErrorAction SilentlyContinue
@@ -1514,12 +1516,26 @@ function Invoke-ComposeUp($J, [string[]]$Extra, [int]$Builds) {
             if ($line -eq 'System.Management.Automation.RemoteException') { $line = '' }
             Add-Content -Path $log -Value $line -ErrorAction SilentlyContinue
             if ($line.Trim()) { $tail.Enqueue($line.Trim()); if ($tail.Count -gt 12) { [void]$tail.Dequeue() } }
+            $paced = $false
             if ($line -match $StepLine -and [int]$Matches[3] -gt 0) {
                 $service = $Matches[1]; $n = [int]$Matches[2]; $m = [int]$Matches[3]
+                $ids[$line.Split(' ')[0]] = @($service, $n)
                 $before = if ($steps.ContainsKey($service)) { $steps[$service][0] } else { 0 }
                 $steps[$service] = @([math]::Max($n, $before), $m)
+                $paced = $true
+            } elseif ($line -match '^(#\d+) CACHED\b' -and $ids.ContainsKey($Matches[1])) {
+                $id = $ids[$Matches[1]]
+                if (-not $cached.ContainsKey($id[0])) { $cached[$id[0]] = @{} }
+                $cached[$id[0]][$id[1]] = $true
+                $paced = $true
+            }
+            if ($paced) {
                 $done = 0.0
-                foreach ($s in $steps.Values) { $done += $s[0] / $s[1] }
+                foreach ($service in $steps.Keys) {
+                    $n = $steps[$service][0]; $m = $steps[$service][1]
+                    $skipped = if ($cached.ContainsKey($service)) { $cached[$service].Count } else { 0 }
+                    $done += if ($m -le $skipped) { 1.0 } else { [math]::Max(0, $n - $skipped) / ($m - $skipped) }
+                }
                 $of = [math]::Max(1, [math]::Max($Builds, $steps.Count))
                 $J.BuildFraction = [math]::Min(1.0, $done / $of)
                 $J.Detail = "$($steps.Count) of $of images under way"

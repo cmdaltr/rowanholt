@@ -246,6 +246,45 @@ def build_log_line(text: str, logged: set, tails: Optional[Dict[str, deque]] = N
     return None
 
 
+class BuildPace:
+    """How far the image builds are, from BuildKit's step lines.
+
+    A cached step is no work, so it counts on neither side of the fraction: an update's rebuild,
+    its early steps all cached, otherwise read as nearly done while one long uncached step ran
+    for half an hour, and the time left crept up instead of down.
+    """
+
+    def __init__(self, builds: int):
+        self.builds = builds
+        self.steps: Dict[str, tuple] = {}  # image -> (furthest step, steps)
+        self.cached: Dict[str, set] = {}  # image -> its cached step numbers
+        self.ids: Dict[str, tuple] = {}  # BuildKit's "#14" -> (image, step)
+
+    def feed(self, text: str) -> bool:
+        """Takes one line of the build's output; True when the fraction may have moved."""
+        match = STEP.match(text)
+        if match:
+            image, n, m = match.group(1), int(match.group(2)), int(match.group(3))
+            if not m:
+                return False
+            self.ids[text.split(" ", 1)[0]] = (image, n)
+            self.steps[image] = (max(n, self.steps.get(image, (0, m))[0]), m)
+            return True
+        cached = re.match(r"^(#\d+) CACHED\b", text)
+        if cached and cached.group(1) in self.ids:
+            image, n = self.ids[cached.group(1)]
+            self.cached.setdefault(image, set()).add(n)
+            return True
+        return False
+
+    def fraction(self) -> float:
+        done = 0.0
+        for image, (n, m) in self.steps.items():
+            skipped = len(self.cached.get(image, ()))
+            done += 1.0 if m <= skipped else max(0, n - skipped) / (m - skipped)
+        return min(1.0, done / max(self.builds, len(self.steps), 1))
+
+
 def compose_up(compose: List[str], build: bool, journey: Journey, reporter: Reporter, builds: int) -> int:
     up = ["up", "-d"] + (["--build"] if build else [])
     if compose[0] == "docker-compose":
@@ -253,21 +292,16 @@ def compose_up(compose: List[str], build: bool, journey: Journey, reporter: Repo
     else:
         # --progress plain: BuildKit's step counts ([service n/m]) to pace a build by
         cmd = compose[:2] + ["--progress", "plain"] + compose[2:] + up
-    steps: Dict[str, tuple] = {}
+    pace = BuildPace(builds)
     logged: set = set()
     tails: Dict[str, deque] = {}
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
     for raw in proc.stdout:
         text = raw.rstrip("\n")
-        match = STEP.match(text)
-        if match:
-            key = match.group(1)
-            n, m = int(match.group(2)), int(match.group(3))
-            if m:
-                steps[key] = (max(n, steps.get(key, (0, m))[0]), m)
-                done = sum(n / m for n, m in steps.values())
-                journey.build_fraction = min(1.0, done / max(builds, len(steps), 1))
-                journey.detail = f"{len(steps)} of {max(builds, len(steps))} images under way"
+        if pace.feed(text):
+            journey.build_fraction = pace.fraction()
+            images = max(builds, len(pace.steps))
+            journey.detail = f"{len(pace.steps)} of {images} images under way"
         if text.startswith("#"):
             # BuildKit's chatter stays out of the log, but each step is named once as it starts
             # (a long build otherwise looks stuck) and its errors come through as they happen
