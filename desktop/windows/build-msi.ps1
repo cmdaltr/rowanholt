@@ -80,6 +80,8 @@ try {
         -d "ProductVersion=$msiVersion" -d "Root=$Root" -d "Tarball=$Tarball" `
         -d "VersionFile=$versionFile" -d "LicenceRtf=$rtf" -d "BannerBmp=$bannerBmp" -d "DialogBmp=$dialogBmp" -o $msi
     if ($LASTEXITCODE -ne 0) { throw "wix build exited with status $LASTEXITCODE" }
+    # wix writes its debug file beside the MSI, and the release attaches everything in the folder
+    Remove-Item ([IO.Path]::ChangeExtension($msi, '.wixpdb')) -ErrorAction SilentlyContinue
     Write-Host "Built $msi (MSI version $msiVersion)"
 } finally {
     Remove-Item -Recurse -Force $work -ErrorAction SilentlyContinue
