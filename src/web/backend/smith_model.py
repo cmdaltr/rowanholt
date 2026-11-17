@@ -39,8 +39,9 @@ DEFAULT_HOST = os.getenv("OLLAMA_HOST", "http://host.docker.internal:11434")
 DEFAULT_MODEL = os.getenv("ROWANHOLT_MODEL_NAME", "llama3.2:3b")
 # Ollama's own default window (2048 tokens) is shorter than the case context Smith sends
 NUM_CTX = int(os.getenv("ROWANHOLT_NUM_CTX", "8192"))
+# 0.0.0.0/8 ("this network") is never routed: OrbStack's host.docker.internal is 0.250.250.254
 PRIVATE_NETS = [ipaddress.ip_network(n) for n in (
-    "127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "169.254.0.0/16",
+    "0.0.0.0/8", "127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "169.254.0.0/16",
     "::1/128", "fc00::/7", "fe80::/10",
 )]
 _lock = threading.Lock()

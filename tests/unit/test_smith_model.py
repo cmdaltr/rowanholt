@@ -42,7 +42,7 @@ def answering(handler):
 class AddressTest(unittest.TestCase):
     def test_private_addresses(self):
         for address in ("127.0.0.1", "10.1.2.3", "172.16.0.9", "172.31.255.1", "192.168.1.20", "100.101.102.103",
-                        "169.254.1.1", "::1", "fd7a:115c:a1e0::1", "fe80::1%en0", "::ffff:192.168.1.5"):
+                        "169.254.1.1", "0.250.250.254", "::1", "fd7a:115c:a1e0::1", "fe80::1%en0", "::ffff:192.168.1.5"):
             self.assertTrue(smith_model.is_private(address), address)
         for address in ("8.8.8.8", "172.32.0.1", "100.128.0.1", "104.18.0.1", "2606:4700::1", "::ffff:8.8.8.8"):
             self.assertFalse(smith_model.is_private(address), address)
