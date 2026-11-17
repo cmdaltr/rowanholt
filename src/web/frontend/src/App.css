@@ -147,6 +147,15 @@ code, pre, kbd, samp { font-family: var(--font-mono); letter-spacing: 0; }
   .App-header nav .nav-menu > a { padding-left: 0.4rem; padding-right: 0.4rem; }
 }
 
+/* Narrower still (a 1,050px app window): the display names are longer than the old ones */
+@media (max-width: 1200px) {
+  .App-header nav { grid-template-columns: 1fr 7rem 1fr; }
+  .App-header nav a { font-size: 0.85rem; letter-spacing: 0.02em; }
+  .App-header nav .nav-left > a,
+  .App-header nav .nav-right > a,
+  .App-header nav .nav-menu > a { padding-left: 0.3rem; padding-right: 0.3rem; }
+}
+
 .App-header nav a {
   color: #f0dba5;
   text-decoration: none;
