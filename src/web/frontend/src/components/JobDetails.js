@@ -358,10 +358,7 @@ function JobDetails() {
     // Select a random 404 image
     const notFoundImages = [
       'boromir404.png',
-      'frodo1404.png',
-      'frodo2404.png',
-      'gandalf404.png',
-      'gollum404.png'
+      'gandalf404.png'
     ];
     const randomImage = notFoundImages[Math.floor(Math.random() * notFoundImages.length)];
     const notFoundImageUrl = `${process.env.PUBLIC_URL}/images/404/${randomImage}`;
