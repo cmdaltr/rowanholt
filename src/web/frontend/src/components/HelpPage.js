@@ -20,7 +20,7 @@ const architecturePages = [
   {
     href: `${process.env.PUBLIC_URL}/architecture/rowanholt-journey.html`,
     preview: 'journey.jpg',
-    title: 'Startup stages: Docker, images, services, open',
+    title: "The evidence's journey, in 3D: Custodian to Ledger to Smith",
   },
 ];
 

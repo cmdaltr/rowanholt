@@ -479,7 +479,7 @@ export const TIPS = [
   { id: 'mordor-practise', text: 'Crucible datasets can be analysed like evidence: a safe way to practise a case end to end on known-bad data.', to: '/elrond' },
   { id: 'api-tokens', text: 'Account has API tokens for scripting against Rowanholt\'s API from your own tooling.', to: '/account' },
   { id: 'cli-anywhere', text: 'After ./rowanholt install, the rowanholt command works from any directory: rowanholt analyse, rowanholt acquire, rowanholt status.', to: '/help' },
-  { id: 'map', text: 'rowanholt map journey opens a diagram of Rowanholt\'s startup stages: Docker, the images, the services, then the app.', to: '/help' },
+  { id: 'map', text: 'rowanholt map journey opens an interactive 3D map of the evidence\'s journey: an eagle carries each kind of evidence between the stops, from Custodian through Ledger to Smith.', to: '/help' },
   { id: 'start-progress', text: 'rowanholt start --progress shows an ETA learnt from this machine\'s earlier starts. The desktop app shows it beside each startup phase.', to: '/help' },
   { id: 'server', text: 'Working as a team? rowanholt server turns an install into a shared server with HTTPS, sign-in, single sign-on and per-job sharing.', to: '/help' },
   { id: 'sharing', text: 'On a team server, share a job from its Access panel to bring a colleague into the case. They can work on it, but only the owner can reshare it.', to: '/jobs' },

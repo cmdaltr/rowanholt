@@ -91,16 +91,16 @@
 <div class="tm">Splunk&reg;, Elastic&reg;, Docker&reg; and other marks are trademarks of their owners; logos from Simple Icons (CC0).</div>
 <header>
   <h1><img id="logo" alt="Rowanholt"><span class="t"><b>Rowan</b>holt &middot; the journey</span></h1>
-  <span class="fig">Fig 4 &middot; there and back again</span>
+  <span class="fig">Fig 4 &middot; the evidence's journey</span>
   <span class="hint">drag to orbit &middot; scroll to zoom &middot; click a place &middot; follow one piece of evidence at a time</span>
 </header>
 <div id="jrow">
   <span class="chip sep">Evidence:</span>
-  <span class="chip jchip on" data-journey="gandalf">Gandalf archive</span>
+  <span class="chip jchip on" data-journey="gandalf">Custodian archive</span>
   <span class="chip jchip" data-journey="disk">Disk image</span>
   <span class="chip jchip" data-journey="memory">Memory image</span>
   <span class="chip jchip" data-journey="cloud">Cloud</span>
-  <span class="chip jchip" data-journey="mordor">Mordor dataset</span>
+  <span class="chip jchip" data-journey="mordor">Attack dataset</span>
   <span class="chip sep">&middot;</span>
   <span class="chip jchip" data-journey="intel">Threat intel</span>
   <span class="chip jchip" data-journey="ask">Ask Smith</span>
@@ -137,37 +137,37 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 // ---------- the places ----------
 // pos is world x (east) and z (south); r is the cleared ground around each place.
 const NODES = [
- {id:'shire', name:'Gandalf · acquisition', port:'the Shire · live hosts', pos:[-100,-30], r:11, char:'gandalf', logos:['gnubash','python'],
-  desc:'Gandalf calls on live hosts, as admin or root, locally or remotely: <code>gandalf.sh</code> (bash 3.2+) and <code>gandalf.py</code> for Linux and macOS, locally or over SSH; <code>Invoke-Gandalf.ps1</code> for Windows, locally or over PSRemoting. Windows 8.1 to 11 and Server 2012 R2+, Linux, macOS from Big Sur. Live state first, then files in order of volatility (the seven lanterns: connections and processes, memory, $LogFile/$J/page files/$MFT, temp directories, event logs and /var/log, prefetch and registry, users and files); locked files are read straight off the NTFS volume. Once everything is copied, every file is SHA-256 hashed into <code>log.meta</code> and the archive is sealed on the cart: None, Password or Key, the key travelling as <code>&lt;host&gt;.shadowfax.key</code>.'},
- {id:'havens', name:'Cloud · AWS, Azure, GCP', port:'the Grey Havens', pos:[-127,10], r:8, icon:'cloud', logos:['amazonwebservices','googlecloud'],
+ {id:'shire', name:'Custodian · acquisition', port:'live hosts · local, SSH, PSRemoting', pos:[-100,-30], r:11, char:'gandalf', logos:['gnubash','python'],
+  desc:'Custodian calls on live hosts, as admin or root, locally or remotely: <code>gandalf.sh</code> (bash 3.2+) and <code>gandalf.py</code> for Linux and macOS, locally or over SSH; <code>Invoke-Gandalf.ps1</code> for Windows, locally or over PSRemoting. Windows 8.1 to 11 and Server 2012 R2+, Linux, macOS from Big Sur. Live state first, then files in order of volatility (the seven lanterns: connections and processes, memory, $LogFile/$J/page files/$MFT, temp directories, event logs and /var/log, prefetch and registry, users and files); locked files are read straight off the NTFS volume. Once everything is copied, every file is SHA-256 hashed into <code>log.meta</code> and the archive is sealed on the cart: None, Password or Key, the key travelling as <code>&lt;host&gt;.shadowfax.key</code>.'},
+ {id:'havens', name:'Cloud · AWS, Azure, GCP', port:'snapshots and cloud logs', pos:[-127,10], r:8, icon:'cloud', logos:['amazonwebservices','googlecloud'],
   desc:'AWS, Azure and GCP: instances, disk snapshots, CloudTrail and activity logs, and Kubernetes audit logs. A snapshot comes ashore as a disk image and takes the disk-image road.'},
- {id:'bree', name:'Web UI · API · job queue', port:'the Prancing Pony :5687 · :5688', pos:[-70,10], r:10, icon:'web', logos:['react','fastapi','redis'],
-  desc:'The React front end on :5687 and the FastAPI back end on :5688: start jobs, upload archives and images or pick them from disk, watch progress, read results, Ask Smith, Pippin, shared findings and notes. Admins also see Aragorn. Each job goes into Redis, the dovecote, and a bird carries it to the Celery worker that runs Elrond.'},
- {id:'weathertop', name:'Identify · mount · verify', port:'Amon Sûl · Elrond step 01', pos:[-42,-26], r:6, icon:'check',
-  desc:'Elrond recognises E01, VMDK, VHD(X), raw and dd images, memory, Gandalf archives, Mordor datasets and cloud logs, and mounts what needs mounting (ewfmount, qemu-nbd, apfs-fuse). A Gandalf archive is decrypted and every file re-hashed against <code>log.meta</code> into <code>gandalf_integrity.jsonl</code> (verified, MISMATCH, missing), then laid out as <code>raw/</code>. The ring of stones turns green when every hash matches.'},
- {id:'rowanhall', name:'Elrond · collect, process, analyse', port:'the Hall under the Rowan, in the rowan wood', pos:[-10,2], r:13, char:'elrond', logos:['celery','python','docker'],
-  desc:'Elrond keeps the ledger. The Celery worker (the mill wheel) takes each job from Redis and runs Elrond, and Elrond runs every tool as its own process: Artemis, RegRipper, Volatility 3, Plaso, YARA, The Sleuth Kit, iLEAPP and ALEAPP for phones, Zeek for network captures. Step 02 collects per OS from the mounted image (hives, event logs, $MFT and journals; launchd, BTM and unified logs; cron, systemd, PAM and logins; shadow copies too); step 03 writes every artefact to <code>cooked/</code> as JSON Lines, each record with its host, source, UTC time and techniques; step 04 (<code>--Analysis</code>, <code>--Keywords</code>, <code>--Yara</code>) searches keywords and YARA, extracts IOCs, stacks across hosts, and finds timestomping, alternate data streams and masquerading. Memory images are read by Volatility 3, by profile.'},
- {id:'pippin', name:'Pippin · threat intelligence', port:'Dol Baran · the palantír', pos:[20,-30], r:7, char:'pippin', opt:true,
-  desc:'Pippin looked into the palantír. The Intel page imports STIX/TAXII bundles, MITRESaw and the Iran APT loader into one table of indicators, each with its group, procedure, technique and source; expiry and confidence sit beside it (STIX\'s own, else 90 days for IPs and domains). With <code>--threatIntel</code> Elrond matches the case against every unexpired indicator, and Smith sees the same context for an artefact. Online lookups (VirusTotal) are off unless turned on, and are for analysts, never for Smith.'},
- {id:'beacons', name:'ATT&CK tagging', port:'the Beacons of Gondor · step 05', pos:[45,6], r:7, icon:'flame',
-  desc:'Fifteen beacons, one per Enterprise tactic (ATT&amp;CK v20.1), lit as techniques are tagged from artefacts, event-log rules and Mordor datasets into <code>mitre_techniques.txt</code>; <code>--Navigator</code> writes an ATT&amp;CK Navigator layer too. The mapping is Elrond\'s, not Smith\'s.'},
- {id:'fangorn', name:'Timeline · Plaso', port:'Fangorn · step 06 · --Timeline', pos:[70,38], r:10, icon:'clock', opt:true,
-  desc:'psteal builds one super-timeline across every source of a host: Treebeard\'s rings, read in order. It is indexed into Splunk or Kibana with the rest when the case is exported.'},
- {id:'orthanc', name:'Export · Splunk, Elastic, Kibana', port:'Orthanc · step 07 · --Splunk / --Elastic', pos:[100,8], r:10, icon:'export', opt:true, logos:['splunk','elastic','kibana'],
+ {id:'bree', name:'Web UI · API · job queue', port:':5687 · :5688 · Redis', pos:[-70,10], r:10, icon:'web', logos:['react','fastapi','redis'],
+  desc:'The React front end on :5687 and the FastAPI back end on :5688: start jobs, upload archives and images or pick them from disk, watch progress, read results, Ask Smith, Lookout, shared findings and notes. Admins also see Steward. Each job goes into Redis, the dovecote, and a bird carries it to the Celery worker that runs Ledger.'},
+ {id:'weathertop', name:'Identify · mount · verify', port:'Ledger step 01', pos:[-42,-26], r:6, icon:'check',
+  desc:'Ledger recognises E01, VMDK, VHD(X), raw and dd images, memory, Custodian archives, OTRF Security-Datasets (Mordor) and cloud logs, and mounts what needs mounting (ewfmount, qemu-nbd, apfs-fuse). A Custodian archive is decrypted and every file re-hashed against <code>log.meta</code> into <code>gandalf_integrity.jsonl</code> (verified, MISMATCH, missing), then laid out as <code>raw/</code>. The ring of stones turns green when every hash matches.'},
+ {id:'rowanhall', name:'Ledger · collect, process, analyse', port:'the Hall under the Rowan, in the rowan wood', pos:[-10,2], r:13, char:'elrond', logos:['celery','python','docker'],
+  desc:'Ledger keeps the ledger. The Celery worker (the mill wheel) takes each job from Redis and runs Ledger, and Ledger runs every tool as its own process: Artemis, RegRipper, Volatility 3, Plaso, YARA, The Sleuth Kit, iLEAPP and ALEAPP for phones, Zeek for network captures. Step 02 collects per OS from the mounted image (hives, event logs, $MFT and journals; launchd, BTM and unified logs; cron, systemd, PAM and logins; shadow copies too); step 03 writes every artefact to <code>cooked/</code> as JSON Lines, each record with its host, source, UTC time and techniques; step 04 (<code>--Analysis</code>, <code>--Keywords</code>, <code>--Yara</code>) searches keywords and YARA, extracts IOCs, stacks across hosts, and finds timestomping, alternate data streams and masquerading. Memory images are read by Volatility 3, by profile.'},
+ {id:'pippin', name:'Lookout · threat intelligence', port:'indicators · --threatIntel', pos:[20,-30], r:7, char:'pippin', opt:true,
+  desc:'Lookout keeps watch. The Intel page imports STIX/TAXII bundles, MITRESaw and the Iran APT loader into one table of indicators, each with its group, procedure, technique and source; expiry and confidence sit beside it (STIX\'s own, else 90 days for IPs and domains). With <code>--threatIntel</code> Ledger matches the case against every unexpired indicator, and Smith sees the same context for an artefact. Online lookups (VirusTotal) are off unless turned on, and are for analysts, never for Smith.'},
+ {id:'beacons', name:'ATT&CK tagging', port:'a beacon per tactic · step 05', pos:[45,6], r:7, icon:'flame',
+  desc:'Fifteen beacons, one per Enterprise tactic (ATT&amp;CK v20.1), lit as techniques are tagged from artefacts, event-log rules and attack datasets into <code>mitre_techniques.txt</code>; <code>--Navigator</code> writes an ATT&amp;CK Navigator layer too. The mapping is Ledger\'s, not Smith\'s.'},
+ {id:'fangorn', name:'Timeline · Plaso', port:'step 06 · --Timeline', pos:[70,38], r:10, icon:'clock', opt:true,
+  desc:'psteal builds one super-timeline across every source of a host: the rings of a felled tree, read in order. It is indexed into Splunk or Kibana with the rest when the case is exported.'},
+ {id:'orthanc', name:'Export · Splunk, Elastic, Kibana', port:'step 07 · --Splunk / --Elastic', pos:[100,8], r:10, icon:'export', opt:true, logos:['splunk','elastic','kibana'],
   desc:'<code>--Splunk</code> and <code>--Elastic</code> index the cooked artefacts, with Rowanholt\'s own Splunk app and Kibana dashboards, to local containers or remote servers. The light on the tower goes up as the case is sent.'},
- {id:'erebor', name:'Case store', port:'under the Lonely Mountain', pos:[80,-40], r:9, icon:'db', logos:['postgresql'],
+ {id:'erebor', name:'Case store', port:'Postgres and case directories', pos:[80,-40], r:9, icon:'db', logos:['postgresql'],
   desc:'Postgres holds users, jobs and history, findings, notes and hosts. Case directories on disk: <code>raw/</code> as collected, <code>cooked/</code> per artefact, <code>analysis/</code>, <code>mitre_techniques.txt</code>, timelines and archives. The case browser reads <code>cooked/</code> and <code>analysis/</code>, never <code>raw/</code>.'},
- {id:'smith', name:'Smith · AI analyst', port:'the smithy under Erebor · Ask Smith', pos:[113,-33], r:9, char:'smith', logos:['ollama'],
-  desc:'Smith keeps his forge beside the Dwarves\' mountain and works only from the case files. With Ollama (a local model; nothing leaves the host) he answers questions, writes case summaries and suggests where to look next, from per-host rows numbered <code>[R1]</code>, <code>[R2]</code>…; each answer returns the rows it cited, and Ask Smith offers to flag them. Without Ollama the forge is banked: he says why, and answers fixed questions straight from the case files: hosts, ATT&amp;CK techniques, persistence, logins, IOCs, suspicious commands. His MCP server is a read-only client of Rowanholt\'s API.'},
- {id:'minas', name:'Aragorn · administration', port:'Minas Tirith · Andúril and the lab', pos:[38,60], r:13, char:'aragorn', logos:['docker'],
-  desc:'For admins. Andúril manages Rowanholt\'s own containers: status, logs, restart; it won\'t stop the worker mid-job. The lab: Linux targets, Tart and UTM VMs, test runs from the browser, Gandalf against seeded hosts, and Mordor recordings of Atomic Red Team tests.'},
- {id:'mordor', name:'Mordor · attack datasets', port:'where the shadows lie', pos:[103,62], r:8, icon:'eye',
-  desc:'OTRF Security-Datasets (APT29 day 1 and 2, Atomic sets) and the lab\'s own recordings of Atomic Red Team tests. <code>--Mordor</code> ingests them as event logs, so detections and ATT&amp;CK tagging can be checked against a known attack.'},
+ {id:'smith', name:'Smith · AI analyst', port:'the forge · Ask Smith', pos:[113,-33], r:9, char:'smith', logos:['ollama'],
+  desc:'Smith keeps his forge beside the case store and works only from the case files. With Ollama (a local model; nothing leaves the host) he answers questions, writes case summaries and suggests where to look next, from per-host rows numbered <code>[R1]</code>, <code>[R2]</code>…; each answer returns the rows it cited, and Ask Smith offers to flag them. Without Ollama the forge is banked: he says why, and answers fixed questions straight from the case files: hosts, ATT&amp;CK techniques, persistence, logins, IOCs, suspicious commands. His MCP server is a read-only client of Rowanholt\'s API.'},
+ {id:'minas', name:'Steward · administration', port:'Quartermaster and the lab', pos:[38,60], r:13, char:'aragorn', logos:['docker'],
+  desc:'For admins. Quartermaster manages Rowanholt\'s own containers: status, logs, restart; it won\'t stop the worker mid-job. The lab: Linux targets, Tart and UTM VMs, test runs from the browser, Custodian against seeded hosts, and Crucible\'s recordings of Atomic Red Team tests.'},
+ {id:'mordor', name:'Crucible · attack datasets', port:'recorded attack telemetry', pos:[103,62], r:8, icon:'flask',
+  desc:'OTRF Security-Datasets (Mordor: APT29 day 1 and 2, Atomic sets) and the lab\'s own recordings of Atomic Red Team tests. <code>--Crucible</code> (<code>--Mordor</code>) ingests them as event logs, so detections and ATT&amp;CK tagging can be checked against a known attack.'},
 ];
 const NODE = Object.fromEntries(NODES.map(n => [n.id, n]));
-const SHORT = {shire:'The Shire', havens:'Grey Havens', bree:'Bree', weathertop:'Amon Sûl', rowanhall:'Elrond', pippin:'Pippin',
-  beacons:'Beacons', fangorn:'Fangorn', orthanc:'Orthanc', erebor:'Erebor', smith:'Smith', minas:'Minas Tirith', mordor:'Mordor'};
-const CHAR = {gandalf:'Gandalf', elrond:'Elrond', pippin:'Pippin', aragorn:'Aragorn', smith:'Smith'};
+const SHORT = {shire:'Live hosts', havens:'Cloud', bree:'Web UI', weathertop:'Verify', rowanhall:'Ledger', pippin:'Lookout',
+  beacons:'ATT&CK', fangorn:'Timeline', orthanc:'Export', erebor:'Case store', smith:'Smith', minas:'Steward', mordor:'Crucible'};
+const CHAR = {gandalf:'Custodian', elrond:'Ledger', pippin:'Lookout', aragorn:'Steward', smith:'Smith'};
 const TACTICS = ['Reconnaissance','Resource Development','Initial Access','Execution','Persistence','Privilege Escalation',
   'Stealth','Defense Impairment','Credential Access','Discovery','Lateral Movement','Collection','Command and Control','Exfiltration','Impact'];
 
@@ -176,57 +176,57 @@ const ASK_SMITH = () => state.ollama
   ? 'Ask Smith: the forge is lit. With Ollama he answers from the case files, citing the rows he used, and you can flag them as findings.'
   : 'Ask Smith: no Ollama, so the forge is banked. He says why, and answers fixed questions straight from the case files.';
 const TAIL = [
-  ['pippin', 'With <code>--threatIntel</code>, Pippin\'s palantír: the case is matched against every unexpired indicator.', true],
+  ['pippin', 'With <code>--threatIntel</code>, Lookout: the case is matched against every unexpired indicator.', true],
   ['beacons', 'The beacons are lit: techniques tagged from artefacts and event-log rules into <code>mitre_techniques.txt</code>, one beacon per tactic.'],
-  ['fangorn', 'With <code>--Timeline</code>, Fangorn: Plaso builds one super-timeline, Treebeard\'s rings.', true],
-  ['orthanc', 'With <code>--Splunk</code> or <code>--Elastic</code>, Orthanc: the case is indexed, with Rowanholt\'s Splunk app and Kibana dashboards.', true],
-  ['erebor', 'Into the hoard under the Lonely Mountain: <code>raw/</code>, <code>cooked/</code>, <code>analysis/</code>, <code>mitre_techniques.txt</code>, the timeline.'],
+  ['fangorn', 'With <code>--Timeline</code>, Plaso builds one super-timeline, read like the rings of a tree.', true],
+  ['orthanc', 'With <code>--Splunk</code> or <code>--Elastic</code>, the case is exported and indexed, with Rowanholt\'s Splunk app and Kibana dashboards.', true],
+  ['erebor', 'Into the case store: <code>raw/</code>, <code>cooked/</code>, <code>analysis/</code>, <code>mitre_techniques.txt</code>, the timeline.'],
   ['smith', ASK_SMITH, true],
 ];
 const JOURNEYS = {
- gandalf:{label:'Gandalf archive', hits:[2,3,4,5,6,7,8,11,12], steps:[
-  ['shire','Gandalf calls on a live host with <code>Invoke-Gandalf.ps1</code>, <code>gandalf.sh</code> or <code>gandalf.py</code>: live state first, then the seven lanterns, in order of volatility. Every file is hashed into <code>log.meta</code> and the archive sealed (Password or Key optional).'],
-  ['bree','At the Prancing Pony the archive is uploaded and the job queued in Redis; a bird carries it to the worker.'],
-  ['weathertop','Amon Sûl: decrypted, every file re-hashed against <code>log.meta</code> into <code>gandalf_integrity.jsonl</code>. The stones turn green.'],
-  ['rowanhall','Elrond enters it in the ledger: collect per OS, process every artefact into <code>cooked/</code> JSON Lines, and with <code>--Analysis</code> search keywords, YARA and IOCs.'],
+ gandalf:{label:'Custodian archive', hits:[2,3,4,5,6,7,8,11,12], steps:[
+  ['shire','Custodian calls on a live host with <code>Invoke-Gandalf.ps1</code>, <code>gandalf.sh</code> or <code>gandalf.py</code>: live state first, then the seven lanterns, in order of volatility. Every file is hashed into <code>log.meta</code> and the archive sealed (Password or Key optional).'],
+  ['bree','In the web UI the archive is uploaded and the job queued in Redis; a bird carries it to the worker.'],
+  ['weathertop','Verified: decrypted, every file re-hashed against <code>log.meta</code> into <code>gandalf_integrity.jsonl</code>. The stones turn green.'],
+  ['rowanhall','Ledger enters it in the ledger: collect per OS, process every artefact into <code>cooked/</code> JSON Lines, and with <code>--Analysis</code> search keywords, YARA and IOCs.'],
   ...TAIL]},
  disk:{label:'Disk image', hits:[2,3,4,6,7,8,9,11], steps:[
-  ['bree','A disk image (E01, VMDK, VHD(X), raw or dd) is uploaded or picked from disk. No Gandalf needed: the eagle carries it.'],
-  ['weathertop','Amon Sûl: identified and mounted (ewfmount, qemu-nbd, apfs-fuse).'],
-  ['rowanhall','Elrond collects per OS from the mounted image (shadow copies too), processes every artefact into <code>cooked/</code>, and analyses with <code>--Analysis</code>.'],
+  ['bree','A disk image (E01, VMDK, VHD(X), raw or dd) is uploaded or picked from disk. No Custodian needed: the eagle carries it.'],
+  ['weathertop','Identified and mounted (ewfmount, qemu-nbd, apfs-fuse).'],
+  ['rowanhall','Ledger collects per OS from the mounted image (shadow copies too), processes every artefact into <code>cooked/</code>, and analyses with <code>--Analysis</code>.'],
   ...TAIL]},
  memory:{label:'Memory image', hits:[3,4,6,7,9,12], steps:[
   ['bree','A memory image (raw, AFF4, hiberfil.sys, pagefile.sys, MEMORY.DMP, .vmem) is uploaded or picked from disk.'],
-  ['weathertop','Amon Sûl: recognised as memory, and its profile found.'],
-  ['rowanhall','Elrond runs Volatility 3 by profile: pslist, psscan, cmdline, netscan, malfind, svcscan, and the linux.* and mac.* equivalents.'],
+  ['weathertop','Recognised as memory, and its profile found.'],
+  ['rowanhall','Ledger runs Volatility 3 by profile: pslist, psscan, cmdline, netscan, malfind, svcscan, and the linux.* and mac.* equivalents.'],
   TAIL[0], TAIL[1], TAIL[3], TAIL[4], TAIL[5]]},
  cloud:{label:'Cloud', hits:[2,3,4,5,8,9,13], steps:[
-  ['havens','From the Grey Havens: an AWS, Azure or GCP disk snapshot, CloudTrail or activity logs, Kubernetes audit logs.'],
-  ['bree','At Bree the snapshot becomes a disk image job, queued in Redis.'],
-  ['weathertop','Amon Sûl: identified and mounted.'],
-  ['rowanhall','Elrond collects, processes and analyses it like any disk image; the cloud logs are processed as logs.'],
+  ['havens','From the cloud: an AWS, Azure or GCP disk snapshot, CloudTrail or activity logs, Kubernetes audit logs.'],
+  ['bree','In the web UI the snapshot becomes a disk image job, queued in Redis.'],
+  ['weathertop','Identified and mounted.'],
+  ['rowanhall','Ledger collects, processes and analyses it like any disk image; the cloud logs are processed as logs.'],
   ...TAIL]},
- mordor:{label:'Mordor dataset', hits:[2,3,4,5,6,7,8,9,10,11,12,13,14], steps:[
-  ['mordor','An OTRF Security-Dataset (APT29 day 1 and 2, Atomic sets) or the lab\'s own Atomic Red Team recording leaves the Black Gate.'],
-  ['bree','Picked at Bree: <code>--Mordor</code>.'],
-  ['weathertop','Amon Sûl: read as event logs.'],
-  ['rowanhall','Elrond processes the event logs as if they came from a host.'],
+ mordor:{label:'Attack dataset', hits:[2,3,4,5,6,7,8,9,10,11,12,13,14], steps:[
+  ['mordor','An OTRF Security-Dataset (APT29 day 1 and 2, Atomic sets) or the lab\'s own Atomic Red Team recording comes out of Crucible\'s quarry.'],
+  ['bree','Picked in the web UI: <code>--Crucible</code> (<code>--Mordor</code>).'],
+  ['weathertop','Read as event logs.'],
+  ['rowanhall','Ledger processes the event logs as if they came from a host.'],
   ['beacons','The beacons are lit by the event-log rules: did the right tactics light for a known attack?'],
   TAIL[2], TAIL[3], TAIL[4]]},
  intel:{label:'Threat intel', hits:[], steps:[
-  ['bree','On Pippin\'s page in the web app, import a STIX/TAXII bundle, MITRESaw output or the Iran APT loader.'],
-  ['pippin','Into the palantír: one table of indicators (group, procedure, technique, source), with expiry and confidence beside it. Expired ones stay listed but are left out of matching.'],
-  ['rowanhall','Elrond\'s <code>--threatIntel</code> matches a case against every unexpired indicator.'],
+  ['bree','On Lookout\'s page in the web app, import a STIX/TAXII bundle, MITRESaw output or the Iran APT loader.'],
+  ['pippin','Into one table of indicators (group, procedure, technique, source), with expiry and confidence beside it. Expired ones stay listed but are left out of matching.'],
+  ['rowanhall','Ledger\'s <code>--threatIntel</code> matches a case against every unexpired indicator.'],
   ['smith','Smith sees the same context when he looks at an artefact. Online lookups (VirusTotal, off unless enabled) are for analysts only, never for Smith.', true]]},
  ask:{label:'Ask Smith', hits:[], steps:[
   ['bree','You ask a question in Ask Smith, or from an MCP host through Smith\'s read-only MCP server.'],
   ['erebor','Smith reads the case: <code>cooked/</code> and <code>analysis/</code>, never <code>raw/</code>, as numbered rows per host: <code>[R1]</code>, <code>[R2]</code>…'],
   ['smith', ASK_SMITH]]},
  admin:{label:'Administration', hits:[], steps:[
-  ['bree','An admin opens Aragorn in the web app.'],
-  ['minas','Andúril keeps Rowanholt\'s own containers: status, logs, restart. It won\'t stop the worker mid-job.'],
-  ['shire','The lab: Linux targets, Tart and UTM VMs, test runs from the browser, Gandalf against seeded hosts.'],
-  ['mordor','Atomic Red Team runs in the lab are recorded as Mordor datasets, ready to replay.']]},
+  ['bree','An admin opens Steward in the web app.'],
+  ['minas','Quartermaster keeps Rowanholt\'s own containers: status, logs, restart. It won\'t stop the worker mid-job.'],
+  ['shire','The lab: Linux targets, Tart and UTM VMs, test runs from the browser, Custodian against seeded hosts.'],
+  ['mordor','Atomic Red Team runs in the lab are recorded as Crucible datasets, ready to replay.']]},
 };
 const jkeys = Object.keys(JOURNEYS);
 const state = {ollama:true};
@@ -235,7 +235,7 @@ const state = {ollama:true};
 const host = document.getElementById('scene');
 let renderer;
 try { renderer = new THREE.WebGLRenderer({antialias:true}); }
-catch (e) { host.innerHTML = '<p class="fallback">WebGL isn\'t available in this browser. The realm map under About shows the same architecture.</p>'; throw e; }
+catch (e) { host.innerHTML = '<p class="fallback">WebGL isn\'t available in this browser. The architecture maps under About show the same thing.</p>'; throw e; }
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.12;
@@ -418,14 +418,14 @@ function hRaw(x, z) {
   let h = (fbm(x * 0.016 + 3, z * 0.016, 4) - 0.5) * 7 + (fbm(x * 0.07, z * 0.07, 3) - 0.5) * 1.5 + 1.8;
   h += smooth(-48, -110, z) * (4 + fbm(x * 0.03, z * 0.03, 3) * 10);                    // highlands to the north
   h += smooth(150, 200, x) * (2 + fbm(x * 0.05 + 5, z * 0.05, 3) * 9);                  // and the east
-  h += 9 * ridge(segDist(x, z, -40, 76, 26, 70), 8) * (0.7 + 0.5 * fbm(x * 0.08, z * 0.08, 2)); // the White Mountains, ending at Minas Tirith
+  h += 9 * ridge(segDist(x, z, -40, 76, 26, 70), 8) * (0.7 + 0.5 * fbm(x * 0.08, z * 0.08, 2)); // a mountain ridge, ending at the white city (administration)
   h += 3.6 * ridge(segDist(x, z, ...BEACON_LINE[0], ...BEACON_LINE[1]), 5);             // the beacon hills
   const wall = Math.max(ridge(segDist(x, z, 92, 42, 170, 42), 4.2), ridge(segDist(x, z, 92, 42, 92, 56), 4.2), ridge(segDist(x, z, 92, 68, 92, 110), 4.2));
   const mx = (fbm(z * 0.06, 3.3, 3) - 0.5) * 10, mz = (fbm(x * 0.06, 7.7, 3) - 0.5) * 10;
   const inside = smooth(92, 99, x + mx) * smooth(42, 49, z + mz);
-  h += (1.2 + 0.6 * fbm(x * 0.1, z * 0.1, 2) - h) * inside;                            // the ash plain of Mordor
+  h += (1.2 + 0.6 * fbm(x * 0.1, z * 0.1, 2) - h) * inside;                            // the ash plain round the attack datasets
   h += 10 * wall * (0.5 + 0.9 * fbm(x * 0.25, z * 0.25, 3)) + wall * Math.max(0, Math.sin(x * 0.9 + z * 1.3)) * 3;
-  h += 8.5 * Math.max(0, 1 - Math.hypot(x + 42, z + 26) / 15) ** 1.3;                    // Weathertop
+  h += 8.5 * Math.max(0, 1 - Math.hypot(x + 42, z + 26) / 15) ** 1.3;                    // the verification hill
   h = Math.min(h, WATER - 0.3 + (96 + (fbm(x * 0.045, 9.1, 4) - 0.5) * 40 + Math.sin(x * 0.07) * 4 - z) * 0.2);    // the southern shore
   const d = x - coastX(z), cliff = smooth(14, -40, z);
   h = Math.min(h, WATER - 0.3 + d * (0.14 + cliff * 0.75));                              // the sea, cliffs to the north
@@ -632,7 +632,7 @@ function archWindow(w, h, c = 0xffc878) { const sh = new THREE.Shape(); sh.moveT
   const m = new THREE.Mesh(new THREE.ShapeGeometry(sh, 10), mat(c, {e:c, ei:1.1, r:0.4})); return m; }
 const barkMat = tmat('bark', 1, 2, {bump:0.06});
 
-// The Shire: Gandalf at a smial, the seven lanterns, the sealed archive on its cart
+// Live hosts: Custodian at a hillside house, the seven lanterns, the sealed archive on its cart
 const fx = {}; // per-place effects, driven by the journey
 function shire(g) {
   const hill = new THREE.Mesh(blobGeo(3.6, 3, 0.5, 0x34502a, 0x5a7838, 0.08), vcMat()); hill.position.set(0, -0.2, -2.3); g.add(hill);
@@ -649,7 +649,7 @@ function shire(g) {
   for (let i = 0; i < 9; i++) { const p = new THREE.Mesh(BOX(0.06, 0.45, 0.06), tmat('planks', 0.1, 0.2)); p.position.set(-3 + i * 0.4, 0.22, 3.4); g.add(p); }
   const rail = new THREE.Mesh(BOX(3.3, 0.05, 0.04), tmat('planks', 1, 0.1)); rail.position.set(-1.4, 0.36, 3.4); g.add(rail);
   for (let i = 0; i < 26; i++) { const f = new THREE.Mesh(SPH(0.07, 6), mat([0xe0b040, 0xc0402f, 0xe6e0d0, 0x9a6ad0][i % 4], {r:0.7})); f.position.set(-2.9 + rnd() * 3.1, 0.15, 2.6 + rnd() * 0.6); g.add(f); }
-  // Gandalf: grey, hatted, staff in hand, satchel at his side
+  // Custodian: grey, hatted, staff in hand, satchel at his side
   const G = figure({robe:0x5f625a, cloak:0x4c4e47, hair:0xd8d4cc, long:1, beard:0xe0dcd2, beardLen:0.42, hat:'wizard', hatC:0x55554f, belt:true,
     armR:[[0, 0, 0], [-0.12, -0.26, 0.12], [-0.16, -0.38, 0.3]], armL:[[0, 0, 0], [0.06, -0.3, 0.06], [0.08, -0.55, 0.12]]});
   G.g.position.set(1.9, 0, 3.0); G.g.rotation.y = -0.5; g.add(G.g);
@@ -699,7 +699,7 @@ function havens(g, n) {
     fx.ships.push(s); });
 }
 function bree(g) {
-  // the Prancing Pony: stone below, timber above, smoke from the chimney; the dovecote is the job queue
+  // the inn: stone below, timber above, smoke from the chimney; the dovecote is the job queue
   const stone = tmat('stone', 2, 1, {bump:0.07});
   const low = new THREE.Mesh(BOX(3.8, 1.4, 2.6), stone); low.position.y = 0.7; g.add(low);
   const up = gable({w:4.0, d:2.8, h:1.25, roofH:1.6, wall:tmat('plaster', 2, 1, {bump:0.02}), roof:tmat('thatch', 3, 3, {bump:0.08}), gableMat:tmat('plaster', 2, 1)}); up.position.y = 1.4; g.add(up);
@@ -724,7 +724,7 @@ function bree(g) {
   g.add(plight(0xffa050, 1.8, 12, 0, 1.6, 2.6));
 }
 function weathertop(g) {
-  // Amon Sûl: a broken tower and a ring of standing stones, which turn green when every hash matches
+  // Verify: a broken tower and a ring of standing stones, which turn green when every hash matches
   fx.stones = [];
   for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, h = 0.9 + ((i * 7) % 5) * 0.18;
     const m = new THREE.MeshStandardMaterial({map:texture('rock', 0.4, 1), color:0xa09a8c, roughness:0.95, emissive:0x000000, flatShading:true});
@@ -736,7 +736,7 @@ function weathertop(g) {
   const ring = new THREE.Mesh(new THREE.TorusGeometry(3.0, 0.05, 6, 64), mat(0xa7db6c, {e:0xa7db6c, ei:0, t:true, o:0})); ring.rotation.x = Math.PI / 2; ring.position.y = 0.06; g.add(ring); fx.wtRing = ring;
 }
 function rowanhall(g) {
-  // the Hall under the Rowan: pale stone, slate roofs, a waterfall turning the mill (the worker); Elrond keeps the ledger on the terrace
+  // the Hall under the Rowan: pale stone, slate roofs, a waterfall turning the mill (the worker); Ledger keeps the ledger on the terrace
   const wall = tmat('white', 2, 1, {bump:0.03}), slate = tmat('slate', 3, 3, {bump:0.05});
   const terr = new THREE.Mesh(BOX(7.2, 0.4, 3.2), tmat('white', 3, 1)); terr.position.set(0, 0.2, 1.4); g.add(terr);
   const hall = gable({w:4.4, d:2.6, h:2.0, roofH:1.9, wall, roof:slate, gableMat:wall, overhang:0.3}); hall.position.set(0, 0.4, -0.8); g.add(hall);
@@ -763,7 +763,7 @@ function rowanhall(g) {
   for (const s of [-0.18, 0.18]) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.85, 0.05, 6, 28), wm); r.rotation.y = Math.PI / 2; r.position.x = s; wheel.add(r); }
   for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; const p = new THREE.Mesh(BOX(0.4, 0.06, 0.32), wm); p.position.set(0, Math.cos(a) * 0.82, Math.sin(a) * 0.82); p.rotation.x = -a; wheel.add(p);
     const sp = new THREE.Mesh(BOX(0.05, 1.6, 0.05), wm); sp.rotation.x = a / 2; wheel.add(sp); }
-  // Elrond, the ledger-keeper: rowan-red cloak over olive, at her lectern with the great ledger
+  // Ledger, the ledger-keeper: rowan-red cloak over olive, at her lectern with the great ledger
   const E = figure({robe:0x5a6236, cloak:0x7a2026, trim:0xc9a24a, hair:0xd8bf86, long:1.3, armR:[[0, 0, 0], [-0.04, -0.22, 0.16], [0.06, -0.3, 0.34]], armL:[[0, 0, 0], [0.04, -0.24, 0.16], [-0.02, -0.34, 0.32]]});
   E.g.position.set(-1.2, 0.4, 1.6); E.g.rotation.y = 0.45; g.add(E.g); fx.elrond = E;
   const brooch = new THREE.Group(); brooch.position.set(0.1, 1.32, 0.2); E.g.add(brooch);
@@ -783,7 +783,7 @@ function rowanhall(g) {
   g.add(plight(0xffcf8a, 2.0, 14, -1, 2.2, 2.8));
 }
 function pippin(g) {
-  // Dol Baran: a knoll of rocks; Pippin, hooded in green, holds the palantír
+  // threat intelligence: a knoll of rocks; Lookout, hooded in green, holds a glowing orb
   [[-1.4, -1.2, 1.4, 1.0], [1.2, -1.6, 1.1, 1.3], [-2.4, 0.6, 0.9, 0.8], [2.2, 0.4, 0.8, 0.9], [0, -2.4, 1.6, 1.5]].forEach(([x, z, r, sy], i) => {
     const m = new THREE.Mesh(rockGeo(r, 3, 0.3, 1.2, sy, 1, i * 7), rockMat); m.position.set(x, r * sy * 0.45, z); g.add(m); });
   const seat = new THREE.Mesh(rockGeo(0.55, 2, 0.2, 1.4, 0.55, 1.1, 4), rockMat); seat.position.set(0, 0.22, 0.2); g.add(seat);
@@ -810,7 +810,7 @@ function beacons(g, n) {
   fx.beaconLight = plight(0xff8a30, 0, 60, 0, 6, 0); g.add(fx.beaconLight);
 }
 function fangorn(g) {
-  // an Ent among the trees, and a cut stump whose rings are the timeline
+  // a tree with a face among the trees, and a cut stump whose rings are the timeline
   const ent = new THREE.Group(); ent.position.set(-0.6, 0, -0.6); ent.scale.setScalar(1.3); g.add(ent); fx.ent = ent;
   const entBark = tmat('bark', 1, 2, {bump:0.08, c:0xb8a890});
   ent.add(new THREE.Mesh(taperTube([[0, 0, 0], [0.15, 1.4, 0.05], [-0.1, 2.8, 0], [0.05, 3.9, -0.1]], t => 0.62 - t * 0.32, {rs:14, ts:20}), entBark));
@@ -840,7 +840,7 @@ function orthanc(g) {
   const floor = new THREE.Mesh(new THREE.CircleGeometry(4.6, 48), tmat('stone', 6, 6, {c:0x8a8378})); floor.rotation.x = -Math.PI / 2; floor.position.y = 0.03; g.add(floor);
 }
 function erebor(g) {
-  // the Front Gate of the Lonely Mountain, the hoard glinting inside
+  // a gate into the mountain, the case store glinting inside
   const st = tmat('rock', 2, 2, {bump:0.1, c:0xb0a898});
   const face = new THREE.Mesh(BOX(6, 5.5, 1.4), st); face.position.set(0, 2.75, -1.6); g.add(face);
   const arch = new THREE.Shape(); arch.moveTo(-1.0, 0); arch.lineTo(1.0, 0); arch.lineTo(1.0, 2.2); arch.absarc(0, 2.2, 1.0, 0, Math.PI, false); arch.lineTo(-1.0, 0);
@@ -896,7 +896,7 @@ function smith(g) {
   const pts = new THREE.Points(sp, spM); pts.position.set(0.9, 0.8, 0.5); g.add(pts); fx.sparks = {pts, v:Array.from({length:N}, () => V3()), t:9};
 }
 function minas(g) {
-  // Minas Tirith: seven white tiers and the tower; Aragorn with Andúril at the gate, the containers and the lab beside him
+  // administration: seven white tiers and the tower; Steward with a sword at the gate, Quartermaster's containers and the lab beside him
   const white = tmat('white', 6, 1, {bump:0.03});
   const city = new THREE.Group(); city.scale.setScalar(0.78); city.position.z = -1.0; g.add(city);
   for (let t = 0; t < 7; t++) { const r = 5.6 - t * 0.68, y = t * 0.75;
@@ -905,13 +905,12 @@ function minas(g) {
   const tower = new THREE.Mesh(CYL(0.42, 0.52, 4.2, 20), tmat('white', 1, 2)); tower.position.set(0, 5.25 + 2.1, -1.5); city.add(tower);
   const tcap = new THREE.Mesh(CONE(0.55, 0.9, 20), tmat('white', 1, 0.5)); tcap.position.set(0, 9.8, -1.5); city.add(tcap);
   const pole = new THREE.Mesh(CYL(0.02, 0.02, 1.0, 6), mat(0x3a3a3a)); pole.position.set(0, 10.6, -1.5); city.add(pole);
-  const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.45), mat(0x15181e, {side:THREE.DoubleSide})); flag.position.set(0.4, 10.85, -1.5); city.add(flag); fx.minasFlag = flag;
-  const tree = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.3), mat(0xf2efe6, {side:THREE.DoubleSide})); tree.position.set(0.4, 10.85, -1.49); city.add(tree);
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.45), mat(0xd0402f, {side:THREE.DoubleSide})); flag.position.set(0.4, 10.85, -1.5); city.add(flag); fx.minasFlag = flag;
   const gate = new THREE.Mesh(BOX(1.0, 0.65, 0.1), mat(0x2a2a2e, {m:0.6, r:0.4})); gate.position.set(0, 0.33, 4.2); city.add(gate);
   fx.tierWin = [];
   for (let t = 0; t < 6; t++) for (let k = 0; k < 7; k++) { const r = 5.6 - t * 0.68, a = -0.9 + k * 0.3 + t * 0.05;
     const wm = mat(0xffd890, {e:0xffb050, ei:0.6}); const w = new THREE.Mesh(BOX(0.12, 0.16, 0.05), wm); w.position.set(Math.sin(a) * (r + 0.13), t * 0.75 + 0.42, -1.5 + Math.cos(a) * (r + 0.13)); w.rotation.y = a; city.add(w); fx.tierWin.push(wm); }
-  // Aragorn, Andúril raised
+  // Steward, sword raised
   const Ar = figure({robe:0x5a3c26, cloak:0x3e4a30, hood:true, hair:0x4a3322, long:0.6, beard:0x3a2a1c, beardLen:0.08, belt:true, bareArms:true,
     armR:[[0, 0, 0], [-0.1, 0.18, 0.08], [-0.12, 0.42, 0.12]]});
   Ar.g.position.set(-2.3, 0, 5.0); Ar.g.rotation.y = 0.35; g.add(Ar.g);
@@ -920,7 +919,7 @@ function minas(g) {
   const blade = new THREE.Mesh(BOX(0.045, 1.05, 0.012), bladeM); blade.position.y = 0.6; sword.add(blade);
   const guard = new THREE.Mesh(BOX(0.26, 0.035, 0.05), mat(0xc9a24a, {m:0.8, r:0.3})); guard.position.y = 0.06; sword.add(guard);
   const grip = new THREE.Mesh(CYL(0.018, 0.018, 0.14, 8), mat(0x2a1d14)); grip.position.y = -0.02; sword.add(grip);
-  // Andúril's charge: Rowanholt's own containers
+  // Quartermaster's charge: Rowanholt's own containers
   fx.containers = [];
   [[2.4, 4.4, 0], [3.5, 4.0, 0], [2.9, 4.3, 1], [4.4, 3.4, 0], [4.0, 3.6, 1]].forEach(([x, z, lvl], i) => {
     const c = new THREE.Mesh(BOX(0.95, 0.55, 0.5), mat(0x5d7590, {r:0.6, m:0.3})); c.position.set(x, 0.28 + lvl * 0.56, z); c.rotation.y = -0.4; g.add(c);
@@ -931,21 +930,15 @@ function minas(g) {
   g.add(plight(0xffe0b0, 1.6, 16, 0, 3, 5));
 }
 function mordor(g, n) {
-  // the Black Gate where the datasets come out; Barad-dûr, the Eye and Mount Doom behind
+  // Crucible's quarry: a dark rock face the datasets are cut from, blocks and crates on its floor; the volcano smokes behind
   const dark = new THREE.MeshStandardMaterial({color:0x1d1816, roughness:0.75, metalness:0.2});
-  const gate = new THREE.Mesh(BOX(1.0, 3.2, 6.0), dark); gate.position.set(-4.4, 1.6, 0); g.add(gate);
-  for (const s of [-1, 1]) { const t = new THREE.Mesh(CYL(0.8, 1.0, 5.0, 8), dark); t.position.set(-4.4, 2.5, s * 3.5); g.add(t);
-    const c = new THREE.Mesh(CONE(0.9, 1.2, 8), dark); c.position.set(-4.4, 5.6, s * 3.5); g.add(c); }
+  const rockM = mat(0x3b342f, {r:0.95});
+  for (let i = 0; i < 5; i++) { const r = new THREE.Mesh(rockGeo(1.5 + (i % 3) * 0.45, 3, 0.3, 1, 1.5, 0.9, i * 3.1), rockM); r.position.set(-4.4 + (i % 2) * 0.7, 1.4, -3.8 + i * 1.9); g.add(r); }
+  for (let i = 0; i < 3; i++) { const b = new THREE.Mesh(BOX(0.9, 0.6, 0.7), dark); b.position.set(-2.8 + i * 0.35, 0.3, 2.0 - i * 1.2); b.rotation.y = i * 0.45; g.add(b); }
   const cr = new THREE.Group(); g.add(cr);
   for (let i = 0; i < 4; i++) { const box = new THREE.Mesh(BOX(0.6, 0.45, 0.45), tmat('planks', 0.4, 0.3, {c:0x6a4a3a})); box.position.set(-1.6 + (i % 2) * 0.7, 0.23 + (i >> 1) * 0.46, -0.6 + (i % 3) * 0.4); cr.add(box); }
-  // Barad-dûr and Mount Doom are far behind the gate, in world space
-  const B = new THREE.Group(); const bx = 128, bz = 64, by = hRaw(bx, bz); B.position.set(bx, by, bz); scene.add(B);
-  const tw = new THREE.Mesh(new THREE.LatheGeometry([[3.2, 0], [2.6, 4], [1.8, 10], [1.4, 16], [2.0, 17], [1.0, 19], [0.5, 22], [0, 22.3]].map(([r, y]) => V2(r, y)), 10), dark); B.add(tw);
-  for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; B.add(new THREE.Mesh(taperTube([[Math.cos(a) * 1.2, 21, Math.sin(a) * 1.2], [Math.cos(a) * 1.8, 23, Math.sin(a) * 1.8], [Math.cos(a) * 1.6, 25, Math.sin(a) * 1.6]], [0.3, 0.02], {rs:6, ts:6}), dark)); }
-  const eyeM = mat(0xff6a1a, {e:0xff5010, ei:2.5, r:0.4}); const eye = new THREE.Mesh(SPH(1.0, 24), eyeM); eye.scale.set(1.6, 0.8, 0.5); eye.position.y = 24.2; B.add(eye); fx.eye = eye; fx.eyeM = eyeM;
-  const pupil = new THREE.Mesh(BOX(0.25, 1.4, 0.1), mat(0x000000)); pupil.position.set(0, 0, 0.98); eye.add(pupil);
-  B.add(plight(0xff5a1a, 4, 70, 0, 24, 3));
-  shadowed(B); B.traverse(o => { if (o.isMesh) o.userData.node = n; });
+  g.add(plight(0xff7a3a, 1.2, 14, -2.5, 2.5, 0));
+  // the volcano, far behind, in world space
   const lava = new THREE.Mesh(CONE(1.5, 1.4, 16), mat(0xff5a10, {e:0xff3a00, ei:2.4})); lava.position.set(DOOM.x, doom.position.y + 7.6, DOOM.z); scene.add(lava); fx.lava = lava.material;
   smoke(scene, DOOM.x, doom.position.y + 8.6, DOOM.z, 5, 0x4a3a34);
   fx.doomLight = plight(0xff4a10, 4, 90, DOOM.x, doom.position.y + 12, DOOM.z); scene.add(fx.doomLight);
@@ -960,7 +953,7 @@ const ICONS = {
   clock:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5.5"/><circle cx="12" cy="12" r="2"/>',
   export:'<path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/>',
   db:'<ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v14c0 1.7 3 3 7 3s7-1.3 7-3V5"/><path d="M5 12c0 1.7 3 3 7 3s7-1.3 7-3"/>',
-  eye:'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  flask:'<path d="M9 3h6M10 3v6l-5 10a1.5 1.5 0 0 0 1.3 2h11.4a1.5 1.5 0 0 0 1.3-2L14 9V3"/><path d="M7.5 15h9"/>',
 };
 function roundRect(x, a, b, w, h, r) { x.beginPath(); x.moveTo(a + r, b); x.arcTo(a + w, b, a + w, b + h, r); x.arcTo(a + w, b + h, a, b + h, r); x.arcTo(a, b + h, a, b, r); x.arcTo(a, b, a + w, b, r); x.closePath(); }
 function iconTexture(inner, stroke = '#f0dba5') {
@@ -1041,7 +1034,7 @@ Promise.all([...new Set(NODES.flatMap(n => n.logos || []))].map(k => fetch(`./ve
   const d = (t.match(/<path[^>]*\sd="([^"]+)"/) || [])[1]; if (d) LOGO_SVG[k] = `<svg viewBox="0 0 24 24" aria-label="${LOGO_NAME[k]}"><title>${LOGO_NAME[k]}</title><path d="${d}"/></svg>`; }).catch(() => {})))
   .then(() => NODES.forEach(n => { n._el.querySelector('.lg').innerHTML = (n.logos || []).map(k => LOGO_SVG[k] || '').join(''); }));
 
-// ---------- the Great Eagle: it carries the evidence from place to place ----------
+// ---------- the eagle: it carries the evidence from place to place ----------
 function featherGeo(len, w, base, tip, tipAt, shaft) {
   const s = new THREE.Shape(); s.moveTo(0, 0);
   s.quadraticCurveTo(w * 0.62, len * 0.12, w * 0.52, len * 0.58); s.quadraticCurveTo(w * 0.38, len * 0.94, 0, len);
@@ -1091,7 +1084,7 @@ function greatEagle() {
   g._wings = wings; return g;
 }
 const eagle = greatEagle(); eagle.scale.setScalar(2.1); shadowed(eagle); scene.add(eagle);
-// the messenger from Bree's dovecote to the worker
+// the messenger from the web UI's dovecote to the worker
 const messenger = new THREE.Group();
 { const bm = mat(0xe8e4da, {r:0.6}); const b = new THREE.Mesh(SPH(0.22, 10), bm); b.scale.set(0.7, 0.7, 1.4); messenger.add(b);
   const h = new THREE.Mesh(SPH(0.13, 10), bm); h.position.set(0, 0.1, 0.3); messenger.add(h);
@@ -1278,12 +1271,12 @@ function since(id) { return simT - NODE[id]._fx; }
 const glowColour = new THREE.Color();
 function effects(dt, ts) {
   const J = jkeys[ji];
-  // the Shire: lanterns lit in turn, the seal pressed
+  // live hosts: lanterns lit in turn, the seal pressed
   const sh = since('shire'), shireOn = NODE.shire._visited && J === 'gandalf';
   fx.lanterns.forEach((l, i) => { const on = shireOn ? (sh > 0.3 + i * 0.35 ? 1 : 0) : 0.25; l.material.emissiveIntensity = on * (1.6 + Math.sin(ts * 9 + i) * 0.15); });
   fx.seal.material.emissiveIntensity = shireOn && sh > 3 ? 0.6 + 0.3 * Math.sin(ts * 3) : 0.1;
   fx.staff.material.emissiveIntensity = 1.6 + Math.sin(ts * 2) * 0.5;
-  // Bree: the windows, the sign, the dovecote and its messenger
+  // web UI: the windows, the sign, the dovecote and its messenger
   const br = Math.max(0, 1 - since('bree') / 4);
   fx.breeWin.forEach((w, i) => w.material.emissiveIntensity = 1.1 + br * 1.2 + Math.sin(ts * 2 + i) * 0.05);
   fx.sign.rotation.x = Math.sin(ts * 1.4) * 0.12;
@@ -1291,7 +1284,7 @@ function effects(dt, ts) {
   if (msg.t < 1) { msg.t = Math.min(1, msg.t + dt * 0.28); const a = fx.loft(), b = fx.wheel.getWorldPosition(tmp2).clone().add(V3(0, 3, 0)), k = msg.t;
     messenger.position.lerpVectors(a, b, k); messenger.position.y += Math.sin(k * Math.PI) * 18; tmp.lerpVectors(a, b, Math.min(1, k + 0.02)); tmp.y = messenger.position.y + Math.cos(k * Math.PI) * 0.4;
     messenger.lookAt(tmp); messenger._w.forEach((w, i) => w.rotation.z = (i ? -1 : 1) * Math.sin(ts * 16) * 0.7); messenger.visible = true; } else messenger.visible = false;
-  // Amon Sûl: the stones light in turn: green for verified hashes, parchment for a mount
+  // verify: the stones light in turn: green for verified hashes, parchment for a mount
   const wt = since('weathertop'), wtOn = NODE.weathertop._visited;
   glowColour.setHex(J === 'gandalf' ? 0x5fae3a : 0xc9a860);
   fx.stones.forEach((m, i) => { const on = wtOn && wt > i * 0.18; m.emissive.copy(on ? glowColour : glowColour.clone().setHex(0)); m.emissiveIntensity = on ? 0.32 + 0.1 * Math.sin(ts * 3 + i) : 0; });
@@ -1303,7 +1296,7 @@ function effects(dt, ts) {
   fx.imlWin.forEach(m => m.emissiveIntensity = working ? 1.8 : 1.0);
   fx.fallsTex.offset.y = ts * 0.9;
   fx.elrond.armR.rotation.x = working ? Math.sin(ts * 5) * 0.08 : 0; fx.elrond.head.rotation.x = 0.25;
-  // Pippin: the palantír flares
+  // Lookout: the orb flares
   const pp = since('pippin'), pf = NODE.pippin._visited ? Math.max(0, 1 - Math.abs(pp - 1.5) / 3.5) : 0;
   fx.palantir.material.emissiveIntensity = 0.2 + pf * 2.2 + Math.sin(ts * 2.3) * 0.08; fx.palLight.intensity = 0.4 + pf * 6;
   fx.palCore.scale.setScalar(0.8 + pf * 0.9 + Math.sin(ts * 5) * 0.08); fx.palCore.rotation.y += dt;
@@ -1311,14 +1304,14 @@ function effects(dt, ts) {
   const hits = JOURNEYS[J].hits, bc = since('beacons'), bOn = NODE.beacons._visited;
   let lit = 0; fx.beacons.forEach((f, i) => { const k = hits.indexOf(i), on = bOn && k >= 0 && bc > 0.4 + k * 0.32; f.visible = on; if (on) lit++; });
   fx.beaconLight.intensity = lit * 0.6;
-  // Fangorn: the rings turn, the Ent's eyes open
+  // timeline: the rings turn, the tree's eyes open
   const fg = since('fangorn'), fOn = NODE.fangorn._visited && fg < 7;
   fx.ringFace.rotation.z += dt * (fOn ? 1.8 : 0.05); fx.ringMat.emissiveIntensity = fOn ? 0.5 : 0;
   fx.entEyes.forEach(m => m.emissiveIntensity = fOn ? 2.4 : 0.35); fx.ent.rotation.y = Math.sin(ts * 0.3) * 0.08;
-  // Orthanc: the light goes up as the case is sent
+  // export: the light goes up as the case is sent
   const oc = since('orthanc'), oOn = NODE.orthanc._visited ? Math.max(0, 1 - Math.abs(oc - 2) / 3.5) : 0;
   fx.orLamp.material.emissiveIntensity = 0.3 + oOn * 3; fx.orBeam.material.opacity = oOn * 0.28; fx.orLight.intensity = oOn * 6;
-  // Erebor: the gate glows as the case is laid down
+  // case store: the gate glows as the case is laid down
   const er = since('erebor'), eOn = NODE.erebor._visited ? Math.max(0, 1 - er / 6) : 0;
   fx.gate.emissiveIntensity = 0.4 + eOn * 1.6 + Math.sin(ts * 1.7) * 0.05; fx.gateLight.intensity = 1 + eOn * 4;
   // Smith: the forge burns with Ollama and is banked without; he strikes, the sparks fly
@@ -1335,13 +1328,12 @@ function effects(dt, ts) {
     if (S.t === dt) S.v.forEach(v => v.set((Math.random() - 0.5) * 2.4, 1 + Math.random() * 2.2, (Math.random() - 0.5) * 2.4));
     for (let i = 0; i < S.v.length; i++) { const t = S.t; P.setXYZ(i, S.v[i].x * t * 0.5, S.v[i].y * t * 0.5 - 2.2 * t * t, S.v[i].z * t * 0.5); }
     P.needsUpdate = true; S.pts.material.opacity = Math.max(0, 1 - S.t / 0.7); }
-  // Minas Tirith: the containers blink, Andúril catches the light
+  // administration: the containers blink, the sword catches the light
   fx.containers.forEach((m, i) => m.emissiveIntensity = Math.sin(ts * 2.2 + i * 1.9) > -0.6 ? 1.2 : 0.1);
   fx.anduril.emissiveIntensity = 0.15 + Math.max(0, Math.sin(ts * 0.8)) ** 8 * 1.6 + (NODE.minas._visited && since('minas') < 4 ? 0.8 : 0);
   fx.minasFlag.rotation.y = Math.sin(ts * 1.6) * 0.25;
   fx.tierWin.forEach((m, i) => m.emissiveIntensity = 0.5 + 0.2 * Math.sin(ts * 0.7 + i));
-  // Mordor: the Eye follows the eagle
-  fx.eye.lookAt(eagle.position); fx.eye.rotateX(0); fx.eyeM.emissiveIntensity = 2.2 + Math.sin(ts * 1.9) * 0.5 + (NODE.mordor._visited && since('mordor') < 4 ? 1.5 : 0);
+  // the volcano glows
   fx.lava.emissiveIntensity = 2.2 + Math.sin(ts * 2.6) * 0.5; fx.doomLight.intensity = 4 + Math.sin(ts * 2.1) * 1.2;
   fx.ships.forEach((s, i) => { s.position.y = (WATER - NODE.havens._gy) / LOC_SCALE + Math.sin(ts * 1.1 + i) * 0.05; s.rotation.z = Math.sin(ts * 0.9 + i * 2) * 0.03; });
 }

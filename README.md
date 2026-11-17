@@ -206,8 +206,8 @@ Custodian acquires, Ledger analyses, Smith answers. Four pictures show how. In t
       <b>Custodian's acquisition flow.</b> The three collectors, what each takes in order of volatility, how locked files are read, and how the hashed, encrypted archive reaches Ledger.
     </td>
     <td width="50%" valign="top">
-      <a href="./src/web/frontend/public/architecture/rowanholt-journey.html"><img src="./src/web/frontend/public/architecture/journey.jpg" alt="Rowanholt's startup stages"/></a><br>
-      <b>Startup stages.</b> What a start does, in order: Docker, the images, the services, then Rowanholt opening, with the same ETA wording as the desktop apps. Open it with <code>rowanholt map journey</code> or under About.
+      <a href="./src/web/frontend/public/architecture/rowanholt-journey.html"><img src="./src/web/frontend/public/architecture/journey.jpg" alt="The evidence's journey through Rowanholt, in 3D"/></a><br>
+      <b>The evidence's journey.</b> An interactive 3D map: an eagle carries each kind of evidence between the stops, from Custodian and the web UI through Ledger to ATT&amp;CK tagging, export, the case store and Smith. Open it with <code>rowanholt map journey</code> or under About.
     </td>
   </tr>
 </table>

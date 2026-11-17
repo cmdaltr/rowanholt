@@ -24,7 +24,7 @@
 
 ### 📐 Architecture
 
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System design, components, data flow; the architecture map, Ledger's roads, Custodian's acquisition flow and the startup stages (`rowanholt map`)
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System design, components, data flow; the architecture map, Ledger's roads, Custodian's acquisition flow and the 3D evidence journey (`rowanholt map`)
 - **[REQUIREMENTS.md](REQUIREMENTS.md)** - System requirements and dependencies
 - **[FUNCTIONALITY.md](FUNCTIONALITY.md)** - File-descriptor handling, retries and other operational behaviour
 - **[PROGRESS_TRACKING.md](PROGRESS_TRACKING.md)** - How a job's progress percentage is worked out

@@ -53,7 +53,7 @@ It follows its own link back to the repository, so moving the clone means runnin
 | `rowanholt lab <command>` | The test lab, `lab/lab.sh` |
 | `rowanholt scripts` | Lists every script under `scripts/` |
 | `rowanholt <group> <name> [args]` | One of them, e.g. `rowanholt jobs status`, `rowanholt siem splunk-restart`, `rowanholt docker clean` |
-| `rowanholt map [realm\|elrond\|gandalf\|journey]` | Opens an architecture page; `journey` (the startup stages, also `machine`) is served on 127.0.0.1:5690 until Ctrl-C |
+| `rowanholt map [realm\|elrond\|gandalf\|journey]` | Opens an architecture page; `journey` (the interactive 3D map of the evidence's journey, also `machine`) is served on 127.0.0.1:5690 until Ctrl-C |
 | `rowanholt app [install\|uninstall] [--dock]` | The desktop app: builds `Rowanholt.app` on macOS (`--dock` pins it), a menu entry on Linux; see `desktop/README.md` |
 | `rowanholt where` | Prints the repository path |
 

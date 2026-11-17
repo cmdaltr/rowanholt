@@ -568,7 +568,7 @@ open_map() {
         journey|machine)
             # ES modules don't load from file://, so the 3D page is served on loopback
             local port="${ROWANHOLT_MAP_PORT:-5690}"
-            echo "The Rowanholt journey: http://127.0.0.1:$port/rowanholt-journey.html (Ctrl-C to stop)"
+            echo "The evidence's journey in 3D: http://127.0.0.1:$port/rowanholt-journey.html (Ctrl-C to stop)"
             (sleep 1; open_url "http://127.0.0.1:$port/rowanholt-journey.html") &
             exec "${ROWANHOLT_PYTHON:-python3}" -m http.server "$port" --bind 127.0.0.1 -d "$dir" ;;
         *) echo "Unknown map '$1': realm, elrond, gandalf or journey" >&2; return 1 ;;
