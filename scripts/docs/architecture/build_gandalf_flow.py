@@ -1,7 +1,7 @@
 """
-Builds Gandalf's acquisition flow: the three collectors, how each reaches a host,
+Builds Custodian's acquisition flow: the three collectors, how each reaches a host,
 what it takes there in order of volatility, how locked files are read, and how
-the archive gets to Elrond. One self-contained HTML page (inline SVG, logos
+the archive gets to Ledger. One self-contained HTML page (inline SVG, logos
 embedded).
 
     python3 scripts/docs/architecture/build_gandalf_flow.py [out.html]
@@ -82,7 +82,7 @@ def manifest_icon(cx, cy):
 
 
 # ---- the collectors ----
-GX, GY = 760, 470  # Gandalf
+GX, GY = 760, 470  # Custodian
 image(png("flow-bash.png"), 250, 140, 130, 130)
 text(250, 232, ["gandalf.sh", "Linux and macOS · bash 3.2+", "Local, or Remote over SSH + scp"])
 image(png("flow-powershell.png"), 760, 135, 140, 140)
@@ -94,13 +94,13 @@ arrow(f"M 300 300 C 420 320, 560 350, {GX - 110} {GY - 70}")
 arrow(f"M {GX} 312 L {GX} {GY - 112}")
 arrow(f"M 1150 300 C 1080 330, 960 360, {GX + 110} {GY - 70}")
 
-# ---- Gandalf ----
+# ---- Custodian ----
 svg.append(f'<circle cx="{GX}" cy="{GY}" r="92" fill="#e9f2ea" stroke="#2f6b3a" stroke-width="3"/>')
 svg.append(f'<clipPath id="gclip"><circle cx="{GX}" cy="{GY}" r="89"/></clipPath>')
-# head and shoulders from the project's own Gandalf (public/images/gandalf.png), filling the circle
+# head and shoulders from the project's own Custodian (public/images/gandalf.png), filling the circle
 svg.append(f'<image href="{png("flow-gandalf.png")}" x="{GX - 92}" y="{GY - 92}" width="184" height="184" '
            f'clip-path="url(#gclip)" preserveAspectRatio="xMidYMid slice"/>')
-text(GX, GY + 122, ["Gandalf", "live acquisition"], size=19)
+text(GX, GY + 122, ["Custodian", "live acquisition"], size=19)
 
 # ---- targets ----
 for (img, w, h, label, sub), y in zip(
@@ -154,10 +154,10 @@ pills(by + 38, "On the host, in order of volatility: copied locally first, hashe
     "Connections, processes", "Memory", "$LogFile, $J, page files, $MFT", "Temp dirs",
     "Event logs, /var/log", "Prefetch, registry", "Users, files"], numbered=True)
 pills(by + 178, "How a locked or in-use file is read", [
-    "Gandalf's raw NTFS reader", "RawCopy (disk_tools.zip)", "temporary VSS snapshot", "reg save + hive logs",
+    "Custodian's raw NTFS reader", "RawCopy (disk_tools.zip)", "temporary VSS snapshot", "reg save + hive logs",
     "plain copy", "log show export (macOS)"])
 
-# ---- archive, manifest, Elrond ----
+# ---- archive, manifest, Ledger ----
 manifest_icon(1530, 810)
 text(1530, 892, ["log.meta", "SHA-256 of every file, after copying", "log.audit: when each was taken"])
 arrow(f"M {bx + bw + 4} 830 C 1400 828, 1440 820, 1472 812")
@@ -166,7 +166,7 @@ text(1530, 568, ["Encrypted archive", "None · Password · Key", "key: &lt;host&
 arrow("M 1530 752 L 1530 640", "archived", 1530, 700)
 # the ledger-keeper (public/images/elrond.png), trimmed to the figure
 image(png("flow-elrond.png"), 1530, 150, 110, 166)
-text(1530, 254, ["Elrond", "decrypts, re-hashes every file", "gandalf_integrity.jsonl"])
+text(1530, 254, ["Ledger", "decrypts, re-hashes every file", "gandalf_integrity.jsonl"])
 arrow("M 1530 416 L 1530 322", "scp · PSRemoting · copy", 1530, 372)
 
 page = f"""<!doctype html>
@@ -174,7 +174,7 @@ page = f"""<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gandalf acquisition flow</title>
+<title>Custodian acquisition flow</title>
 <style>
 html,body{{margin:0;background:#ffffff}}
 svg{{display:block;width:100%;max-width:{W}px;height:auto;margin:0 auto;
@@ -182,7 +182,7 @@ svg{{display:block;width:100%;max-width:{W}px;height:auto;margin:0 auto;
 </style>
 </head>
 <body>
-<svg viewBox="0 0 {W} {H}" role="img" aria-label="Gandalf's acquisition flow: three collectors, the hosts they reach, what they take in order of volatility, and the archive's path to Elrond">
+<svg viewBox="0 0 {W} {H}" role="img" aria-label="Custodian's acquisition flow: three collectors, the hosts they reach, what they take in order of volatility, and the archive's path to Ledger">
 <defs><marker id="head" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
 <path d="M 0 0 L 10 5 L 0 10 Z" fill="{RED}"/></marker></defs>
 {chr(10).join(svg)}

@@ -1,7 +1,7 @@
 """
 Builds Rowanholt's architecture map: a self-contained HTML page (fonts and images
-embedded) in the style of a map of Middle-earth. Page 1 is the realm (Gandalf, the
-web UI, the worker, Elrond, Smith, Aragorn, Mordor); page 2 is Elrond's directed graph,
+embedded), drawn over Rowanholt's own map. Page 1 is the platform (Custodian, the
+web UI, the worker, Ledger, Smith, Steward, Crucible); page 2 is Ledger's directed graph,
 branching by evidence type and operating system.
 
     python3 scripts/docs/architecture/build_map.py [out.html]
@@ -54,7 +54,7 @@ PLACES = {
 
 parts = []
 svg = []
-overlay = []  # drawn above the cards (arrows inside the Elrond inset)
+overlay = []  # drawn above the cards (arrows inside the Ledger inset)
 
 
 def box(x, y, w, h, title, body, colour=PARCH, kicker="", icons=(), border=None, dashed=False):
@@ -73,10 +73,6 @@ def place(key, label, dx=14, dy=-28):
     parts.append(f'<div class="place" style="left:{x + dx}px;top:{y + dy}px">{label}</div>')
     svg.append(f'<g transform="translate({x},{y})"><circle r="9" fill="{NAVY}" stroke="{PARCH}" stroke-width="2.5"/>'
                f'<path d="M0 -6 L1.8 -1.8 L6 0 L1.8 1.8 L0 6 L-1.8 1.8 L-6 0 L-1.8 -1.8 Z" fill="{GOLD}"/></g>')
-
-
-def region(x, y, text, size=46, rotate=0):
-    parts.append(f'<div class="region" style="left:{x}px;top:{y}px;font-size:{size}px;transform:rotate({rotate}deg)">{text}</div>')
 
 
 MARK = 0
@@ -115,20 +111,20 @@ parts.append(f'<img src="data:image/png;base64,{b64(ASSETS / "rowanholt.png")}" 
              f'style="position:absolute;left:52px;top:26px;height:108px;border-radius:8px;border:1px solid {PARCH_DIM}">')
 parts.append(f'<div style="position:absolute;left:{52 + 180}px;top:30px;width:720px">'
              f'<div class="h1">Rowanholt</div>'
-             f'<div class="h2">A map of the realm: how a case travels from Gandalf to Elrond to Smith</div></div>')
+             f'<div class="h2">How a case travels from Custodian to Ledger to Smith</div></div>')
 
 # Smith: the forge above the map (top centre)
 box(1020, 18, 640, 134, "Smith <span class='sub'>AI analyst · Ask Smith</span>",
-    "Reads Elrond's cooked artefacts, IOCs and ATT&amp;CK tags; answers in plain language with a local model "
+    "Reads Ledger's cooked artefacts, IOCs and ATT&amp;CK tags; answers in plain language with a local model "
     "(<b>Ollama</b>, nothing leaves the host). Without Ollama it says why and answers a fixed set of questions "
     "straight from the case files.",
-    VIOLET, kicker="The forge above the realm")
+    VIOLET)
 
 # legend
 lx, ly = 1700, 24
 parts.append(f'<div class="legend" style="left:{lx}px;top:{ly}px;width:800px;height:116px"></div>')
-legend = [(GREEN, "", "live acquisition (hosts, cloud)"), (GOLD, "10 7", "the Great East Road: Gandalf archives"),
-          (TEAL, "", "web UI, jobs and queues"), (CRIMSON, "", "Mordor: attack datasets"),
+legend = [(GREEN, "", "live acquisition (hosts, cloud)"), (GOLD, "10 7", "Custodian archives"),
+          (TEAL, "", "web UI, jobs and queues"), (CRIMSON, "", "Crucible: attack datasets"),
           (VIOLET, "6 6", "Smith: AI, read-only"), ("#9aa3b5", "", "administration and the lab")]
 for i, (col, dash, text) in enumerate(legend):
     x = lx + 24 + (i % 2) * 390
@@ -141,17 +137,7 @@ for i, (col, dash, text) in enumerate(legend):
 parts.append(f'<div class="map" style="left:{MX}px;top:{MY}px;width:{MW}px;height:{MH}px;'
              f'background-size:{MW}px {round(1024 * SCALE)}px;background-position:0 -{round(CROP)}px"></div>')
 
-region(MX + 30, MY + 212, "B E L E G A E R", 26)
-region(MX + 40, MY + 248, "<i style='font-size:18px;letter-spacing:0.12em'>the Great Sea</i>", 18)
-region(MX + 700, MY + 96, "R H O V A N I O N", 28, -2)
-region(MX + 1352, MY + 822, "M O R D O R", 30)
-
-for key, label, dx, dy in (("havens", "Grey Havens", -60, -36), ("shire", "The Shire", -46, 14),
-                           ("bree", "Bree", -64, -34), ("rowanholt", "Rowanholt", -126, -6),
-                           ("moria", "Moria", 14, -10), ("isengard", "Isengard", 14, -10),
-                           ("minas", "Minas Tirith", -80, -38), ("mordor", "Barad-dûr", 14, -30),
-                           ("erebor", "Erebor", -82, -10)):
-    place(key, label, dx, dy)
+place("rowanholt", "Rowanholt", -126, -6)
 
 # compass rose (the sea, top left)
 cx, cy = MX + 300, MY + 350
@@ -168,61 +154,61 @@ svg.append(f'<g transform="translate({cx},{cy})" opacity="0.8"><circle r="46" fi
            f'<circle r="52" fill="none" stroke="{INK}" stroke-width="0.8"/>{rose}'
            f'<text x="0" y="-74" text-anchor="middle" font-family="Cinzel" font-size="20" fill="{INK}">N</text></g>')
 
-# ================= realms (cards on the map) =================
+# ================= the parts (cards on the map) =================
 # The cards keep off the map's heart (the rowan, the keep, the lake, the village, the standing stones)
 # and its snow-peaks: they sit on the sea, the north coast and the rugged south.
 S, B, R, M, I, T, MO, E, GH = (PLACES[k] for k in ("shire", "bree", "rowanholt", "moria", "isengard", "minas",
                                                    "mordor", "erebor", "havens"))
 
-box(MX + 20, MY + 420, 330, 286, "Gandalf <span class='sub'>acquisition</span>",
+box(MX + 20, MY + 420, 330, 286, "Custodian <span class='sub'>acquisition</span>",
     "<b>gandalf.sh</b> and <b>gandalf.py</b> (Linux, macOS; local or over SSH) and <b>Invoke-Gandalf.ps1</b> "
     "(Windows, as admin). Live state first, then files in order of volatility; locked ones straight off the "
-    "NTFS volume. Once all is copied, every file is SHA-256 hashed into <code>log.meta</code>, which Elrond checks "
+    "NTFS volume. Once all is copied, every file is SHA-256 hashed into <code>log.meta</code>, which Ledger checks "
     "on arrival. The archive is encrypted; in Key mode the key rides home as <code>&lt;host&gt;.shadowfax.key</code>.",
-    GREEN, kicker="Sets out from the Shire")
+    GREEN)
 
 box(MX + 240, MY + 24, 360, 168, "Web UI and API <span class='sub'>:5687 · :5688</span>",
     "React front end and FastAPI back end: start jobs, upload or pick images, watch progress, read results, "
-    "Ask Smith, Pippin (threat intelligence), shared findings. Admins also see Aragorn.",
-    TEAL, kicker="The Prancing Pony, Bree")
+    "Ask Smith, Lookout (threat intelligence), shared findings. Admins also see Steward.",
+    TEAL)
 
-box(MX + 600, MY + 230, 330, 196, "Elrond worker <span class='sub'>Celery</span>",
-    "Jobs arrive through <b>Redis</b>. The worker runs Elrond, and Elrond runs its tools as separate processes: "
+box(MX + 600, MY + 230, 330, 196, "Ledger worker <span class='sub'>Celery</span>",
+    "Jobs arrive through <b>Redis</b>. The worker runs Ledger, and Ledger runs its tools as separate processes: "
     "Volatility 3, Plaso, Artemis, RegRipper, YARA, The Sleuth Kit.",
-    TEAL, kicker="Delving in Moria")
+    TEAL)
 
 box(MX + 1442, MY + 236, 240, 250, "SIEM <span class='sub'>Splunk · Elastic</span>",
     "<code>--Splunk</code> and <code>--Elastic</code> index the cooked artefacts, with Rowanholt's own Splunk app "
     "and Kibana dashboards. Local containers or remote servers.",
-    RUST, kicker="Orthanc's palantír")
+    RUST)
 
-box(MX + 20, MY + 960, 340, 226, "Aragorn <span class='sub'>administration</span>",
-    "<b>Andúril</b>: Rowanholt's own containers (status, logs, restart; won't stop the worker mid-job). "
-    "<b>The lab</b>: Linux targets, Tart and UTM VMs, test runs from the browser, Gandalf against seeded hosts, "
-    "Mordor recordings.",
-    "#c9cfdc", kicker="The King in Minas Tirith")
+box(MX + 20, MY + 960, 340, 226, "Steward <span class='sub'>administration</span>",
+    "<b>Quartermaster</b>: Rowanholt's own containers (status, logs, restart; won't stop the worker mid-job). "
+    "<b>The lab</b>: Linux targets, Tart and UTM VMs, test runs from the browser, Custodian against seeded hosts, "
+    "Crucible recordings.",
+    "#c9cfdc")
 
-box(MX + 1350, MY + 960, 332, 246, "Mordor <span class='sub'>attack datasets</span>",
+box(MX + 1350, MY + 960, 332, 246, "Crucible <span class='sub'>attack datasets</span>",
     "OTRF Security-Datasets (APT29 day 1 and 2, Atomic sets) and the lab's own recordings of Atomic Red Team "
-    "tests. <code>--Mordor</code> ingests them as event logs, so detections and ATT&amp;CK tagging can be checked "
+    "tests. <code>--Crucible</code> ingests them as event logs, so detections and ATT&amp;CK tagging can be checked "
     "against known attacks.",
-    CRIMSON, kicker="Where the shadows lie")
+    CRIMSON)
 
 box(MX + 1290, MY + 50, 392, 176, "Case store <span class='sub'>the hoard</span>",
     "<b>Postgres</b>: users, jobs, history. Case directories on disk: <code>raw/</code>, <code>cooked/</code>, "
     "<code>analysis/</code>, <code>mitre_techniques.txt</code>, timelines, archives.",
-    GOLD, kicker="Under the Lonely Mountain")
+    GOLD)
 
-# Rowanholt: Elrond's road, an inset below the hall on the hill
+# Rowanholt: Ledger's road, an inset below the hall on the hill
 rx, ry, rw, rh = MX + 520, MY + 640, 812, 560
 parts.append(f'<div class="inset" style="left:{rx}px;top:{ry}px;width:{rw}px;height:{rh}px"></div>')
 parts.append(f'<div class="inset-title" style="left:{rx + 24}px;top:{ry + 14}px">'
              f'<span class="kicker" style="color:{PARCH}">The Hall under the Rowan</span><br>'
-             f'<span style="color:{PARCH};font-size:30px">Elrond</span> <span class="sub">analysis · a directed graph, '
+             f'<span style="color:{PARCH};font-size:30px">Ledger</span> <span class="sub">analysis · a directed graph, '
              f'not a pipeline: it branches by OS, evidence type and cloud provider</span></div>')
 steps = [
-    ("01", "Identify and mount", "E01, VMDK, raw and dd images; memory; Gandalf archives (checked, extracted, "
-     "laid out); Mordor datasets; cloud logs"),
+    ("01", "Identify and mount", "E01, VMDK, raw and dd images; memory; Custodian archives (checked, extracted, "
+     "laid out); Crucible datasets; cloud logs"),
     ("02", "Collect", "Per OS: hives, event logs, $MFT and journals; launchd, BTM, unified logs; cron, systemd, "
      "PAM, logins, containers. Shadow copies too."),
     ("03", "Process", "Parsers and tools turn raw artefacts into cooked JSON Lines, each record with its host, source, UTC time and techniques"),
@@ -244,12 +230,12 @@ for i, (num, name, text) in enumerate(steps):
             route(f"M {x + 91} {y + 210} C {x + 91} {y + 218}, {rx + 111} {y + 214}, {rx + 111} {y + 224}", GOLD, 3,
                   layer=overlay)
 parts.append(f'<div class="inset-note" style="left:{rx + 612}px;top:{ry + 340}px;width:184px">'
-             f'Gandalf archives are mapped onto the same <code>raw/</code> layout a disk image gets, so every later '
+             f'Custodian archives are mapped onto the same <code>raw/</code> layout a disk image gets, so every later '
              f'stage treats them alike.</div>')
 
 # ================= the margins: lands of Men (inputs) and what returns (outputs) =================
-parts.append(f'<div class="column-title" style="left:40px;top:172px;width:360px">The Lands of Men'
-             f'<div class="column-sub">what Gandalf and Elrond read</div></div>')
+parts.append(f'<div class="column-title" style="left:40px;top:172px;width:360px">What Comes In'
+             f'<div class="column-sub">what Custodian and Ledger read</div></div>')
 inputs = [
     ("Windows hosts", "Event logs, registry and hives with logs, $MFT, $UsnJrnl, Prefetch, SRUM, Amcache, "
      "tasks, BITS, Search, Defender, browsers, memory", ["windows"], GREEN),
@@ -259,7 +245,7 @@ inputs = [
      "XProtect, Biome, browsers", ["macos"], GREEN),
     ("Cloud", "AWS, Azure and GCP: instances, disk snapshots, CloudTrail and activity logs; Kubernetes audit logs", ["aws", "azure"], GREEN),
     ("Disk and memory images", "E01, VMDK, raw and dd, VHD(X); memory dumps, hiberfil, pagefile. "
-     "Straight to Elrond, no Gandalf needed.", [], TEAL),
+     "Straight to Ledger, no Custodian needed.", [], TEAL),
 ]
 ys = []
 for i, (t, body, icons, col) in enumerate(inputs):
@@ -290,23 +276,23 @@ gx, gy = MX + 20 + 330, MY + 420 + 140
 for i in range(3):
     route(c((400, ys[i] + 103), (415, ys[i] + 103), (MX + 6, gy - 30 + i * 30), (MX + 20, gy - 30 + i * 30)),
           GREEN, 3)
-# cloud: Rowanholt's cloud commands pull disks and logs for Elrond
+# cloud: Rowanholt's cloud commands pull disks and logs for Ledger
 route(c((400, ys[3] + 103), (418, ys[3] + 103), (418, MY + 780), (rx, MY + 780)), GREEN, 3,
       dash="2 7", label="cloud: snapshots and logs", lx=MX + 40, ly=MY + 738, lw=230)
-# disk images: straight to Elrond
+# disk images: straight to Ledger
 route(c((400, ys[4] + 103), (426, ys[4] + 103), (426, MY + 860), (rx, MY + 860)),
-      TEAL, 3, label="images go straight to Elrond", lx=MX + 40, ly=MY + 874, lw=230)
+      TEAL, 3, label="images go straight to Ledger", lx=MX + 40, ly=MY + 874, lw=230)
 
-# the Great East Road: Gandalf -> Shire -> Bree -> Rowanholt
+# Custodian's archives -> Rowanholt
 route(c((MX + 350, MY + 560), S, (MX + 960, MY + 628), B, (MX + 1250, MY + 500), R), GOLD, 5, dash="14 9",
-      arrow=False, label="<b>The Great East Road</b>: encrypted per-host archives, <code>acquisitions/</code>, "
+      arrow=False, label="<b>Custodian archives</b>: encrypted per-host archives, <code>acquisitions/</code>, "
                          "decrypted and checked on arrival", lx=MX + 372, ly=MY + 450, lw=250)
 route(c(R, (MX + 1384, MY + 560), (MX + 1316, ry)), GOLD, 5, dash="14 9")
 
-# Bree (web UI) -> Moria (worker) via Redis; Moria -> Rowanholt
+# web UI -> worker via Redis; worker -> Rowanholt
 route(c((MX + 520, MY + 192), (MX + 560, MY + 214), (MX + 640, MY + 230)), TEAL, 3.5,
       label="jobs queued in Redis", lx=MX + 612, ly=MY + 160, lw=160)
-route(c((MX + 765, MY + 426), (MX + 780, MY + 540), (MX + 800, ry)), TEAL, 3.5, label="runs Elrond",
+route(c((MX + 765, MY + 426), (MX + 780, MY + 540), (MX + 800, ry)), TEAL, 3.5, label="runs Ledger",
       lx=MX + 812, ly=MY + 500, lw=110)
 
 # Rowanholt -> Isengard (SIEM)
@@ -318,10 +304,10 @@ route(c((rx + rw, ry + 30), (MX + 1426, MY + 640), (MX + 1426, MY + 400), (MX + 
 # Erebor -> Smith (read-only)
 route(c((MX + 1480, MY + 50), (MX + 1440, MY + 16), (1500, 140)), VIOLET, 3, dash="6 6",
       label="Smith reads the case", lx=1250, ly=MY + 10, lw=180)
-# Mordor -> Rowanholt
+# Crucible -> Rowanholt
 route(c((MX + 1400, MY + 960), (MX + 1400, MY + 920), (rx + rw, MY + 920)), CRIMSON, 4,
-      label="<code>--Mordor</code>: datasets as event logs", lx=MX + 1420, ly=MY + 914, lw=262)
-# Aragorn's lab -> Mordor (recordings, along the south coast) and -> Gandalf (seeded targets)
+      label="<code>--Crucible</code>: datasets as event logs", lx=MX + 1420, ly=MY + 914, lw=262)
+# Steward's lab -> Crucible (recordings, along the south coast) and -> Custodian (seeded targets)
 route(c((MX + 380, MY + 1150), (MX + 450, MY + 1212), (MX + 1300, MY + 1212), (MX + 1350, MY + 1180)), "#9aa3b5", 3,
       label="lab recordings", lx=MX + 386, ly=MY + 1112, lw=126)
 route(c((MX + 320, MY + 960), (MX + 330, MY + 830), (MX + 300, MY + 706)), "#9aa3b5", 3,
@@ -333,8 +319,8 @@ for i, y in enumerate(oys):
     route(c((rx + rw, y0), (gxo, y0), (gxo, y + 103), (2160, y + 103)),
           GOLD if i < 3 else (RUST if i == 3 else VIOLET), 3, dash="6 6" if i == 4 else "")
 
-parts.append(f'<div class="footer">Rowanholt · Gandalf collects · Elrond analyses · Smith answers · '
-             f'Aragorn keeps the realm · page 1 of 2 · generated from the codebase, November 2026</div>')
+parts.append(f'<div class="footer">Rowanholt · Custodian collects · Ledger analyses · Smith answers · '
+             f'Steward administers · page 1 of 2 · generated from the codebase, November 2026</div>')
 
 
 def page(anchor, label):
@@ -348,16 +334,16 @@ def page(anchor, label):
     return html
 
 
-pages = [page("realm", "Rowanholt, drawn as a map of Middle-earth")]
+pages = [page("realm", "Rowanholt's architecture, drawn as a map")]
 
-# ================= page 2: Elrond's roads =================
+# ================= page 2: Ledger's roads =================
 LANE_COLOURS = {"Windows": TEAL, "Linux": GOLD, "macOS": VIOLET}
 MEM = RUST
 
 parts.append(f'<img src="data:image/png;base64,{b64(ASSETS / "rowanholt.png")}" alt="Rowanholt" '
              f'style="position:absolute;left:52px;top:26px;height:108px;border-radius:8px;border:1px solid {PARCH_DIM}">')
 parts.append(f'<div style="position:absolute;left:{52 + 180}px;top:30px;width:1100px">'
-             f'<div class="h1">Elrond</div>'
+             f'<div class="h1">Ledger</div>'
              f'<div class="h2">The roads from Rowanholt: one directed graph, branching by evidence type, operating '
              f'system and shadow copy</div></div>')
 
@@ -376,11 +362,11 @@ for i, (col, dash, text) in enumerate(legend):
 
 # what arrives
 parts.append(f'<div class="column-title" style="left:40px;top:172px;width:360px">What Arrives'
-             f'<div class="column-sub">every kind of evidence Elrond takes</div></div>')
+             f'<div class="column-sub">every kind of evidence Ledger takes</div></div>')
 arrivals = [
     ("Disk images", "E01, VMDK, VHD(X), raw and dd; whole disks or single volumes.", ["windows", "linux", "macos"]),
     ("Memory images", "Raw dumps, AFF4, hiberfil.sys, pagefile.sys, MEMORY.DMP, a VM's .vmem.", []),
-    ("Gandalf archives", "Per-host archives from all three collectors, encrypted or not.", []),
+    ("Custodian archives", "Per-host archives from all three collectors, encrypted or not.", []),
     ("Event datasets", "OTRF Security-Datasets (Mordor) and the lab's own recordings of Atomic tests.", []),
     ("Cloud", "Instances' disk snapshots, CloudTrail and activity logs from AWS, Azure and GCP; Kubernetes audit logs.", ["aws", "azure"]),
 ]
@@ -458,14 +444,14 @@ route(f"M {mx + MW_ / 2} {lanes[2][2] + 30} L {mx + MW_ / 2} {lanes[1][2] + 300 
 route(f"M {mx + MW_ / 2} {lanes[1][2] + 30} L {mx + MW_ / 2} {lanes[0][2] + 300 + 4}", MEM, 2.5, dash="4 6")
 parts.append(f'<div class="route-label" style="left:{mx + MW_ / 2 - 130}px;top:{py + ph + 18}px;width:260px;'
              f'text-align:center;border-color:{MEM}">memory images, by the profile they were given</div>')
-# Gandalf archives skip collection: they join between Collect and Process
+# Custodian archives skip collection: they join between Collect and Process
 gx = cx + CW + 12
 route(c((400, ay[2] + 98), (422, ay[2] + 98), (422, py + ph + 40), (gx, py + ph + 40), (gx, lanes[2][2] + 185)),
       GREEN, 3.5)
 route(f"M {gx} {lanes[2][2] + 145} L {gx} {lanes[1][2] + 185}", GREEN, 3.5, arrow=False)
 route(f"M {gx} {lanes[1][2] + 145} L {gx} {lanes[0][2] + 185}", GREEN, 3.5)
 parts.append(f'<div class="route-label" style="left:{gx - 240}px;top:{py + ph + 56}px;width:470px;text-align:center;'
-             f'border-color:{GREEN}"><b>Gandalf archives</b> are decrypted, checked against Gandalf\'s SHA-256 '
+             f'border-color:{GREEN}"><b>Custodian archives</b> are decrypted, checked against Custodian\'s SHA-256 '
              f'manifest and laid out as <code>raw/</code>: already collected, they join at Process</div>')
 
 # shared stages
@@ -476,7 +462,7 @@ stages = [
     ("Analyse", "Keyword and YARA searches, IOC extraction, timestomping and alternate data streams in $MFT, "
      "masquerading and misplaced binaries, NSRL matching. <code>--threatIntel</code> matches the case and ranks "
      "groups by what matched; stacking ranks what few of the hosts have, with its reasons."),
-    ("ATT&amp;CK", "Techniques tagged from artefacts, event-log rules and Mordor datasets into "
+    ("ATT&amp;CK", "Techniques tagged from artefacts, event-log rules and Crucible datasets into "
      "<code>mitre_techniques.txt</code>; a Navigator layer."),
     ("Timeline", "<b>Plaso</b> (psteal) builds one super-timeline across every source of a host."),
     ("Export", "<code>--Splunk</code>, <code>--Elastic</code> (Rowanholt's app and dashboards), "
@@ -499,9 +485,9 @@ route(c((400, ay[3] + 98), (412, ay[3] + 98), (412, py + ph + 120), (sx - 40, py
       label="event datasets: one host per computer, events into <code>cooked/evt/</code>", lx=1430,
       ly=py + ph + 104, lw=440)
 
-parts.append(f'<div class="footer">Rowanholt · Elrond · the same stages for every host, whatever road it took · '
+parts.append(f'<div class="footer">Rowanholt · Ledger · the same stages for every host, whatever road it took · '
              f'page 2 of 2 · generated from the codebase, November 2026</div>')
-pages.append(page("elrond", "Elrond's directed graph, branching by evidence type and operating system"))
+pages.append(page("elrond", "Ledger's directed graph, branching by evidence type and operating system"))
 
 font_css = "".join(
     f"@font-face{{font-family:'Cinzel';font-weight:{wt};src:url(data:font/ttf;base64,{b64(FONTS / f)}) format('truetype')}}"
@@ -512,7 +498,7 @@ html = f"""<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=2560">
-<title>Rowanholt — a map of the realm</title>
+<title>Rowanholt architecture</title>
 <style>
 {font_css}
 """ + f'''{font_css}
