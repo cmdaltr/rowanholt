@@ -328,7 +328,7 @@ def case_root(path: Path, case_number: str = "") -> Path:
     for candidate in (path, path / case_number) if case_number else (path,):
         if candidate.is_dir() and (_is_host(candidate) or any(_is_host(p) for p in candidate.iterdir() if p.is_dir())):
             return candidate
-    raise FileNotFoundError(f"{path}: no Elrond host folders (artefacts/ or analysis/) here")
+    raise FileNotFoundError(f"{path}: no Ledger host folders (artefacts/ or analysis/) here")
 
 
 def _is_host(path: Path) -> bool:
@@ -599,8 +599,8 @@ def _audit(report: CaseReport, root: Path) -> None:
 def _method(report: CaseReport, root: Path) -> None:
     path = root / METHOD_FILE
     if not path.is_file():
-        report.method_problem = (f"Elrond didn't record its method in this case ({METHOD_FILE} is missing: the case "
-                                 "was processed before Elrond recorded it)")
+        report.method_problem = (f"Ledger didn't record its method in this case ({METHOD_FILE} is missing: the case "
+                                 "was processed before Ledger recorded it)")
         return
     try:
         report.method = json.loads(path.read_text(encoding="utf-8", errors="replace"))

@@ -310,15 +310,15 @@ def ingest_gandalf_archive(archive, output_directory, verbosity, allimgs):
             write_records(os.path.join(host_dir, "gandalf_integrity" + SUFFIX), rows, host=gandalf_host,
                           artefact="gandalf_integrity", source_path="log.meta")
             summary = ", ".join("{} {}".format(n, s) for s, n in counts.items() if n)
-            print("   Checked '{}' against Gandalf's hashes: {}".format(gandalf_host, summary))
+            print("   Checked '{}' against Custodian's hashes: {}".format(gandalf_host, summary))
             entry, prnt = (
                 "{},{},gandalf integrity,{}\n".format(datetime.now().isoformat(), gandalf_host, summary.replace(",", ";")),
-                " -> {} -> checked '{}' against Gandalf's hashes: {}".format(
+                " -> {} -> checked '{}' against Custodian's hashes: {}".format(
                     datetime.now().isoformat().replace("T", " "), gandalf_host, summary),
             )
             write_audit_log_entry(verbosity, output_directory, entry, prnt)
         else:
-            print("   No archive-path hashes from Gandalf for '{}' (older collector); integrity not checked".format(gandalf_host))
+            print("   No archive-path hashes from Custodian for '{}' (older collector); integrity not checked".format(gandalf_host))
         for audit in ("log.audit", "log.meta"):
             for f in list(_files_under(staging)):
                 if os.path.basename(f) == audit:

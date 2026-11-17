@@ -378,7 +378,7 @@ def parse_gandalf_host_info(first_line):
     else:
         fields = first_line.split()
         if len(fields) < 2:
-            raise ValueError("unrecognised Gandalf host.info: {!r}".format(first_line))
+            raise ValueError("unrecognised Custodian host.info: {!r}".format(first_line))
         system, gandalf_host = fields[0], fields[1]
     return gandalf_host, "macOS" if system == "Darwin" else system
 

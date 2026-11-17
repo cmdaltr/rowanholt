@@ -117,7 +117,6 @@ def main(
     ewf_mount,
     system_artefacts,
     quotes,
-    asciitext,
     skip_unmount=False,  # Skip unmounting previous images (for multi-image phased processing)
     phase=None,  # Phase control: "mount", "collect", "process", or None for full pipeline
     mounted_imgs=None,  # Pre-populated imgs dict from mount phase (for collect/process phases)
@@ -132,15 +131,15 @@ def main(
     if not is_noninteractive():
         subprocess.Popen(["clear"])
         time.sleep(2)
-        print("\n\n    \033[1;36mElrond DFIR Analysis\033[1;m\n\n")
+        print("\n\n    \033[1;36mLedger DFIR Analysis\033[1;m\n\n")
     if not collect and not gandalf:
         print(
-            "\n  You MUST use the collect switch (-C) or gandalf switch (-G)\n   If you are processing acquired disk and/or memory images, you must invoke the collect switch (-C)\n   If you have previously collected artefacts having used gandalf, you must invoke the gandalf switch (-G)\n\n  Please try again.\n\n\n"
+            "\n  You MUST use the collect switch (-C) or Custodian switch (-G)\n   If you are processing acquired disk and/or memory images, you must invoke the collect switch (-C)\n   If you have previously collected artefacts having used Custodian, you must invoke the Custodian switch (-G)\n\n  Please try again.\n\n\n"
         )
         sys.exit(1)
     if collect and gandalf:
         print(
-            "\n  You cannot use the collect switch (-C) and the collect gandalf (-G).\n   If you are processing acquired disk and/or memory images, you must invoke the collect switch (-C).\n   If you have previously collected artefacts using gandalf, you must invoke the gandalf switch (-G).\n\n  Please try again.\n\n\n"
+            "\n  You cannot use the collect switch (-C) and the Custodian switch (-G).\n   If you are processing acquired disk and/or memory images, you must invoke the collect switch (-C).\n   If you have previously collected artefacts using Custodian, you must invoke the Custodian switch (-G).\n\n  Please try again.\n\n\n"
         )
         sys.exit(1)
     if volatility and not process:
@@ -168,7 +167,7 @@ def main(
         if gandalf:
             # A Gandalf archive (or Mordor dataset) is collected already: nothing to collect from
             print(
-                "\n\n  The {} can't be used with the {}: a Gandalf archive has nothing left to collect. Please try again.\n\n\n\n".format(
+                "\n\n  The {} can't be used with the {}: a Custodian archive has nothing left to collect. Please try again.\n\n\n\n".format(
                     collectand, gandalforcollect
                 )
             )
@@ -343,7 +342,7 @@ def main(
         for ext in (".e01", ".vmdk", ".dd", ".raw", ".img", ".001", ".mem", ".vmem", ".lime", ".dmp", ".aff4")
     ):
         print(
-            "\n  [directory] - '{}' does not contain any valid files (.E01/.VMDK/.dd/.raw/.img/.001, or memory: .mem/.vmem/.lime/.dmp/.aff4)\n   for elrond to assess.\n   Please ensure you are referencing the correct directory path and try again.\n\n\n".format(
+            "\n  [directory] - '{}' does not contain any valid files (.E01/.VMDK/.dd/.raw/.img/.001, or memory: .mem/.vmem/.lime/.dmp/.aff4)\n   for Ledger to assess.\n   Please ensure you are referencing the correct directory path and try again.\n\n\n".format(
                 d
             )
         )

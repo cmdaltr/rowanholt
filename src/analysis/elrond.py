@@ -50,7 +50,7 @@ parser.add_argument(
 )  # outstanding - Out-of-Sequence Windows-based file activity
 parser.add_argument(
     "--Brisk",
-    help="'Brisk Mode.' Invokes Analysis, extractIocs, Navigator, Process, and Userprofiles. You MUST provide either --Collect, --Gandalf, or --Mordor depending on your data source.",
+    help="'Brisk Mode.' Invokes Analysis, extractIocs, Navigator, Process, and Userprofiles. You MUST provide either --Collect, --Custodian, or --Crucible depending on your data source.",
     action="store_const",
     const=True,
     default=False,
@@ -99,20 +99,24 @@ parser.add_argument(
 )
 parser.add_argument(
     "--Index",
-    help="Index a case Elrond has already processed into Splunk, Elastic, OpenSearch, Timesketch and/or the Navigator (with --Splunk, --Elastic, --OpenSearch, --Timesketch, --Navigator), without processing it again; the directory is the case's folder; Example syntax: elrond.py CASE /path/to/case --Index --Splunk --Elastic",
+    help="Index a case Ledger has already processed into Splunk, Elastic, OpenSearch, Timesketch and/or the Navigator (with --Splunk, --Elastic, --OpenSearch, --Timesketch, --Navigator), without processing it again; the directory is the case's folder; Example syntax: elrond.py CASE /path/to/case --Index --Splunk --Elastic",
     action="store_const",
     const=True,
     default=False,
 )
 parser.add_argument(
+    "--Custodian",
     "--Gandalf",
-    help="Read artefacts acquired using gandalf",
+    dest="Gandalf",
+    help="Read artefacts acquired using Custodian",
     action="store_const",
     const=True,
     default=False,
 )
 parser.add_argument(
+    "--Crucible",
     "--Mordor",
+    dest="Mordor",
     help="Read artefacts from OTRF Mordor attack simulation datasets (pre-collected threat data)",
     action="store_const",
     const=True,
@@ -122,7 +126,7 @@ parser.add_argument(
     "--Network",
     help="Read network evidence: PCAP/PCAPNG captures (through Zeek), Zeek logs (TSV or JSON) and NetFlow/IPFIX "
     "text exports (nfdump -o csv, SiLK rwcut); a source that's a capture, a log or a folder of them becomes its own "
-    "folder in the case. Other sources still need --Collect or --Gandalf; Example syntax: elrond.py CASE capture.pcap "
+    "folder in the case. Other sources still need --Collect or --Custodian; Example syntax: elrond.py CASE capture.pcap "
     "/path/to/output --Network --extractIocs",
     action="store_const",
     const=True,
@@ -294,14 +298,14 @@ parser.add_argument(
 )
 parser.add_argument(
     "--eXhaustive",
-    help="Exhaustive mode. Invoke all flags: Brisk, Delete, Elastic, Memory, nsrl, Splunk, Timeline, memorytimeline, and Ziparchive. You MUST provide either --Collect, --Gandalf, or --Mordor depending on your data source.",
+    help="Exhaustive mode. Invoke all flags: Brisk, Delete, Elastic, Memory, nsrl, Splunk, Timeline, memorytimeline, and Ziparchive. You MUST provide either --Collect, --Custodian, or --Crucible depending on your data source.",
     action="store_const",
     const=True,
     default=False,
 )
 parser.add_argument(
     "--ThreatHunt",
-    help="'Threat Hunt Mode.' Aggressive threat-hunting analysis. Invokes Analysis, extractIocs, Memory, Navigator, Process, Splunk, Elastic, and Userprofiles. Designed for comprehensive incident response and threat detection. You MUST provide either --Collect, --Gandalf, or --Mordor.",
+    help="'Threat Hunt Mode.' Aggressive threat-hunting analysis. Invokes Analysis, extractIocs, Memory, Navigator, Process, Splunk, Elastic, and Userprofiles. Designed for comprehensive incident response and threat detection. You MUST provide either --Collect, --Custodian, or --Crucible.",
     action="store_const",
     const=True,
     default=False,
@@ -315,7 +319,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--Report",
-    help="Write the case's report (Markdown and DOCX) into the case folder when the run ends: hosts and timespan, ATT&CK techniques with the rows behind each, indicators, Gandalf's integrity check and this run's method. A case already processed: python3 -m rowanholt.report /path/to/case",
+    help="Write the case's report (Markdown and DOCX) into the case folder when the run ends: hosts and timespan, ATT&CK techniques with the rows behind each, indicators, Custodian's integrity check and this run's method. A case already processed: python3 -m rowanholt.report /path/to/case",
     action="store_const",
     const=True,
     default=False,
@@ -477,73 +481,12 @@ system_artefacts = [
     "/var/vm/sleepimage",
     "/var/vm/swapfile",
 ]
-quotes = [
-    "Now come the days of the King, and may they be blessed.\n     -- Gandalf, The Return of the King",
-    "Forty-two, Master Legolas!\n     -- Gimli, The Two Towers",
-    "There is a lot more in him than you guess,\n     and a deal more than he has any idea of himself.\n     -- Gandalf, The Hobbit",
-    "One Ring to rule them all, One Ring to find them,\n     One Ring to bring them all and in the darkness bind them.\n     -- the Ring-verse, The Fellowship of the Ring",
-    "The world is changing: I feel it in the water,\n     I feel it in the earth, and I smell it in the air.\n     -- Treebeard, The Return of the King",
-    "Who knows? Have patience. Go where you must go, and hope!\n     -- Gandalf, The Two Towers",
-    "All we have to decide is what to do with the time that is given us.\n     -- Gandalf, The Fellowship of the Ring",
-    "Deeds will not be less valiant because they are unpraised.\n     -- Aragorn, The Two Towers",
-    "In the end the Shadow was only a small and passing thing.\n     -- Sam, in Mordor, The Return of the King",
-    "It's the job that's never started as takes longest to finish.\n     -- Sam, after the Gaffer, The Fellowship of the Ring",
-    "I laid low the warriors of old and their like is not in the world today.\n     -- Smaug, The Hobbit",
-    "Something is the matter with you! You are not the hobbit that you were.\n     -- Gandalf, The Hobbit",
-    "Do not be too eager to deal out death in judgement.\n     For even the very wise cannot see all ends.\n     -- Gandalf, The Fellowship of the Ring",
-    "The treacherous are ever distrustful.\n     -- Gandalf, The Two Towers",
-    "Let him not vow to walk in the dark, who has not seen the nightfall.\n     -- Elrond, The Fellowship of the Ring",
-    "He that breaks a thing to find out what it is has left the path of wisdom.\n     -- Gandalf, The Fellowship of the Ring",
-    "I was the herald of Gil-galad and marched with his host.\n     -- Elrond, The Fellowship of the Ring",
-    "I don't know half of you half as well as I should like;\n     and I like less than half of you half as well as you deserve.\n     -- Bilbo, The Fellowship of the Ring",
-    "The Company of the Ring shall be Nine;\n     and the Nine Walkers shall be set against the Nine Riders that are evil.\n     -- Elrond, The Fellowship of the Ring",
-    "You shall not pass!\n     -- Gandalf, The Fellowship of the Ring",
-    "Keep it secret, and keep it safe!\n     -- Gandalf, The Fellowship of the Ring",
-    "Small hands do them because they must, while the eyes of the great are elsewhere.\n     -- Elrond, The Fellowship of the Ring",
-    "I wish it need not have happened in my time.\n     -- Frodo, The Fellowship of the Ring",
-    "A hunted man sometimes wearies of distrust and longs for friendship.\n     -- Aragorn, The Fellowship of the Ring",
-    "The world is indeed full of peril, and in it there are many dark places.\n     -- Haldir, The Fellowship of the Ring",
-    "Someone else always has to carry on the story.\n     -- Bilbo, The Fellowship of the Ring",
-    "It is useless to meet revenge with revenge: it will heal nothing.\n     -- Frodo, The Return of the King",
-    "Despair is only for those who see the end beyond all doubt. We do not.\n     -- Gandalf, The Fellowship of the Ring",
-    "Speak, friend, and enter.\n     -- the West-gate of Moria, The Fellowship of the Ring",
-    "The wise speak only of what they know.\n     -- Gandalf, The Two Towers",
-    "Not all those who wander are lost.\n     -- Bilbo's verse, The Fellowship of the Ring",
-    "It's the deep breath before the plunge.\n     -- Gandalf, The Return of the King",
-    "There is nothing like looking, if you want to find something.\n     -- Thorin, The Hobbit",
-    "You certainly usually find something, if you look,\n     but it is not always quite the something you were after.\n     -- the narrator, The Hobbit",
-    "It does not do to leave a live dragon out of your calculations, if you live near him.\n     -- the narrator, The Hobbit",
-    "Never laugh at live dragons, Bilbo you fool!\n     -- Bilbo, The Hobbit",
-    "What has it got in its pocketses?\n     -- Gollum, The Hobbit",
-    "Thief, thief, thief! Baggins!\n     -- Gollum, The Hobbit",
-    "I am looking for someone to share in an adventure that I am arranging,\n     and it's very difficult to find anyone.\n     -- Gandalf, The Hobbit",
-    "We are plain quiet folk and have no use for adventures.\n     -- Bilbo, The Hobbit",
-    "In a hole in the ground there lived a hobbit.\n     -- the opening line, The Hobbit",
-    "Escaping goblins to be caught by wolves!\n     -- Bilbo, The Hobbit",
-    "Where there's life there's hope.\n     -- Bilbo, The Hobbit",
-    "Short cuts make long delays.\n     -- Pippin, The Fellowship of the Ring",
-    "It's a dangerous business, Frodo, going out your door.\n     -- Bilbo, The Fellowship of the Ring",
-    "The Road goes ever on and on\n     Down from the door where it began.\n     -- Bilbo's walking-song, The Fellowship of the Ring",
-    "Advice is a dangerous gift, even from the wise to the wise,\n     and all courses may run ill.\n     -- Gandalf, The Fellowship of the Ring",
-    "It is perilous to study too deeply the arts of the Enemy, for good or for ill.\n     -- Elrond, The Fellowship of the Ring",
-    "Always after a defeat and a respite, the Shadow takes another shape and grows again.\n     -- Gandalf, The Fellowship of the Ring",
-    "Faithless is he that says farewell when the road darkens.\n     -- Gimli, The Fellowship of the Ring",
-    "Do not meddle in the affairs of Wizards, for they are subtle and quick to anger.\n     -- Gildor, The Fellowship of the Ring",
-    "Go not to the Elves for counsel, for they will say both no and yes.\n     -- Frodo, The Fellowship of the Ring",
-    "Not idly do the leaves of Lorien fall.\n     -- Aragorn, The Two Towers",
-    "Strange are the turns of fortune! Often does hatred hurt itself!\n     -- Gandalf, The Two Towers",
-    "The burned hand teaches best.\n     After that advice about fire goes to the heart.\n     -- Gandalf, The Two Towers",
-    "Oft hope is born when all is forlorn.\n     -- Legolas, The Return of the King",
-    "Fly, you fools!\n     -- Gandalf, The Fellowship of the Ring",
-    "Well, I'm back.\n     -- Sam, The Return of the King",
-    "This tale grew in the telling.\n     -- Tolkien's foreword, The Fellowship of the Ring",
-]
-asciitext = [
-    "\n\n        \033[1;36mWelcome to Minas Tirith\n\n\n      |||            _.'   _      _.-. |        | |--\n     \\|||         _.'    -    _.-'  _|-|       -| |__\n      ||;-,    _.'   '-  _.-'' _.-''|  |-'      | `._\n     -'| / \\_,' _    _.-'   _.' |   |  |    -|  |\n     ----|,`   |  _.'   _.-' | ,| ,'| _| |      |_   \n        _:  _   ,'   .-'    _|/ \\ | | -|  _|_   | '\n       | |    ,'  .-'     , )|)-( |_|  |-       |    -\n     -   |  ,'  ,'(   `  /_\\||`.'   |- |   -|_  |\n     ___-| /  ,'   )     `.'||.-| _ | ||        | '-'\n     __( |;  /    / ,-    | ||  |/ \\|_ | _|    -|    \n       | :  ; ,-.-)       | ||  || ||  |   |_   |    _\n      _| | :/` _..\\  `-.  | ||__||_|;--;--------:  ,'`\n       | | |,-'  _/       |,-/\\_|  /__/__________\\::::\n       |-| |   ,' \\, ` ___|||||-|  |  |  _|_     ||___\n     _ | | | ,'   (   ;   :'''' /| ||_|       _  ||---\n     - | | |/     ;  /     :   : | |  |   _|_    ||---\n       | | |      |,'______|-..| | |_||      |  _||---\n       | | |      ||_      |   | | |_ |  -      -|----   \n     _|| | |      ;|-:  _  |   | |,|- |-   _|  _ |--,'\n       | | |______\\| |,' `.|`-.| |:|  | _|    |  |,','\n       |-| | ~   ~|| ||__|||! !| | ;--;----__---,','|\n       | | |,._,~_|:.||-'|||! !| |/__/____/\\_\\,','|\\|\n     -.| | ;     _.-'|| - ||`.!| ||  |    ||_|,'| | |,\n      || ;'|_,-''    -    - `.`| ||  | ___|| ||\\| |,',\n     , | | |    -     -     -  ) '|__||\\  || | \\|,','\n       ; | | -     -      -      |\\    \\\\ || |_,',' \n      /| | ;    -     -           \\\\    \\\\|| |','\n     / | |/                        \\\\    \\|| |' SSt\033[1;m",
-    "\n\n        \033[1;36mWelcome to Bag End\n\n\n                        . .:.:.:.:. .:\\     /:. .:.:.:.:. ,\n                   .-._  `..:.:. . .:.:`- -':.:. . .:.:.,'  _.-.\n                  .:.:.`-._`-._..-''_...---..._``-.._.-'_.-'.:.:.\n               .:.:. . .:_.`' _..-''._________,``-.._ `.._:. . .:.:.\n            .:.:. . . ,-'_.-''      ||_-(O)-_||      ``-._`-. . . .:.:.\n           .:. . . .,'_.'           '---------'           `._`.. . . .:.\n         :.:. . . ,','               _________               `.`. . . .:.:\n        `.:.:. .,','            _.-''_________``-._            `._.     _.'\n      -._  `._./ /            ,'_.-'' ,       ``-._`.          ,' '`:..'  _.-\n     .:.:`-.._' /           ,','                   `.`.       /'  '  \\\\.-':.:.\n     :.:. . ./ /          ,','               ,       `.`.    / '  '  '\\\\. .:.: \n    :.:. . ./ /          / /    ,                      \\ \\  :  '  '  ' \\\\. .:.:\n    .:. . ./ /          / /            ,          ,     \\ \\ :  '  '  ' '::. .:.\n    :. . .: :    o     / /                               \\ ;'  '  '  ' ':: . .:\n    .:. . | |   /_\\   : :     ,                      ,    : '  '  '  ' ' :: .:.\n    :. . .| |  ((<))  | |,          ,       ,             |\\'__',-._.' ' ||. .:\n    .:.:. | |   `-'   | |---....____                      | ,---\\/--/  ' ||:.:.\n    ------| |         : :    ,.     ```--..._   ,         |''  '  '  ' ' ||----\n    _...--. |  ,       \\ \\             ,.    `-._     ,  /: '  '  '  ' ' ;;..._\n    :.:. .| | -O-       \\ \\    ,.                `._    / /:'  '  '  ' ':: .:.:\n    .:. . | |_(`__       \\ \\                        `. / / :'  '  '  ' ';;. .:.\n    :. . .<' (_)  `>      `.`.          ,.    ,.     ,','   \\  '  '  ' ;;. . .:\n    .:. . |):-.--'(         `.`-._  ,.           _,-','      \\ '  '  '//| . .:.\n    :. . .;)()(__)(___________`-._`-.._______..-'_.-'_________\\'  '  //_:. . .:\n    .:.:,' \\/\\/--\\/--------------------------------------------`._',;'`. `.:.:.\n    :.,' ,' ,'  ,'  /   /   /   ,-------------------.   \\   \\   \\  `. `.`. `..:\n    ,' ,'  '   /   /   /   /   //                   \\\\   \\   \\   \\   \\  ` `.SSt\033[1;m",
-    "\n\n\n\n\n                                                \033[1;36m_______________________\n       _______________________-------------------                       `\\\n     /:--__                                                              |\n    ||< > |                                   ___________________________/\n    | \\__/_________________-------------------                         |\n    |                                                                  |\n     |                       THE LORD OF THE RINGS                      |\n     |                                                                  |\n     |      Three Rings for the Elven-kings under the sky,              |\n      |        Seven for the Dwarf-lords in their halls of stone,        |\n      |      Nine for Mortal Men doomed to die.                          |\n      |        One for the Dark Lord on his dark throne,                  |\n      |      In the Land of Mordor where the Shadows lie.                 |\n       |       One Ring to rule them all, One Ring to find them,          |\n       |       One Ring to bring them all and in the darkness bind them   |\n       |     In the Land of Mordor where the Shadows lie.                |\n      |                                              ____________________|_\n      |  ___________________-------------------------                      `\\\n      |/`--_                                                                 |\n      ||[ ]||                                            ___________________/\n       \\===/___________________--------------------------\033[1;m",
-    "\n\n    ||                                ..........',:clooddddoolc:;''...   .......  .....'..'''||\n    ||                             ........'',;:clodxkkkkkkkkkxoc;,'............   ......''''||\n    ||                         ......',;,,;;:lddxxdxxxxxkkkkOOOkxdl:;'....... ...  ..........||\n    ||                      .....',;;;::;;:cloddoooodxxkkOOOOOOOOkkkxdolc;'...     ..........||\n    ||                  .....''',;;;;::c::;:ccllllodxxxxxxk0K000000OOkkkkxo:,'..     ........||\n    ||                ........',;,,;,,;:llclooooddxkkkxolokkxdk0Oxdxxdodddl:::,....  ........||\n    ||                ..........'''',,;;:cllddxkkOOOO00xox000KXX0xoolcccodocc:,'''......''''.||\n    ||               ...''....'''''.',;:coddxxkOOOOOOO0OxkO00K00Okdl:,'',;,';:cc;'.''....''..||\n    ||              ..........''''''';:cloxxkkkOOOOOO000KXXKKK00Okdol:,'..''...;:c'...''.....||\n    ||            ...'''''....',,;;;;;:cloxkkOOOOOOOO000KKKKKK00Okdooc;'...''....';,. .'''...||\n    ||            ..',,,,;;;;;;:::::::ccldxkkOOOOOOOO00KKKKKKK0OOxolc:;'....'.......'..','...||\n    ||            ..',,,;;;;;:::::::::clodkkOOOOOOOO0000KKKKKK00Okdl:;,'........... .........||\n    ||             .',;;;;::::::::::::cldxkkOOOOO0000000KKKXXKKKK0kdc;,''. ........    .....'||\n    ||             .',;;;:ccllcc::::cclodxkkkkkkOO000OOOO0KKKKKKKK0Oxc,'..   .......  ... .;;||\n    ||             ..,,;;:cllllc:::ccllodxxxxxxxxxxxdodxkO0KKKXKKKK0Oo;...    ......';:oo;...||\n    ||             ..',;;:cllllc::cclllooddollc:::cldxOO0000KKKKKKKK0x:'..    .....,codxkx:. ||\n    ||             .',,;;::cclll::clllllc::,'''',:oxOO0000000KKKKKKKKkl,...   .....,;;:okOd'.||\n    ||             ...',;::::clcc:::c:;,''..'''',,;:cldxkO0000KKKXKKKOo:...   ...'.,,;:cdkk;.||\n    ||            .......',;;:::::::::;;;,'''.......,:ccldxkO0KKXXXK0Odc'.    ...',;;:cldOk;.||\n    ||             .....  .....';clddxdlc;,,'',,,'',:loxOOOO00KKXXXKOkdc'........',,;;:lxOd' ||\n    ||              ...    .....;cok00Oxdoc;,,,,,,;:cldkO0000KKKKXK0Okoc,......'..',,;:okOc. ||\n    ||                ......','';ldOKKK0Okoc::::::ccloxkO0000KXXXKKOkdo:,..',..'..',;:lxko.. ||\n    ||                 ....'',',:lx0XXXXKK0kxoccccloodkOOOOO00KKKK0kxdl:'...'.....';ldkko'  .||\n    ||                 ..''',,,;cxOKXXXXXXXK0OxxdoooodxkkOOO000000Okxdl;'.........,:dOOd'   .||\n    ||                 ...',,,,:ok0KXXXXKXXXK000OkkkxdxxkkOOO00OOOOkxoc;'.........';oko'     ||\n    ||                 .,,,,,,;cok0KKKXK00000OOOOOOOOkkkkOOOOOOOOOkxdoc;,.........';l:..     ||\n    ||                 .,,,,,,;cdO000KKK00K0OdddxkkOOOOOOOO000OOOkxddl:;'...... ..';c;.      ||\n    ||                 .',,,,,,:lxkOxxxdoxO0OxllloxkkOOOO00000OOOkxdol:;'.....  ..':o:.      ||\n    ||                  .',,,,''',:lllllccdkOxdoooodxkOOO00000OOkxdolc:,'.....  ..,cxc.      ||\n    ||                   .''',,'...,:cdkxxkkkkxxxxddxkOO00000OOOkxdolc;,......  ..,oko'      ||\n    ||                   ...',,,''';::ldxxxxxkkkkkkkxxxkOO000OOOkxolc:;'......  ..;xkd,      ||\n    ||                    ..'',,'',:c;:ldxxxxkkOOkkkkkxxkOOOOOkkkdlc:;,'.....   ..:xkk:.     ||\n    ||                     ..''',,,:c::cllloooddddoodxkkkOOOOkkxxol:;,,'''...   ..ckOkl.   ..||\n    ||                      .''',,,,,,,;;;::cloolllcclodxkOOOkxddlc:;,,,;,..    ..:xxdc'..;ld||\n    ||                      ..''..''',;:cloodxkkkkkkxdooodxxkxddolc;,,;:c:..    .';lollodkkkx||\n    ||                       ..'''',,;;:cclloooddddxxddooodxxdddol:;;::clc,.  ...';ldkkkkkxoc||\n    ||                       .....',,;;;;;;::cccclloooooodxxxxdolc:::cclc:;......'coxkOkxoc;'||\n    ||                    ...''....',,,;;;;::clccclllllloodxxdolc::::c:::;;'.....,ldxxxdl:,..||\n    || .':lcc;,''',,;:cllloddxko:'..'',;::ccloddddoodoooooooolc:;;;;;;,;;;;,.....:oddooc;,.. ||\n    ||.:xO0KKK00OOOOOOOOOOkkkkO00Odc,',;:cccloddxxxxddooolcc:;;;,,,'',;:::cc:...'collcc;'..  ||\n    ||'lxO0KKKKKK0000000000OkOO00000kl:;;::::cllooddddoolc:;;,,,''',,;::clool,...;:cc:;'.. ..||\n    ||;lxO0KXXXXKKKK0000000OOO0KXKOkOOkdoc;;;;:::cclllc:::;,,''.',;::::cllooc.   .'::,...... ||\n    ||:ok0KKKKKKKKKKKKKKKK0OO0KXXNXOxdkOOkdlc;;,,,,,,,,,,,'''..',:ccccclooo:..    .,'......  ||\n    ||cdkO00KKKKKKKKKK0000OO0KXKKXNX0dldxkkOkxl:,.............',:cccclool:,..'.  .''......   ||\n    ||cdxkOOOO0KKKKKKK0O0K0kkKXXK00XNKd::clodxoc,.............':cccllooo;. ......,,'......   ||\n    ||coxxk00OkxxxxkkOOO0KK0kk0XXKOOKKKxlcloddol;. .......'''',:ccloooooc'.......'''.....    ||\n    ||loodk000Oxc'',,,cdk0KXKkk0KX0xxOO00kdol:'...........'''':ccloooololc;'....''......    .||\n    ||loodxOOxl,.......,cdO0K0kxOKXOooxO00x;... ...........'',cclloollllllc:..'''..'..       ||",
-]
+# src/common/quips.py, when Ledger runs from a checkout; the worker image carries src/analysis alone
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+try:
+    from common.quips import QUIPS as quotes
+except ImportError:
+    quotes = []
 
 
 if __name__ == "__main__":
@@ -551,7 +494,7 @@ if __name__ == "__main__":
     # switch on collection options (user profiles, the disk timeline) when there's a disk
     # to collect from. Asked for by name, they still fail the check in main().
     if mobile and (mordor or args.Gandalf or collect):
-        print("\n  Error: --Mobile is an evidence source of its own: it can't be used with --Collect, --Gandalf or --Mordor\n")
+        print("\n  Error: --Mobile is an evidence source of its own: it can't be used with --Collect, --Custodian or --Crucible\n")
         sys.exit(1)
     if args.backupPasswordStdin and not mobile:
         print("\n  Error: --backupPasswordStdin is for encrypted phone backups, with --Mobile\n")
@@ -675,7 +618,7 @@ if __name__ == "__main__":
             print("\n  Error: --Network found no PCAP, Zeek log or NetFlow export in the sources\n")
             sys.exit(1)
         if sources and not (collect or gandalf):
-            print("\n  Error: {} isn't network evidence: give --Collect or --Gandalf for it too\n".format(", ".join(sources)))
+            print("\n  Error: {} isn't network evidence: give --Collect or --Custodian for it too\n".format(", ".join(sources)))
             sys.exit(1)
     output_directory = os.path.join(destination or "./", "")
     network_done = []
@@ -761,7 +704,6 @@ if __name__ == "__main__":
                 ewf_mount,
                 system_artefacts,
                 quotes,
-                asciitext,
                 clamav=clamav,
                 mobile=mobile,
                 skip_unmount=(idx > 0),  # Don't unmount after first image
@@ -858,7 +800,6 @@ if __name__ == "__main__":
             ewf_mount,
             system_artefacts,
             quotes,
-            asciitext,
             clamav=clamav,
             mobile=mobile,
             skip_unmount=True,  # Don't unmount - images are still mounted
@@ -931,7 +872,6 @@ if __name__ == "__main__":
                 ewf_mount,
                 system_artefacts,
                 quotes,
-                asciitext,
                 clamav=clamav,
                 mobile=mobile,
                 skip_unmount=True,  # Don't unmount between processing
@@ -1031,7 +971,6 @@ if __name__ == "__main__":
                 ewf_mount,
                 system_artefacts,
                 quotes,
-                asciitext,
                 clamav=clamav,
                 mobile=mobile,
                 skip_unmount=True,
@@ -1086,7 +1025,7 @@ if __name__ == "__main__":
             indicators = load_all(threatintel)
             print(f"     Loaded {len(indicators)} indicators from {len(threatintel)} file(s)", flush=True)
             totals = match_case(output_directory, indicators, log=lambda m: print(f"     {m}", flush=True))
-            entry, prnt = "{},{},threat intelligence,{} indicators; {} elements matched; {} iocs; {} groups; {} of Gandalf's own records left out\n".format(
+            entry, prnt = "{},{},threat intelligence,{} indicators; {} elements matched; {} iocs; {} groups; {} of Custodian's own records left out\n".format(
                 datetime.now().isoformat(), case, totals["indicators"], totals["elements"], totals["iocs"], totals["groups"],
                 totals["collector"],
             ), " -> {} -> matched the case against {} threat intelligence indicators: {} elements found".format(
@@ -1192,7 +1131,6 @@ if __name__ == "__main__":
                 ewf_mount,
                 system_artefacts,
                 quotes,
-                asciitext,
                 clamav=clamav,
                 mobile=mobile,
                 skip_unmount=True,

@@ -172,7 +172,7 @@ def test_markdown_says_everything_with_its_citation(case):
         assert heading in text, heading
     assert "| LAB-WIN11 | 2026-10-25 10:07:00Z | `artefacts/cooked/evt/Security.jsonl` | 3 |" in text
     assert "1 of 2 files don't verify" in text and "MISMATCH" in text
-    assert "not a Gandalf acquisition" in text
+    assert "not a Custodian acquisition" in text
     assert "processing failed (artemis)" in text
     assert "powershell -enc SQBFAFgA \\| x" in text  # a pipe in evidence doesn't break the table
     assert "T1003.001" not in text

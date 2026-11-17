@@ -10,7 +10,7 @@ python3 -m pip install gdown python-registry registry libesedb-python
 export PATH="$HOME/.local/bin:$PATH"
 source ~/.bashrc
 clear
-printf "\n  -> Downloading additional elrond components...\n\n"
+printf "\n  -> Downloading additional Ledger components...\n\n"
 
 # downloading additional tools for elrond
 cd /tmp

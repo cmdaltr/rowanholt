@@ -15,7 +15,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="python3 -m rowanholt.report",
                                      description="Write a case's report (Markdown and DOCX) from its case folder.")
     parser.add_argument("case_folder", help="the case's folder: the one holding its host folders")
-    parser.add_argument("--case", default="", help="the case number (default: the one Elrond recorded, or the folder's name)")
+    parser.add_argument("--case", default="", help="the case number (default: the one Ledger recorded, or the folder's name)")
     parser.add_argument("--out", default="", help="where to write the report (default: the case folder)")
     parser.add_argument("--format", nargs="+", choices=FORMATS, default=list(FORMATS), help="markdown, docx or both")
     args = parser.parse_args(argv)

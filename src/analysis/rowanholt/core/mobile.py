@@ -301,7 +301,7 @@ def find_evidence(source: Path) -> List[MobileEvidence]:
         if own:
             return [own]
     for name in skipped:
-        print("   '{}' isn't mobile evidence Elrond reads; skipping it".format(name))
+        print("   '{}' isn't mobile evidence Ledger reads; skipping it".format(name))
     return found
 
 
@@ -321,7 +321,7 @@ def ingest_mobile(output_directory: str, verbosity: str, source: str, allimgs: D
     """
     evidence = find_evidence(Path(source))
     if not evidence:
-        print("   No mobile evidence in '{}': Elrond reads iTunes/Finder backups, ADB backups (.ab), bug reports "
+        print("   No mobile evidence in '{}': Ledger reads iTunes/Finder backups, ADB backups (.ab), bug reports "
               "and full file system extractions (folders or .zip/.tar archives)\n".format(source))
         return []
     write_audit_log_entry(verbosity, output_directory, "LastWriteTime,elrond_host,elrond_stage,elrond_log_entry\n",

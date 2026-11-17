@@ -539,7 +539,7 @@ if __name__ == "__main__":
     import argparse
 
     cli = argparse.ArgumentParser(description="Stack a case's hosts, or build a baseline from clean cases.")
-    cli.add_argument("cases", nargs="+", help="Elrond case directories")
+    cli.add_argument("cases", nargs="+", help="Ledger case directories")
     cli.add_argument("--baseline", metavar="OUT", help="write a baseline of every value in these cases instead")
     cli.add_argument("--against", metavar="FILE", default="", help="score the case against this baseline")
     options = cli.parse_args()

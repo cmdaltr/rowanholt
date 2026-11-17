@@ -87,7 +87,7 @@ sudo sysctl -p
 sleep 2
 
 clear
-printf "\n\n  -> '"$(hostname)"' has been successfully configured for elrond; a reboot is required. Press ENTER to continue..."
+printf "\n\n  -> '"$(hostname)"' has been successfully configured for Ledger; a reboot is required. Press ENTER to continue..."
 read answer
 echo '' | sudo tee ~/.bash_history
 history -c

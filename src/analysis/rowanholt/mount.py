@@ -109,7 +109,7 @@ def unmount_images(elrond_mount, ewf_mount):
             shutil.rmtree(each)
         except PermissionError:
             print(
-                "\n   Error: Unable to unmount locations. Are you running elrond as root?\n\n"
+                "\n   Error: Unable to unmount locations. Are you running Ledger as root?\n\n"
             )
             sys.exit(1)
         except OSError as e:

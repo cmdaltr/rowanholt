@@ -20,7 +20,7 @@ PULL=false
 # Help message
 show_help() {
     cat << EOF
-Elrond Docker Startup Script
+Ledger Docker Startup Script
 
 Usage: ./docker-start.sh [OPTIONS]
 
@@ -57,7 +57,7 @@ EOF
 # Print header
 print_header() {
     echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║   Elrond Docker Environment Manager   ║${NC}"
+    echo -e "${BLUE}║   Ledger Docker Environment Manager   ║${NC}"
     echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
     echo ""
 }
@@ -154,7 +154,7 @@ start_services() {
     fi
 
     echo ""
-    echo -e "${GREEN}Starting Elrond services...${NC}"
+    echo -e "${GREEN}Starting Ledger services...${NC}"
     $compose_cmd -f $compose_file up $build_flag $detach_flag
 
     if [ "$DETACHED" = true ]; then
@@ -184,7 +184,7 @@ stop_services() {
         compose_file="docker/docker-compose.prod.yml"
     fi
 
-    echo -e "${YELLOW}Stopping Elrond services...${NC}"
+    echo -e "${YELLOW}Stopping Ledger services...${NC}"
     $compose_cmd -f $compose_file down
 
     echo -e "${GREEN}✓ Services stopped${NC}"
@@ -223,7 +223,7 @@ clean_all() {
         compose_cmd="docker compose"
     fi
 
-    echo -e "${RED}WARNING: This will remove all Elrond containers, volumes, and images!${NC}"
+    echo -e "${RED}WARNING: This will remove all Ledger containers, volumes, and images!${NC}"
     read -p "Are you sure? (yes/no): " confirm
 
     if [ "$confirm" != "yes" ]; then

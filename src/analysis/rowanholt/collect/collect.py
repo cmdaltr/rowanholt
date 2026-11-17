@@ -80,7 +80,7 @@ def collect_artefacts(
                 nsrlexit = safe_input("\n     It doesn't look like '/opt/elrond/elrond/tools/rds_modernm/NSRLFile.txt' exists.\n      Do you want to continue? Y/n [Y] ", default="y")
                 if nsrlexit == "n":
                     print(
-                        "     If you wish to utilise the NSRL hash database, run the '.../elrond/tools/scripts/nsrl.sh' script, before running elrond and try again.\n\n"
+                        "     If you wish to utilise the NSRL hash database, run the '.../elrond/tools/scripts/nsrl.sh' script, before running Ledger and try again.\n\n"
                     )
                     sys.exit(1)
         if not metacollected:

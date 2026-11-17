@@ -54,7 +54,7 @@ ILEAPP = ToolDefinition(
 ALEAPP = ToolDefinition(
     name="ALEAPP",
     description="Android Logs, Events, And Protobuf Parser: file system extractions, bug reports and ADB backups "
-                "(which Elrond lays out as a file system first)",
+                "(which Ledger lays out as a file system first)",
     platforms=[ToolPlatform.LINUX],
     executable_name="aleapp",
     common_paths={"linux": ["/usr/local/bin"]},

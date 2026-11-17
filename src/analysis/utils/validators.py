@@ -38,9 +38,9 @@ def validate_mode_flags(collect: bool, gandalf: bool, reorganise: bool) -> str:
 
     if len(modes) == 0:
         raise ValidationError(
-            "You MUST use one of: collect (-C), gandalf (-G), or reorganise (-R)\n"
+            "You MUST use one of: collect (-C), Custodian (-G), or reorganise (-R)\n"
             "  -C: Process acquired disk and/or memory images\n"
-            "  -G: Process artefacts collected using gandalf\n"
+            "  -G: Process artefacts collected using Custodian\n"
             "  -R: Reorganise previously collected artefacts"
         )
 
@@ -122,7 +122,7 @@ def validate_mode_specific_flags(
         collect_only_flags.append("userprofiles (-U)")
 
     if collect_only_flags:
-        mode_name = "gandalf (-G)" if gandalf else "reorganise (-R)"
+        mode_name = "Custodian (-G)" if gandalf else "reorganise (-R)"
         raise ValidationError(
             f"The following flags require collect mode (-C):\n"
             f"  {', '.join(collect_only_flags)}\n"

@@ -296,7 +296,7 @@ def process_memory(
                     pass
                 else:
                     print(
-                        "    elrond has identified that there is no available symbol table for this image.\n    You will need to create your own symbol table; information is provided in SUPPORT.md\n    Once you have created the symbol table and placed it in the respective directory (.../volatility3/volatility3/symbols[/windows/mac/linux]/), return to elrond."
+                        "    Ledger has identified that there is no available symbol table for this image.\n    You will need to create your own symbol table; information is provided in SUPPORT.md\n    Once you have created the symbol table and placed it in the respective directory (.../volatility3/volatility3/symbols[/windows/mac/linux]/), return to elrond."
                     )
                     time.sleep(5)
                     customprofile = choose_custom_profile(volchoice)
@@ -322,7 +322,7 @@ def process_memory(
                 pass
             else:
                 print(
-                    "    elrond has identified that there is no available symbol table for this image.\n    You will need to create your own symbol table; information is provided in SUPPORT.md\n    Once you have created the symbol table and placed it in the respective directory (.../volatility3/volatility3/symbols[/windows/mac/linux]/), return to elrond."
+                    "    Ledger has identified that there is no available symbol table for this image.\n    You will need to create your own symbol table; information is provided in SUPPORT.md\n    Once you have created the symbol table and placed it in the respective directory (.../volatility3/volatility3/symbols[/windows/mac/linux]/), return to elrond."
                 )
                 time.sleep(5)
                 customprofile = choose_custom_profile(volchoice)

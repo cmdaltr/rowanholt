@@ -369,7 +369,7 @@ class ToolInstaller:
             True if all installations succeeded
         """
         self.logger.info("="*60)
-        self.logger.info("elrond Forensic Tools Installer")
+        self.logger.info("Ledger Forensic Tools Installer")
         self.logger.info("="*60)
 
         # Check prerequisites
@@ -448,7 +448,7 @@ class ToolInstaller:
         print("WSL2 Installation Instructions for Windows")
         print("="*60)
         print()
-        print("elrond works best on Windows with WSL2 (Windows Subsystem for Linux).")
+        print("Ledger works best on Windows with WSL2 (Windows Subsystem for Linux).")
         print()
         print("To install WSL2:")
         print()

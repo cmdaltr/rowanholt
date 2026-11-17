@@ -248,13 +248,13 @@ def configure_splunk_stack(verbosity, output_directory, case, stage, allimgs, sa
         remote_splunk_path = "opt/"
 
         # Step 1: Deploy elrond app to shared volume
-        print("     Deploying elrond Splunk app...")
+        print("     Deploying the Ledger Splunk app...")
         try:
             if not os.path.isdir("/" + remote_splunk_path + "splunk/etc/apps/elrond/"):
                 build_app_elrond(case, remote_splunk_path)
-                print("     elrond app deployed successfully")
+                print("     Ledger Splunk app deployed successfully")
             else:
-                print("     elrond app already exists, updating for case '{}'...".format(case))
+                print("     Ledger Splunk app already exists, updating for case '{}'...".format(case))
                 # Update nav menu with new case
                 nav_file = "/" + remote_splunk_path + "splunk/etc/apps/elrond/default/data/ui/nav/default.xml"
                 if os.path.exists(nav_file):
@@ -270,7 +270,7 @@ def configure_splunk_stack(verbosity, output_directory, case, stage, allimgs, sa
                             with open(nav_file, "w") as new_default_nav:
                                 new_default_nav.write(insert_new_case + "\n")
         except Exception as e:
-            print("     WARNING: Could not deploy elrond app: {}".format(e))
+            print("     WARNING: Could not deploy the Ledger Splunk app: {}".format(e))
 
         # Step 2: Deploy dependency apps if available
         print("     Deploying Splunk dependency apps...")

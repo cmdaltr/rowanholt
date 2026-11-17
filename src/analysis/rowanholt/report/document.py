@@ -333,7 +333,7 @@ def docx(blocks: List[Block], title: str, theme: Optional[Theme] = None) -> byte
             'xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
             'xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" '
             'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
-            f"<dc:title>{_xml_text(title)}</dc:title><dc:creator>Rowanholt (Elrond)</dc:creator>"
+            f"<dc:title>{_xml_text(title)}</dc:title><dc:creator>Rowanholt (Ledger)</dc:creator>"
             f'<dcterms:created xsi:type="dcterms:W3CDTF">{now}</dcterms:created>'
             f'<dcterms:modified xsi:type="dcterms:W3CDTF">{now}</dcterms:modified></cp:coreProperties>')
     buffer = io.BytesIO()

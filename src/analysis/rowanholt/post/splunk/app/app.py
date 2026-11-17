@@ -396,7 +396,7 @@ label.control-label {
         elif sd.endswith("default/"):
             with open(sd + "app.conf", "w") as appconf:
                 appconf.write(
-                    "#\n# Splunk app configuration file\n#\n\n[install]\nis_configured = 0\n\n[ui]\nis_visible = 1\nlabel = elrond\n\n[launcher]\nauthor = cmdaltr [cmdaltrthon (at) gmail (dot) com]\ndescription = Accompanying Splunk app for elrond script\nversion = 1.2.0\n\n[package]\nid = elrond\n"
+                    "#\n# Splunk app configuration file\n#\n\n[install]\nis_configured = 0\n\n[ui]\nis_visible = 1\nlabel = Ledger\n\n[launcher]\nauthor = cmdaltr [cmdaltrthon (at) gmail (dot) com]\ndescription = Accompanying Splunk app for Ledger\nversion = 1.2.0\n\n[package]\nid = elrond\n"
                 )
             with open(sd + "fields.conf", "w") as fieldsconf:
                 fieldsconf.write("[mitre_technique_name]\nINDEXED = True\n\n")
@@ -564,7 +564,7 @@ label.control-label {
                 defaultnav.write(case_views)
                 defaultnav.write('\n\t</collection>\n\t')
                 # Elrond Search - custom search page
-                defaultnav.write('<view name="elrond_search" label="Elrond Search" />\n')
+                defaultnav.write('<view name="elrond_search" label="Ledger Search" />\n')
                 defaultnav.write('</nav>')
         elif sd.endswith("elrond/static/"):
             # Copy app icons to root static folder (for Splunk app launcher)
@@ -622,7 +622,7 @@ label.control-label {
                 )
             with open(sd + "elrond_search.xml", "w") as elrondsearchxml:
                 elrondsearchxml.write(
-                    '<form version="1.1" stylesheet="mitre.css" theme="dark">\n  <label>Elrond Search</label>\n  <fieldset submitButton="true" autoRun="false">\n    <input type="text" token="search_tok" searchWhenChanged="false">\n      <label>Search Query</label>\n      <default>index=* | head 1000</default>\n      <initialValue>index=* | head 1000</initialValue>\n    </input>\n    <input type="time" token="time_tok" searchWhenChanged="false">\n      <label>Time Range</label>\n      <default>\n        <earliest>-24h@h</earliest>\n        <latest>now</latest>\n      </default>\n    </input>\n  </fieldset>\n  <row>\n    <panel>\n      <table>\n        <search>\n          <query>$search_tok$</query>\n          <earliest>$time_tok.earliest$</earliest>\n          <latest>$time_tok.latest$</latest>\n        </search>\n        <option name="count">50</option>\n        <option name="dataOverlayMode">none</option>\n        <option name="drilldown">cell</option>\n        <option name="percentagesRow">false</option>\n        <option name="refresh.display">progressbar</option>\n        <option name="rowNumbers">true</option>\n        <option name="totalsRow">false</option>\n        <option name="wrap">true</option>\n      </table>\n    </panel>\n  </row>\n</form>'
+                    '<form version="1.1" stylesheet="mitre.css" theme="dark">\n  <label>Ledger Search</label>\n  <fieldset submitButton="true" autoRun="false">\n    <input type="text" token="search_tok" searchWhenChanged="false">\n      <label>Search Query</label>\n      <default>index=* | head 1000</default>\n      <initialValue>index=* | head 1000</initialValue>\n    </input>\n    <input type="time" token="time_tok" searchWhenChanged="false">\n      <label>Time Range</label>\n      <default>\n        <earliest>-24h@h</earliest>\n        <latest>now</latest>\n      </default>\n    </input>\n  </fieldset>\n  <row>\n    <panel>\n      <table>\n        <search>\n          <query>$search_tok$</query>\n          <earliest>$time_tok.earliest$</earliest>\n          <latest>$time_tok.latest$</latest>\n        </search>\n        <option name="count">50</option>\n        <option name="dataOverlayMode">none</option>\n        <option name="drilldown">cell</option>\n        <option name="percentagesRow">false</option>\n        <option name="refresh.display">progressbar</option>\n        <option name="rowNumbers">true</option>\n        <option name="totalsRow">false</option>\n        <option name="wrap">true</option>\n      </table>\n    </panel>\n  </row>\n</form>'
                 )
             create_static_pages(sd)
             create_xmls(sd)

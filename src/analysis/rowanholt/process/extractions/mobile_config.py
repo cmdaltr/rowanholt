@@ -133,7 +133,7 @@ def _component_package(component: str) -> str:
 def android_config_rows(path: str, data: bytes) -> List[Dict]:
     """Rows for one Android device-policy file (path as it was on the phone)."""
     if data.startswith(ABX_MAGIC):
-        logger.warning("%s is Android binary XML (ABX), which Elrond doesn't read; skipped", path)
+        logger.warning("%s is Android binary XML (ABX), which Ledger doesn't read; skipped", path)
         return []
     try:
         root = ET.fromstring(data)
