@@ -642,7 +642,7 @@ sudo python3 python/gandalf.py Password Remote -O /evidence/CASE-001`}</Code>
             <p>
               Ledger takes the case ID, one or more sources and the output directory, then long options only (an
               unambiguous prefix works: <code>--Coll</code>). Memory images are read from the source directory with
-              the disk images. Full list: <ExternalLink href={doc('CLI.md#elrond---analysis')}>CLI.md</ExternalLink>.
+              the disk images. Full list: <ExternalLink href={doc('CLI.md#ledger---analysis')}>CLI.md</ExternalLink>.
             </p>
             <div className="hp-shell">
               <div>
