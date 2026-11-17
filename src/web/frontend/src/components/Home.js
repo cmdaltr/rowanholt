@@ -12,7 +12,7 @@ const mordorOpenImage = `${process.env.PUBLIC_URL}/images/mordor_open.jpg`;
 
 // The banners, left to right (the Aragorn page itself is for admins). Insight is Smith.
 // drop lowers a figure in its frame; zoom closes in when it's open
-const JOURNEYS = [
+export const JOURNEYS = [
   { to: '/gandalf', image: gandalfImage, name: 'Custodian', role: 'Acquisition',
     text: 'Collect evidence from live or remote systems with encrypted packaging.' },
   { to: '/elrond', image: elrondImage, name: 'Ledger', role: 'Analysis', drop: '12px', zoom: 1.1,

@@ -42,19 +42,28 @@ function AddWebhook({ events, onAdded }) {
   return (
     <form className="card" onSubmit={add}>
       <h2>Add a webhook</h2>
-      <label>URL <input aria-label="Webhook URL" value={url} onChange={(e) => setUrl(e.target.value)}
-        placeholder="https://soar.example.org/rowanholt" style={{ width: '100%' }} /></label>
-      <p style={{ color: '#888' }}>https:// only; http:// is allowed for localhost and private 10/172.16/192.168 addresses.</p>
-      <label>Description <input aria-label="Description" value={description}
-        onChange={(e) => setDescription(e.target.value)} style={{ width: '100%' }} /></label>
-      <fieldset>
-        <legend>Events</legend>
-        {events.map((event) => (
-          <label key={event} style={{ marginRight: '1rem' }}>
-            <input type="checkbox" checked={chosen.includes(event)} onChange={() => toggle(event)} /> {event}
-          </label>
-        ))}
-      </fieldset>
+      <div className="form-group">
+        <label htmlFor="webhook-url">URL</label>
+        <input id="webhook-url" type="url" aria-label="Webhook URL" value={url} onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://soar.example.org/rowanholt" />
+        <p className="field-hint">https:// only; http:// is allowed for localhost and private 10/172.16/192.168 addresses.</p>
+      </div>
+      <div className="form-group">
+        <label htmlFor="webhook-description">Description</label>
+        <input id="webhook-description" type="text" aria-label="Description" value={description}
+          onChange={(e) => setDescription(e.target.value)} />
+      </div>
+      <div className="form-group">
+        <label>Events</label>
+        <div className="checkbox-group">
+          {events.map((event) => (
+            <label key={event} className="checkbox-item">
+              <input type="checkbox" checked={chosen.includes(event)} onChange={() => toggle(event)} />
+              <code>{event}</code>
+            </label>
+          ))}
+        </div>
+      </div>
       <button type="submit" disabled={!url.trim() || !chosen.length}>Add</button>
       {error && <div className="error">{error}</div>}
     </form>

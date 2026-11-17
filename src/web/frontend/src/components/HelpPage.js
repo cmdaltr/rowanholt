@@ -1156,7 +1156,6 @@ python3 src/analysis/elrond.py CASE-001 /cases/CASE-001 \\
           <h4>Additional Resources</h4>
           <ul className="hp-cols">
             <li><strong>Repository:</strong> <ExternalLink href={REPO}>github.com/cmdaltr/rowanholt</ExternalLink></li>
-            <li><strong>Author:</strong> <ExternalLink href="https://github.com/cmdaltr">@cmdaltr</ExternalLink></li>
             <li><strong>Version:</strong> {VERSION}</li>
             <li><strong>Licence:</strong> <ExternalLink href={`${REPO}/blob/main/LICENSE`}>Elastic License 2.0</ExternalLink>; Pro and Services: <ExternalLink href={`${REPO}/blob/main/COMMERCIAL-LICENSE.md`}>commercial licence</ExternalLink></li>
           </ul>

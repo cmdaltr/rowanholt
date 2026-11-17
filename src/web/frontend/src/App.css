@@ -139,7 +139,9 @@ code, pre, kbd, samp { font-family: var(--font-mono); letter-spacing: 0; }
 }
 
 /* The logo on every other page goes home */
-.App:not(.App--home) img.hero-image { cursor: pointer; }
+/* .hero-image takes no clicks (the home page's scroll-shrunk logo sits over the banners), so
+   the others' logo turns them back on: App's click handler takes it home */
+.App:not(.App--home) img.hero-image { cursor: pointer; pointer-events: auto; }
 
 /* A laptop-width window (Windows at 125-150% scaling is often 1100-1300px): the links don't
    wrap, so each group would otherwise grow past its column and scroll the whole page sideways */
@@ -290,6 +292,8 @@ input[type="text"],
 input[type="email"],
 input[type="password"],
 input[type="number"],
+input[type="url"],
+input:not([type]),
 select,
 textarea {
   background: rgba(17, 22, 12, 0.85);
@@ -308,6 +312,8 @@ input[type="text"]:focus,
 input[type="email"]:focus,
 input[type="password"]:focus,
 input[type="number"]:focus,
+input[type="url"]:focus,
+input:not([type]):focus,
 select:focus,
 textarea:focus {
   outline: none;
@@ -1308,6 +1314,21 @@ table input[type="checkbox"] {
   color: #e9e3cf;
   font-family: 'Georgia', 'Garamond', serif;
   font-size: 1rem;
+}
+
+/* Sign-in: one closed banner, the home page's, beside the form */
+.login-layout {
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  gap: 1.5rem;
+  max-width: 90%;
+  margin: 0 auto;
+}
+.login-layout .login-card { flex: 0 1 800px; min-width: 0; margin: 0; }
+.login-layout .login-figure { flex: 0 0 180px; }
+@media (max-width: 900px) {
+  .login-layout .login-figure { display: none; }
 }
 
 /* Narrow screens: the banners stack, each a short open card */
@@ -3506,9 +3527,21 @@ a.mt-pill-link:hover { border-color: #66d9ef; }
   text-align: center;
 }
 
+/* What the edition doesn't send or apply: a notice, not an error */
 .licence-notice {
-  color: #df514e;
+  color: #e6c06a;
 }
+
+/* A field's help line, under its input */
+.field-hint {
+  margin: 0.4rem 0 0;
+  color: #a49e88;
+  font-size: 0.92rem;
+}
+
+/* A checkbox-item that is the label itself (Webhooks' events): the identifiers read as code */
+label.checkbox-item { margin: 0; cursor: pointer; font-family: var(--font-body); letter-spacing: 0; }
+label.checkbox-item code { color: #e5e0d0; font-size: 0.9rem; }
 
 /* The worker removing a job's old output after a confirmed retry */
 .status-removing {

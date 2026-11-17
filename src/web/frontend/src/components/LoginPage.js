@@ -3,12 +3,15 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { login as apiLogin, loginAsGuest as apiLoginAsGuest, getAuthConfig, completeMfaSignIn } from '../api';
 import { API_BASE_URL } from '../apiBase';
+import { JOURNEYS } from './Home';
 
 const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
 
 const LoginPage = () => {
   const navigate = useNavigate();
   const { login: setUser } = useAuth();
+  // One of the home page's five figures beside the form, a different one each visit
+  const [figure] = useState(() => JOURNEYS[Math.floor(Math.random() * JOURNEYS.length)]);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [searchParams] = useSearchParams();
@@ -111,7 +114,15 @@ const LoginPage = () => {
         </p>
       </header>
 
-      <div className="card" style={{ width: '800px', maxWidth: '90%', margin: '0 auto' }}>
+      <div className="login-layout">
+      <div className="journey-banner login-figure" aria-hidden="true">
+        <img src={figure.image} alt="" style={{ '--drop': figure.drop }} />
+        <span className="journey-banner__name">
+          <span>{figure.name}</span>
+          <span className="journey-banner__role">{figure.role}</span>
+        </span>
+      </div>
+      <div className="card login-card">
         <h3>Sign In</h3>
 
         {error && (
@@ -239,7 +250,7 @@ const LoginPage = () => {
           )}
         </div>
       </div>
-
+      </div>
     </div>
   );
 };
