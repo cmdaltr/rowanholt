@@ -39,7 +39,7 @@ def _load_tables():
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             return module
-    raise ImportError("rowanholt/core/records.py not found: is Elrond's source mounted at ROWANHOLT_ELROND_SRC?")
+    raise ImportError("rowanholt/core/records.py not found: is Ledger's source mounted at ROWANHOLT_ELROND_SRC?")
 
 
 _report = None
@@ -61,7 +61,7 @@ def report_package():
                 _report = module
                 break
         else:
-            raise ImportError("rowanholt/report not found: is Elrond's source mounted at ROWANHOLT_ELROND_SRC?")
+            raise ImportError("rowanholt/report not found: is Ledger's source mounted at ROWANHOLT_ELROND_SRC?")
     return _report
 
 
@@ -82,7 +82,7 @@ def mitre_layers():
                 _layers = module
                 break
         else:
-            raise ImportError("rowanholt/post/mitre not found: is Elrond's source mounted at ROWANHOLT_ELROND_SRC?")
+            raise ImportError("rowanholt/post/mitre not found: is Ledger's source mounted at ROWANHOLT_ELROND_SRC?")
     return _layers
 
 

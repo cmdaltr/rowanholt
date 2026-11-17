@@ -82,10 +82,10 @@ def check_image_removable(image: dict, containers: Iterable[dict], scoped_image_
 def check_action(service: str, action: str, job_processes: list[str], force: bool, allow_self: bool = False) -> None:
     """Refuse actions that would cut off administration or interrupt a job."""
     if service == ANDURIL_SERVICE and not allow_self:
-        raise ScopeError("Anduril can only be stopped or updated from the host CLI (rowanholt anduril disable)")
+        raise ScopeError("Quartermaster can only be stopped or updated from the host CLI (rowanholt quartermaster disable)")
     if service in JOB_SENSITIVE_SERVICES and job_processes and not force:
         raise BusyError(
-            f"Refusing to {action} {service}: Elrond is running in the worker "
+            f"Refusing to {action} {service}: Ledger is running in the worker "
             f"({'; '.join(job_processes)}). Use force to override."
         )
 

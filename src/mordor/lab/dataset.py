@@ -232,7 +232,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     found = result.get("events", result.get("log_lines", 0))
     if not found:
         logger.warning("%s: nothing was recorded in its %d tests", result["run"], result["tests"])
-    logger.info("Dataset for Elrond: %s (%d tests, %s %s)", result["acquisitions"], result["tests"], f"{found:,}",
+    logger.info("Dataset for Ledger: %s (%d tests, %s %s)", result["acquisitions"], result["tests"], f"{found:,}",
                 "events" if "events" in result else "log lines")
     if result.get("network"):
         logger.info("Captures for --Network: %s (%d)", result["network"], result["captures"])

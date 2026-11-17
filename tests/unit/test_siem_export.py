@@ -480,7 +480,7 @@ class WorkerExportTest(unittest.TestCase):
         stored = self.store.get_job(job.id)
         self.assertEqual((stored.status, stored.progress, stored.result["hosts"]), (self.JobStatus.COMPLETED, 100, 1))
         log = "\n".join(stored.log)
-        self.assertIn("SIEM export started: Elrond --Index into Splunk, Elastic", log)
+        self.assertIn("SIEM export started: Ledger --Index into Splunk, Elastic", log)
         self.assertIn("Commencing Splunk Phase", log)
         self.assertIn("Note from bob: checking Splunk", log)  # not clobbered by the export's lines
         self.assertNotIn("indexed 'prefetch'", log)

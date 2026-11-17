@@ -97,10 +97,12 @@ class JourneyTest(unittest.TestCase):
         self.assertEqual(records[-1]["phases"], {"docker": 5, "images": 5, "containers": 5, "ui": 5})
         self.assertEqual(sp.load_history("warm"), [])
 
-    def test_places_along_the_road(self):
-        self.assertEqual(sp.place(0.0), "the Shire")
-        self.assertEqual(sp.place(0.4), "Weathertop")
-        self.assertEqual(sp.place(1.0), "Rowanholt")
+    def test_phases_and_time_left_in_plain_words(self):
+        self.assertEqual(list(sp.MESSAGES.values()),
+                         ["Starting Docker", "Building images", "Starting services", "Opening Rowanholt"])
+        self.assertEqual(sp.eta_text(30), "Less than a minute left")
+        self.assertEqual(sp.eta_text(60), "About a minute left")
+        self.assertEqual(sp.eta_text(300), "About 5 minutes left")
 
     def test_build_step_lines(self):
         match = sp.STEP.match("#14 [celery-worker  7/21] RUN pip install -r requirements.txt")

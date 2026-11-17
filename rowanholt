@@ -25,13 +25,14 @@ The platform (Docker):
   server init|uninstall|users|licence|ca
                                     A team server: TLS proxy, sign-in, per-user jobs, licence (docs/SERVER.md);
                                     init and uninstall are deploy/linux/install.sh and deploy/linux/uninstall.sh
-  anduril <command>                 Administer Rowanholt's containers (status, logs, restart, ...)
+  quartermaster <command>           Quartermaster: administer Rowanholt's containers (status, logs, restart, ...);
+                                    'anduril' works too
 
 Forensics (run from the directory you're working in; relative paths stay relative):
-  gandalf [bash|python] <args>      Collect from a Linux or macOS host (gandalf.sh by default)
-  acquire <args>                    Gandalf through the Python CLI (rowanholt acquire --help)
-  analyse <args>                    Elrond (rowanholt analyse --help); 'analyze' works too
-  mordor <command>                  Security datasets: list, download, info, local, verify, ...
+  gandalf [bash|python] <args>      Custodian: collect from a Linux or macOS host (gandalf.sh by default)
+  acquire <args>                    Custodian through the Python CLI (rowanholt acquire --help)
+  analyse <args>                    Ledger (rowanholt analyse --help); 'analyze' works too
+  mordor <command>                  Crucible's security datasets: list, download, info, local, verify, ...
   samples list|fetch|import         Public forensic images as ready cases (ROWANHOLT_SAMPLES_DIR)
   symbols fetch|what|add|list       Volatility symbol tables for memory images, in the worker
                                     (fetch <image>; what <image>; add --package|--kdk <.dmg>|--vmlinux|--table)
@@ -604,7 +605,7 @@ case "$COMMAND" in
         ;;
     acquire|web) exec "$PYTHON" "$ROOT/src/cli/rowanholt.py" "$COMMAND" "$@" ;;
     analyse|analyze) exec "$PYTHON" "$ROOT/src/cli/rowanholt.py" analyze "$@" ;;
-    anduril|aragorn) exec "$PYTHON" "$ROOT/src/cli/rowanholt.py" anduril "$@" ;;
+    quartermaster|anduril|aragorn) exec "$PYTHON" "$ROOT/src/cli/rowanholt.py" quartermaster "$@" ;;
     mordor) exec "$PYTHON" "$ROOT/src/cli/mordor.py" "$@" ;;
     samples) exec "$PYTHON" "$ROOT/src/cli/samples.py" "$@" ;;
     # In the worker, which has Volatility, dwarf2json and the symbols folders; an image or file

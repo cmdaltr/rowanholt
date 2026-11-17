@@ -4,7 +4,7 @@
 
 set -e
 
-echo "🧙‍♂️ Starting Elrond Web Interface..."
+echo "🧙‍♂️ Starting Ledger Web Interface..."
 
 # Check if Docker is installed
 if ! command -v docker-compose &> /dev/null; then
@@ -39,7 +39,7 @@ sleep 5
 # Check if services are running
 if docker-compose ps | grep -q "Up"; then
     echo ""
-    echo "✅ Elrond Web Interface is now running!"
+    echo "✅ Ledger Web Interface is now running!"
     echo ""
     echo "📍 Access points:"
     echo "   • Frontend:  http://localhost:3000"

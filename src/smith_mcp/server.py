@@ -314,7 +314,7 @@ def build_server(api: RowanholtAPI, writes: bool = False, max_writes: int = MAX_
             except ApiError as exc:
                 if exc.status not in (400, 404):
                     raise
-        return {"rows": [], "note": "No stacking for this case: it needs two or more hosts and Elrond's "
+        return {"rows": [], "note": "No stacking for this case: it needs two or more hosts and Ledger's "
                                     "analysis (--Analysis); rare needs three or more hosts of an OS."}
 
     @server.tool(annotations=READ_ONLY)

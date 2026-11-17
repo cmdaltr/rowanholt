@@ -161,7 +161,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _dispatch(self, method: str) -> None:
         if not self._authorised():
-            self._send(401, {"detail": "Invalid Anduril token"})
+            self._send(401, {"detail": "Invalid Quartermaster token"})
             return
         url = urlparse(self.path)
         parts = [p for p in url.path.split("/") if p]
@@ -250,7 +250,7 @@ def main() -> None:
     except EngineUnavailable as exc:
         logger.error("%s - is /var/run/docker.sock mounted?", exc)
     server = ThreadingHTTPServer((BIND, PORT), Handler)
-    logger.info("Anduril listening on %s:%d", BIND, PORT)
+    logger.info("Quartermaster listening on %s:%d", BIND, PORT)
     server.serve_forever()
 
 

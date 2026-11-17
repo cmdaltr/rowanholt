@@ -210,7 +210,7 @@ class DockerAdmin:
         if ref not in self._scoped_refs():
             raise ScopeError(f"'{ref}' is not an image used by Rowanholt")
         if any(ref in i["tags"] and i["built"] for i in self.list_images()):
-            raise ScopeError(f"'{ref}' is built locally; rebuild it from the host CLI (rowanholt anduril rebuild)")
+            raise ScopeError(f"'{ref}' is built locally; rebuild it from the host CLI (rowanholt quartermaster rebuild)")
         return ref
 
     def pull(self, ref: str, progress: Optional[Progress] = None) -> str:

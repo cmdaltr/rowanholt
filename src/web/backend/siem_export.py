@@ -251,7 +251,7 @@ class Progress:
             if name in self.failures:
                 out[name] = {"ok": False, "error": self.failures[name]}
             elif returncode != 0 and not self.failures:
-                out[name] = {"ok": False, "error": self.error or f"Elrond exited with status {returncode}"}
+                out[name] = {"ok": False, "error": self.error or f"Ledger exited with status {returncode}"}
             else:
                 out[name] = {"ok": True}
             totals = self.counts.get(name)

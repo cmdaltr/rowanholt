@@ -304,7 +304,7 @@ def rowanholt_signal_job(state, job_id: str, action: str) -> dict:
 
     process = _get_job_process(job_id)
     if not process:
-        return {"ok": False, "error": "job has no running Elrond process"}
+        return {"ok": False, "error": "job has no running Ledger process"}
     # Guard against PID reuse across containers: a PGID is only meaningful
     # in the namespace of the worker that started it.
     if process["hostname"] != state.consumer.hostname:
@@ -315,7 +315,7 @@ def rowanholt_signal_job(state, job_id: str, action: str) -> dict:
         os.killpg(pgid, _JOB_SIGNALS[action])
     except ProcessLookupError:
         _clear_job_process(job_id)
-        return {"ok": False, "error": "Elrond process group no longer exists"}
+        return {"ok": False, "error": "Ledger process group no longer exists"}
     except PermissionError as e:
         return {"ok": False, "error": f"cannot signal process group {pgid}: {e}"}
 
@@ -338,7 +338,7 @@ def send_job_signal(job_id: str, action: str, timeout: float = 5.0) -> dict:
     """
     process = _get_job_process(job_id)
     if not process:
-        return {"ok": False, "error": "job has no running Elrond process"}
+        return {"ok": False, "error": "job has no running Ledger process"}
 
     replies = celery_app.control.broadcast(
         "rowanholt_signal_job",
@@ -607,7 +607,7 @@ def _stop_process_group(process, grace=30):
     except ProcessLookupError:
         pass
     except Exception as e:
-        logger.warning(f"Could not stop Elrond (pid {process.pid}): {e}")
+        logger.warning(f"Could not stop Ledger (pid {process.pid}): {e}")
         process.kill()
 
 
@@ -712,10 +712,10 @@ def _run_siem_export(job_id: str, task_id: str, names: list) -> dict:
     elrond_path = os.environ.get("ELROND_HOME", "/opt/elrond-src")
     elrond_script = Path(elrond_path) / "elrond.py"
     if not elrond_script.exists():
-        return fail(f"Elrond isn't at {elrond_script} (ELROND_HOME)")
+        return fail(f"Ledger isn't at {elrond_script} (ELROND_HOME)")
 
     cmd = siem_export.index_command(str(elrond_script), job.case_number, str(case_dir), names)
-    _export_log(job_id, f"SIEM export started: Elrond --Index into {', '.join(names)}")
+    _export_log(job_id, f"SIEM export started: Ledger --Index into {', '.join(names)}")
     logger.info(f"Job {job_id}: {' '.join(cmd)}")
     # As start_analysis runs Elrond, so --Index reads the same SPLUNK_*, ELASTICSEARCH_*,
     # OPENSEARCH_* and TIMESKETCH_* settings a run with these options would
@@ -861,8 +861,8 @@ def start_analysis(self, job_id: str):
         if not elrond_script.exists():
             # Elrond not installed - create placeholder error
             raise FileNotFoundError(
-                f"Elrond script not found at {elrond_script}. "
-                f"Please install Elrond or set ELROND_HOME environment variable to point to Elrond installation."
+                f"Ledger script not found at {elrond_script}. "
+                f"Please install Ledger or set ELROND_HOME environment variable to point to Ledger installation."
             )
 
         # Prepend python3 and elrond script path to command
@@ -1338,7 +1338,7 @@ def start_analysis(self, job_id: str):
         # Nothing reads Elrond's stdout any more; left running it blocks on the
         # full pipe forever with the image mounted.
         if process is not None and process.poll() is None:
-            job.log.append(f"[{datetime.now().isoformat().replace('T', ' ')}] -> Stopping Elrond (pid {process.pid}) after the error")
+            job.log.append(f"[{datetime.now().isoformat().replace('T', ' ')}] -> Stopping Ledger (pid {process.pid}) after the error")
             _stop_process_group(process)
 
     finally:

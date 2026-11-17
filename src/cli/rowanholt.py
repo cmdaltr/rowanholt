@@ -45,20 +45,20 @@ def print_banner():
    Digital Forensics Suite - Acquisition & Analysis
    Version {version}
 
-   Gandalf: Remote Forensic Acquisition
-   Elrond:  Automated Forensic Analysis
+   Custodian: Remote Forensic Acquisition
+   Ledger:    Automated Forensic Analysis
 """.format(red=red, green=green, brown=brown, reset=reset, version=VERSION)
     print(banner)
 
 
 def cmd_acquire(args):
     """Run Gandalf acquisition"""
-    print("[*] Starting Gandalf acquisition module...")
+    print("[*] Starting Custodian acquisition module...")
 
     # gandalf.py parses its arguments at import time, so run it as its own process.
     gandalf_py = ROWANHOLT_ROOT / "acquisition" / "python" / "gandalf.py"
     if not gandalf_py.exists():
-        print(f"[ERROR] Gandalf not found at {gandalf_py}")
+        print(f"[ERROR] Custodian not found at {gandalf_py}")
         return 1
     cmd = [sys.executable, str(gandalf_py), args.encryption, args.mode]
     if args.output:
@@ -75,13 +75,13 @@ def cmd_acquire(args):
 
 def cmd_analyze(args):
     """Run Elrond analysis"""
-    print("[*] Starting Elrond analysis module...")
+    print("[*] Starting Ledger analysis module...")
 
     # Elrond parses its arguments at import time, so run it as its own process
     # (which also keeps the analysis tools behind a subprocess boundary).
     elrond_py = ROWANHOLT_ROOT / "analysis" / "elrond.py"
     if not elrond_py.exists():
-        print(f"[ERROR] Elrond not found at {elrond_py}")
+        print(f"[ERROR] Ledger not found at {elrond_py}")
         return 1
     cmd = [sys.executable, str(elrond_py), args.case_id, args.evidence_path]
     if args.output:
@@ -151,8 +151,8 @@ Examples:
   rowanholt web --port 8000
 
   # Rowanholt containers, and enabling Docker administration in the web UI
-  rowanholt anduril status
-  rowanholt anduril enable
+  rowanholt quartermaster status
+  rowanholt quartermaster enable
 
   # Use individual tools directly:
   python3 acquisition/python/gandalf.py Password Local -M
@@ -165,7 +165,7 @@ Examples:
     subparsers = parser.add_subparsers(dest='command', help='Command to execute')
 
     # Acquire command (Gandalf)
-    acquire_parser = subparsers.add_parser('acquire', help='Acquire forensic artifacts')
+    acquire_parser = subparsers.add_parser('acquire', help='Acquire forensic artifacts (Custodian)')
     acquire_parser.add_argument('encryption', choices=['Key', 'Password', 'None'],
                                help='Encryption method')
     acquire_parser.add_argument('mode', choices=['Local', 'Remote'],
@@ -180,7 +180,7 @@ Examples:
     acquire_parser.set_defaults(func=cmd_acquire)
 
     # Analyze command (Elrond)
-    analyze_parser = subparsers.add_parser('analyze', help='Analyze forensic artifacts')
+    analyze_parser = subparsers.add_parser('analyze', help='Analyze forensic artifacts (Ledger)')
     analyze_parser.add_argument('case_id', help='Case identifier')
     analyze_parser.add_argument('evidence_path', help='Path to evidence file/directory')
     analyze_parser.add_argument('output', nargs='?', help='Output directory')

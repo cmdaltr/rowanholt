@@ -11,7 +11,7 @@ its own estimate from BuildKit's step counts as it goes.
 
 Output is the compose output, plus a line per second like
     @@progress {"fraction": 0.42, "eta": 95, "phase": "images", "message": "...", "learning": false}
-for Rowanholt.app's journey across Middle-earth; --zenity prints zenity --progress's
+for Rowanholt.app's start page; --zenity prints zenity --progress's
 format instead. Stdlib only, Python 3.8+.
 """
 
@@ -40,14 +40,11 @@ DEFAULTS = {
     "cold": {"docker": 20, "images": 900, "containers": 25, "ui": 90},
 }
 MESSAGES = {
-    "docker": "Waking Docker",
-    "images": "Forging the images",
-    "containers": "Raising the halls",
-    "ui": "Opening the doors",
+    "docker": "Starting Docker",
+    "images": "Building images",
+    "containers": "Starting services",
+    "ui": "Opening Rowanholt",
 }
-# Where the traveller is, by fraction of the journey (Rowanholt.app draws the same road)
-PLACES = [(0.0, "the Shire"), (0.18, "Bree"), (0.38, "Weathertop"), (0.55, "the Last Bridge"),
-          (0.7, "the Trollshaws"), (0.86, "the Ford of Bruinen"), (1.0, "Rowanholt")]
 HISTORY_KEEP = 20
 STEP = re.compile(r"^#\d+ \[([\w.-]+)(?:\s+[\w.-]+)?\s+(\d+)/(\d+)\]")
 
@@ -85,8 +82,13 @@ def save_history(record: dict) -> None:
         pass
 
 
-def place(fraction: float) -> str:
-    return [name for at, name in PLACES if fraction >= at][-1]
+def eta_text(seconds: int) -> str:
+    """The time left in words, as the Windows launcher puts it."""
+    if seconds < 45:
+        return "Less than a minute left"
+    if seconds < 90:
+        return "About a minute left"
+    return f"About {int(round(seconds / 60))} minutes left"
 
 
 class Journey:
@@ -136,7 +138,7 @@ class Journey:
         fraction = min(0.99, elapsed / (elapsed + remaining)) if elapsed + remaining > 0 else 0.0
         message = MESSAGES[self.phase] + (f" ({self.detail})" if self.detail else "")
         return {"fraction": round(fraction, 3), "eta": int(round(remaining)), "phase": self.phase,
-                "message": message, "place": place(fraction), "learning": self.learning}
+                "message": message, "learning": self.learning}
 
     def finish(self, ok: bool) -> None:
         self.done[self.phase] = time.time() - self.phase_started
@@ -163,10 +165,8 @@ class Reporter:
         report = self.journey.report()
         with self.lock:
             if self.zenity:
-                minutes = report["eta"] // 60
-                eta = "less than a minute" if report["eta"] < 60 else f"about {minutes + 1} minutes"
                 print(int(report["fraction"] * 100), flush=True)
-                print(f"# At {report['place']}: {report['message']}. {eta} to Rowanholt", flush=True)
+                print(f"# {report['message']}. {eta_text(report['eta'])}", flush=True)
             else:
                 print("@@progress " + json.dumps(report), flush=True)
 
@@ -323,7 +323,7 @@ def main(argv: List[str]) -> int:
                     print("100\n# Rowanholt is ready", flush=True)
                 else:
                     print("@@progress " + json.dumps({"fraction": 1.0, "eta": 0, "phase": "ui",
-                                                      "message": "Rowanholt is ready", "place": "Rowanholt",
+                                                      "message": "Rowanholt is ready",
                                                       "learning": journey.learning}), flush=True)
 
 

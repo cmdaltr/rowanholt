@@ -5,7 +5,7 @@ rowanholt samples: public forensic images as ready cases (src/analysis/rowanholt
 Usage:
     rowanholt samples list
     rowanholt samples fetch <id> [<id> ...] | --all     download, check each file's hash, unpack
-    rowanholt samples import <id> [<id> ...] | --all [--force]   start each as an Elrond job
+    rowanholt samples import <id> [<id> ...] | --all [--force]   start each as a Ledger job
 
 The samples folder is ROWANHOLT_SAMPLES_DIR (or --dir; default /tmp/rowanholt/samples): a path
 the worker can read, as the jobs it starts read the images where they are. Import uses
@@ -113,7 +113,7 @@ def main() -> int:
     parser.add_argument("--dir", help="the samples folder (default: ROWANHOLT_SAMPLES_DIR, else /tmp/rowanholt/samples)")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("list", help="the catalogue, with what's here")
-    for name, text in (("fetch", "download, check and unpack"), ("import", "start as Elrond jobs")):
+    for name, text in (("fetch", "download, check and unpack"), ("import", "start as Ledger jobs")):
         p = sub.add_parser(name, help=text)
         p.add_argument("ids", nargs="*")
         p.add_argument("--all", action="store_true")

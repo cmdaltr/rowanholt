@@ -39,7 +39,7 @@ router = APIRouter(tags=["anduril"])
 ANDURIL_URL = os.environ.get("ANDURIL_URL") or os.environ.get("ARAGORN_URL") or "http://anduril:5690"
 ANDURIL_TOKEN_PATH = Path(os.environ.get("ANDURIL_TOKEN_PATH", "/run/anduril/token"))
 DEFAULT_SECRET = "your-secret-key-change-in-production"
-ENABLE_COMMAND = "rowanholt anduril enable"
+ENABLE_COMMAND = "rowanholt quartermaster enable"
 # Services whose restart interrupts a running job (see anduril/scope.py).
 JOB_SENSITIVE_SERVICES = {"celery-worker", "rowanholt-celery-worker", "postgres", "rowanholt-postgres", "redis", "rowanholt-redis"}
 
@@ -78,7 +78,7 @@ async def require_anduril_admin(
     if not _secret_configured():
         raise HTTPException(
             status_code=503,
-            detail="Anduril is disabled until SECRET_KEY is set for the backend (the default JWT secret lets anyone forge an admin token)",
+            detail="Quartermaster is disabled until SECRET_KEY is set for the backend (the default JWT secret lets anyone forge an admin token)",
         )
     token = credentials.credentials if credentials else session_token
     payload = verify_token(token) if token else None
@@ -93,13 +93,13 @@ async def require_anduril_admin(
 async def _call(method: str, path: str, json: Any = None, params: Optional[dict] = None, timeout: float = 30.0) -> Any:
     token = _read_token()
     if not token:
-        raise HTTPException(status_code=503, detail=f"Anduril is not enabled. On the host, run: {ENABLE_COMMAND}")
+        raise HTTPException(status_code=503, detail=f"Quartermaster is not enabled. On the host, run: {ENABLE_COMMAND}")
     try:
         async with httpx.AsyncClient(base_url=ANDURIL_URL, timeout=timeout) as client:
             resp = await client.request(method, path, json=json, params=params, headers={"X-Anduril-Token": token})
     except httpx.HTTPError as exc:
-        logger.warning("Anduril unreachable at %s: %s", ANDURIL_URL, exc)
-        raise HTTPException(status_code=503, detail=f"Anduril is not running. On the host, run: {ENABLE_COMMAND}")
+        logger.warning("Quartermaster unreachable at %s: %s", ANDURIL_URL, exc)
+        raise HTTPException(status_code=503, detail=f"Quartermaster is not running. On the host, run: {ENABLE_COMMAND}")
     try:
         data = resp.json()
     except ValueError:
@@ -113,7 +113,7 @@ def _active_jobs() -> list[str]:
     try:
         jobs = JobStorage().list_jobs(status=JobStatus.RUNNING, limit=50)
     except Exception:  # noqa: BLE001 - an unreachable database must not hide the guard
-        logger.exception("Could not list running jobs for the Anduril guard")
+        logger.exception("Could not list running jobs for the Quartermaster guard")
         return []
     return [j.case_number for j in jobs]
 
@@ -175,25 +175,25 @@ async def container_action(name: str, action: str, body: ActionRequest, user: di
                 status_code=409,
                 detail={"message": f"Refusing to {action} {name} while jobs are running: {', '.join(running)}", "busy": True},
             )
-    logger.info("Anduril: %s requested %s on %s (force=%s)", user.get("username"), action, name, body.force)
+    logger.info("Quartermaster: %s requested %s on %s (force=%s)", user.get("username"), action, name, body.force)
     return await _call("POST", f"/containers/{name}/{action}", json={"force": body.force})
 
 
 @router.post("/images/pull", status_code=202)
 async def pull_image(body: PullRequest, user: dict = Depends(require_anduril_admin)) -> Any:
-    logger.info("Anduril: %s requested pull of %s", user.get("username"), body.ref)
+    logger.info("Quartermaster: %s requested pull of %s", user.get("username"), body.ref)
     return await _call("POST", "/images/pull", json={"ref": body.ref})
 
 
 @router.post("/images/remove", status_code=202)
 async def remove_image(body: RemoveImageRequest, user: dict = Depends(require_anduril_admin)) -> Any:
-    logger.info("Anduril: %s requested removal of image %s", user.get("username"), body.id)
+    logger.info("Quartermaster: %s requested removal of image %s", user.get("username"), body.id)
     return await _call("POST", "/images/remove", json={"id": body.id})
 
 
 @router.post("/images/prune", status_code=202)
 async def prune_images(user: dict = Depends(require_anduril_admin)) -> Any:
-    logger.info("Anduril: %s requested image prune", user.get("username"))
+    logger.info("Quartermaster: %s requested image prune", user.get("username"))
     return await _call("POST", "/images/prune", json={})
 
 

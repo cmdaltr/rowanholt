@@ -167,7 +167,7 @@ def destination_refusal(destination, job_id: Optional[str], sources: Sequence[st
     compares by device and inode as well, before it removes anything."""
     target = place(translate(str(destination)))
     if in_elrond_mount(destination):
-        return f"{destination} is where Elrond mounts images"
+        return f"{destination} is where Ledger mounts images"
     for source in sources:
         where = place(translate(source))
         if where == target or where.is_relative_to(target):
@@ -347,7 +347,7 @@ def check_removal(target, job, jobs: Sequence, roots: Iterable[str],
     jobs = [job] + [other for other in jobs if other.id != job.id]  # its own sources count too
     path = contained(target, roots, must_exist=True)
     if in_elrond_mount(path):
-        raise PathRefused(f"{path} is where Elrond mounts images")
+        raise PathRefused(f"{path} is where Ledger mounts images")
     try:
         resolved = path.resolve(strict=True)
         top = _lstat(path)

@@ -138,7 +138,7 @@ def _host_info(host: Path) -> str:
 def hosts(case_path: str) -> str:
     found = _hosts(case_path)
     if not found:
-        return "No processed hosts in this case yet: Elrond writes one folder per host with an artefacts/ folder inside."
+        return "No processed hosts in this case yet: Ledger writes one folder per host with an artefacts/ folder inside."
     lines = []
     for host in found:
         cooked = _cooked(host, "*")
@@ -152,7 +152,7 @@ def techniques(case_path: str) -> str:
         if path.is_file():
             ids.update(t.strip() for t in path.read_text(errors="replace").split() if re.match(r"^T\d{4}(?:\.\d{3})?$", t.strip()))
     if not ids:
-        return "No ATT&CK techniques were tagged for this case. Run Elrond with --Analysis (and --Navigator for a layer)."
+        return "No ATT&CK techniques were tagged for this case. Run Ledger with --Analysis (and --Navigator for a layer)."
     return (f"**{len(ids)} ATT&CK techniques were tagged:**\n" + ", ".join(sorted(ids)) +
             "\n\nEach was tagged by a processor or analysis rule from a specific artefact; "
             "the Navigator layer (--Navigator) shows them on the matrix.")
@@ -200,7 +200,7 @@ def persistence(case_path: str) -> str:
         if lines:
             sections.append(f"**{host.name}**\n" + _bullets(lines))
     if not sections:
-        return ("Nothing flagged as persistence. Elrond flags startup items, Run keys, WMI event subscriptions, "
+        return ("Nothing flagged as persistence. Ledger flags startup items, Run keys, WMI event subscriptions, "
                 "launchd and BTM items, PAM, sudoers, udev, autostart, generators and kernel modules when it "
                 "finds something unusual.")
     return "**Flagged persistence and privilege findings:**\n\n" + "\n\n".join(sections)
@@ -242,7 +242,7 @@ def iocs(case_path: str) -> str:
                         ")\n" + _bullets(f"{v} (×{n}{', watchlist' if v in watched else ''})"
                                          for v, n in values.most_common(MAX_ROWS)))
     if not sections:
-        return "No IOCs were extracted. Run Elrond with --extractIocs."
+        return "No IOCs were extracted. Run Ledger with --extractIocs."
     return "**Extracted IOCs** (most frequent network indicators first; check before acting on them):\n\n" + "\n\n".join(sections)
 
 
@@ -290,8 +290,8 @@ def threat_intel(case_path: str) -> str:
                    case_files.CASE_HOST, groups_csv.name, ref, normal)
             for ref, g, normal in groups[:8]))
     if not sections:
-        return ("No threat intelligence matching was run on this case. Import indicators in Pippin (threat intelligence), "
-                "then tick Threat intelligence on Elrond's page (or run Elrond with --threatIntel).")
+        return ("No threat intelligence matching was run on this case. Import indicators in Lookout (threat intelligence), "
+                "then tick Threat intelligence on Ledger's page (or run Ledger with --threatIntel).")
     return "**Threat intelligence matches** (the most specific first):\n\n" + "\n\n".join(sections)
 
 
@@ -321,7 +321,7 @@ def staging(case_path: str) -> str:
         if lines:
             sections.append(f"**{host.name}**\n" + _bullets(lines))
     if not sections:
-        return "No executables were listed in /tmp, /var/tmp or /dev/shm (Linux, Gandalf collections)."
+        return "No executables were listed in /tmp, /var/tmp or /dev/shm (Linux, Custodian collections)."
     return "**Executables in temporary directories:**\n\n" + "\n\n".join(sections)
 
 
@@ -364,7 +364,7 @@ def rare(case_path: str) -> str:
     rows = list(_numbered(stacking_csv))
     if not rows:
         return ("Nothing was stacked for this case. Stacking compares hosts, so it needs two or more, and runs with "
-                "Elrond's analysis (--Analysis); something is called rare only among three or more hosts of an OS.")
+                "Ledger's analysis (--Analysis); something is called rare only among three or more hosts of an OS.")
     def text(r: Dict[str, str]) -> str:
         return (f"#{r.get('Rank')} {r.get('Value')} ({r.get('Family')}): on {r.get('Hosts With It')} of "
                 f"{r.get('Hosts In Case')} hosts ({r.get('Hosts')}); {r.get('Reasons')}")
@@ -448,8 +448,8 @@ def analysis(case_path: str) -> str:
                                *_where(host, path), ref, normal) for ref, r, normal in rows]
             sections.append(f"**{host.name}**: " + ", ".join(f"{k} ({n})" for k, n in kinds.most_common()) + "\n" + _bullets(examples, 10))
     if not sections:
-        return "Elrond's analysis stage found nothing (or wasn't run: use --Analysis)."
-    return "**What Elrond's analysis flagged** (timestomping, ADS, masquerading and the like):\n\n" + "\n\n".join(sections)
+        return "Ledger's analysis stage found nothing (or wasn't run: use --Analysis)."
+    return "**What Ledger's analysis flagged** (timestomping, ADS, masquerading and the like):\n\n" + "\n\n".join(sections)
 
 
 # ---- general questions (no case) ----------------------------------------------
@@ -493,10 +493,10 @@ GENERAL_ANSWERS = {
         "• TCC grants, quarantine events and the unified-log export show what ran and what it was allowed to touch."
     ),
     "gandalf": (
-        "**Collecting with Gandalf**\n\n"
+        "**Collecting with Custodian**\n\n"
         "• Linux/macOS: `sudo ./gandalf.sh -E Key -A Local` (or gandalf.py), or Remote over SSH with a hosts list\n"
         "• Windows: `Invoke-Gandalf.ps1 -EncryptionObject Key -Acquisition Local` as admin; locked files come off the raw volume\n"
-        "• Then give Elrond the acquisitions/ folder: `elrond.py <CASE> <dir>/acquisitions <dest> --Gandalf --Process --Analysis`"
+        "• Then give Ledger the acquisitions/ folder: `elrond.py <CASE> <dir>/acquisitions <dest> --Gandalf --Process --Analysis`"
     ),
 }
 
@@ -509,7 +509,7 @@ CASE_QUESTIONS: Dict[str, Dict[str, object]] = {
     "commands": {"question": "Which shell commands look suspicious?", "answer": commands},
     "staging": {"question": "Were executables staged in temp directories?", "answer": staging},
     "detections": {"question": "Any malware detections or web shells?", "answer": detections},
-    "analysis": {"question": "What did Elrond's analysis flag?", "answer": analysis},
+    "analysis": {"question": "What did Ledger's analysis flag?", "answer": analysis},
     "rare": {"question": "What's rare in this case?", "answer": rare},
     "threat_intel": {"question": "Does anything match known threat intelligence?", "answer": threat_intel},
     "findings": {"question": "What have analysts confirmed?", "answer": findings},
@@ -519,7 +519,7 @@ GENERAL_QUESTIONS = {
     "windows_persistence": "Where does Windows persistence live?",
     "linux_persistence": "What's the Linux persistence checklist?",
     "macos_persistence": "What's the macOS persistence checklist?",
-    "gandalf": "How do I collect a host with Gandalf?",
+    "gandalf": "How do I collect a host with Custodian?",
 }
 
 

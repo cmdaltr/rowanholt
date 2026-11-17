@@ -64,7 +64,7 @@ def cmd_list(args):
     """List available datasets from OTRF catalog."""
     catalog = MordorCatalog()
 
-    print("[*] Fetching Mordor dataset catalog...")
+    print("[*] Fetching Crucible dataset catalog...")
     datasets = catalog.list_datasets(
         platform=args.platform,
         tactic=args.tactic,
@@ -335,7 +335,7 @@ def cmd_stats(args):
     storage = MordorStorage()
 
     print("\n" + "=" * 50)
-    print("  Mordor Dataset Statistics")
+    print("  Crucible Dataset Statistics")
     print("=" * 50)
 
     # Catalog stats
@@ -366,7 +366,7 @@ def cmd_stats(args):
 def main():
     """Main entry point for the CLI."""
     parser = argparse.ArgumentParser(
-        description="Rowanholt Mordor Dataset Manager - Manage OTRF Security Datasets",
+        description="Rowanholt Crucible Dataset Manager - Manage OTRF Security Datasets",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

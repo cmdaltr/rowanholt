@@ -196,15 +196,15 @@ def backend_has_anduril(admin: DockerAdmin) -> bool:
 def cmd_status(admin: DockerAdmin, args: argparse.Namespace) -> None:
     rows = []
     for c in admin.list_containers():
-        note = "job running" if c["job_processes"] else ("Anduril" if c["protected"] else "")
+        note = "job running" if c["job_processes"] else ("Quartermaster" if c["protected"] else "")
         rows.append([c["name"], c["service"], c["state"], c["status"], ", ".join(c["ports"]), note])
     print(f"Docker engine: {admin.engine.socket_path}  (project '{admin.project}', containers named {NAME_PREFIX}*)\n")
     table(rows, ["CONTAINER", "SERVICE", "STATE", "STATUS", "PORTS", "NOTE"])
     for c in admin.list_containers():
         for p in c["job_processes"]:
-            print(f"\n[!] Elrond running in {c['name']}: {p}")
+            print(f"\n[!] Ledger running in {c['name']}: {p}")
     enabled = any(c["service"] == ANDURIL_SERVICE and c["state"] == "running" for c in admin.list_containers())
-    print(f"\nAnduril (web UI administration): {'enabled' if enabled else 'not enabled - run: rowanholt anduril enable'}")
+    print(f"\nQuartermaster (web UI administration): {'enabled' if enabled else 'not enabled - run: rowanholt quartermaster enable'}")
 
 
 def cmd_images(admin: DockerAdmin, args: argparse.Namespace) -> None:
@@ -259,7 +259,7 @@ def cmd_update(admin: DockerAdmin, args: argparse.Namespace) -> None:
 
 def cmd_pull(admin: DockerAdmin, args: argparse.Namespace) -> None:
     image_id = admin.pull(args.ref, progress=lambda m: print(f"    {m}"))
-    print(f"[+] Pulled {args.ref} ({image_id.split(':')[-1][:12]}). Run `rowanholt anduril update <service>` to use it.")
+    print(f"[+] Pulled {args.ref} ({image_id.split(':')[-1][:12]}). Run `rowanholt quartermaster update <service>` to use it.")
 
 
 def cmd_rmi(admin: DockerAdmin, args: argparse.Namespace) -> None:
@@ -282,7 +282,7 @@ def cmd_rebuild(admin: DockerAdmin, args: argparse.Namespace) -> None:
     service = container_service(c)
     image = next((i for i in admin.engine.images() if i["Id"] == c.get("ImageID")), {})
     if not image_is_built(image, admin.project):
-        raise ScopeError(f"{service} uses an upstream image; use `rowanholt anduril update {service}` instead")
+        raise ScopeError(f"{service} uses an upstream image; use `rowanholt quartermaster update {service}` instead")
     try:
         check_action(service, "rebuild", admin.job_processes(), args.force, allow_self=True)
     except BusyError as exc:
@@ -300,33 +300,33 @@ def cmd_rebuild(admin: DockerAdmin, args: argparse.Namespace) -> None:
 
 def cmd_enable(admin: DockerAdmin, args: argparse.Namespace) -> None:
     print(
-        "Anduril lets admin users of the Rowanholt web UI start, stop, restart, update and remove\n"
+        "Quartermaster lets admin users of the Rowanholt web UI start, stop, restart, update and remove\n"
         "Rowanholt's own containers and images. To do that it needs:\n\n"
         "  - the Docker socket (/var/run/docker.sock) mounted into the rowanholt-anduril container.\n"
-        "    Socket access is root-equivalent on the Docker VM, so Anduril is the only container\n"
+        "    Socket access is root-equivalent on the Docker VM, so Quartermaster is the only container\n"
         "    that holds it, it is reachable only from the backend on an internal network, and it\n"
         f"    refuses anything not labelled com.docker.compose.project={admin.project} and named {NAME_PREFIX}*.\n"
-        "  - the backend recreated so it joins that network and can read Anduril's token.\n"
+        "  - the backend recreated so it joins that network and can read Quartermaster's token.\n"
     )
     if backend_secret_is_default(admin):
         print(
             "[!] The backend is using the default JWT secret, so anyone could forge an admin token.\n"
-            "    The web UI keeps Anduril disabled until you set SECRET_KEY (in your shell or a .env\n"
-            "    file next to docker-compose.yml) and re-run `rowanholt anduril enable`.\n"
+            "    The web UI keeps Quartermaster disabled until you set SECRET_KEY (in your shell or a .env\n"
+            "    file next to docker-compose.yml) and re-run `rowanholt quartermaster enable`.\n"
         )
-    if not confirm("Grant Docker socket access to Anduril and enable it?", args.yes):
+    if not confirm("Grant Docker socket access to Quartermaster and enable it?", args.yes):
         raise Aborted()
     compose(admin, "--profile", "anduril", "up", "-d", "--build", "--no-deps", ANDURIL_SERVICE)
     if not backend_has_anduril(admin) or args.recreate_backend:
         compose(admin, "up", "-d", "--no-deps", "backend")
-    print("[+] Anduril enabled. Admin users will see it on Aragorn → Settings in the web UI.")
+    print("[+] Quartermaster enabled. Admin users will see it on Steward → Settings in the web UI.")
 
 
 def cmd_disable(admin: DockerAdmin, args: argparse.Namespace) -> None:
-    if not confirm("Stop Anduril and remove its Docker socket access?", args.yes):
+    if not confirm("Stop Quartermaster and remove its Docker socket access?", args.yes):
         raise Aborted()
     compose(admin, "--profile", "anduril", "rm", "--stop", "--force", ANDURIL_SERVICE)
-    print("[+] Anduril disabled. The web UI will show it as not enabled.")
+    print("[+] Quartermaster disabled. The web UI will show it as not enabled.")
 
 
 # --- argument parsing ------------------------------------------------------------
@@ -334,8 +334,8 @@ def cmd_disable(admin: DockerAdmin, args: argparse.Namespace) -> None:
 
 def add_parser(subparsers: argparse._SubParsersAction) -> None:
     """Register `rowanholt anduril ...` on the main CLI."""
-    p = subparsers.add_parser("anduril", aliases=["aragorn"],
-                              help="Administer Rowanholt Docker containers and images (Anduril)")
+    p = subparsers.add_parser("quartermaster", aliases=["anduril", "aragorn"],
+                              help="Administer Rowanholt Docker containers and images (Quartermaster)")
     p.add_argument("-y", "--yes", action="store_true", help="Answer yes to confirmation prompts (never to interrupting a job)")
     p.add_argument("--socket", help="Docker socket to use (default: the engine running Rowanholt)")
     sub = p.add_subparsers(dest="anduril_command", metavar="COMMAND")
@@ -355,7 +355,7 @@ def add_parser(subparsers: argparse._SubParsersAction) -> None:
     for name in ("start", "stop", "restart"):
         s = sub.add_parser(name, help=f"{name.title()} a Rowanholt container")
         s.add_argument("name", help="Container or service name, e.g. rowanholt-backend or backend")
-        s.add_argument("--force", action="store_true", help="Proceed even if Elrond is running")
+        s.add_argument("--force", action="store_true", help="Proceed even if Ledger is running")
         s.set_defaults(anduril_func=cmd_lifecycle, command_name=name)
 
     s = sub.add_parser("update", help="Pull a container's upstream image and recreate it if newer")
@@ -379,10 +379,10 @@ def add_parser(subparsers: argparse._SubParsersAction) -> None:
 
     sub.add_parser("prune", help="Remove dangling images built for Rowanholt").set_defaults(anduril_func=cmd_prune)
 
-    s = sub.add_parser("enable", help="Enable Anduril for the web UI (grants it Docker socket access)")
+    s = sub.add_parser("enable", help="Enable Quartermaster for the web UI (grants it Docker socket access)")
     s.add_argument("--recreate-backend", action="store_true", help="Recreate the backend even if already connected")
     s.set_defaults(anduril_func=cmd_enable)
-    sub.add_parser("disable", help="Stop Anduril and remove its socket access").set_defaults(anduril_func=cmd_disable)
+    sub.add_parser("disable", help="Stop Quartermaster and remove its socket access").set_defaults(anduril_func=cmd_disable)
 
     p.set_defaults(func=run, anduril_parser=p)
 

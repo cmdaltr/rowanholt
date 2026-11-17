@@ -942,5 +942,5 @@ async def mordor_lab_post(verb: str, req: MordorLabRequest, user: dict = Depends
     if verb not in ("create", "action", "adopt", "clone", "verify-iso", "provision", "record"):
         raise HTTPException(status_code=404, detail="Unknown lab action")
     if verb != "verify-iso" and not (verb == "record" and not req.execute):
-        logger.info(f"Mordor lab {verb} by {user.get('username')}: {req.engine} {req.name} {req.action}".strip())
+        logger.info(f"Crucible lab {verb} by {user.get('username')}: {req.engine} {req.name} {req.action}".strip())
     return await _lab_agent("POST", f"/mordor/{verb}", json=req.model_dump())

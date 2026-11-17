@@ -64,7 +64,7 @@ def plan(engine_key: str, name: str, os_name: str, techniques: List[str], run_na
     ]
     if revert_to:
         steps.append(f"Revert {name} to the snapshot {revert_to}")
-    steps.append("Rebuild Your lab so the recording shows on the Mordor page")
+    steps.append("Rebuild Your lab so the recording shows on the Crucible page")
     return steps
 
 
@@ -133,7 +133,7 @@ def record(engine_key: str, name: str, os_name: str, techniques, run_name: str =
     from ..telemetry.__main__ import build
 
     build(["lab"], log=say)
-    say(f"Recorded. {run_name} is now under Your lab on the Mordor page.")
+    say(f"Recorded. {run_name} is now under Your lab on the Crucible page.")
     return {"run": run_name, "executed": True, "path": local}
 
 
