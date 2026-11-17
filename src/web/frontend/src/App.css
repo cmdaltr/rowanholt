@@ -76,8 +76,8 @@ code, pre, kbd, samp { font-family: var(--font-mono); letter-spacing: 0; }
   justify-content: center;
   position: sticky;
   top: 0;
-  /* Above every page's own layers (the hero image is 15), so the nav's menus open over the page;
-     below the modals (1000) */
+  /* Above the page's own layers, so the nav's menus open over the page; below each page's logo
+     (.hero-section, 110), which hangs over the header's middle, and the modals (1000) */
   z-index: 100;
   overflow: visible;
 }
@@ -1174,15 +1174,17 @@ table input[type="checkbox"] {
   gap: 2rem;
 }
 
+/* Every page's logo sits over the header's middle gap, above it (the header is 100), and takes
+   its own clicks: it's the way home. The section around it is see-through and takes none */
 .home .hero-section {
-  z-index: 15;
+  z-index: 110;
 }
 
 .hero-section {
   padding: 0;
   position: sticky;
   top: 0;
-  z-index: 5;
+  z-index: 110;
   margin-top: -120px;
   pointer-events: none;
 }
@@ -1322,10 +1324,11 @@ table input[type="checkbox"] {
   justify-content: center;
   align-items: stretch;
   gap: 1.5rem;
-  max-width: 90%;
+  width: 100%;
+  max-width: min(90%, calc(800px + 180px + 1.5rem));
   margin: 0 auto;
 }
-.login-layout .login-card { flex: 0 1 800px; min-width: 0; margin: 0; }
+.login-layout .login-card { flex: 1 1 auto; min-width: 0; margin: 0; }
 .login-layout .login-figure { flex: 0 0 180px; }
 @media (max-width: 900px) {
   .login-layout .login-figure { display: none; }
@@ -1460,7 +1463,7 @@ table input[type="checkbox"] {
   margin-bottom: -20px;
   height: 140px;
   overflow: visible;
-  z-index: 15;
+  z-index: 110;
 }
 
 .job-list table a {
@@ -3135,7 +3138,7 @@ button.mt-close:hover { background: none; box-shadow: none; color: #fff; }
 button.mt-pill.mt-inline { padding: 0.1rem 0.6rem; font-size: 0.75rem; margin-left: 0.5rem; }
 
 /* Aragorn: Lab | Manage tabs */
-.aragorn-tabs { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid #50562e; }
+.aragorn-tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); border-bottom: 1px solid #50562e; }
 .aragorn-tab { padding: 0.8rem 1rem; background: none; border: none; border-bottom: 2px solid transparent; color: #f0dba5; font-family: 'Cinzel', serif; font-size: 1.15rem; letter-spacing: 0.06em; cursor: pointer; }
 .aragorn-tab:hover { color: #66d9ef; }
 .aragorn-tab.is-active { color: #c3e88d; border-bottom-color: #8abf4d; background: rgba(138, 191, 77, 0.06); }
@@ -3540,6 +3543,11 @@ a.mt-pill-link:hover { border-color: #66d9ef; }
 }
 
 /* Steward's Smith tab */
+.smith-model > p:first-of-type { margin-bottom: 1.25rem; }
+/* Addresses and model names are typed exactly: not in Cinzel's capitals */
+input[type="url"],
+.smith-model input[type="text"],
+.smith-model input[type="password"] { font-family: var(--font-mono); letter-spacing: 0; }
 .smith-model__actions { margin-top: 0.5rem; }
 .smith-model__ok { color: #a7db6c; }
 label.checkbox-inline { display: inline-flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0 0; cursor: pointer; }
