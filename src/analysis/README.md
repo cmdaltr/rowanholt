@@ -1,11 +1,23 @@
-# Elrond - Digital Forensics Automation Tool
+# Ledger - Digital Forensics Automation Tool
 
 [![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)](https://github.com/cmdaltr/elrond)
 [![Python](https://img.shields.io/badge/python-3.10+-green.svg)](https://www.python.org/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/license-Elastic--2.0-orange.svg)](LICENSE)
 
-**Elrond** is a comprehensive digital forensics automation tool designed to streamline the analysis of disk images, memory dumps, and digital evidence. Named after the wise Elven lord from Middle-earth, Elrond brings wisdom and power to forensic investigations.
+**Ledger** is a comprehensive digital forensics automation tool designed to streamline the analysis of disk images, memory dumps, and digital evidence.
+
+Ledger is the analysis module's display name; its code name, Elrond, stays in paths, identifiers and flags (`elrond.py`). The other modules:
+
+| Display name | Code name | Where the code lives |
+|---|---|---|
+| Custodian (acquisition) | Gandalf | `src/acquisition/`: `bash/gandalf.sh`, `python/gandalf.py`, `windows/Invoke-Gandalf.ps1`; web page `/gandalf` |
+| Ledger (analysis) | Elrond | `src/analysis/elrond.py`, `src/analysis/rowanholt/`; web page `/elrond` |
+| Smith (AI analyst) | Smith | `src/analysis/rowanholt/ai/`, `src/web/backend/ai_routes.py`, `src/smith_mcp/` |
+| Lookout (threat intelligence) | Pippin | `src/analysis/rowanholt/threat_intel/`, `src/web/backend/threat_intel_routes.py`; web page `/pippin` (`ThreatIntel.js`) |
+| Steward (administration) | Aragorn | web page `/aragorn` (`Aragorn.js`), `src/web/backend/lab_routes.py` |
+| Quartermaster (Docker manager) | Andúril | `src/common/anduril/`, `src/cli/anduril_cli.py`, `src/web/backend/anduril_routes.py`; `rowanholt quartermaster` (or `anduril`) |
+| Crucible (lab and recorded attack telemetry) | Mordor | `src/mordor/`, `src/web/backend/mordor_routes.py`, `lab/`; web page `/mordor` |
 
 ## 🎯 Features
 
@@ -60,7 +72,7 @@ elrond/
 │
 ├── scripts/                # 🔧 Shell Scripts
 │   ├── config.sh          # Configuration script
-│   ├── elrond.sh          # Elrond wrapper script
+│   ├── elrond.sh          # Ledger wrapper script
 │   └── docker-start.sh    # Docker startup manager
 │
 ├── core/                   # 🎯 Core Engine
@@ -127,7 +139,7 @@ elrond/
 
 ### Option 1: Docker (Recommended)
 
-Elrond runs inside Rowanholt's stack, as the Celery worker behind the web UI. From the repository root:
+Ledger runs inside Rowanholt's stack, as the Celery worker behind the web UI. From the repository root:
 
 ```bash
 rowanholt start --testing      # or ./rowanholt start --testing
@@ -194,8 +206,8 @@ python elrond.py INC-2025-001 /evidence/disk.E01 /output \
 
 **Evidence Sources:**
 - `-C, --Collect`: Local disk/memory images
-- `-G, --Gandalf`: Gandalf acquisition archives
-- `--Mordor`: OTRF Mordor datasets
+- `-G, --Custodian` (or `--Gandalf`): Custodian acquisition archives
+- `--Crucible` (or `--Mordor`): OTRF Mordor datasets
 
 **Processing Modes:**
 - `-B, --Brisk`: Balanced speed/thoroughness (recommended)
@@ -213,7 +225,7 @@ python elrond.py INC-2025-001 /evidence/disk.E01 /output \
 
 ### Non-Interactive Mode (Web/Automation)
 
-**Elrond runs in non-interactive mode by default** when used in Docker or web environments. This provides:
+**Ledger runs in non-interactive mode by default** when used in Docker or web environments. This provides:
 
 - ✅ Clean output without ANSI colors or ASCII art
 - ✅ No interactive prompts (uses safe defaults)
@@ -228,11 +240,11 @@ python elrond.py CASE-001 /evidence/disk.E01 /output --Collect
 
 ## 🐳 Docker Usage
 
-Rowanholt's `docker-compose.yml` at the repository root runs Elrond; use `rowanholt start | stop | restart | status` ([docs/CLI.md](../../docs/CLI.md#the-rowanholt-command)). The compose files and `docs/DOCKER*.md` here describe the earlier standalone Elrond stack (ports 3000 and 8000) and are kept for reference only.
+Rowanholt's `docker-compose.yml` at the repository root runs Ledger; use `rowanholt start | stop | restart | status` ([docs/CLI.md](../../docs/CLI.md#the-rowanholt-command)). The compose files and `docs/DOCKER*.md` here describe the earlier standalone Ledger stack (ports 3000 and 8000) and are kept for reference only.
 
 ## 🧪 Testing
 
-Elrond includes comprehensive test suites for both Python and web components.
+Ledger includes comprehensive test suites for both Python and web components.
 
 ### Python Tests
 
@@ -388,7 +400,7 @@ Please ensure:
 
 ## 🔒 Security
 
-Elrond is designed for defensive security and forensic analysis only. Please:
+Ledger is designed for defensive security and forensic analysis only. Please:
 - Do not use for malicious purposes
 - Report security vulnerabilities responsibly
 - Follow ethical forensic practices
@@ -405,7 +417,6 @@ This project is licensed under the Elastic License 2.0 - see the [LICENSE](../..
 - **The Sleuth Kit** - File system analysis
 - **FastAPI** - Modern web framework
 - **React** - Frontend framework
-- **Tolkien** - For the inspiration and naming
 
 ## 📞 Support
 
@@ -442,5 +453,3 @@ For issues, questions, or contributions:
 ---
 
 **Made with ⚔️ by forensic investigators, for forensic investigators**
-
-*"Not all those who wander are lost, but their artifacts shall be found." - Gandalf (probably)*

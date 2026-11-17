@@ -45,7 +45,7 @@ If you use [FlightDeck](https://github.com/cmdaltr/FlightDeck) to manage your ho
 
 ## 🔧 Quick Start (Local Installation)
 
-Docker is the supported way to run the web stack: the worker image carries every forensic tool. A local install suits CLI use of Elrond and Gandalf.
+Docker is the supported way to run the web stack: the worker image carries every forensic tool. A local install suits CLI use of Ledger and Custodian.
 
 ### 1. Install Dependencies
 
@@ -76,7 +76,7 @@ Jobs also need a Celery worker running `celery -A tasks_docker.celery_app worker
 
 ## 📥 Acquire Evidence
 
-Run Gandalf from `src/acquisition/`; it opens `lists/` and `tools/` relative to the current directory.
+Run Custodian from `src/acquisition/`; it opens `lists/` and `tools/` relative to the current directory.
 
 ### Local Acquisition (Linux/macOS)
 
@@ -130,7 +130,7 @@ fixtures/
 └── yara_rules/      # .yar / .yara files
 ```
 
-Keep blank and `#` lines out of `keywords.txt`: Elrond treats them as keywords and matches every line. Lines starting `#` in `iocs.txt` are comments.
+Keep blank and `#` lines out of `keywords.txt`: Ledger treats them as keywords and matches every line. Lines starting `#` in `iocs.txt` are comments.
 
 When creating jobs, use these paths:
 
@@ -140,7 +140,7 @@ When creating jobs, use these paths:
 
 ## 🔍 Analyze Evidence
 
-Elrond takes long options only (`--Brisk`, not `-B`) and reads every image in the source directory. See [CLI.md](CLI.md#elrond---analysis) for all options and [PERFORMANCE.md](PERFORMANCE.md) for what each one costs.
+Ledger takes long options only (`--Brisk`, not `-B`) and reads every image in the source directory. See [CLI.md](CLI.md#ledger---analysis) for all options and [PERFORMANCE.md](PERFORMANCE.md) for what each one costs.
 
 ### Quick Analysis
 
@@ -151,7 +151,7 @@ python3 src/analysis/elrond.py CASE-001 /evidence /output/CASE-001 --Collect --P
 # Brisk mode (adds IOC extraction, Navigator and user profiles, so not faster)
 python3 src/analysis/elrond.py CASE-001 /evidence /output/CASE-001 --Collect --Brisk
 
-# A Gandalf acquisition
+# A Custodian acquisition
 python3 src/analysis/elrond.py CASE-001 /evidence /output/CASE-001 --Gandalf --Process --Analysis
 ```
 
@@ -283,7 +283,7 @@ docker compose build --no-cache celery-worker
 
 ### Permission Issues (Acquisition)
 
-Gandalf needs root (`sudo`) to read system artefacts and memory. Make the scripts executable with `chmod +x src/acquisition/bash/gandalf.sh src/acquisition/python/gandalf.py`.
+Custodian needs root (`sudo`) to read system artefacts and memory. Make the scripts executable with `chmod +x src/acquisition/bash/gandalf.sh src/acquisition/python/gandalf.py`.
 
 ### Import Errors (Analysis)
 

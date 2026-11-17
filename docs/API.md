@@ -17,9 +17,9 @@ Paths below are given in full (`/api/...`), except under Authentication, where t
 4. [Users](#users)
 5. [Job Management](#job-management)
 6. [File System](#file-system)
-7. [Administration (Aragorn)](#administration-aragorn)
-8. [Docker Administration (Anduril)](#docker-administration-anduril)
-9. [Mordor: Recorded Attack Telemetry](#mordor-recorded-attack-telemetry) (and datasets)
+7. [Administration (Steward)](#administration-steward)
+8. [Docker Administration (Quartermaster)](#docker-administration-quartermaster)
+9. [Crucible: Recorded Attack Telemetry](#crucible-recorded-attack-telemetry) (and datasets)
 10. [Threat Intelligence](#threat-intelligence)
 11. [Case Browser and Collaboration](#case-browser-and-collaboration)
 12. [Smith (AI Analyst)](#smith-ai-analyst)
@@ -35,7 +35,7 @@ Paths below are given in full (`/api/...`), except under Authentication, where t
 
 What a caller may do depends on the mode the backend runs in. Every request goes through one middleware (`src/web/backend/auth/access.py`), which works out who is calling and, in server mode, turns away what they may not do, so a route added later is covered without remembering to protect it.
 
-**Local mode** (the default: a stack on an analyst's own machine). Nothing needs a sign-in. A request without a token acts as the local analyst (`local`, role `admin`) and sees every job and case. The stack publishes the API on `127.0.0.1:5688` only, as it does every other port (Postgres, Redis, the web app, Splunk, Elastic, Kibana, the Navigator), so the open API is the machine's own. Signing in still works (login, guest and register are open), and a signed-in caller is that account: a non-admin one gets `403` from the admin-only routes (licence, brands, webhooks, users, symbol tables, sample data), which an anonymous request passes. A guest's token names no account, so a guest acts as the local analyst. Two areas want a signed-in admin even locally, since they drive the host: the lab (`/api/lab`, the Mordor lab and the Mordor telemetry Update) and Andúril (`/api/anduril`). Both are off (`503`) while the backend uses the default `SECRET_KEY`.
+**Local mode** (the default: a stack on an analyst's own machine). Nothing needs a sign-in. A request without a token acts as the local analyst (`local`, role `admin`) and sees every job and case. The stack publishes the API on `127.0.0.1:5688` only, as it does every other port (Postgres, Redis, the web app, Splunk, Elastic, Kibana, the Navigator), so the open API is the machine's own. Signing in still works (login, guest and register are open), and a signed-in caller is that account: a non-admin one gets `403` from the admin-only routes (licence, brands, webhooks, users, symbol tables, sample data), which an anonymous request passes. A guest's token names no account, so a guest acts as the local analyst. Two areas want a signed-in admin even locally, since they drive the host: the lab (`/api/lab`, the Crucible lab and the Crucible telemetry Update) and Quartermaster (`/api/anduril`). Both are off (`503`) while the backend uses the default `SECRET_KEY`.
 
 **Server mode** (`ROWANHOLT_SERVER_MODE`, set by `deploy/server/docker-compose.server.yml`; see [SERVER.md](SERVER.md)). Every `/api` route needs a signed-in user (`401 Sign in required`) except `/api/health`, `/api/busy`, `/api/auth/config`, `/api/auth/login`, `/api/auth/login/mfa` (the sign-in's second step, whose challenge is its credential), `/api/auth/logout`, `/api/auth/oidc/login`, `/api/auth/oidc/callback` and `/api/auth/verify`. There are no guests and no open sign-up. With `ROWANHOLT_REQUIRE_MFA=true`, a password user's sign-in without MFA reaches only `/api/auth/me`, `/api/auth/session` and `/api/auth/mfa`, `/mfa/setup` and `/mfa/enable` until MFA is on: anything else, `/api/auth/verify` included, is `403` (with `"mfa_enrolment_required": true`; [Multi-Factor Authentication](#multi-factor-authentication)). On top of that:
 
@@ -53,7 +53,7 @@ A job's `can_manage` says which side of the last row the caller is on ([List Job
 - A sign-in ([Login](#login), or single sign-on) returns a JWT and sets it as the `session_token` cookie: `httpOnly`, `SameSite=Lax`, `Secure` in server mode, valid for 24 hours (`access_token_expire_minutes`). Each request checks the account in the user store, so disabling someone stops their next request.
 - An API token (`rvt_…`, [API Tokens](#api-tokens)) goes in the bearer header. Its scope limits it: `full` is whatever its user may do, `smith-mcp` only what Smith's MCP server needs. Tokens are made on a team server only.
 
-The lab and Andúril check a sign-in's JWT against the user store themselves, so an API token doesn't open them (`401`), even an admin's `full` one.
+The lab and Quartermaster check a sign-in's JWT against the user store themselves, so an API token doesn't open them (`401`), even an admin's `full` one.
 
 ---
 
@@ -387,11 +387,11 @@ The same can be done from the host with `rowanholt server users` ([SERVER.md](SE
 
 `destination_path` is optional. `backup_password` (optional, Mobile jobs only) is an encrypted phone backup's password: it goes to the worker through Redis, expiring, and is never stored with the job.
 
-`options` maps onto Elrond's command line (`build_elrond_command` in `tasks_docker.py`). All are optional booleans unless shown otherwise:
+`options` maps onto Ledger's command line (`build_elrond_command` in `tasks_docker.py`). All are optional booleans unless shown otherwise:
 
 | Group | Fields |
 |---|---|
-| Source | `local` (default `true`; collect from images), `gandalf` (pre-collected Gandalf archives), `network` (PCAPs, Zeek logs, NetFlow exports), `mobile` (phone backups and extractions) |
+| Source | `local` (default `true`; collect from images), `gandalf` (pre-collected Custodian archives), `network` (PCAPs, Zeek logs, NetFlow exports), `mobile` (phone backups and extractions) |
 | Modes | `brisk`, `mordor` |
 | Phases | `analysis`, `memory`, `memory_timeline`, `timeline` |
 | Collection | `vss`, `userprofiles`, `collectFiles` + `collectFiles_filter`, `collect_files_all`, `collect_files_archive`, `collect_files_bin`, `collect_files_docs`, `collect_files_hidden`, `collect_files_lnk`, `collect_files_mail`, `collect_files_scripts`, `collect_files_unalloc` (carving), `collect_files_virtual`, `collect_files_web` |
@@ -404,7 +404,7 @@ The same can be done from the host with `rowanholt server users` ([SERVER.md](SE
 
 Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, which becomes `/tmp/elrond/output/…`. Host paths under `/Volumes` work because both containers mount `/Volumes` at the same path.
 
-**Paths.** Every source and the destination must be inside one of the allowed folders (this OS's defaults and `ROWANHOLT_EVIDENCE_PATHS`): a folder boundary, not a prefix (`/tmp/rowanholtX` isn't inside `/tmp/rowanholt`), with no `..` and no symbolic link below the allowed folder (`403` otherwise). A source may be a whole allowed folder, and must exist (`400`); the destination may be neither an allowed folder nor above one. Without `destination_path`, the output goes beside the first source as before (`<folder>/<case>` for a folder, `<parent>/<case>` for a file or a Gandalf acquisitions folder), and that's checked the same way; with no sources either, it's `OUTPUT_DIR/<case>`. The destination is refused (`409`) when it would hold evidence (any job's source), is where Elrond mounts images (`/mnt/elrond_mount*` and the like), or is at, in or around the output of a job that's still going.
+**Paths.** Every source and the destination must be inside one of the allowed folders (this OS's defaults and `ROWANHOLT_EVIDENCE_PATHS`): a folder boundary, not a prefix (`/tmp/rowanholtX` isn't inside `/tmp/rowanholt`), with no `..` and no symbolic link below the allowed folder (`403` otherwise). A source may be a whole allowed folder, and must exist (`400`); the destination may be neither an allowed folder nor above one. Without `destination_path`, the output goes beside the first source as before (`<folder>/<case>` for a folder, `<parent>/<case>` for a file or a Custodian acquisitions folder), and that's checked the same way; with no sources either, it's `OUTPUT_DIR/<case>`. The destination is refused (`409`) when it would hold evidence (any job's source), is where Ledger mounts images (`/mnt/elrond_mount*` and the like), or is at, in or around the output of a job that's still going.
 
 **An output folder that's already there.** Without `force_overwrite`: `400` with `[Errno 17] File exists: '<path>'` (the web app then offers to overwrite). With it, the folder is replaced only if it's Rowanholt's output: the `.rowanholt-output` marker the worker writes when it creates a job's output folder, or, for output from before the marker (12 November 2026), the recorded output of an older job with its `rowanholt_job.log` in it. That job must be one the caller owns (or the caller an admin; only an admin for a job since deleted) and must not still be going. Anything else is never removed: `409` (not Rowanholt's, or still going) or `403` (someone else's), and the request is recorded in the audit log (`output.removal_requested`). The removal itself happens in the worker, which checks it all again first: see [Removing a job's old output](#removing-a-jobs-old-output).
 
@@ -561,7 +561,7 @@ Each job has every field in [Get Job Details](#get-job-details) (shortened here)
 
 **Endpoint:** `POST /api/jobs/{job_id}/cancel`
 
-**Description:** Cancel a pending or running job. Revokes the Celery task with `SIGKILL` and releases the job's image locks. Child processes started by Elrond (foremost, yara, log2timeline) are not killed and keep the image mounted; see `tests/docs/TEST_RUNNER_GUIDE.md` for clean-up.
+**Description:** Cancel a pending or running job. Revokes the Celery task with `SIGKILL` and releases the job's image locks. Child processes started by Ledger (foremost, yara, log2timeline) are not killed and keep the image mounted; see `tests/docs/TEST_RUNNER_GUIDE.md` for clean-up.
 
 **Authentication:** In server mode, the job's owner or an admin; not the people it's shared with. The same goes for `POST /api/jobs/{job_id}/pause` and `/resume`.
 
@@ -584,7 +584,7 @@ The job is marked cancelled first (the status, `completed_at` and a log line, in
 
 **Endpoints:** `POST /api/jobs/{job_id}/pause`, `POST /api/jobs/{job_id}/resume`
 
-**Description:** `pause` sends `SIGSTOP` to a running job's Elrond process group and sets it `paused`; `resume` sends `SIGCONT` and sets it `running` again. Image mounts and the image lock stay held while it's paused, and Elrond's wall-clock timeouts keep counting, so a tool call paused for longer than its timeout fails on resume. The worker writes the event to the job's log.
+**Description:** `pause` sends `SIGSTOP` to a running job's Ledger process group and sets it `paused`; `resume` sends `SIGCONT` and sets it `running` again. Image mounts and the image lock stay held while it's paused, and Ledger's wall-clock timeouts keep counting, so a tool call paused for longer than its timeout fails on resume. The worker writes the event to the job's log.
 
 **Authentication:** In server mode, the job's owner or an admin.
 
@@ -600,11 +600,11 @@ The job is marked cancelled first (the status, `completed_at` and a log line, in
 
 ### Removing a job's old output
 
-A fresh run (`force_overwrite` on a new job, a restart with `fresh=true`, a completed job's restart by default) removes the job's output folder before Elrond runs. The worker does it, in its own container, and only after checking (`src/web/backend/output_removal.py`):
+A fresh run (`force_overwrite` on a new job, a restart with `fresh=true`, a completed job's restart by default) removes the job's output folder before Ledger runs. The worker does it, in its own container, and only after checking (`src/web/backend/output_removal.py`):
 
 - the folder comes from the job record (its recorded destination), never from a request or the pending action, and is inside the allowed folders as above, and not one of them;
 - it's this job's output: its `.rowanholt-output` marker names the job (or the job the API checked it may replace), or, from before the marker, it's the job's own recorded destination with a `rowanholt_job.log`;
-- nothing in it is evidence (any job's source), an allowed folder, another job's output or a mount point (an image Elrond mounted, a bind mount, another device), compared by path and again by device and inode, so a hard link or another spelling of the same folder doesn't hide one;
+- nothing in it is evidence (any job's source), an allowed folder, another job's output or a mount point (an image Ledger mounted, a bind mount, another device), compared by path and again by device and inode, so a hard link or another spelling of the same folder doesn't hide one;
 - no job that's still going writes at, in or around it.
 
 It's deleted without following symbolic links or crossing onto another device, and must be gone afterwards. Each removal is recorded in the audit log (`audit_logs`, as licence and brand changes are): `output.removed` with the files and bytes, `output.removal_refused` or `output.removal_failed` with the reason. The job's own log is in the folder being removed, so the audit log is the record that lasts. A refusal fails the job with the reason (trying again can't help); a removal that fails part way (a busy file, permissions) stops the job in `awaiting_confirmation`, with `pending_action` (`action_type` `remove_output`, `target_path`, `message`).
@@ -657,7 +657,7 @@ It's deleted without following symbolic links or crossing onto another device, a
 
 **Query Parameters:**
 - `confirm` (bool, default `false`): restart even though the job has findings
-- `fresh` (bool, default `true` for a completed job, `false` for a failed or cancelled one): remove the job's output first. Elrond skips any artefact whose cooked file is already there, so a completed job re-run into its old output comes out unchanged. The worker never removes an output directory that holds one of the job's sources
+- `fresh` (bool, default `true` for a completed job, `false` for a failed or cancelled one): remove the job's output first. Ledger skips any artefact whose cooked file is already there, so a completed job re-run into its old output comes out unchanged. The worker never removes an output directory that holds one of the job's sources
 
 **Response:** `200 OK` with the job, `"status": "pending"` and its new `celery_task_id`.
 
@@ -730,9 +730,9 @@ A job whose [SIEM export](#export-job-to-siem) is queued or running is skipped, 
 
 **Endpoints:** `POST /api/jobs/{job_id}/export-siem`, `GET /api/jobs/{job_id}/export-siem`
 
-**Description:** Index a completed job's output, again or for the first time, into the SIEMs its options name (`splunk`, `elastic`, `opensearch`, `timesketch`, `navigator`). The `POST` queues a task in the worker and answers at once; the worker runs Elrond's own `--Index` of the job's output folder (`python3 $ELROND_HOME/elrond.py <case> <output> --Index --Splunk ...`, the code a run with those options ends with), so the export uses the worker's `SPLUNK_*`, `ELASTICSEARCH_*`, `OPENSEARCH_*` and `TIMESKETCH_*` settings and its network. Each SIEM's index for the case is replaced, as `--Index` does (`docs/CLI.md`). The `GET` answers the job's last export: poll it while `state` is `queued` or `running`.
+**Description:** Index a completed job's output, again or for the first time, into the SIEMs its options name (`splunk`, `elastic`, `opensearch`, `timesketch`, `navigator`). The `POST` queues a task in the worker and answers at once; the worker runs Ledger's own `--Index` of the job's output folder (`python3 $ELROND_HOME/elrond.py <case> <output> --Index --Splunk ...`, the code a run with those options ends with), so the export uses the worker's `SPLUNK_*`, `ELASTICSEARCH_*`, `OPENSEARCH_*` and `TIMESKETCH_*` settings and its network. Each SIEM's index for the case is replaced, as `--Index` does (`docs/CLI.md`). The `GET` answers the job's last export: poll it while `state` is `queued` or `running`.
 
-The export's notable lines (each target's phase, warnings and errors, and the outcome) are appended to the job's log one at a time, each a conditional update of a still-completed job, so the job's other fields are never rewritten; Elrond's full output goes to `rowanholt_siem_export.log` in the job's output folder. While an export is queued or running, nothing replaces or removes the output it reads: restarting, archiving or deleting the job answers `409` ("A SIEM export is running for this job; wait for it to finish", or `queued`), and the bulk forms skip it with that reason as its `error`. If Redis can't be read, those actions go ahead rather than be refused. Should the job still move on mid-export (Redis was unreadable), the export notices on its next log line, stops Elrond and fails. Its state is kept in Redis for 30 days, not in the job.
+The export's notable lines (each target's phase, warnings and errors, and the outcome) are appended to the job's log one at a time, each a conditional update of a still-completed job, so the job's other fields are never rewritten; Ledger's full output goes to `rowanholt_siem_export.log` in the job's output folder. While an export is queued or running, nothing replaces or removes the output it reads: restarting, archiving or deleting the job answers `409` ("A SIEM export is running for this job; wait for it to finish", or `queued`), and the bulk forms skip it with that reason as its `error`. If Redis can't be read, those actions go ahead rather than be refused. Should the job still move on mid-export (Redis was unreadable), the export notices on its next log line, stops Ledger and fails. Its state is kept in Redis for 30 days, not in the job.
 
 **`POST` response:** `202 Accepted`, the export's record:
 ```json
@@ -743,7 +743,7 @@ The export's notable lines (each target's phase, warnings and errors, and the ou
 **`GET` response:** `200 OK`, `{"state": "none"}` before any export, else the record, whose `state` is one of:
 - `queued`: waiting for a worker
 - `running`: with `started_at`, `hosts` and `phase`, `step` and `steps` (the target being indexed: `{"phase": "Elastic", "step": 2, "steps": 2}`)
-- `succeeded` or `failed`: with `finished_at`, `returncode` and `results`, one per target: `{"ok": true}` or `{"ok": false, "error": "..."}`, plus `total` (Elastic's document count from `_count` after the run; OpenSearch's records and Timesketch's events, with `by_host`), `techniques` (Navigator), or for Splunk a `note`: Splunk is given monitors on the case's files and restarted, and reads them itself afterwards, so it has no count at the end of the export. `error` is set when Elrond stopped before indexing (a SIEM unreachable, no processed hosts), which fails every target
+- `succeeded` or `failed`: with `finished_at`, `returncode` and `results`, one per target: `{"ok": true}` or `{"ok": false, "error": "..."}`, plus `total` (Elastic's document count from `_count` after the run; OpenSearch's records and Timesketch's events, with `by_host`), `techniques` (Navigator), or for Splunk a `note`: Splunk is given monitors on the case's files and restarted, and reads them itself afterwards, so it has no count at the end of the export. `error` is set when Ledger stopped before indexing (a SIEM unreachable, no processed hosts), which fails every target
 - `interrupted`: its worker died (no heartbeat), or it left the queue with no worker taking it; `error` says which. Export again
 
 **Errors:**
@@ -863,9 +863,9 @@ Folders come first, then files, by name; `..` leads when there's a parent. `is_i
 
 ---
 
-## Administration (Aragorn)
+## Administration (Steward)
 
-**Role Required:** `ADMIN` (the local analyst on a local stack). These back Aragorn's pages in the web app.
+**Role Required:** `ADMIN` (the local analyst on a local stack). These back Steward's pages in the web app.
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -890,19 +890,19 @@ Folders come first, then files, by name; `..` leads when there's a parent. `is_i
 | `GET` | `/api/samples/tasks/{task_id}` | `running` with progress, then `done` |
 | `POST` | `/api/samples/{sample_id}/import` | The job request for a fetched sample (backup password included), for the caller to `POST` to `/api/jobs` so the job is theirs. `409` until it's fetched or built |
 
-Every licence, brand and webhook change goes in the audit log. Editions, events, signing and the URL rules are in [LICENSING_MODEL.md](LICENSING_MODEL.md#rowanholts-split). `/api/symbols` and `/api/samples` answer `503` when Elrond's package isn't mounted in the backend, or the worker's queue isn't available.
+Every licence, brand and webhook change goes in the audit log. Editions, events, signing and the URL rules are in [LICENSING_MODEL.md](LICENSING_MODEL.md#rowanholts-split). `/api/symbols` and `/api/samples` answer `503` when Ledger's package isn't mounted in the backend, or the worker's queue isn't available.
 
 ---
 
-## Docker Administration (Anduril)
+## Docker Administration (Quartermaster)
 
 **Role Required:** `ADMIN`, signed in with a password or single sign-on (a sign-in's JWT, by cookie or bearer; not an API token), locally as well as on a team server. `/status` needs nothing locally and an admin on a team server. `/api/aragorn/…`, the name before the rename, answers the same.
 
-Anduril manages Rowanholt's own containers and images. The backend doesn't hold the Docker socket: these endpoints proxy to the `anduril` service over the internal `rowanholt-anduril` network. Anduril only acts on containers that carry the `com.docker.compose.project=rowanholt` label and are named `rowanholt-*`, and on the images those containers use; anything else returns `403`. The API is off (`503`) until Anduril is enabled on the host with `rowanholt anduril enable`, and it stays off while the backend uses the default `SECRET_KEY`.
+Quartermaster manages Rowanholt's own containers and images. The backend doesn't hold the Docker socket: these endpoints proxy to the `anduril` service over the internal `rowanholt-anduril` network. Quartermaster only acts on containers that carry the `com.docker.compose.project=rowanholt` label and are named `rowanholt-*`, and on the images those containers use; anything else returns `403`. The API is off (`503`) until Quartermaster is enabled on the host with `rowanholt anduril enable`, and it stays off while the backend uses the default `SECRET_KEY`.
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/anduril/status` | Whether Anduril is usable: `enabled`, `secret_configured`, `token_present`, `reachable`, `reason` (`secret_key`, `not_enabled`, `unreachable`, `error`) and `enable_command` |
+| `GET` | `/api/anduril/status` | Whether Quartermaster is usable: `enabled`, `secret_configured`, `token_present`, `reachable`, `reason` (`secret_key`, `not_enabled`, `unreachable`, `error`) and `enable_command` |
 | `GET` | `/api/anduril/containers` | Rowanholt containers: name, service, image, state, health, upstream or built image |
 | `GET` | `/api/anduril/images` | Rowanholt images: tags, size, whether built locally, which containers use them |
 | `GET` | `/api/anduril/containers/{name}/logs?tail=200` | Last `tail` log lines (1–5000) |
@@ -927,15 +927,15 @@ Stopping, restarting, updating or recreating `celery-worker`, `postgres` or `red
 }
 ```
 
-Anduril won't stop, restart or recreate its own container from the API. Use `rowanholt anduril disable` on the host.
+Quartermaster won't stop, restart or recreate its own container from the API. Use `rowanholt anduril disable` on the host.
 
 ---
 
-## Mordor: Recorded Attack Telemetry
+## Crucible: Recorded Attack Telemetry
 
 **Authentication:** locally, none, apart from Update and the lab, which need a signed-in admin (as [Lab](#lab)). On a team server, anyone signed in may read (GET); everything else under `/api/mordor` is admin-only, `/check` and `/noisy` included, as are dataset downloads and deletion
 
-Which logs record each ATT&CK technique, from attacks emulated in labs, and whether a detection's indicators appear in the recorded events. The engine is `src/mordor/telemetry`, ported from Archer. It ships with 1,632 recordings covering 354 techniques: OTRF Security-Datasets (Mordor), Splunk attack_data and EVTX-to-MITRE-Attack. Your own recordings from `./lab.sh mordor-record` or the Mordor page show up as the source `lab`, and Microsoft GUIDE adds Defender XDR's alerting per technique. Reading touches no network. A rebuild from the CLI (`python -m src.mordor.telemetry --build`) or the lab is picked up on the next request.
+Which logs record each ATT&CK technique, from attacks emulated in labs, and whether a detection's indicators appear in the recorded events. The engine is `src/mordor/telemetry`, ported from Archer. It ships with 1,632 recordings covering 354 techniques: OTRF Security-Datasets (Mordor), Splunk attack_data and EVTX-to-MITRE-Attack. Your own recordings from `./lab.sh mordor-record` or the Crucible page show up as the source `lab`, and Microsoft GUIDE adds Defender XDR's alerting per technique. Reading touches no network. A rebuild from the CLI (`python -m src.mordor.telemetry --build`) or the lab is picked up on the next request.
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -962,7 +962,7 @@ A detection for `/check`:
 
 Indicator kinds are `cmd`, `file`, `sw`, `path`, `reg`, `network`, `domain`, `ip`, `port`, `service`, `acct`, `evt`, `api` and `op`/`operation`.
 
-### Mordor Datasets
+### Crucible Datasets
 
 OTRF Security-Datasets (Mordor) to download as evidence (`mordor_routes.py`).
 
@@ -976,7 +976,7 @@ OTRF Security-Datasets (Mordor) to download as evidence (`mordor_routes.py`).
 | `DELETE` | `/api/mordor/datasets/{dataset_id}` | Remove a downloaded dataset |
 | `GET` | `/api/mordor/datasets/{dataset_id}/verify` | Check its files: `valid`, `files_checked`, `total_files`, `errors` |
 
-### Mordor Lab
+### Crucible Lab
 
 **Role Required:** `ADMIN`, signed in (a sign-in's JWT, not an API token), locally as well as on a team server
 
@@ -1003,7 +1003,7 @@ A job returns `202` with a lab run (`id`, `label`, `status`); poll `/api/lab/run
 
 **Authentication:** none locally. On a team server, anyone signed in may read and make an online lookup; importing, pulling, changing expiry and deleting are admin-only
 
-The indicators in `threat_intel_indicators`, in the fixed ten-column schema (Evidential Element, Threat Group, Procedure Example, Technique ID, Technique Name, Tactic, Contextual Evidence, Reference URL, Navigation Layer URL, Source Type). Parsing and matching are Elrond's (`src/analysis/rowanholt/threat_intel/`); the backend mounts that package. A job with `"threat_intel": true` exports them for Elrond's `--threatIntel`.
+The indicators in `threat_intel_indicators`, in the fixed ten-column schema (Evidential Element, Threat Group, Procedure Example, Technique ID, Technique Name, Tactic, Contextual Evidence, Reference URL, Navigation Layer URL, Source Type). Parsing and matching are Ledger's (`src/analysis/rowanholt/threat_intel/`); the backend mounts that package. A job with `"threat_intel": true` exports them for Ledger's `--threatIntel`.
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -1041,10 +1041,10 @@ A job's output, read-only, and the team's findings, notes, host assignments and 
 | `GET` | `/api/jobs/{job_id}/case/activity?since=` | Who did what, newest first; `since` (the highest `id` seen) for polling |
 | `WS` | `/api/jobs/{job_id}/case/live` | Sends `{activity, status, progress}` when any of them changes (checked every 2 seconds): the newest activity id and the job's state, so a page knows when to reload; no case data. Authenticated like the routes above, by the session cookie or a bearer header (never a token in the URL), and checked again before each check, so signing out or losing the share closes it (code 1008); refused from a page on an origin the backend doesn't serve |
 | `GET` | `/api/jobs/{job_id}/case/report` | Markdown: case notes, then confirmed findings by host with their notes (the case browser's **Findings**) |
-| `GET` | `/api/jobs/{job_id}/case/full-report?format=docx\|markdown` | The case report as a download (DOCX by default): case notes and confirmed findings, each with its row and whether the row is unchanged; Appendix A, open leads and dismissed rows; Appendix B, Elrond's report from the case (hosts and timespan, techniques with their rows, indicators, Gandalf's integrity check, method; [CLI.md](CLI.md#case-report)). Read-only over the case; the case's reading is kept until its files change, since the first download of a large case reads all its tables. Recorded in the activity feed. `503` if Elrond's `rowanholt/report` isn't mounted |
+| `GET` | `/api/jobs/{job_id}/case/full-report?format=docx\|markdown` | The case report as a download (DOCX by default): case notes and confirmed findings, each with its row and whether the row is unchanged; Appendix A, open leads and dismissed rows; Appendix B, Ledger's report from the case (hosts and timespan, techniques with their rows, indicators, Custodian's integrity check, method; [CLI.md](CLI.md#case-report)). Read-only over the case; the case's reading is kept until its files change, since the first download of a large case reads all its tables. Recorded in the activity feed. `503` if Ledger's `rowanholt/report` isn't mounted |
 | `GET` | `/api/jobs/{job_id}/case/layer?domain=` | An ATT&CK Navigator layer of confirmed findings' techniques only; `domain` `enterprise-attack` or `mobile-attack` |
 
-A case's report brand (`/api/jobs/{job_id}/case/brand`) is an admin's: see [Administration](#administration-aragorn).
+A case's report brand (`/api/jobs/{job_id}/case/brand`) is an admin's: see [Administration](#administration-steward).
 
 ---
 
@@ -1052,7 +1052,7 @@ A case's report brand (`/api/jobs/{job_id}/case/brand`) is an admin's: see [Admi
 
 **Authentication:** none locally. On a team server, anyone signed in, over the cases behind jobs they can see (`404` for another case); case folders in Smith's data directory with no job behind them are admins'. A `smith-mcp` token may call the GETs and the question POSTs (`/offline/answer`, `/query`, `/summary`, `/suggestions`), not `/chat`
 
-Ask Smith's back end. Free-text answers come from Ollama at `OLLAMA_HOST` (default `http://host.docker.internal:11434`) with the model `ROWANHOLT_MODEL_NAME` (default `llama3.2:3b`) and a `ROWANHOLT_NUM_CTX`-token window (default 8192). Without them, `/status` says why and the offline endpoints answer fixed questions from Elrond's output.
+Ask Smith's back end. Free-text answers come from Ollama at `OLLAMA_HOST` (default `http://host.docker.internal:11434`) with the model `ROWANHOLT_MODEL_NAME` (default `llama3.2:3b`) and a `ROWANHOLT_NUM_CTX`-token window (default 8192). Without them, `/status` says why and the offline endpoints answer fixed questions from Ledger's output.
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -1074,7 +1074,7 @@ The LLM endpoints return `503` when Ollama or the model isn't available.
 
 **Role Required:** `ADMIN`, signed in with a password or single sign-on (a sign-in's JWT, by cookie or bearer; not an API token), locally as well as on a team server, since the lab drives the host. Off (`503`) while the backend uses the default `SECRET_KEY`. `/status` needs nothing locally and an admin on a team server.
 
-The test lab (`lab/`) from the browser: Linux targets, Tart and UTM VMs, Gandalf against seeded hosts. Docker, Tart and UTM are on the host, so these proxy to the lab agent (`./lab.sh agent start`, loopback `:5691`).
+The test lab (`lab/`) from the browser: Linux targets, Tart and UTM VMs, Custodian against seeded hosts. Docker, Tart and UTM are on the host, so these proxy to the lab agent (`./lab.sh agent start`, loopback `:5691`).
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -1120,10 +1120,10 @@ The test lab (`lab/`) from the browser: Linux targets, Tart and UTM VMs, Gandalf
 |---|---|
 | `jobs` | a job is running or paused and its worker's heartbeat is live, or lapsed less than 90 seconds ago (see [Jobs left by a crash](#jobs-left-by-a-crash)). Pending jobs never count |
 | `requests` | a mutating `/api` request (not GET, HEAD or OPTIONS) from a caller the access checks let through is being handled: uploads |
-| `downloads` | a Mordor dataset download is running in the background |
+| `downloads` | a Crucible dataset download is running in the background |
 | `siem-exports` | a worker is running a job's SIEM export: its heartbeat key in Redis is live (refreshed every 15 seconds, expiring after 60). A queued export doesn't count, as a pending job doesn't (see [Export Job to SIEM](#export-job-to-siem)) |
 | `side-tasks` | a sample fetch or symbol table build queued in the worker hasn't finished (forgotten after six hours with no result) |
-| `telemetry-build` | the Mordor telemetry update is running |
+| `telemetry-build` | the Crucible telemetry update is running |
 | `removals` | the worker is removing a job's old output (`removing`), its task waiting in the queue or its heartbeat beating; a removal whose worker died is failed after the same grace, with its own reason (registered by `removal_routes.py`) |
 
 A check that fails (the database unreachable, say) counts as busy. A pending job isn't busy (decided 12 November 2026): it's a message in Celery's queue, and the queue is in Redis, which a rebuild doesn't recreate (`rowanholt start` runs `docker compose up -d --build`, which leaves the unchanged Redis container alone, and its `redis_data` volume keeps the RDB snapshots if it is ever recreated). The job waits out the rebuild and runs on the new worker a few minutes later; counting it held updates for hours behind a long queue. A job awaiting confirmation isn't busy: it waits on a person, in the database. Lab runs aren't counted: they run on the host, through the lab agent, which a rebuild doesn't touch.
@@ -1134,7 +1134,7 @@ The jobs table only says what was last saved, so a worker killed mid-job (its co
 
 | Status | Live while |
 |---|---|
-| `running`, `paused` | the worker's heartbeat key exists. A thread in the worker refreshes it every 15 seconds with a 60-second expiry, from the task's start to its final save, whatever Elrond is doing: a Volatility or Plaso step silent for hours, or a paused job, keeps it |
+| `running`, `paused` | the worker's heartbeat key exists. A thread in the worker refreshes it every 15 seconds with a 60-second expiry, from the task's start to its final save, whatever Ledger is doing: a Volatility or Plaso step silent for hours, or a paused job, keeps it |
 | `pending` | the same heartbeat (a job waiting for its images' locks is still pending), or its task's message is in Celery's queue (any priority) or delivered to a worker and not yet started, or it was queued in the last two minutes |
 
 A job with none of these is given a further 90 seconds, during which a running or paused one still counts as busy (a Redis restart loses every key while the workers carry on; their next refresh puts them back), then it's failed: status `failed`, the reason in `error` and as the last line of its log, `completed_at` set, a `job.failed` webhook, and its image locks released. Its output so far is kept and nothing is deleted; restart it as any failed job. A dead job stops holding rebuilds within about three minutes of dying: up to 60 seconds for its heartbeat to expire, then the grace. The backend looks for such jobs at start-up and every 30 seconds, and on each busy check; a pass is one indexed query and one Redis round trip.
@@ -1169,7 +1169,7 @@ A successful response is the resource itself (a job, a list, a finding), with no
 {"detail": "Only the job's owner or an admin can cancel it"}
 ```
 
-`detail` is a string, except in a few places where it's an object: a restart refused for findings (`{"findings": 3, "message": "..."}`) and Andúril's busy refusal (`{"message", "busy"}`). There are no error codes beyond the HTTP status.
+`detail` is a string, except in a few places where it's an object: a restart refused for findings (`{"findings": 3, "message": "..."}`) and Quartermaster's busy refusal (`{"message", "busy"}`). There are no error codes beyond the HTTP status.
 
 ### Validation Error Response (422)
 
@@ -1194,7 +1194,7 @@ FastAPI's, for a body or parameter of the wrong shape:
 ### HTTP Status Codes
 
 - `200 OK`: Successful request
-- `202 Accepted`: queued: a confirmed removal, an Andúril operation, a lab job
+- `202 Accepted`: queued: a confirmed removal, an Quartermaster operation, a lab job
 - `400 Bad Request`: Invalid request, or not allowed in the job's state
 - `401 Unauthorized`: not signed in (server mode), or a wrong password
 - `402 Payment Required`: the licence has no free place for another account, or this edition doesn't send webhooks
@@ -1206,7 +1206,7 @@ FastAPI's, for a body or parameter of the wrong shape:
 - `429 Too Many Requests`: sign-in locked out
 - `500 Internal Server Error`: Server error
 - `502 Bad Gateway`: a TAXII collection or VirusTotal couldn't be read
-- `503 Service Unavailable`: a dependency is missing: Ollama, the lab agent, Andúril, an Elrond package not mounted, the worker's queue, or the default `SECRET_KEY`
+- `503 Service Unavailable`: a dependency is missing: Ollama, the lab agent, Quartermaster, an Ledger package not mounted, the worker's queue, or the default `SECRET_KEY`
 
 ---
 
@@ -1340,7 +1340,7 @@ A bearer request needs no `X-Rowanholt` header; one signed in by the cookie (`cu
 2. **Use HTTPS on a team server.** Caddy terminates TLS and is the only thing published ([SERVER.md](SERVER.md))
 3. **Prefer API tokens for scripts.** Give each a name and the shortest life that works, `smith-mcp` where reads, leads and notes are enough, and revoke it when it's done with
 4. **Never log or share a token.** A JWT can't be revoked before it expires (24 hours); an API token can
-5. **Set `SECRET_KEY`.** With the default, anyone could forge a JWT: the lab and Andúril refuse to run, and a team server won't start
+5. **Set `SECRET_KEY`.** With the default, anyone could forge a JWT: the lab and Quartermaster refuse to run, and a team server won't start
 
 ---
 

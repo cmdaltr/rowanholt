@@ -1,6 +1,18 @@
-# Elrond Web Interface
+# Ledger Web Interface
 
-A modern web application for the Elrond Digital Forensics Acceleration Suite. This interface provides an intuitive way to analyze disk and memory images with full control over all analysis options through an easy-to-use GUI.
+A modern web application for the Ledger Digital Forensics Acceleration Suite. This interface provides an intuitive way to analyze disk and memory images with full control over all analysis options through an easy-to-use GUI.
+
+The modules' display names and the code names that stay in paths, identifiers and routes:
+
+| Display name | Code name | Where the code lives |
+|---|---|---|
+| Custodian (acquisition) | Gandalf | `src/acquisition/`: `bash/gandalf.sh`, `python/gandalf.py`, `windows/Invoke-Gandalf.ps1`; web page `/gandalf` |
+| Ledger (analysis) | Elrond | `src/analysis/elrond.py`, `src/analysis/rowanholt/`; web page `/elrond` |
+| Smith (AI analyst) | Smith | `src/analysis/rowanholt/ai/`, `src/web/backend/ai_routes.py`, `src/smith_mcp/` |
+| Lookout (threat intelligence) | Pippin | `src/analysis/rowanholt/threat_intel/`, `src/web/backend/threat_intel_routes.py`; web page `/pippin` (`ThreatIntel.js`) |
+| Steward (administration) | Aragorn | web page `/aragorn` (`Aragorn.js`), `src/web/backend/lab_routes.py` |
+| Quartermaster (Docker manager) | Andúril | `src/common/anduril/`, `src/cli/anduril_cli.py`, `src/web/backend/anduril_routes.py`; `rowanholt quartermaster` (or `anduril`) |
+| Crucible (lab and recorded attack telemetry) | Mordor | `src/mordor/`, `src/web/backend/mordor_routes.py`, `lab/`; web page `/mordor` |
 
 ## Features
 
@@ -13,7 +25,7 @@ A modern web application for the Elrond Digital Forensics Acceleration Suite. Th
 - **RESTful API**: Programmatic access to all features
 
 ### 🔧 Analysis Options Supported
-- **Operation Modes**: Collect, Gandalf, Process
+- **Operation Modes**: Collect, Custodian, Process
 - **Collection**: User profiles, VSS, files, symlinks
 - **Analysis**: Automated analysis, IOC extraction, timelines
 - **Memory**: Volatility analysis, memory timelines
@@ -151,7 +163,7 @@ elrond-web/
    - Navigate through option categories using the tabs
    - Check/uncheck options as needed
    - Use "Enable All" or "Disable All" for quick configuration
-   - **Important**: At least one operation mode (Collect or Gandalf) must be selected
+   - **Important**: At least one operation mode (Collect or Custodian) must be selected
 5. **Optional**: Specify destination directory (defaults to output directory)
 6. **Click "Start Analysis"**
 
@@ -364,7 +376,7 @@ For issues, questions, or contributions:
 
 ## License
 
-This project follows the same license as the main Elrond project.
+This project follows the same license as the main Ledger project.
 
 ## Acknowledgments
 

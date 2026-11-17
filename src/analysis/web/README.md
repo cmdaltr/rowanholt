@@ -1,8 +1,8 @@
-# Elrond Web Interface
+# Ledger Web Interface
 
-> **Legacy.** This describes the standalone Elrond stack in `src/analysis/web` and `src/analysis/docker` (ports 3000 and 8000), which Rowanholt no longer uses. Rowanholt runs from the repository's `docker-compose.yml` (web UI on :5687, API on :5688): start with [docs/QUICKSTART.md](../../../docs/QUICKSTART.md) and the `rowanholt` command.
+> **Legacy.** This describes the standalone Ledger stack in `src/analysis/web` and `src/analysis/docker` (ports 3000 and 8000), which Rowanholt no longer uses. Rowanholt runs from the repository's `docker-compose.yml` (web UI on :5687, API on :5688): start with [docs/QUICKSTART.md](../../../docs/QUICKSTART.md) and the `rowanholt` command.
 
-A modern web application for the Elrond Digital Forensics Acceleration Suite. This interface provides an intuitive way to analyze disk and memory images with full control over all analysis options through an easy-to-use GUI.
+A modern web application for the Ledger Digital Forensics Acceleration Suite. This interface provides an intuitive way to analyze disk and memory images with full control over all analysis options through an easy-to-use GUI.
 
 ## Features
 
@@ -15,7 +15,7 @@ A modern web application for the Elrond Digital Forensics Acceleration Suite. Th
 - **RESTful API**: Programmatic access to all features
 
 ### 🔧 Analysis Options Supported
-- **Operation Modes**: Collect, Gandalf, Reorganise, Process
+- **Operation Modes**: Collect, Custodian, Reorganise, Process
 - **Collection**: User profiles, VSS, files, symlinks
 - **Analysis**: Automated analysis, IOC extraction, timelines
 - **Memory**: Volatility analysis, memory timelines
@@ -152,7 +152,7 @@ elrond-web/
    - Navigate through option categories using the tabs
    - Check/uncheck options as needed
    - Use "Enable All" or "Disable All" for quick configuration
-   - **Important**: At least one operation mode (Collect/Gandalf/Reorganise) must be selected
+   - **Important**: At least one operation mode (Collect/Custodian/Reorganise) must be selected
 5. **Optional**: Specify destination directory (defaults to output directory)
 6. **Click "Start Analysis"**
 
@@ -371,7 +371,7 @@ For issues, questions, or contributions:
 
 ## License
 
-This project follows the same license as the main Elrond project.
+This project follows the same license as the main Ledger project.
 
 ## Acknowledgments
 

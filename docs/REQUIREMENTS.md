@@ -119,9 +119,9 @@ wsl --install -d Ubuntu-22.04
 
 ### Phones (`--Mobile`)
 - **iLEAPP** v2026.4.6 - iOS backups (encrypted too) and file system extractions
-- **ALEAPP** v2026.4.5 - Android file system extractions, bug reports, and ADB backups (laid out by Elrond)
+- **ALEAPP** v2026.4.5 - Android file system extractions, bug reports, and ADB backups (laid out by Ledger)
 
-Both are in the worker image (`src/web/backend/Dockerfile.forensics`, step 4h), each cloned at its release tag into `/opt/<tool>/src` with its own Python 3.12 virtualenv (`/opt/<tool>/venv`, from the deadsnakes PPA: they need 3.11+), so their pinned dependencies stay out of Elrond's Python. Elrond runs them as `/usr/local/bin/ileapp` and `aleapp` (`src/analysis/tools/definitions.py`). Outside the image, install them the same way and put launchers of those names on the `PATH`.
+Both are in the worker image (`src/web/backend/Dockerfile.forensics`, step 4h), each cloned at its release tag into `/opt/<tool>/src` with its own Python 3.12 virtualenv (`/opt/<tool>/venv`, from the deadsnakes PPA: they need 3.11+), so their pinned dependencies stay out of Ledger's Python. Ledger runs them as `/usr/local/bin/ileapp` and `aleapp` (`src/analysis/tools/definitions.py`). Outside the image, install them the same way and put launchers of those names on the `PATH`.
 
 ### File System Analysis
 - **The Sleuth Kit (TSK)** - File system analysis tools
@@ -130,14 +130,14 @@ Both are in the worker image (`src/web/backend/Dockerfile.forensics`, step 4h), 
 - **libvhdi** - VHD/VHDX support
 
 ### IOC Extraction
-IOCs (IPs, domains, URLs, emails, hashes) are extracted by Elrond itself from the cooked artefacts; no external tool is needed.
+IOCs (IPs, domains, URLs, emails, hashes) are extracted by Ledger itself from the cooked artefacts; no external tool is needed.
 
 ### Artifact Parsers
 - **python-registry** - Windows Registry parser
 - **pytsk3** - Python bindings for TSK
 - **dfvfs** - Virtual file system library (used by Plaso)
 
-Browser history (Chromium-based browsers, Firefox and Safari) is collected by Elrond and parsed by Artemis.
+Browser history (Chromium-based browsers, Firefox and Safari) is collected by Ledger and parsed by Artemis.
 
 ### Malware Analysis
 - **YARA** - Signature scanning

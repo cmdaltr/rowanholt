@@ -1,6 +1,6 @@
-# Elrond Test Suite
+# Ledger Test Suite
 
-Comprehensive test suite for the Elrond digital forensics automation tool.
+Comprehensive test suite for the Ledger digital forensics automation tool.
 
 ## Overview
 

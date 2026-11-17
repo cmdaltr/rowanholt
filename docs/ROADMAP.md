@@ -14,25 +14,25 @@ Container forensics goes first because half of it is written. ML goes last becau
 
 ## Container forensics (Docker, Kubernetes)
 
-**Built.** The outputs are listed in `docs/CLI.md` (Gandalf's Linux table).
+**Built.** The outputs are listed in `docs/CLI.md` (Custodian's Linux table).
 
-- **Collection.** All three collectors take the same set: `gandalf.sh`, `gandalf.py`, and Elrond's image collection in `collect/linux.py`. It covers:
+- **Collection.** All three collectors take the same set: `gandalf.sh`, `gandalf.py`, and Ledger's image collection in `collect/linux.py`. It covers:
   - each Docker container's `config.v2.json`, `hostconfig.json` and log;
   - static pod manifests, pod logs and the API server's audit log.
-- **The writable layer.** Each container's writable layer is listed with hashes as `gandalf+container_changes.csv`, and the executables and scripts in it are copied (up to 500 per container, 64 MB each) into `container_layer/<id>/`, where Elrond reads them as staged files. That makes the change set the container version of misplaced binaries, without the tens of gigabytes of image layers that `gandalf.py` used to risk.
+- **The writable layer.** Each container's writable layer is listed with hashes as `gandalf+container_changes.csv`, and the executables and scripts in it are copied (up to 500 per container, 64 MB each) into `container_layer/<id>/`, where Ledger reads them as staged files. That makes the change set the container version of misplaced binaries, without the tens of gigabytes of image layers that `gandalf.py` used to risk.
 - **Parsing.** `process/extractions/containers.py` and `k8s_audit.py`, routed from `linux_artefacts.py`.
 - **Techniques.** A technique is tagged only where a row justifies it. A container is tagged for what it can reach, not for existing; a Kubernetes component doing its job is never a finding.
 - **Exported audit logs.** `python3 -m src.analysis.rowanholt.cloud.cli k8s analyze-logs` handles audit logs exported from EKS, AKS or GKE.
 - **The lab.** The Linux targets seed a Docker host's and a Kubernetes node's state on disk (`lab/linux-targets/seed/seed-containers.sh`), with the expected results in their `expected.json`. `tests/unit/test_containers.py` runs that seed through collection and processing.
 
 **Still to do.**
-- **The bash collector against the seed.** `gandalf.py`'s copy of the container lists ran against the rebuilt targets on 29 October (the containers video section shows its output). `gandalf.sh` collected the seed the same day, layer copy included, and Elrond over its result passed every container row of `verify-expected.py` on both targets (the one miss, `status.php`, needs YARA, which that run didn't use).
+- **The bash collector against the seed.** `gandalf.py`'s copy of the container lists ran against the rebuilt targets on 29 October (the containers video section shows its output). `gandalf.sh` collected the seed the same day, layer copy included, and Ledger over its result passed every container row of `verify-expected.py` on both targets (the one miss, `status.php`, needs YARA, which that run didn't use).
 - **containerd's own metadata** (`/var/lib/containerd`, a bbolt database) is collected by all three collectors since 29 October, with Podman/CRI-O's `containers.json`, and parsed since 2 November: every container in every namespace but Docker's own (`moby`) becomes a `docker_containers.csv` row, `Runtime` `containerd`, flagged by the same rules. Podman's own state is read too (2 November): `db.sql` (SQLite, Podman 4.8 on; its `-wal` read with it, from a copy) or `libpod/bolt_state.db` (bbolt, before), each container's config with its OCI spec, `Runtime` `podman`. Rootless stores too since 3 November: each user's `~/.local/share/containers/storage` state is collected by all three collectors into the user's files and read the same way, `Runtime` `podman (rootless, <user>)`. `containers.json` stays unparsed: it has names and images but no settings.
-- **Live container capture** built 3 November as the explicit opt-in this line asked for: `gandalf.sh -l` and `gandalf.py -L` save each running container's `inspect`, `top` and `export` (cut at `GANDALF_CONTAINER_EXPORT_MAX`, 2 GB), every command audited as `ran`; Elrond reads the processes into `container_processes.csv`. CRIU checkpoints stay out (experimental, and they can stop the container).
+- **Live container capture** built 3 November as the explicit opt-in this line asked for: `gandalf.sh -l` and `gandalf.py -L` save each running container's `inspect`, `top` and `export` (cut at `GANDALF_CONTAINER_EXPORT_MAX`, 2 GB), every command audited as `ran`; Ledger reads the processes into `container_processes.csv`. CRIU checkpoints stay out (experimental, and they can stop the container).
 
 ## Threat intelligence integration
 
-**Built.** The package is `src/analysis/rowanholt/threat_intel/`, inside Elrond's tree, so the worker has it and the backend mounts it.
+**Built.** The package is `src/analysis/rowanholt/threat_intel/`, inside Ledger's tree, so the worker has it and the backend mounts it.
 
 - **Schema and loader.** The fixed ten columns are a frozen dataclass (`schema.py`). `iran_apt_loader.py` reads the workbook and finds its header row. Postgres holds the indicators in `threat_intel_indicators`, added by Alembic revision `7c41d2e9a0b3`.
 - **Intake.** `sources.py` takes a file and recognises its format. It handles:
@@ -45,14 +45,14 @@ Container forensics goes first because half of it is written. ML goes last becau
 
   The STIX and TAXII parsers are ported from Archer. `Source Type` records each row's origin, and duplicates are dropped on element, group, technique and source. No columns were added.
 - **Matching.** `index.py` infers each indicator's kind and refuses the ones that would flood a case: built-ins, ordinary words, prose, placeholders, bare extensions and shallow directories. Archer's `known_good.json` supplies part of that list. Each element carries its breadth, the number of groups behind it, and an element more than 15 groups use is marked common. Against a whole case, MITRESaw contributes only software names and multi-word command phrases. On a copy of the Windows 11 demo case, that took the result from 86,829 matches (Lazarus first, on `.jpg`) to 42 matches across seven elements.
-- **Elrond.** `--threatIntel FILE ...`, or Threat Intelligence on Elrond's page, runs after analysis (`match.py`). It writes `<host>/analysis/threat_intel_matches.csv`, fills `watchlist_match` in `iocs.csv`, and writes the case's `threat_groups.csv`. That file ranks groups by atomic indicators, then specific elements, then technique overlap. Its Basis column states which of those each rank rests on, and a group that overlaps only on techniques says so.
-- **Web.** Pippin, the threat intelligence page (`/pippin`), imports files, pulls TAXII collections, lists and removes sources, searches indicators and checks a single value (`/api/threat-intel`, [API.md](API.md#threat-intelligence)). Importing is admin-only on a team server.
+- **Ledger.** `--threatIntel FILE ...`, or Threat Intelligence on Ledger's page, runs after analysis (`match.py`). It writes `<host>/analysis/threat_intel_matches.csv`, fills `watchlist_match` in `iocs.csv`, and writes the case's `threat_groups.csv`. That file ranks groups by atomic indicators, then specific elements, then technique overlap. Its Basis column states which of those each rank rests on, and a group that overlaps only on techniques says so.
+- **Web.** Lookout, the threat intelligence page (`/pippin`), imports files, pulls TAXII collections, lists and removes sources, searches indicators and checks a single value (`/api/threat-intel`, [API.md](API.md#threat-intelligence)). Importing is admin-only on a team server.
 - **Smith.** The offline question "Does anything match known threat intelligence?" lists the most specific matches first. `enrich_artefact()` (`threat_intel_routes.enrich_value`) is ready for the planned MCP server.
 - **Tests.** `tests/unit/test_threat_intel.py`, and the Smith question in `test_smith_offline.py`.
 
 **Still to do.**
-- **Expiry** (done 2 November). STIX `valid_until` and confidence are kept beside the ten columns in `threat_intel_validity` (`threat_intel/validity.py`, Alembic `9e3c5a7b1f42`); other sources default to 90 days for IPs and domains, as Archer does. Expired indicators stay listed but are left out of Elrond's matching and Smith's value index.
-- **Online lookups** (4 November, approved under the threat model the same day). VirusTotal only, off unless `.env` sets `ROWANHOLT_ONLINE_LOOKUPS=virustotal` and `VIRUSTOTAL_API_KEY`: a **Look up on VirusTotal** button on Pippin's *Check a value*, one IP, domain or hash per click, refused to Smith, private addresses and internal names never sent, logged with who asked (`threat_intel_lookup.py`, `test_threat_intel_lookup.py`). The review accepted them from Pippin, logged in the backend log, not per case.
+- **Expiry** (done 2 November). STIX `valid_until` and confidence are kept beside the ten columns in `threat_intel_validity` (`threat_intel/validity.py`, Alembic `9e3c5a7b1f42`); other sources default to 90 days for IPs and domains, as Archer does. Expired indicators stay listed but are left out of Ledger's matching and Smith's value index.
+- **Online lookups** (4 November, approved under the threat model the same day). VirusTotal only, off unless `.env` sets `ROWANHOLT_ONLINE_LOOKUPS=virustotal` and `VIRUSTOTAL_API_KEY`: a **Look up on VirusTotal** button on Lookout's *Check a value*, one IP, domain or hash per click, refused to Smith, private addresses and internal names never sent, logged with who asked (`threat_intel_lookup.py`, `test_threat_intel_lookup.py`). The review accepted them from Lookout, logged in the backend log, not per case.
 
 ## Collaborative investigation
 
@@ -65,7 +65,7 @@ Container forensics goes first because half of it is written. ML goes last becau
   - A second flag on an already-flagged row is refused with the existing finding's number and author; the second analyst adds a note to it instead.
   - A status change carries the `updated_at` it was made against, and the server refuses it (409) if a colleague changed the finding first; the page then reloads it.
   - The worker's image locks keep two jobs off the same evidence. Re-running a case that already has findings rewrites its cooked output, and the affected findings then show "row changed". So a restart of a job with findings is refused (409, with the count) unless the request says `confirm=true`; the bulk restart skips such jobs the same way. The Job page and the Jobs list say how many findings there are and send `confirm` once the analyst agrees.
-- **Output.** **Findings** is Markdown: case notes first, then confirmed findings by host with their notes. **Navigator layer** holds confirmed findings' techniques only. Elrond's own layer is unchanged. **Report (DOCX)** and **Report (Markdown)** are the case report (FR-07, 8 November): confirmed findings first, then open leads and dismissed rows, then Elrond's report from the case (`docs/CLI.md`, Case report).
+- **Output.** **Findings** is Markdown: case notes first, then confirmed findings by host with their notes. **Navigator layer** holds confirmed findings' techniques only. Ledger's own layer is unchanged. **Report (DOCX)** and **Report (Markdown)** are the case report (FR-07, 8 November): confirmed findings first, then open leads and dismissed rows, then Ledger's report from the case (`docs/CLI.md`, Case report).
 - **Smith.** The offline question "What have analysts confirmed?" lists confirmed findings, then open leads. With a model, confirmed findings go into its context first.
 - **Storage.** Four tables, `case_findings`, `case_notes`, `case_hosts` and `case_activity`, added by Alembic revision `4d8b1f6e2c57`.
 - **Tests.** `tests/unit/test_case_browser.py` covers the refusals around `raw/`, paging and filters, the finding lifecycle (including a changed row), notes, assignment (checked against the users on a server), activity, the report, the layer and Smith's answer.
@@ -133,7 +133,7 @@ Each feature's "Still to do" above, as work to schedule, then the Smith MCP serv
 
 ### Container forensics
 
-1. **The bash collector against the seed** (done 29 October). `./lab.sh linux-targets reset`, `./lab.sh gandalf-collect bash`, Elrond over the result, then `lab/verify-expected.py` against each target's `expected.json`. Done when `docker_containers.csv`, `container_changes.csv`, `static_pods.csv` and `k8s_audit.csv` match for `gandalf.sh` as they already do for `gandalf.py`.
+1. **The bash collector against the seed** (done 29 October). `./lab.sh linux-targets reset`, `./lab.sh gandalf-collect bash`, Ledger over the result, then `lab/verify-expected.py` against each target's `expected.json`. Done when `docker_containers.csv`, `container_changes.csv`, `static_pods.csv` and `k8s_audit.csv` match for `gandalf.sh` as they already do for `gandalf.py`.
 2. **containerd's metadata** (done 2 November). On a containerd or CRI-O node, per-container settings (image, mounts, privileges, namespaces) live in `/var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db`, a bbolt database.
    - Collect `meta.db` in all three collectors, read-only, beside the Docker files. Done 29 October.
    - Parse it into the existing `docker_containers.csv` columns, adding a `Runtime` column (`docker`, `containerd`) so one table covers both; the technique rules then apply unchanged. Done: `containers.containerd_rows` reads `v1/<namespace>/containers/<id>` (image, labels, `createdat`, and the OCI spec inside the protobuf `Any` in `spec`). Privileged is every device plus `CAP_SYS_ADMIN`; a host namespace is one the spec leaves out or one joined from PID 1 (`/proc/1/ns/…`); a pod's labels give its namespace, pod and container names. The resolver files a runtime mounts read-only into every container (`/etc/hosts`, `/etc/resolv.conf`, `/etc/hostname`) aren't flagged, for Docker either. Missing a seccomp profile isn't flagged: ctr and the CRI leave it out by default, so it would be on every row. Started, finished and running state aren't in `meta.db` (they're the task's, in memory).
@@ -145,10 +145,10 @@ Each feature's "Still to do" above, as work to schedule, then the Smith MCP serv
 
 1. **Expiry and confidence** (done 2 November: built on `feat/ti-expiry`, merged into `feat/server-deployment`, Alembic `9e3c5a7b1f42`). The ten-column schema stays as it is. A side table, `threat_intel_validity` (indicator id, `valid_until`, `confidence`, `first_seen`), added by an Alembic migration:
    - STIX imports fill it from `valid_until` and `confidence`; other sources get a default lifetime per kind (90 days for IPs and domains, as Archer does; none for hashes and tool names).
-   - Matching skips expired indicators and says how many it skipped; Pippin shows the expiry and lets an admin extend or clear it.
+   - Matching skips expired indicators and says how many it skipped; Lookout shows the expiry and lets an admin extend or clear it.
    - Tests: an expired STIX indicator doesn't match; a refreshed import revives it.
    - Agreed (decision 3).
-2. **Online lookups** (built and approved 4 November, `.claude/threat-model.md`). Keys only in `.env`, off by default, one provider (VirusTotal), from the Pippin page only, so nothing is sent from `raw/` or by Elrond or Smith. The review dropped the per-case switch and case audit log: any analyst, from Pippin, in the backend log.
+2. **Online lookups** (built and approved 4 November, `.claude/threat-model.md`). Keys only in `.env`, off by default, one provider (VirusTotal), from the Lookout page only, so nothing is sent from `raw/` or by Ledger or Smith. The review dropped the per-case switch and case audit log: any analyst, from Lookout, in the backend log.
 
 ### Collaborative investigation
 
@@ -160,7 +160,7 @@ Each feature's "Still to do" above, as work to schedule, then the Smith MCP serv
 ### Stacking (anomaly detection)
 
 1. **Smith's "What's rare in this case?"** (done 30 October). An offline question over `stacking.csv`: the top rows, persistence first, each with its hosts and reasons, and the reminder that a row is a lead, not a verdict. Tests in `test_smith_offline.py`, one keeping its persistence families equal to `stacking.PERSISTENCE`.
-2. **One command for the lab evaluation** (built 30 October; first run end to end 3 November: precision at 4, 8 and 20 all 1.00, the plants at ranks 1, 2 and 4, recorded in `lab/README.md`). `./lab.sh stacking-eval` builds the stacking targets, collects them into a folder of its own, runs Elrond in the worker and prints precision at 4, 8 and 20 against the plants (the `stacking` values in each target's `expected.json`), appending the result to a table in `lab/README.md`. The scorer, `lab/lib/stacking_eval.py`, is tested in `test_stacking_eval.py`. Linux every release; Windows when its clean VMs are rebuilt (about two hours), at least once per major release.
+2. **One command for the lab evaluation** (built 30 October; first run end to end 3 November: precision at 4, 8 and 20 all 1.00, the plants at ranks 1, 2 and 4, recorded in `lab/README.md`). `./lab.sh stacking-eval` builds the stacking targets, collects them into a folder of its own, runs Ledger in the worker and prints precision at 4, 8 and 20 against the plants (the `stacking` values in each target's `expected.json`), appending the result to a table in `lab/README.md`. The scorer, `lab/lib/stacking_eval.py`, is tested in `test_stacking_eval.py`. Linux every release; Windows when its clean VMs are rebuilt (about two hours), at least once per major release.
 
 ### The Smith MCP server
 
@@ -176,7 +176,7 @@ Each feature's "Still to do" above, as work to schedule, then the Smith MCP serv
 - It calls nothing but the Rowanholt API, so it adds no outbound access.
 - It runs over stdio on the analyst's machine (`src/smith_mcp/server.py`, `rowanholt mcp` to start it), and optionally over streamable HTTP behind Caddy on a team server.
 
-The March 2026 prototype ("Building an MCP") kept its own case folders, ran its own acquisition and could call Anthropic's API. None of that carries over: cases are Rowanholt jobs, acquisition is Gandalf's, and Smith's model is Ollama. Archer keeps its own server.
+The March 2026 prototype ("Building an MCP") kept its own case folders, ran its own acquisition and could call Anthropic's API. None of that carries over: cases are Rowanholt jobs, acquisition is Custodian's, and Smith's model is Ollama. Archer keeps its own server.
 
 **Phase 1: reading a case** (two days; built).
 
@@ -195,7 +195,7 @@ The server's instructions: start from a job id; cite file and row for every clai
 
 **Phase 2: writing leads** (a day, after review). `flag_lead` (a lead on a cited row, never a confirmed finding: confirming stays with an analyst) and `add_note`. Each write lands in `case_activity` as "Smith (for <user>)". Deferred (decision 4).
 
-**Never exposed:** starting, restarting or deleting jobs, Gandalf acquisition, importing or deleting threat intelligence, and anything under `raw/`.
+**Never exposed:** starting, restarting or deleting jobs, Custodian acquisition, importing or deleting threat intelligence, and anything under `raw/`.
 
 **Before it goes near a live case**, the threat model's review:
 - the tool list against the never-exposed list;

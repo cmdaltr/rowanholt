@@ -24,7 +24,7 @@
 
 ### 📐 Architecture
 
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System design, components, data flow; the realm map, Elrond's roads, Gandalf's acquisition flow and the 3D journey (`rowanholt map`)
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System design, components, data flow; the architecture map, Ledger's roads, Custodian's acquisition flow and the startup stages (`rowanholt map`)
 - **[REQUIREMENTS.md](REQUIREMENTS.md)** - System requirements and dependencies
 - **[FUNCTIONALITY.md](FUNCTIONALITY.md)** - File-descriptor handling, retries and other operational behaviour
 - **[PROGRESS_TRACKING.md](PROGRESS_TRACKING.md)** - How a job's progress percentage is worked out
@@ -32,7 +32,7 @@
 
 ### 🧪 Testing
 
-- **[../lab/README.md](../lab/README.md)** - The test lab: Linux targets, Tart and UTM VMs, Gandalf against seeded hosts, Mordor recordings
+- **[../lab/README.md](../lab/README.md)** - The test lab: Linux targets, Tart and UTM VMs, Custodian against seeded hosts, Crucible recordings
 - **[../tests/docs/BUGS.md](../tests/docs/BUGS.md)** - Every bug found in testing, and its fix
 
 ---
@@ -58,8 +58,8 @@
 
 ### For CLI Users
 **[CLI.md](CLI.md)** - Complete command reference:
-- Gandalf acquisition (local & remote)
-- Elrond analysis (all modes)
+- Custodian acquisition (local & remote)
+- Ledger analysis (all modes)
 - MITRE ATT&CK tools
 - Cloud forensics (AWS, Azure, GCP)
 - Smith (AI analyst) commands

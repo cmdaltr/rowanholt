@@ -2,7 +2,7 @@
 
 Status: **approved, 6 November 2026** (decisions at the end); built on `feat/jsonl-output` (what changed from the plan while building it is in "As built", before the decisions).
 
-Elrond's output today is two formats chosen by whichever parser wrote the file: about 30 writers produce JSON (Artemis, registry, browsers, plists, journalctl, Linux logs and services, mail, clipboard, USB) and about 70 file names are CSV (the native parsers in `process/windows_artefacts.py`, `linux_artefacts.py`, `mac_artefacts.py`, `extra_artefacts.py`, plus bash and zsh history, `group` and UAL). No artefact gets both, and nothing converts between them. Readers cope unevenly: the case browser reads both, stacking mostly JSON, Smith's context search CSV only, so Smith never sees Artemis, registry, event log, browser or journal output.
+Ledger's output today is two formats chosen by whichever parser wrote the file: about 30 writers produce JSON (Artemis, registry, browsers, plists, journalctl, Linux logs and services, mail, clipboard, USB) and about 70 file names are CSV (the native parsers in `process/windows_artefacts.py`, `linux_artefacts.py`, `mac_artefacts.py`, `extra_artefacts.py`, plus bash and zsh history, `group` and UAL). No artefact gets both, and nothing converts between them. Readers cope unevenly: the case browser reads both, stacking mostly JSON, Smith's context search CSV only, so Smith never sees Artemis, registry, event log, browser or journal output.
 
 The goal: every record Rowanholt writes, in `cooked/`, `analysis/` and the case-level tables, is a JSON Lines file (`.jsonl`, one object per line) with the same envelope fields, so every reader treats every artefact the same way.
 
@@ -49,7 +49,7 @@ Flat rather than nesting the artefact's fields under a key, because Splunk's tra
 | `mitre_techniques.txt` | a list of IDs | unchanged: not records |
 | Navigator layer, Splunk and Kibana content | their own formats | unchanged formats, updated searches |
 | Stacking baseline you supply | CSV | stays CSV: it's your input, not Rowanholt's output |
-| Gandalf's `raw/linux/gandalf+*.csv` | CSV | unchanged: collector output in `raw/` |
+| Custodian's `raw/linux/gandalf+*.csv` | CSV | unchanged: collector output in `raw/` |
 
 ## Existing cases
 
@@ -92,7 +92,7 @@ It replaces the two copies of `_append_rows` (`windows_artefacts.py:49`, `linux_
 - **Registry, plists, browsers, WMI fallback**: already dicts; switch `json.dump(list)` to `write_records`. Registry's append-mode array (`[...][...]` on a second write, guarded only by an existence check) goes away.
 - **String-built JSON** (journalctl `linux.py:122`, USB `usb.py:80`, clipboard `clipboard.py:894`, mail `nix.py:450`, logs `:878`, services `:976`): rebuilt as dicts. These are the riskiest rewrites and also fix invalid JSON on awkward input, so each gets a test with quotes, backslashes and newlines in the values.
 - **Hand-rolled CSV**: bash and zsh history (`nix.py:144`, `:225`), `group` (`:480`), UAL (`windows.py:579`, where KStrike's commas are currently stripped), `LastAccessTimes` (`process.py:418`).
-- **Analysis writers**: `analysis.py` (`analysis.csv`, `iocs.csv`), `iocs.py:257`, YARA, ClamAV, keywords, masquerading, misplaced, threat intelligence's `threat_intel_matches` and `threat_groups`, stacking's output and Gandalf's integrity table.
+- **Analysis writers**: `analysis.py` (`analysis.csv`, `iocs.csv`), `iocs.py:257`, YARA, ClamAV, keywords, masquerading, misplaced, threat intelligence's `threat_intel_matches` and `threat_groups`, stacking's output and Custodian's integrity table.
 - **Plaso** (`process/timeline.py`): psteal with `-o json_line`, each line decoded with `json.loads`, the envelope added. This replaces the regex.
 - **Volatility** (`memory/extract.py:76`): `-r jsonl`.
 

@@ -213,7 +213,7 @@ Single sign-on stays free because gating it would sign people out, which the sha
 - **Admins.** An account with the `admin` role, or the analyst in local mode. The API is
   `/api/licence` (GET; POST `/check`; GET `/terms`; PUT with `accept_terms` and `terms_version`,
   422 / 409; DELETE), `/api/brands` and `/api/webhooks`, all admin-only. The Licence, Branding and
-  Webhooks pages are linked for admins beside Aragorn; the Licence page shows "Commercial licence vX
+  Webhooks pages are linked for admins beside Steward; the Licence page shows "Commercial licence vX
   accepted by NAME on DATE"; during grace every page warns admins.
 - **Command line.** `rowanholt server licence show|install FILE --accept-terms "Name <email>"|remove`
   (`scripts/server/server-licence.sh`, running `manage_licence.py` in the backend container), in

@@ -52,9 +52,9 @@ Prices are the vendors' own where published; check with them before relying on a
 
 ## Where Rowanholt stands
 
-Rowanholt is an automation platform rather than a viewer. Point it at a host, a disk or memory image, a Gandalf collection or a set of cloud logs, and it runs the whole chain: collect, verify, parse with 30+ tools, map to ATT&CK, stack across hosts, match against threat intelligence, and hand the result to an analyst, a team or a SIEM. The closest commercial equivalents are Binalyze AIR and Cyber Triage; the closest free one is Velociraptor feeding Plaso and Timesketch, which takes three tools and the glue between them to cover the same ground.
+Rowanholt is an automation platform rather than a viewer. Point it at a host, a disk or memory image, a Custodian collection or a set of cloud logs, and it runs the whole chain: collect, verify, parse with 30+ tools, map to ATT&CK, stack across hosts, match against threat intelligence, and hand the result to an analyst, a team or a SIEM. The closest commercial equivalents are Binalyze AIR and Cyber Triage; the closest free one is Velociraptor feeding Plaso and Timesketch, which takes three tools and the glue between them to cover the same ground.
 
-It isn't a replacement for a forensic suite when the job is reviewing one device in depth: there's no hex or file viewer, no carving review, and no mobile support. Nor is it a fleet-scale hunting agent like Velociraptor or AIR; Gandalf collects host by host. It has no court track record or third-party validation yet, it's maintained by one person, and it wants 16 GB of RAM to run comfortably. The cloud modules have had less lab time than the host analysis.
+It isn't a replacement for a forensic suite when the job is reviewing one device in depth: there's no hex or file viewer, no carving review, and no mobile support. Nor is it a fleet-scale hunting agent like Velociraptor or AIR; Custodian collects host by host. It has no court track record or third-party validation yet, it's maintained by one person, and it wants 16 GB of RAM to run comfortably. The cloud modules have had less lab time than the host analysis.
 
 ## What sets it apart
 
@@ -62,15 +62,15 @@ It isn't a replacement for a forensic suite when the job is reviewing one device
 
 **Evidence never leaves the building.** Smith runs on a local model through Ollama, and answers its fixed questions straight from the case files when there's no model at all. Nothing is sent to a hosted AI service, which matters for air-gapped labs and for evidence under legal hold.
 
-**Attribution that says how sure it is.** Pippin ranks threat groups by what matched and labels the basis of each: atomic indicators, specific procedures, common tooling, or technique overlap only. Elements dozens of groups share are marked common, and built-in commands never match, so a shared PowerShell switch never reads like attribution.
+**Attribution that says how sure it is.** Lookout ranks threat groups by what matched and labels the basis of each: atomic indicators, specific procedures, common tooling, or technique overlap only. Elements dozens of groups share are marked common, and built-in commands never match, so a shared PowerShell switch never reads like attribution.
 
 **Stacking that explains itself.** Rare processes, services, tasks, autoruns, WMI consumers and kernel modules across hosts, each row with its reasons. Hosts are compared only with the same operating system, Linux hosts only with the same distribution family, nothing counts as rare on fewer than three, and at equal score persistence ranks above programs.
 
 **Containers and Kubernetes from the disk.** Container configurations, the writable layer (listed and hashed, its executables copied), static pods and the API server's audit log, from a disk image or a collection, mapped to the container techniques such as **T1611** and **T1609**. Dissect also opens a disk image's Docker containers as evidence of their own; none of the tools above documents reading Kubernetes static pods or the audit log from dead-box evidence, or mapping either to ATT&CK.
 
-**Integrity checked at both ends.** Gandalf collects in order of volatility and hashes everything with SHA-256 into `log.meta`; Elrond re-checks every hash on arrival before it parses anything.
+**Integrity checked at both ends.** Custodian collects in order of volatility and hashes everything with SHA-256 into `log.meta`; Ledger re-checks every hash on arrival before it parses anything.
 
-**Measured against ground truth.** The test lab plants known artefacts on Windows, Linux and macOS targets and checks each case against what was planted, and the Mordor datasets carry recorded attack telemetry. Detection quality is a number, not a claim.
+**Measured against ground truth.** The test lab plants known artefacts on Windows, Linux and macOS targets and checks each case against what was planted, and the Crucible datasets carry recorded attack telemetry. Detection quality is a number, not a claim.
 
 ## Using it alongside other tools
 

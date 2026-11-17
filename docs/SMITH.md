@@ -10,7 +10,7 @@ The model is given the case per host: the analysts' confirmed findings, the host
 
 ## Without Ollama
 
-If Ollama isn't running, or the model isn't pulled, Ask Smith says which and how to fix it, turns off free text, and offers fixed questions answered exactly from Elrond's output for the selected case: which hosts are in it, which ATT&CK techniques were tagged, what persistence was flagged, who logged in (and failed to), which IOCs were extracted, which shell commands look suspicious, what matched threat intelligence (when the case was run with it), what's rare across the hosts (stacking's top rows, persistence first, each a lead rather than a verdict), and what analysts have confirmed in the case browser. With a model, confirmed findings go into its context first. A few general questions (persistence locations per OS, what Gandalf collects) need no case. These answers are read from the files and the findings, not generated, so they are the same every time. Under an answer, Ask Smith lists the host rows its lines came from (file and row; the SHA-256 on hover), each with ⚑ to flag it as a lead or a confirmed finding on that row, as the case browser would; a row someone has already flagged says who.
+If Ollama isn't running, or the model isn't pulled, Ask Smith says which and how to fix it, turns off free text, and offers fixed questions answered exactly from Ledger's output for the selected case: which hosts are in it, which ATT&CK techniques were tagged, what persistence was flagged, who logged in (and failed to), which IOCs were extracted, which shell commands look suspicious, what matched threat intelligence (when the case was run with it), what's rare across the hosts (stacking's top rows, persistence first, each a lead rather than a verdict), and what analysts have confirmed in the case browser. With a model, confirmed findings go into its context first. A few general questions (persistence locations per OS, what Custodian collects) need no case. These answers are read from the files and the findings, not generated, so they are the same every time. Under an answer, Ask Smith lists the host rows its lines came from (file and row; the SHA-256 on hover), each with ⚑ to flag it as a lead or a confirmed finding on that row, as the case browser would; a row someone has already flagged says who.
 
 ## From an MCP host
 
@@ -63,7 +63,7 @@ claude mcp add rowanholt --env ROWANHOLT_MCP_PYTHON=$HOME/.rowanholt-mcp/bin/pyt
 | `rare_across_hosts(job_id)` | The top of `stacking.jsonl`, each row with the host row it was read from (`Host`, `Artefact`, `Row`) |
 | `findings`, `report`, `navigator_layer` | Analysts' findings (with whether each row is still intact), the Markdown report, the confirmed-findings layer |
 
-The server tells the host to start from a job id, cite file and row for every claim, and treat a stacking row or a threat intelligence match as a lead, not a verdict. It can't start, restart or delete jobs, run Gandalf, import or delete threat intelligence, assign hosts, or change or remove findings.
+The server tells the host to start from a job id, cite file and row for every claim, and treat a stacking row or a threat intelligence match as a lead, not a verdict. It can't start, restart or delete jobs, run Custodian, import or delete threat intelligence, assign hosts, or change or remove findings.
 
 Started with `--allow-writes` (`rowanholt mcp --allow-writes`, or `"args": ["mcp", "--allow-writes"]`), it adds two tools, and nothing else that writes:
 

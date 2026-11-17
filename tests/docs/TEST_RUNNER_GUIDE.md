@@ -96,7 +96,7 @@ Some steps write nothing to the audit log or job log, so a healthy job can look 
 | Step | Where | Seen |
 |---|---|---|
 | Empty-directory cleanup at the end of collection | `collect.py`, three `os.walk` passes | 32 min on `win_full` (7 shadow copies) |
-| Result statistics after Elrond exits | `tasks_docker.py`, `rglob` + `stat` of the output tree | 33 min for 87k carved files |
+| Result statistics after Ledger exits | `tasks_docker.py`, `rglob` + `stat` of the output tree | 33 min for 87k carved files |
 | foremost | `carve.py` | 36–59 min on a 21 GB raw image |
 | Plaso | `log2timeline` | 105 min on the Windows E01 |
 

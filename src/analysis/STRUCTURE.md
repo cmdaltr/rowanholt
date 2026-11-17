@@ -1,6 +1,6 @@
-# Elrond Project Structure
+# Ledger Project Structure
 
-Complete directory structure reference for the Elrond project.
+Complete directory structure reference for the Ledger project.
 
 ## Root Directory
 
@@ -60,7 +60,7 @@ docker/
 scripts/
 ├── docker-start.sh              # Docker startup manager (interactive)
 ├── config.sh                    # Configuration helper script
-└── elrond.sh                    # Elrond wrapper script
+└── elrond.sh                    # Ledger wrapper script
 ```
 
 **Purpose**: Executable shell scripts for common operations.
@@ -330,7 +330,7 @@ tests/
 
 ## Quick Reference
 
-### Starting Elrond
+### Starting Ledger
 
 ```bash
 # Docker

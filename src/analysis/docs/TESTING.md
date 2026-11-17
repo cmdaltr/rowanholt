@@ -1,10 +1,10 @@
-# Elrond Testing Guide
+# Ledger Testing Guide
 
-Comprehensive testing documentation for the Elrond digital forensics automation tool.
+Comprehensive testing documentation for the Ledger digital forensics automation tool.
 
 ## Overview
 
-Elrond has two complementary test suites:
+Ledger has two complementary test suites:
 
 1. **Python Backend Tests** - Unit and integration tests for the core forensics engine
 2. **Web Application Tests** - End-to-end and API tests for the web interface
@@ -136,7 +136,7 @@ npm run test:api
 - ✅ Accessibility features
 
 #### Options Panel Tests (30 tests)
-- ✅ All 30+ Elrond options
+- ✅ All 30+ Ledger options
 - ✅ Section tabs and switching
 - ✅ Checkbox interactions
 - ✅ Enable/disable all buttons
@@ -480,7 +480,7 @@ For questions or issues:
 
 ---
 
-**Maintained by**: Elrond Development Team
+**Maintained by**: Ledger Development Team
 **Last Updated**: 2025-01-15
 **Test Framework Versions**:
 - Python: pytest 7.4+

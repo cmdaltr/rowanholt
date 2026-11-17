@@ -1,8 +1,8 @@
-# Elrond Docker Quick Start
+# Ledger Docker Quick Start
 
-> **Legacy.** This describes the standalone Elrond stack in `src/analysis/web` and `src/analysis/docker` (ports 3000 and 8000), which Rowanholt no longer uses. Rowanholt runs from the repository's `docker-compose.yml` (web UI on :5687, API on :5688): start with [docs/QUICKSTART.md](../../../docs/QUICKSTART.md) and the `rowanholt` command.
+> **Legacy.** This describes the standalone Ledger stack in `src/analysis/web` and `src/analysis/docker` (ports 3000 and 8000), which Rowanholt no longer uses. Rowanholt runs from the repository's `docker-compose.yml` (web UI on :5687, API on :5688): start with [docs/QUICKSTART.md](../../../docs/QUICKSTART.md) and the `rowanholt` command.
 
-Get Elrond up and running in Docker in 5 minutes!
+Get Ledger up and running in Docker in 5 minutes!
 
 ## Prerequisites
 
@@ -24,7 +24,7 @@ cd elrond
 cp .env.example .env
 ```
 
-### 2. Start Elrond
+### 2. Start Ledger
 
 **Option A: Using the startup script (recommended)**
 
@@ -49,7 +49,7 @@ docker-compose up
 docker-compose up -d
 ```
 
-### 3. Access Elrond
+### 3. Access Ledger
 
 Open your browser:
 
@@ -206,7 +206,7 @@ docker cp elrond-engine:/output/CASE-001 ./results/
 docker volume inspect elrond-output
 ```
 
-### Update Elrond
+### Update Ledger
 
 ```bash
 # Pull latest code
@@ -326,14 +326,14 @@ ALLOWED_PATHS=/evidence,/mnt,/media
 CORS_ORIGINS=http://localhost:3000
 
 # Non-Interactive Mode (DEFAULT: Enabled)
-# Elrond runs in non-interactive mode by default for web/automation
+# Ledger runs in non-interactive mode by default for web/automation
 # This provides clean output without prompts, colors, or ASCII art
 ELROND_NONINTERACTIVE=1  # 1=enabled (default), 0=interactive CLI mode
 ```
 
 ### Non-Interactive Mode
 
-**Elrond automatically runs in non-interactive mode by default** for web and automation environments. This ensures:
+**Ledger automatically runs in non-interactive mode by default** for web and automation environments. This ensures:
 
 - ✅ **No user prompts** - All decisions use safe defaults
 - ✅ **Clean log output** - No ANSI color codes, banners, or separators
@@ -365,7 +365,7 @@ export ELROND_NONINTERACTIVE=0
                            │
                            ▼
                     ┌──────────────┐
-                    │   Elrond     │
+                    │   Ledger     │
                     │   Engine     │
                     └──────────────┘
 ```

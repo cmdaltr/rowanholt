@@ -208,7 +208,7 @@ curl -X POST http://localhost:5688/api/jobs/{job_id}/cancel \
 python3 tests/scripts/run_test.py --cancel {job_id}
 ```
 
-Cancelling leaves the tool Elrond was running (foremost, yara, Plaso) alive in the worker, still holding the image mount. See [TEST_RUNNER_GUIDE.md](../tests/docs/TEST_RUNNER_GUIDE.md#cleaning-up-after-a-cancel) for clean-up.
+Cancelling leaves the tool Ledger was running (foremost, yara, Plaso) alive in the worker, still holding the image mount. See [TEST_RUNNER_GUIDE.md](../tests/docs/TEST_RUNNER_GUIDE.md#cleaning-up-after-a-cancel) for clean-up.
 
 A job in `awaiting_confirmation` can only be ended with `POST /api/jobs/{job_id}/cancel-removal`.
 
@@ -329,14 +329,14 @@ cat /output/CASE-001/*/artefacts/plaso_timeline.jsonl | head
 
 ### Export to Splunk and Elasticsearch
 
-SIEM export runs inside Elrond, not as a separate tool. Enable Splunk, Elastic and Navigator on the job, or export a completed job again (the job page's **Export to SIEM**, or the API). The export is queued in the worker, which runs Elrond's `--Index` of the job's output; poll its status for progress and each target's outcome:
+SIEM export runs inside Ledger, not as a separate tool. Enable Splunk, Elastic and Navigator on the job, or export a completed job again (the job page's **Export to SIEM**, or the API). The export is queued in the worker, which runs Ledger's `--Index` of the job's output; poll its status for progress and each target's outcome:
 
 ```bash
 curl -X POST http://localhost:5688/api/jobs/{job_id}/export-siem   # 202, state "queued"
 curl http://localhost:5688/api/jobs/{job_id}/export-siem           # running, then succeeded or failed
 ```
 
-From the CLI, add `--Splunk --Elastic --Navigator` to the Elrond command. Start the services first with `docker compose --profile siem up -d`.
+From the CLI, add `--Splunk --Elastic --Navigator` to the Ledger command. Start the services first with `docker compose --profile siem up -d`.
 
 ### Generate MITRE ATT&CK Mapping
 
@@ -345,7 +345,7 @@ python3 -m src.analysis.mitre.cli map powershell_history -c "<command line>"
 python3 -m src.analysis.mitre.coverage_cli dashboard CASE-001 /output/CASE-001 -o coverage.html
 ```
 
-The Navigator layer is written by Elrond (`<case>_navigator.json`) or downloaded with `GET /api/jobs/{job_id}/navigator`.
+The Navigator layer is written by Ledger (`<case>_navigator.json`) or downloaded with `GET /api/jobs/{job_id}/navigator`.
 
 ---
 

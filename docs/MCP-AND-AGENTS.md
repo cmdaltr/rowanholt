@@ -43,9 +43,9 @@ Before giving any component its own server or agent, I'd ask two questions: does
 
 ### Most of Rowanholt is deterministic by design
 
-Elrond is a directed graph of known steps: detect the evidence type, branch by OS, run Volatility, Plaso, RegRipper and YARA as subprocesses, write `cooked/`, map techniques. Every branch is decided by the evidence, not by judgement. Putting an agent in the middle would swap a repeatable pipeline for one that might run a different set of steps each time. In forensics that's the opposite of what you want. Two runs over the same image should give the same output, and the audit log should show a fixed procedure, not a model's choices.
+Ledger is a directed graph of known steps: detect the evidence type, branch by OS, run Volatility, Plaso, RegRipper and YARA as subprocesses, write `cooked/`, map techniques. Every branch is decided by the evidence, not by judgement. Putting an agent in the middle would swap a repeatable pipeline for one that might run a different set of steps each time. In forensics that's the opposite of what you want. Two runs over the same image should give the same output, and the audit log should show a fixed procedure, not a model's choices.
 
-The subprocess boundary and the order-of-volatility logic in Gandalf are there for isolation and defensibility. An agent deciding which artefacts to collect, or in what order, undermines both.
+The subprocess boundary and the order-of-volatility logic in Custodian are there for isolation and defensibility. An agent deciding which artefacts to collect, or in what order, undermines both.
 
 ### Some components shouldn't be reachable by a model at all
 
@@ -53,18 +53,18 @@ The roadmap's never-exposed list (`docs/ROADMAP.md`, and the top of `src/smith_m
 
 | Component | What a model would be doing | Why not |
 |---|---|---|
-| Gandalf | Starting acquisitions over SSH or PSRemoting against live hosts | A model with remote execution on a target estate; chain of custody starts here and should start with a person |
-| Elrond (control) | Starting, restarting, deleting jobs | Deleting or overwriting output a finding cites, or restarting a job someone is working |
-| Pippin (writes) | Importing or deleting threat intelligence | A model poisoning or emptying the indicators every case is matched against |
-| Andúril / Aragorn | Recreating containers, changing settings | Interrupting running jobs; admin actions belong with an admin |
-| Mordor / the lab | Building VMs, running attack recordings | Dev tooling; a model gains nothing and you get detonations triggered by a prompt |
+| Custodian | Starting acquisitions over SSH or PSRemoting against live hosts | A model with remote execution on a target estate; chain of custody starts here and should start with a person |
+| Ledger (control) | Starting, restarting, deleting jobs | Deleting or overwriting output a finding cites, or restarting a job someone is working |
+| Lookout (writes) | Importing or deleting threat intelligence | A model poisoning or emptying the indicators every case is matched against |
+| Quartermaster / Steward | Recreating containers, changing settings | Interrupting running jobs; admin actions belong with an admin |
+| Crucible / the lab | Building VMs, running attack recordings | Dev tooling; a model gains nothing and you get detonations triggered by a prompt |
 | `raw/` | Reading evidence as collected | The case browser never reaches it; nor should anything else |
 
 An MCP server for any of these would mostly exist to expose the actions on this list.
 
 ### The parts that should be reachable share one server
 
-The useful thing a model can do with Rowanholt is read a finished case and reason about it: which hosts, which rare persistence, which rows match an indicator, what to look at next. That's real judgement work, which is where an agent helps. Smith's MCP server covers it across every component: `list_cases`, `case_overview` and `read_rows` (Elrond's output), `rare_across_hosts` (stacking), `check_indicator` (Pippin), `ask_offline`, `ask_smith`, `case_summary` and `suggestions` (Smith), and `findings`, `report` and `navigator_layer` (the case browser). With `--allow-writes` it adds `flag_lead` and `add_note`, and nothing else that writes; the backend records those as Smith's and refuses anything but a lead. `docs/SMITH.md` has the details.
+The useful thing a model can do with Rowanholt is read a finished case and reason about it: which hosts, which rare persistence, which rows match an indicator, what to look at next. That's real judgement work, which is where an agent helps. Smith's MCP server covers it across every component: `list_cases`, `case_overview` and `read_rows` (Ledger's output), `rare_across_hosts` (stacking), `check_indicator` (Lookout), `ask_offline`, `ask_smith`, `case_summary` and `suggestions` (Smith), and `findings`, `report` and `navigator_layer` (the case browser). With `--allow-writes` it adds `flag_lead` and `add_note`, and nothing else that writes; the backend records those as Smith's and refuses anything but a lead. `docs/SMITH.md` has the details.
 
 Splitting that into a server per component would bring three problems:
 
@@ -86,7 +86,7 @@ Claude Code subagents are a different matter, because they're for development, n
 |---|---|
 | Artefact-parser author | stdlib module in `process/extractions/` → OS router → `cooked/<name>.csv` → `_record_techniques` → `is_extra_artefact` in `process/extra_artefacts.py` → unit test |
 | Lab runner | `lab.sh` targets, `verify-expected.py` against `expected.json`, never editing `lab.sh` mid-run, `tests/docs/BUGS.md` for what breaks |
-| Gandalf cross-collector reviewer | A collection change lands in bash, Python and PowerShell alike, read-only, hashed into `log.meta` |
+| Custodian cross-collector reviewer | A collection change lands in bash, Python and PowerShell alike, read-only, hashed into `log.meta` |
 
 None of these is urgent. The sensible trigger is the next time you do one of these jobs and notice you're explaining the same steps again.
 
@@ -96,6 +96,6 @@ None of these is urgent. The sensible trigger is the next time you do one of the
 |---|---|
 | An MCP server for Rowanholt? | Yes: one, Smith's, read-only unless started with `--allow-writes` (leads and notes only); built, over stdio and streamable HTTP |
 | One MCP server per component? | No: duplicated auth, multiple reviews, mostly exposing never-exposed actions |
-| Agents inside the pipeline (Gandalf, Elrond)? | No: deterministic and auditable by design |
+| Agents inside the pipeline (Custodian, Ledger)? | No: deterministic and auditable by design |
 | Smith calling functions through Ollama? | Not on a 3B model; revisit with a stronger local model |
 | Claude Code subagents for development? | Optional, cheap, add when a repeated task calls for one |

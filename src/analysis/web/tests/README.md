@@ -1,8 +1,8 @@
-# Elrond Web Application - Test Suite
+# Ledger Web Application - Test Suite
 
-> **Legacy.** This describes the standalone Elrond stack in `src/analysis/web` and `src/analysis/docker` (ports 3000 and 8000), which Rowanholt no longer uses. Rowanholt runs from the repository's `docker-compose.yml` (web UI on :5687, API on :5688): start with [docs/QUICKSTART.md](../../../../docs/QUICKSTART.md) and the `rowanholt` command.
+> **Legacy.** This describes the standalone Ledger stack in `src/analysis/web` and `src/analysis/docker` (ports 3000 and 8000), which Rowanholt no longer uses. Rowanholt runs from the repository's `docker-compose.yml` (web UI on :5687, API on :5688): start with [docs/QUICKSTART.md](../../../../docs/QUICKSTART.md) and the `rowanholt` command.
 
-Comprehensive Playwright test suite for the Elrond Web Interface.
+Comprehensive Playwright test suite for the Ledger Web Interface.
 
 ## 📋 Table of Contents
 
@@ -17,7 +17,7 @@ Comprehensive Playwright test suite for the Elrond Web Interface.
 
 ## Overview
 
-This test suite provides comprehensive end-to-end and API testing for the Elrond Web Application using Playwright. The tests cover:
+This test suite provides comprehensive end-to-end and API testing for the Ledger Web Application using Playwright. The tests cover:
 
 - **UI/UX Testing**: User interface components and interactions
 - **E2E Testing**: Complete user workflows from start to finish
@@ -52,7 +52,7 @@ tests/
 
 - Node.js 18 or later
 - npm or yarn
-- Elrond web application running (frontend + backend)
+- Ledger web application running (frontend + backend)
 
 ### Installation
 
@@ -163,7 +163,7 @@ npx playwright show-report test-results/html
 - ✅ Checkbox interactions
 - ✅ Enable/Disable all buttons
 - ✅ Option persistence
-- ✅ All 30+ Elrond options
+- ✅ All 30+ Ledger options
 - ✅ Responsive design
 - ✅ Accessibility
 

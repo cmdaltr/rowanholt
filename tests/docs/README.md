@@ -153,7 +153,7 @@ Test configuration JSON files follow this structure:
 | Option | Type | Description |
 |--------|------|-------------|
 | `local` | bool | Local disk/memory image analysis (default: true) |
-| `gandalf` | bool | Process pre-collected Gandalf artifacts |
+| `gandalf` | bool | Process pre-collected Custodian artifacts |
 | `analysis` | bool | Run automated analysis |
 | `extract_iocs` | bool | Extract IOCs from artifacts |
 | `vss` | bool | Process Volume Shadow Copies (Windows) |
@@ -198,7 +198,7 @@ Test configuration JSON files follow this structure:
 - Cross-platform combinations
 - Stress tests with all images
 
-### Gandalf Tests (1 test)
+### Custodian Tests (1 test)
 - Pre-collected artifact processing
 
 ## Environment Variables

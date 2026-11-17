@@ -2,7 +2,7 @@
 
 ## Environment Variables
 
-Elrond behavior can be configured through environment variables:
+Ledger behavior can be configured through environment variables:
 
 ### Non-Interactive Mode (Default: Enabled)
 
@@ -20,7 +20,7 @@ ELROND_NONINTERACTIVE=1
 **Default**: `1` (enabled)
 **To disable** (interactive CLI mode only): `ELROND_NONINTERACTIVE=0`
 
-### Elrond Paths
+### Ledger Paths
 
 ```bash
 ELROND_HOME=/opt/elrond          # Installation directory

@@ -1,6 +1,6 @@
-# Elrond Web Application - Test Suite
+# Ledger Web Application - Test Suite
 
-Comprehensive Playwright test suite for the Elrond Web Interface.
+Comprehensive Playwright test suite for the Ledger Web Interface.
 
 ## 📋 Table of Contents
 
@@ -15,7 +15,7 @@ Comprehensive Playwright test suite for the Elrond Web Interface.
 
 ## Overview
 
-This test suite provides comprehensive end-to-end and API testing for the Elrond Web Application using Playwright. The tests cover:
+This test suite provides comprehensive end-to-end and API testing for the Ledger Web Application using Playwright. The tests cover:
 
 - **UI/UX Testing**: User interface components and interactions
 - **E2E Testing**: Complete user workflows from start to finish
@@ -50,7 +50,7 @@ tests/
 
 - Node.js 18 or later
 - npm or yarn
-- Elrond web application running (frontend + backend)
+- Ledger web application running (frontend + backend)
 
 ### Installation
 
@@ -161,7 +161,7 @@ npx playwright show-report test-results/html
 - ✅ Checkbox interactions
 - ✅ Enable/Disable all buttons
 - ✅ Option persistence
-- ✅ All 30+ Elrond options
+- ✅ All 30+ Ledger options
 - ✅ Responsive design
 - ✅ Accessibility
 

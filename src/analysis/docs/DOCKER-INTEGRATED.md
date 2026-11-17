@@ -1,8 +1,8 @@
-# Elrond Fully Integrated Docker Deployment
+# Ledger Fully Integrated Docker Deployment
 
-> **Legacy.** This describes the standalone Elrond stack in `src/analysis/web` and `src/analysis/docker` (ports 3000 and 8000), which Rowanholt no longer uses. Rowanholt runs from the repository's `docker-compose.yml` (web UI on :5687, API on :5688): start with [docs/QUICKSTART.md](../../../docs/QUICKSTART.md) and the `rowanholt` command.
+> **Legacy.** This describes the standalone Ledger stack in `src/analysis/web` and `src/analysis/docker` (ports 3000 and 8000), which Rowanholt no longer uses. Rowanholt runs from the repository's `docker-compose.yml` (web UI on :5687, API on :5688): start with [docs/QUICKSTART.md](../../../docs/QUICKSTART.md) and the `rowanholt` command.
 
-Complete dockerization of the entire Elrond application - forensics engine + web interface running from a single unified container image.
+Complete dockerization of the entire Ledger application - forensics engine + web interface running from a single unified container image.
 
 ## Overview
 
@@ -13,7 +13,7 @@ This deployment method runs **everything** in Docker containers, including:
 - ✅ React frontend
 - ✅ Redis message broker
 
-**Key Difference**: Unlike the basic Docker setup where only the web interface runs in containers, this configuration runs the complete Elrond forensics engine inside Docker, allowing for:
+**Key Difference**: Unlike the basic Docker setup where only the web interface runs in containers, this configuration runs the complete Ledger forensics engine inside Docker, allowing for:
 - Complete isolation and reproducibility
 - No need to install forensic tools on the host
 - Consistent environment across all deployments
@@ -25,7 +25,7 @@ This deployment method runs **everything** in Docker containers, including:
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Host System                                  │
 │  ┌────────────────────────────────────────────────────────────┐ │
-│  │              Elrond Docker Environment                      │ │
+│  │              Ledger Docker Environment                      │ │
 │  │                                                              │ │
 │  │   ┌──────────────┐    ┌──────────────┐    ┌─────────────┐│ │
 │  │   │   Frontend   │───▶│   Backend    │───▶│    Redis    ││ │
@@ -37,7 +37,7 @@ This deployment method runs **everything** in Docker containers, including:
 │  │   ┌────────────────────────────────────────────────┐      │ │
 │  │   │        Celery Workers                          │      │ │
 │  │   │  ┌────────────────────────────────────────┐   │      │ │
-│  │   │  │  Elrond Forensics Engine               │   │      │ │
+│  │   │  │  Ledger Forensics Engine               │   │      │ │
 │  │   │  │  • Volatility 3                        │   │      │ │
 │  │   │  │  • Plaso                               │   │      │ │
 │  │   │  │  • Sleuthkit                           │   │      │ │

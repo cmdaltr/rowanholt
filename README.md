@@ -15,6 +15,22 @@
 
 ---
 
+## Names
+
+Rowanholt's modules have a display name, used in the web app, CLI output and these docs, and a code name that stays in paths, identifiers, flags, URL routes and the files written into cases.
+
+| Display name | Code name | Where the code lives |
+|---|---|---|
+| Custodian (acquisition) | Gandalf | `src/acquisition/`: `bash/gandalf.sh`, `python/gandalf.py`, `windows/Invoke-Gandalf.ps1`; web page `/gandalf` |
+| Ledger (analysis) | Elrond | `src/analysis/elrond.py`, `src/analysis/rowanholt/`; web page `/elrond` |
+| Smith (AI analyst) | Smith | `src/analysis/rowanholt/ai/`, `src/web/backend/ai_routes.py`, `src/smith_mcp/` |
+| Lookout (threat intelligence) | Pippin | `src/analysis/rowanholt/threat_intel/`, `src/web/backend/threat_intel_routes.py`; web page `/pippin` (`ThreatIntel.js`) |
+| Steward (administration) | Aragorn | web page `/aragorn` (`Aragorn.js`), `src/web/backend/lab_routes.py` |
+| Quartermaster (Docker manager) | Andúril | `src/common/anduril/`, `src/cli/anduril_cli.py`, `src/web/backend/anduril_routes.py`; `rowanholt quartermaster` (or `anduril`) |
+| Crucible (lab and recorded attack telemetry) | Mordor | `src/mordor/`, `src/web/backend/mordor_routes.py`, `lab/`; web page `/mordor` |
+
+---
+
 ## 🚀 Quick Start
 
 ### Installation
@@ -171,27 +187,27 @@ _3. Additional optional features_
 
 ### 🎯 Architecture
 
-Gandalf acquires, Elrond analyses, Smith answers. Four pictures show how. In the web app they're under **About**; from a shell, `rowanholt map realm|elrond|gandalf|journey` opens each one.
+Custodian acquires, Ledger analyses, Smith answers. Four pictures show how. In the web app they're under **About**; from a shell, `rowanholt map realm|elrond|gandalf|journey` opens each one.
 
 <table>
   <tr>
     <td width="50%" valign="top">
-      <a href="./src/web/frontend/public/architecture/rowanholt-architecture.html"><img src="./src/web/frontend/public/architecture/realm.jpg" alt="The realm: Gandalf to Elrond to Smith, drawn as a map of Middle-earth"/></a><br>
-      <b>The realm.</b> The whole platform as a map of Middle-earth: hosts, images and cloud in; Gandalf, the web UI, the Celery worker and Elrond; the case store, SIEM, Navigator, Smith, Aragorn and Mordor.
+      <a href="./src/web/frontend/public/architecture/rowanholt-architecture.html"><img src="./src/web/frontend/public/architecture/realm.jpg" alt="The architecture map: Custodian to Ledger to Smith"/></a><br>
+      <b>The architecture map.</b> The whole platform: hosts, images and cloud in; Custodian, the web UI, the Celery worker and Ledger; the case store, SIEM, Navigator, Smith, Steward and Crucible.
     </td>
     <td width="50%" valign="top">
-      <a href="./src/web/frontend/public/architecture/rowanholt-architecture.html"><img src="./src/web/frontend/public/architecture/elrond.jpg" alt="Elrond's roads: the directed graph branching by evidence type and OS"/></a><br>
-      <b>Elrond's roads.</b> The directed graph: how each evidence type enters, and the Windows, Linux and macOS lanes from Collect through Process and Memory to the shared stages.
+      <a href="./src/web/frontend/public/architecture/rowanholt-architecture.html"><img src="./src/web/frontend/public/architecture/elrond.jpg" alt="Ledger's roads: the directed graph branching by evidence type and OS"/></a><br>
+      <b>Ledger's roads.</b> The directed graph: how each evidence type enters, and the Windows, Linux and macOS lanes from Collect through Process and Memory to the shared stages.
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="./src/web/frontend/public/architecture/gandalf-acquisition.html"><img src="./src/web/frontend/public/architecture/gandalf.jpg" alt="Gandalf's acquisition flow"/></a><br>
-      <b>Gandalf's acquisition flow.</b> The three collectors, what each takes in order of volatility, how locked files are read, and how the hashed, encrypted archive reaches Elrond.
+      <a href="./src/web/frontend/public/architecture/gandalf-acquisition.html"><img src="./src/web/frontend/public/architecture/gandalf.jpg" alt="Custodian's acquisition flow"/></a><br>
+      <b>Custodian's acquisition flow.</b> The three collectors, what each takes in order of volatility, how locked files are read, and how the hashed, encrypted archive reaches Ledger.
     </td>
     <td width="50%" valign="top">
-      <a href="./src/web/frontend/public/architecture/rowanholt-journey.html"><img src="./src/web/frontend/public/architecture/journey.jpg" alt="The evidence's journey through Rowanholt, an interactive 3D map of Middle-earth"/></a><br>
-      <b>There and back again (3D).</b> The evidence's journey across Middle-earth: Gandalf walks his archives from the Shire, eagles carry images and datasets, through Bree, Amon Sûl and Rowanholt to the beacons and the palantír. Pick an evidence type to change the road; switch Ollama off to see Smith fall back to fixed answers. Open it with <code>rowanholt map journey</code> or under About.
+      <a href="./src/web/frontend/public/architecture/rowanholt-journey.html"><img src="./src/web/frontend/public/architecture/journey.jpg" alt="Rowanholt's startup stages"/></a><br>
+      <b>Startup stages.</b> What a start does, in order: Docker, the images, the services, then Rowanholt opening, with the same ETA wording as the desktop apps. Open it with <code>rowanholt map journey</code> or under About.
     </td>
   </tr>
 </table>
@@ -202,7 +218,7 @@ The 2D pages are generated by `scripts/docs/architecture/build_map.py` and `buil
 
 ## 📋 Features Overview
 
-### 🧙 Gandalf - Remote Acquisition
+### 📥 Custodian - Remote Acquisition
 
 Collect forensic artifacts from local and remote systems.
 
@@ -211,7 +227,7 @@ Collect forensic artifacts from local and remote systems.
 - Remote acquisition via SSH and PowerShell
 - Memory dump collection
 - Encrypted evidence packaging
-- Live state first, then files in order of volatility; everything copied locally, then SHA-256 hashed into `log.meta`, which Elrond re-checks on arrival
+- Live state first, then files in order of volatility; everything copied locally, then SHA-256 hashed into `log.meta`, which Ledger re-checks on arrival
 - Audit trail of when each artefact was taken
 - Comprehensive artifact collection
 
@@ -229,11 +245,11 @@ Collect forensic artifacts from local and remote systems.
 - Services
 - Memory dumps
 
-[Full Documentation →](docs/CLI.md#gandalf---acquisition)
+[Full Documentation →](docs/CLI.md#custodian---acquisition)
 
 ---
 
-### 🧝‍♂️ Elrond - Automated Analysis
+### 🔍 Ledger - Automated Analysis
 
 Process and analyze forensic evidence with integrated tools.
 
@@ -258,7 +274,7 @@ Process and analyze forensic evidence with integrated tools.
 - The Sleuth Kit, libewf, apfs-fuse (images and file systems)
 - 25+ additional forensic utilities
 
-[Full Documentation →](docs/CLI.md#elrond---analysis)
+[Full Documentation →](docs/CLI.md#ledger---analysis)
 
 ---
 
@@ -269,7 +285,7 @@ Automatically map forensic findings to MITRE ATT&CK techniques with comprehensiv
 **Features:**
 - One pinned MITRE ATT&CK release, v20.1, both domains: Enterprise (cloud platforms included) and Mobile
 - Content-based pattern matching for accurate technique detection
-- All 831 techniques of v20.1 named and laid out (706 Enterprise, 125 Mobile); about 320 detected by Elrond's own rules
+- All 831 techniques of v20.1 named and laid out (706 Enterprise, 125 Mobile); about 320 detected by Ledger's own rules
 - Multi-tactic technique support (techniques mapped to all relevant tactics)
 - ATT&CK Navigator layers per case: Enterprise, and Mobile for phones
 - Splunk dashboards for each technique with tactic badges
@@ -305,7 +321,7 @@ Real-time MITRE ATT&CK coverage analysis during investigations.
 **Features:**
 - Standalone coverage analyzer
 - Live detection as artifacts are processed
-- Integration with Elrond analysis
+- Integration with Ledger analysis
 - SIEM export (Splunk, Elasticsearch)
 - Visual coverage dashboards
 
@@ -332,7 +348,7 @@ Extended support for Windows, macOS, and Linux artifacts.
 - **macOS**: plists, launch agents/daemons, unified logs, FSEvents
 - **Linux**: systemd services, cron jobs, bash history, auth logs
 
-These parsers run as part of Elrond's processing phase; there is no separate command for each.
+These parsers run as part of Ledger's processing phase; there is no separate command for each.
 
 [Full Documentation →](docs/FUNCTIONALITY.md)
 
@@ -379,7 +395,7 @@ python3 -m src.analysis.rowanholt.cloud.cli aws analyze-logs \
 
 ### Feature 5: Smith, the AI Analyst
 
-Query investigation data using natural language with local AI. In the web app, **Ask Smith** talks to Ollama; when Ollama isn't running or the model isn't pulled, Smith says why and offers fixed questions (hosts, techniques, persistence, logins, IOCs, commands, threat intelligence, confirmed findings) answered straight from Elrond's output. See [docs/SMITH.md](docs/SMITH.md).
+Query investigation data using natural language with local AI. In the web app, **Ask Smith** talks to Ollama; when Ollama isn't running or the model isn't pulled, Smith says why and offers fixed questions (hosts, techniques, persistence, logins, IOCs, commands, threat intelligence, confirmed findings) answered straight from Ledger's output. See [docs/SMITH.md](docs/SMITH.md).
 
 **Features:**
 - Natural language queries of forensic data
@@ -421,7 +437,7 @@ python3 -m src.analysis.rowanholt.ai.web_interface
 
 ### Feature 6: Container Forensics
 
-Docker hosts and Kubernetes nodes, from a disk image or a Gandalf collection.
+Docker hosts and Kubernetes nodes, from a disk image or a Custodian collection.
 
 **Features:**
 - Every Docker, containerd and Podman container's configuration, mounts, capabilities and log (`docker_containers.jsonl`, `container_logs.jsonl`)
@@ -431,19 +447,19 @@ Docker hosts and Kubernetes nodes, from a disk image or a Gandalf collection.
 
 **Detected Techniques:** **T1611** (escape to host), **T1610** (deploy container), **T1609** (container administration command), **T1552.007** (container API), **T1613** (container and resource discovery), **T1543.005** (container service) and more.
 
-[Full Documentation →](docs/CLI.md#gandalf---acquisition)
+[Full Documentation →](docs/CLI.md#custodian---acquisition)
 
 ---
 
 ### Feature 7: Threat Intelligence
 
-Match a case against the Iran APT workbook, STIX 2.1 bundles, TAXII 2.1 collections, MITRESaw procedures or a watchlist, in **Pippin** (the web app's threat intelligence page) or from a shell.
+Match a case against the Iran APT workbook, STIX 2.1 bundles, TAXII 2.1 collections, MITRESaw procedures or a watchlist, in **Lookout** (the web app's threat intelligence page) or from a shell.
 
 **Features:**
 - Every cooked artefact and IOC matched, with the groups, techniques and reference behind each element (`threat_intel_matches.jsonl`)
 - Groups ranked by what matched (`threat_groups.jsonl`), each with the basis for its rank: atomic indicators, specific procedures, common tooling or technique overlap only
 - Elements dozens of groups share are marked common, and built-ins and ordinary words never match, so a shared PowerShell switch never reads like attribution
-- Single values checked in Pippin, and an offline Smith question
+- Single values checked in Lookout, and an offline Smith question
 
 **Usage:**
 ```bash
@@ -599,8 +615,8 @@ And 25+ additional tools. See [REQUIREMENTS.md](docs/REQUIREMENTS.md) for the co
 
 ### Reference
 - **[Docker Installation](scripts/DOCKER_INSTALL.md)** - Docker Desktop and OrbStack setup
-- **[Gandalf Documentation](docs/CLI.md#gandalf---acquisition)** - Remote acquisition guide
-- **[Elrond Documentation](src/analysis/README.md)** - Analysis engine guide
+- **[Custodian Documentation](docs/CLI.md#custodian---acquisition)** - Remote acquisition guide
+- **[Ledger Documentation](src/analysis/README.md)** - Analysis engine guide
 - **[Tools Reference](docs/REQUIREMENTS.md)** - All integrated forensic tools
 - **[Troubleshooting](docs/CLI.md#troubleshooting)** - Common problems
 

@@ -17,7 +17,7 @@ The MITRE ATT&CK Integration Module provides comprehensive content-based techniq
 - ✅ **ATT&CK Navigator Integration**: Automatic layer file generation for visualization
 - ✅ **Splunk Dashboards**: Individual technique dashboards with inline tactic badges
 - ✅ **Full Technique Descriptions**: Complete descriptions from enterprise_attack.csv
-- ✅ **Elrond Integration**: Seamless integration with existing analysis pipeline
+- ✅ **Ledger Integration**: Seamless integration with existing analysis pipeline
 
 ## Quick Start
 
@@ -223,9 +223,9 @@ python -m analysis.mitre.cli stats --detailed
 python -m analysis.mitre.cli list-artifacts
 ```
 
-## Integration with Elrond
+## Integration with Ledger
 
-The module integrates seamlessly with the existing Elrond analysis pipeline:
+The module integrates seamlessly with the existing Ledger analysis pipeline:
 
 ```python
 from analysis.rowanholt.post.mitre.mitre_integration import ElrondMitreIntegration
@@ -257,7 +257,7 @@ result = integration.generate_dashboards(
     formats=['splunk', 'elastic', 'navigator']
 )
 
-# Export for legacy Elrond format
+# Export for legacy Ledger format
 integration.export_to_legacy_format('CASE-2025-001')
 
 # Get techniques for SIEM
@@ -294,7 +294,7 @@ dashboards:
     - elastic
     - navigator
 
-# Elrond integration
+# Ledger integration
 elrond_integration:
   enabled: true
   auto_map: true
