@@ -27,6 +27,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from collections import deque
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -216,8 +217,16 @@ def missing_images(compose: List[str]) -> List[str]:
     return missing
 
 
-def build_log_line(text: str, logged: set) -> Optional[str]:
-    """A BuildKit line as the log shows it: a step the first time it appears, or an error."""
+OUTPUT = re.compile(r"^(#\d+) \d+\.\d+ (.*)$")
+TAIL = 12
+
+
+def build_log_line(text: str, logged: set, tails: Optional[Dict[str, deque]] = None) -> Optional[str]:
+    """A BuildKit line as the log shows it: a step the first time it appears, or an error.
+
+    A failing step's last lines of output come with its error: the error itself names only
+    the command and its exit code, and the reason (apt's E: line, curl's) is in the output.
+    """
     match = STEP.match(text)
     if match:
         key = match.groups()
@@ -226,8 +235,14 @@ def build_log_line(text: str, logged: set) -> Optional[str]:
         logged.add(key)
         rest = text[match.end():].strip()
         return f"{match.group(1)} {match.group(2)}/{match.group(3)}: {rest}"[:160]
-    if re.match(r"^#\d+ ERROR\b", text) or " ERROR: " in text:
-        return text[:300]
+    output = OUTPUT.match(text)
+    if output and tails is not None:
+        tails.setdefault(output.group(1), deque(maxlen=TAIL)).append(output.group(2)[:300])
+        return None
+    error = re.match(r"^(#\d+) ERROR\b", text)
+    if error or " ERROR: " in text:
+        tail = list(tails.pop(error.group(1), [])) if error and tails is not None else []
+        return "\n".join(["  " + line for line in tail] + [text[:300]])
     return None
 
 
@@ -240,6 +255,7 @@ def compose_up(compose: List[str], build: bool, journey: Journey, reporter: Repo
         cmd = compose[:2] + ["--progress", "plain"] + compose[2:] + up
     steps: Dict[str, tuple] = {}
     logged: set = set()
+    tails: Dict[str, deque] = {}
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
     for raw in proc.stdout:
         text = raw.rstrip("\n")
@@ -255,9 +271,9 @@ def compose_up(compose: List[str], build: bool, journey: Journey, reporter: Repo
         if text.startswith("#"):
             # BuildKit's chatter stays out of the log, but each step is named once as it starts
             # (a long build otherwise looks stuck) and its errors come through as they happen
-            line = build_log_line(text, logged)
-            if line:
-                reporter.line(line)
+            line = build_log_line(text, logged, tails)
+            for part in (line.split("\n") if line else []):
+                reporter.line(part)
             continue
         if journey.phase == "images" and re.search(r"\b(Creating|Created|Starting|Started|Recreate|Running)\b", text):
             journey.enter("containers")

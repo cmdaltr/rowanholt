@@ -114,6 +114,22 @@ class JourneyTest(unittest.TestCase):
                          ["celery-worker 7/21: RUN pip install -r requirements.txt", None, None, None,
                           '#22 ERROR: process "/bin/sh -c apt-get update" did not complete'])
 
+    def test_a_failing_step_brings_its_last_output(self):
+        seen, tails = set(), {}
+        lines = ["#31 [celery-worker 14/21] RUN apt-get update && apt-get install -y python3.12",
+                 "#31 2.104 Get:1 http://archive.ubuntu.com/ubuntu jammy InRelease",
+                 "#30 2.200 Collecting fastapi",
+                 "#31 9.871 E: Failed to fetch https://ppa.launchpadcontent.net/deadsnakes  502  Bad Gateway",
+                 '#31 ERROR: process "/bin/sh -c apt-get update" did not complete successfully: exit code: 100']
+        out = [sp.build_log_line(t, seen, tails) for t in lines]
+        self.assertEqual(out[1:4], [None, None, None])
+        self.assertEqual(out[4].split("\n"), [
+            "  Get:1 http://archive.ubuntu.com/ubuntu jammy InRelease",
+            "  E: Failed to fetch https://ppa.launchpadcontent.net/deadsnakes  502  Bad Gateway",
+            lines[4]])
+        self.assertIn("#30", tails)
+        self.assertNotIn("#31", tails)
+
     def test_build_step_lines(self):
         match = sp.STEP.match("#14 [celery-worker  7/21] RUN pip install -r requirements.txt")
         self.assertEqual(match.groups(), ("celery-worker", "7", "21"))

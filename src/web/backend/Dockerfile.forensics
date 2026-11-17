@@ -271,6 +271,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends gnupg \
 # The PPA is added by hand, not with add-apt-repository: that asks Launchpad's API about the PPA
 # first, and a hung or dropped API call failed whole builds. The key comes from Ubuntu's keyserver
 # and must have the deadsnakes fingerprint, or the step fails.
+# apt retries its fetches: a dropped Launchpad download failed a desktop app's first start (apt exit 100).
 ARG ILEAPP_VERSION=v2026.4.6
 ARG ALEAPP_VERSION=v2026.4.5
 ARG DEADSNAKES_KEY=F23C5A6CF475977595C89F51BA6932366A755776
@@ -280,8 +281,8 @@ RUN curl -fsSL --retry 5 --retry-all-errors \
     gpg --show-keys --with-colons /etc/apt/trusted.gpg.d/deadsnakes.gpg | grep -q "^fpr:::::::::${DEADSNAKES_KEY}:" && \
     echo "deb https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu jammy main" \
         > /etc/apt/sources.list.d/deadsnakes.list && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends python3.12 python3.12-venv python3.12-dev libsqlcipher-dev && \
+    apt-get -o Acquire::Retries=5 update && \
+    apt-get -o Acquire::Retries=5 install -y --no-install-recommends python3.12 python3.12-venv python3.12-dev libsqlcipher-dev && \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
     for leapp in "ileapp iLEAPP ${ILEAPP_VERSION}" "aleapp ALEAPP ${ALEAPP_VERSION}"; do \
         set -- $leapp && \
