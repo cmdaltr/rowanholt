@@ -547,10 +547,30 @@ function Clear-PendingDependencies([string[]]$Items) {
     }
 }
 
+function Get-Cim([string]$Class, [string]$Filter = '', [int]$Timeout = 20) {
+    # A WMI query that gives up: $null if WMI doesn't answer in time. Just after a sign-in WMI can
+    # stop answering (on a clean install it crashed under the first query of setup's resume after
+    # the WSL restart), and Get-CimInstance then never returns. It runs on a runspace of its own
+    # and is abandoned, not stopped, at the deadline: stopping it would wait on the same hung call
+    $ps = [powershell]::Create()
+    [void]$ps.AddCommand('Get-CimInstance').AddParameter('ClassName', $Class).AddParameter('OperationTimeoutSec', $Timeout).AddParameter('ErrorAction', 'SilentlyContinue')
+    if ($Filter) { [void]$ps.AddParameter('Filter', $Filter) }
+    $async = $ps.BeginInvoke()
+    $deadline = (Get-Date).AddSeconds($Timeout)
+    while (-not $async.IsCompleted -and (Get-Date) -lt $deadline) {
+        Start-Sleep -Milliseconds 100
+        if ($script:GuiReady) { Step-Gui }
+    }
+    if (-not $async.IsCompleted) { return $null }
+    try { return , @($ps.EndInvoke($async)) } finally { $ps.Dispose() }
+}
+
 function Test-WslFeatures {
-    # Win32_OptionalFeature answers without administrator rights; Get-WindowsOptionalFeature doesn't
-    $on = @(Get-CimInstance Win32_OptionalFeature -Filter "InstallState = 1" -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -in 'Microsoft-Windows-Subsystem-Linux', 'VirtualMachinePlatform' })
+    # Win32_OptionalFeature answers without administrator rights; Get-WindowsOptionalFeature doesn't.
+    # WMI not answering: the WSL package is taken as the answer, as it's only installed with them
+    $features = Get-Cim Win32_OptionalFeature 'InstallState = 1'
+    if ($null -eq $features) { return Test-WslPackage }
+    $on = @($features | Where-Object { $_.Name -in 'Microsoft-Windows-Subsystem-Linux', 'VirtualMachinePlatform' })
     return $on.Count -eq 2
 }
 
@@ -564,9 +584,11 @@ function Test-WslReady { return (Test-WslFeatures) -and (Test-WslPackage) }
 
 function Test-Virtualisation {
     # With Windows' own hypervisor running (WSL on), the processor reports its virtualisation as off
-    $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
-    if ($cpu.VirtualizationFirmwareEnabled) { return $true }
-    return (Test-WslFeatures) -and (Get-CimInstance Win32_ComputerSystem).HypervisorPresent
+    # WMI not answering: assumed on, so WSL's own installer is the one to say otherwise
+    $cpu = Get-Cim Win32_Processor
+    if ($null -eq $cpu -or ($cpu | Select-Object -First 1).VirtualizationFirmwareEnabled) { return $true }
+    $pc = Get-Cim Win32_ComputerSystem
+    return (Test-WslFeatures) -and ($null -eq $pc -or ($pc | Select-Object -First 1).HypervisorPresent)
 }
 
 # This PC against docs/REQUIREMENTS.md, the numbers src/common/resources.py holds for macOS and
@@ -577,11 +599,13 @@ $MemoryFloorGB = 8; $MemoryMinGB = 16; $CoresMin = 4; $DiskFloorGB = 30; $DiskMi
 
 function Get-Resources {
     # Docker Desktop keeps its disks under %LOCALAPPDATA%\Docker\wsl unless moved
-    $pc = Get-CimInstance Win32_ComputerSystem
+    # Not WMI, which can stop answering just after a sign-in (Get-Cim)
+    Add-Type -AssemblyName Microsoft.VisualBasic
+    $memory = (New-Object Microsoft.VisualBasic.Devices.ComputerInfo).TotalPhysicalMemory
     $drive = (Split-Path -Qualifier $env:LOCALAPPDATA).TrimEnd(':')
     $free = (Get-PSDrive $drive -ErrorAction SilentlyContinue).Free
     return [pscustomobject]@{
-        MemoryGB = [int][math]::Round($pc.TotalPhysicalMemory / 1GB); Cores = [int]$pc.NumberOfLogicalProcessors
+        MemoryGB = [int][math]::Round($memory / 1GB); Cores = [Environment]::ProcessorCount
         Drive = "${drive}:"; FreeGB = $(if ($null -ne $free) { [int][math]::Floor($free / 1GB) } else { $null })
     }
 }
@@ -1640,8 +1664,7 @@ function Invoke-UpdateCheck {
 # The window's browser processes: our own profile's, so everyday Edge and Chrome windows don't count
 function Get-WindowProcesses {
     $filter = "Name = 'msedge.exe' OR Name = 'chrome.exe'"
-    return @(Get-CimInstance Win32_Process -Filter $filter -ErrorAction SilentlyContinue |
-        Where-Object { $_.CommandLine -and $_.CommandLine.Contains($BrowserProfile) })
+    return @(Get-Cim Win32_Process $filter | Where-Object { $_.CommandLine -and $_.CommandLine.Contains($BrowserProfile) })
 }
 
 function Show-OpenWindow {
