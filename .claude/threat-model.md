@@ -114,6 +114,12 @@ The one place Rowanholt deletes a folder on its own: a fresh run's removal of th
 
 Accepted: evidence stays mounted read-write in the worker, because output beside the images is the default and a legitimate use; the checks above are the defence. A removal walks the folder twice (the check, then the delete). Re-review if anything else is given a way to delete a folder, the marker rule is loosened, or the worker's evidence mounts change.
 
+## Smith's model on another machine (17 November 2026: Ben asked for it, private addresses only; not yet reviewed)
+
+Smith's free text can come from a model server an admin names (`smith_model.py`, `/api/ai/model`, Steward's Smith tab): Ollama or an OpenAI-compatible API (LM Studio, vLLM, llama.cpp, LocalAI), so the case context Smith builds leaves the Rowanholt host for that server. Before every request the backend resolves the endpoint's host, and every address must be loopback, RFC 1918, 100.64/10 (the tailnet), link-local or IPv6 ULA, or nothing is sent; redirects aren't followed. `ROWANHOLT_ALLOW_PUBLIC_MODEL=1` lifts the check, an admin's deliberate choice in `.env`. The optional API key is stored 0600 in `smith-model.json` and never returned by the API. Admins only (`require_admin`, and `/api/ai/model` is in `ADMIN_PREFIXES`, so smith-mcp tokens are refused). Known gap: the check and httpx's own connection resolve the name separately, so a name an attacker controls could rebind between them; private addresses typed as IPs aren't affected. The model server itself sees the case context in the clear over http://; https:// where it crosses a network the analyst doesn't trust.
+
+Re-review if the address check is loosened, the key is ever returned, non-admins can set it, or the endpoint is offered to Smith's MCP tools.
+
 ## Chain of custody note
 
 Evidence packages are SHA256-hashed at acquisition time. Do not modify anything under `evidence/` or `cases/<CASE-ID>/raw/`. Processed output under `cases/<CASE-ID>/output/` is writable.

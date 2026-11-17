@@ -217,12 +217,18 @@ def test_general_and_missing_case():
 
 
 def test_unavailable_reasons():
-    down = smith_offline.unavailable_reason({"available": False}, "http://h:11434", "llama3.2:3b")
+    ollama = {"provider": "ollama", "url": "http://h:11434", "model": "llama3.2:3b"}
+    down = smith_offline.unavailable_reason({"available": False}, ollama)
     assert "isn't reachable at http://h:11434" in down and "ollama pull llama3.2:3b" in down
-    no_model = smith_offline.unavailable_reason({"available": True, "model_loaded": False, "models": ["qwen2.5"]},
-                                              "http://h:11434", "llama3.2:3b")
+    no_model = smith_offline.unavailable_reason({"available": True, "model_loaded": False, "models": ["qwen2.5"]}, ollama)
     assert "isn't pulled" in no_model and "qwen2.5" in no_model
-    assert smith_offline.unavailable_reason({"available": True, "model_loaded": True}, "h", "m") == ""
+    assert smith_offline.unavailable_reason({"available": True, "model_loaded": True}, ollama) == ""
+    other = {"provider": "openai", "url": "http://gpu:1234", "model": "qwen3-8b"}
+    assert "model server at http://gpu:1234" in smith_offline.unavailable_reason({"available": False, "error": "refused"}, other)
+    assert "doesn't have qwen3-8b" in smith_offline.unavailable_reason(
+        {"available": True, "model_loaded": False, "models": ["gemma"]}, other)
+    refused = smith_offline.unavailable_reason({"available": False, "refused": True, "error": "x isn't private."}, other)
+    assert refused.startswith("x isn't private.")
 
 
 def test_detections_include_clamav_and_yara(tmp_path):

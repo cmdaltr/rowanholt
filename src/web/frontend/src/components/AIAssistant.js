@@ -450,7 +450,7 @@ function AIAssistant() {
               <button
                 onClick={handleGetSuggestions}
                 disabled={loading || !llmStatus.available}
-                title={llmStatus.available ? '' : 'Needs the language model (Ollama)'}
+                title={llmStatus.available ? '' : "Needs Smith's language model (see the note above)"}
                 style={{
                   padding: '0.5rem 1rem',
                   fontSize: '0.85rem',
@@ -467,7 +467,7 @@ function AIAssistant() {
               <button
                 onClick={handleGetSummary}
                 disabled={loading || !llmStatus.available}
-                title={llmStatus.available ? '' : 'Needs the language model (Ollama)'}
+                title={llmStatus.available ? '' : "Needs Smith's language model (see the note above)"}
                 style={{
                   padding: '0.5rem 1rem',
                   fontSize: '0.85rem',

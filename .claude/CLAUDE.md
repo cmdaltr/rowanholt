@@ -67,7 +67,7 @@ Each module has a display name and a code name (Ben's decision, 12 November 2026
 - argparse for CLIs (`src/cli/rowanholt.py`, `elrond.py`)
 - openpyxl for XLSX output
 - Volatility 3, Plaso (psteal), Artemis, RegRipper, YARA, The Sleuth Kit, ClamAV, ewfmount/qemu-nbd/apfs-fuse as subprocess calls
-- Smith's LLM backend is Ollama (`OLLAMA_HOST`, `ROWANHOLT_MODEL_NAME`, default `llama3.2:3b`); the CLI can also use llama.cpp through LangChain. No hosted-API backend exists
+- Smith's LLM backend (`src/web/backend/smith_model.py`): Ollama or an OpenAI-compatible server (LM Studio, vLLM, llama.cpp, LocalAI), on this machine or another, set by an admin on Steward's Smith tab (`/api/ai/model`), else the environment (`OLLAMA_HOST`, `ROWANHOLT_MODEL_NAME`, default `llama3.2:3b`); the CLI can also use llama.cpp through LangChain. Private addresses only, checked per request (`ROWANHOLT_ALLOW_PUBLIC_MODEL=1` overrides; Ben's decision 17 November 2026): no cloud backend
 - React 18 front end; Docker Compose for everything (`docker-compose.yml`)
 
 ## Code conventions

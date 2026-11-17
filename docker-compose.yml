@@ -72,6 +72,8 @@ services:
       - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
       - ROWANHOLT_MODEL_NAME=${ROWANHOLT_MODEL_NAME:-llama3.2:3b}
       - ROWANHOLT_NUM_CTX=${ROWANHOLT_NUM_CTX:-8192}
+      # 1 lets Smith use a model server on a public address (smith_model.py); off by default
+      - ROWANHOLT_ALLOW_PUBLIC_MODEL=${ROWANHOLT_ALLOW_PUBLIC_MODEL:-}
       # Shown on Aragorn's symbol tables (the worker's setting, which it acts on)
       - ROWANHOLT_SYMBOL_DOWNLOADS=${ROWANHOLT_SYMBOL_DOWNLOADS:-on}
       # Sample data (rowanholt samples, Aragorn): a folder the worker reads as well

@@ -20,6 +20,7 @@ import LabManage from './Lab';
 import LabBuilder from './LabBuilder';
 import SymbolTables from './SymbolTables';
 import SampleData from './SampleData';
+import SmithModel from './SmithModel';
 
 const formatBytes = (n) => {
   if (!n && n !== 0) return '—';
@@ -377,7 +378,7 @@ function AndurilPanel() {
 // agent); Deploy builds and runs a Gandalf, Elrond or Mordor run; Settings is Rowanholt's containers
 // and images (Anduril, the aragorn service), sample data, memory images' symbol tables, and the lab's host,
 // settings and password.
-const TABS = [['lab', 'Lab'], ['deploy', 'Deploy'], ['settings', 'Settings']];
+const TABS = [['lab', 'Lab'], ['deploy', 'Deploy'], ['smith', 'Smith'], ['settings', 'Settings']];
 
 function Aragorn() {
   const { user } = useAuth();
@@ -385,7 +386,7 @@ function Aragorn() {
   const navigate = useNavigate();
   const tab = TABS.some(([k]) => `#${k}` === hash) ? hash.slice(1) : 'lab';
   const admin = user?.role === 'admin';
-  const adminOnly = <div className="card"><p>The lab is limited to Rowanholt administrators. Sign in with an admin account.</p></div>;
+  const adminOnly = <div className="card"><p>This is for Rowanholt administrators. Sign in with an admin account.</p></div>;
   return (
     <div className="journey-detail">
       <PageHero title="Steward">
@@ -415,6 +416,7 @@ function Aragorn() {
         </LabManage>
       ) : adminOnly)}
       {tab === 'deploy' && (admin ? <LabBuilder /> : adminOnly)}
+      {tab === 'smith' && (admin ? <SmithModel /> : adminOnly)}
       {tab === 'settings' && (
         <>
           <AndurilPanel />

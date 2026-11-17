@@ -11,16 +11,17 @@ from typing import Dict, Any, Optional, List, Tuple
 from pathlib import Path
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 try:
-    from . import case_files, smith_context, smith_offline
+    from . import case_files, smith_context, smith_model, smith_offline
     from .auth import access
     from .storage import JobStorage
 except ImportError:  # main.py imports the routes as top-level modules too
     import case_files
     import smith_context
+    import smith_model
     import smith_offline
     from auth import access
     from storage import JobStorage
@@ -32,13 +33,6 @@ logger = logging.getLogger(__name__)
 
 # Configuration
 ROWANHOLT_DATA_DIR = os.getenv("ROWANHOLT_DATA_DIR", "/opt/rowanholt/data")
-# For Docker on macOS, use host.docker.internal to reach host machine's Ollama
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://host.docker.internal:11434")
-DEFAULT_MODEL = os.getenv("ROWANHOLT_MODEL_NAME", "llama3.2:3b")
-# Ollama's own default window (2048 tokens) is shorter than the case context Smith sends
-NUM_CTX = int(os.getenv("ROWANHOLT_NUM_CTX", "8192"))
-
-
 # Request/Response Models
 class ChatRequest(BaseModel):
     message: str
@@ -62,101 +56,29 @@ class ChatResponse(BaseModel):
     processing_time: Optional[float] = None
 
 
-def old_model_names(model: str) -> List[str]:
-    """What a smith model (src/models/Modelfile.smith*) was called before the analyst was renamed,
-    newest first: smith-qwen was aule-qwen (Aulë, until 12 November 2026) and before that eru-qwen
-    (Eru, until 9 November 2026); smith:latest was aule:latest and eru:latest. Empty for any other model."""
-    if model == "smith" or model.startswith(("smith-", "smith:")):
-        return [old + model[len("smith"):] for old in ("aule", "eru")]
-    return []
+old_model_names = smith_model.old_model_names
 
 
-def _installed(model: str, models: List[str]) -> bool:
-    return model in models or any(model in m for m in models)
-
-
-# LLM Interface
-class OllamaClient:
-    """Simple Ollama HTTP client."""
-
-    def __init__(self, host: str = OLLAMA_HOST, model: str = DEFAULT_MODEL):
-        self.host = host
-        # The model asked for; self.model is the one used, an old name when only that is pulled
-        self.configured = model
-        self.model = model
-        self._resolved = False
+class SmithLLM(smith_model.ModelClient):
+    """Smith's model (smith_model) with its failures as the API's: 403 refused, 503 not answering."""
 
     async def generate(self, prompt: str, system: str = None) -> str:
-        """Generate a response from Ollama."""
         import httpx
 
-        if not self._resolved:
-            await self.check_available()
-        url = f"{self.host}/api/generate"
-
-        payload = {
-            "model": self.model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {"num_ctx": NUM_CTX},
-        }
-
-        if system:
-            payload["system"] = system
-
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                response = await client.post(url, json=payload)
-                response.raise_for_status()
-                data = response.json()
-                return data.get("response", "")
+            return await super().generate(prompt, system)
+        except smith_model.ModelRefused as e:
+            raise HTTPException(status_code=403, detail=str(e))
         except httpx.HTTPError as e:
-            logger.error(f"Ollama HTTP error: {e}")
-            reason = smith_offline.unavailable_reason(await self.check_available(), self.host, self.model)
+            logger.error(f"Smith's model HTTP error: {e}")
+            reason = smith_offline.unavailable_reason(await self.check_available(), self.setting)
             raise HTTPException(status_code=503, detail=reason or f"LLM service unavailable: {e}")
         except Exception as e:
-            logger.error(f"Ollama error: {e}")
+            logger.error(f"Smith's model error: {e}")
             raise HTTPException(status_code=500, detail=f"LLM error: {e}")
 
-    async def check_available(self) -> Dict[str, Any]:
-        """Check if Ollama is available and get model info."""
-        import httpx
 
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                # Check if Ollama is running
-                response = await client.get(f"{self.host}/api/tags")
-                response.raise_for_status()
-                data = response.json()
-
-                models = [m.get("name") for m in data.get("models", [])]
-                self.model = self.choose_model(models)
-                self._resolved = True
-
-                return {
-                    "available": True,
-                    "models": models,
-                    "default_model": self.model,
-                    "model_loaded": _installed(self.model, models)
-                }
-        except Exception as e:
-            logger.debug(f"Ollama not available: {e}")
-            return {"available": False, "error": str(e)}
-
-    def choose_model(self, models: List[str]) -> str:
-        """The configured model, or an old name of it when only that is pulled (old_model_names)."""
-        if _installed(self.configured, models):
-            return self.configured
-        for old in old_model_names(self.configured):
-            if _installed(old, models):
-                if self.model != old:
-                    logger.info(f"{self.configured} isn't pulled but {old}, its name before Smith, is: using {old}")
-                return old
-        return self.configured
-
-
-# Initialize Ollama client
-ollama = OllamaClient()
+llm = SmithLLM()
 
 # Forensic assistant system prompt
 FORENSIC_SYSTEM_PROMPT = """You are Smith, an AI forensic analysis assistant for Rowanholt, a digital forensics acceleration suite.
@@ -193,19 +115,78 @@ async def get_ai_status():
     Returns:
         LLM availability and configuration
     """
-    status = await ollama.check_available()
+    setting = llm.setting
+    status = await llm.check_available()
     usable = bool(status.get("available") and status.get("model_loaded"))
 
     return {
         "llm_available": usable,
-        "ollama_running": bool(status.get("available")),
-        "model_name": ollama.model if usable else None,
+        "endpoint_answering": bool(status.get("available")),
+        "model_name": llm.model if usable else None,
         "models": status.get("models", []),
-        "ollama_host": OLLAMA_HOST,
+        "provider": setting["provider"],
+        "endpoint": setting["url"],
         "data_dir": ROWANHOLT_DATA_DIR,
         # Why free text won't work, for Ask Smith to show; empty when it will
-        "reason": "" if usable else smith_offline.unavailable_reason(status, OLLAMA_HOST, DEFAULT_MODEL),
+        "reason": "" if usable else smith_offline.unavailable_reason(status, setting),
     }
+
+
+# ---- Smith's model: an admin's setting (Steward) ------------------------------------------
+
+class ModelSetting(BaseModel):
+    provider: str = "ollama"
+    url: str
+    model: str
+    # None keeps the saved key; "" removes it
+    api_key: Optional[str] = None
+
+
+def _candidate(body: ModelSetting) -> Dict[str, Any]:
+    problem = smith_model.setting_problem(body.provider, body.url.strip(), body.model.strip())
+    if problem:
+        raise HTTPException(status_code=422, detail=problem)
+    saved = smith_model.load()
+    key = saved.get("api_key", "") if body.api_key is None else body.api_key.strip()
+    return {"provider": body.provider, "url": body.url.strip().rstrip("/"), "model": body.model.strip(), "api_key": key}
+
+
+@router.get("/model")
+async def get_model_setting(admin: dict = Depends(access.require_admin)):
+    """Where Smith's free-text answers come from (admins); the API key only as whether there is one."""
+    return {**smith_model.public(smith_model.load()), "public_allowed": smith_model.public_allowed()}
+
+
+@router.post("/model/test")
+async def test_model_setting(body: ModelSetting, admin: dict = Depends(access.require_admin)):
+    """Whether a setting would work, before it's saved: the address check, the endpoint and its models."""
+    candidate = _candidate(body)
+    client = smith_model.ModelClient(candidate)
+    status = await client.check_available()
+    return {"ok": bool(status.get("available") and status.get("model_loaded")),
+            "answering": bool(status.get("available")), "refused": bool(status.get("refused")),
+            "models": status.get("models", []), "reason": smith_offline.unavailable_reason(status, candidate)}
+
+
+@router.put("/model")
+async def save_model_setting(body: ModelSetting, request: Request, admin: dict = Depends(access.require_admin)):
+    """Saves the setting; refused (403) when the endpoint isn't on a private address."""
+    candidate = _candidate(body)
+    try:
+        await smith_model.check_network(candidate["url"])
+    except smith_model.ModelRefused as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    smith_model.save(candidate)
+    logger.info(f"Smith's model set to {candidate['provider']} {candidate['url']} {candidate['model']} "
+                f"by {admin.get('username')}")
+    return {**smith_model.public(candidate), "public_allowed": smith_model.public_allowed()}
+
+
+@router.delete("/model")
+async def reset_model_setting(admin: dict = Depends(access.require_admin)):
+    """Back to the environment's setting (OLLAMA_HOST, ROWANHOLT_MODEL_NAME)."""
+    smith_model.reset()
+    return {**smith_model.public(smith_model.load()), "public_allowed": smith_model.public_allowed()}
 
 
 @router.get("/offline/questions")
@@ -297,7 +278,7 @@ async def general_chat(request: ChatRequest):
 
     try:
         # Generate response
-        response = await ollama.generate(
+        response = await llm.generate(
             prompt=request.message,
             system=FORENSIC_SYSTEM_PROMPT
         )
@@ -306,7 +287,7 @@ async def general_chat(request: ChatRequest):
 
         return ChatResponse(
             response=response,
-            model=ollama.model,
+            model=llm.model,
             processing_time=processing_time
         )
 
@@ -422,7 +403,7 @@ Question: {request.question}
 
 Provide a detailed forensic analysis answer based on the case data provided."""
 
-    response = await ollama.generate(prompt=prompt, system=f"{FORENSIC_SYSTEM_PROMPT}\n\n{smith_context.CITE_INSTRUCTIONS}")
+    response = await llm.generate(prompt=prompt, system=f"{FORENSIC_SYSTEM_PROMPT}\n\n{smith_context.CITE_INSTRUCTIONS}")
 
     processing_time = time.time() - start_time
 
@@ -469,7 +450,7 @@ Analyze the evidence and suggest 5 specific investigation paths. For each:
 
 Format as a numbered list."""
 
-    response = await ollama.generate(prompt=prompt, system=f"{FORENSIC_SYSTEM_PROMPT}\n\n{smith_context.CITE_INSTRUCTIONS}")
+    response = await llm.generate(prompt=prompt, system=f"{FORENSIC_SYSTEM_PROMPT}\n\n{smith_context.CITE_INSTRUCTIONS}")
 
     # Parse response into suggestions
     suggestions = _parse_suggestions(response)
@@ -517,7 +498,7 @@ Generate a comprehensive executive summary including:
 
 Be thorough but concise."""
 
-    response = await ollama.generate(prompt=prompt, system=f"{FORENSIC_SYSTEM_PROMPT}\n\n{smith_context.CITE_INSTRUCTIONS}")
+    response = await llm.generate(prompt=prompt, system=f"{FORENSIC_SYSTEM_PROMPT}\n\n{smith_context.CITE_INSTRUCTIONS}")
 
     return {
         "case_id": case_id,

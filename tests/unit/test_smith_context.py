@@ -117,7 +117,7 @@ class SmithQueryTest(BackendCase):
                 return f"1. The autostart entry in /tmp [{tag}]\n   See where it came from.\n2. Logins\n   Nothing cited."
             return f"X7KQ.EXE ran on WS01 [{tag}]; it also beaconed [R404]."
 
-        with mock.patch.object(sys.modules["ai_routes"].ollama, "generate", model):
+        with mock.patch.object(sys.modules["ai_routes"].llm, "generate", model):
             resp = self.client.post("/api/ai/cases/CASE-CTX-1/query", headers=self.alice,
                                     json={"question": "Did x7kq.exe run?"})
             self.assertEqual(resp.status_code, 200, resp.text)
@@ -162,7 +162,7 @@ class SmithModelNameTest(unittest.TestCase):
 
     def test_choosing_the_model(self):
         import ai_routes
-        client = ai_routes.OllamaClient(host="http://ollama", model="smith-qwen")
+        client = ai_routes.SmithLLM({"provider": "ollama", "url": "http://ollama", "model": "smith-qwen"})
         self.assertEqual(client.choose_model(["eru-qwen:latest", "llama3.2:3b"]), "eru-qwen")
         self.assertEqual(client.choose_model(["aule-qwen:latest", "llama3.2:3b"]), "aule-qwen")
         # Both old names pulled: the newer one, Aulë's
@@ -170,5 +170,5 @@ class SmithModelNameTest(unittest.TestCase):
         self.assertEqual(client.choose_model(["eru-qwen:latest", "aule-qwen:latest", "smith-qwen:latest"]),
                          "smith-qwen")
         self.assertEqual(client.choose_model(["llama3.2:3b"]), "smith-qwen")  # none: ask for the new name
-        plain = ai_routes.OllamaClient(host="http://ollama", model="llama3.2:3b")
+        plain = ai_routes.SmithLLM({"provider": "ollama", "url": "http://ollama", "model": "llama3.2:3b"})
         self.assertEqual(plain.choose_model(["eru-qwen:latest"]), "llama3.2:3b")

@@ -234,6 +234,11 @@ export const installLicence = async (text, termsVersion) =>
 export const removeLicence = async () => (await api.delete('/api/licence')).data;
 
 // Webhooks (admins): kept on every edition, sent on Pro and Services
+// Smith's model endpoint (admins): Ollama or an OpenAI-compatible server on a private address
+export const getSmithModel = async () => (await api.get('/api/ai/model')).data;
+export const testSmithModel = async (setting) => (await api.post('/api/ai/model/test', setting)).data;
+export const saveSmithModel = async (setting) => (await api.put('/api/ai/model', setting)).data;
+export const resetSmithModel = async () => (await api.delete('/api/ai/model')).data;
 export const getWebhooks = async () => (await api.get('/api/webhooks')).data;
 export const addWebhook = async (hook) => (await api.post('/api/webhooks', hook)).data;
 export const editWebhook = async (id, fields) => (await api.patch(`/api/webhooks/${id}`, fields)).data;

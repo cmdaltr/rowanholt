@@ -62,7 +62,7 @@ PUBLIC_PATHS = {
 # An online lookup is a POST (it sends the value out) that every analyst may make
 LOOKUP_PATH = "/api/threat-intel/lookup"
 ADMIN_PREFIXES = ("/api/lab", "/api/anduril", "/api/aragorn", "/api/auth/users", "/api/symbols", "/api/samples",
-                  "/api/licence", "/api/brands", "/api/webhooks")
+                  "/api/licence", "/api/brands", "/api/webhooks", "/api/ai/model")
 JOB_PATH = re.compile(r"^/api/jobs/([0-9a-fA-F-]{36})(?:/|$)")
 # Every state-changing request a browser's session cookie authenticates must carry this header
 # (the web app's API client sends it). A page on another origin can't add one without CORS

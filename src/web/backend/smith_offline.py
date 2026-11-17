@@ -461,8 +461,10 @@ GENERAL_ANSWERS = {
         "1. Install Ollama: `brew install ollama` on macOS, or see ollama.com for Linux and Windows.\n"
         "2. Start it: `ollama serve` (the macOS app starts it for you).\n"
         "3. Pull the model Rowanholt is set to use (ROWANHOLT_MODEL_NAME, default llama3.2:3b): `ollama pull llama3.2:3b`.\n"
-        "4. Rowanholt's backend reaches it at OLLAMA_HOST (default http://host.docker.internal:11434 from Docker). "
-        "Point that at another machine's Ollama if this one is short of memory.\n"
+        "4. Rowanholt's backend reaches it at http://host.docker.internal:11434 from Docker (OLLAMA_HOST). "
+        "If this machine can't run a model, an admin can point Smith at Ollama or an OpenAI-compatible server "
+        "(LM Studio, vLLM, llama.cpp, LocalAI) on another machine on your network or tailnet, from Steward's "
+        "Smith tab; cloud services are refused.\n"
         "Reload Ask Smith once it's running: the LLM badge turns green."
     ),
     "windows_persistence": (
@@ -559,16 +561,31 @@ def answer_with_rows(question_id: str, case_path: Optional[str]) -> Dict[str, ob
     return {"answer": text, "rows": unique}
 
 
-def unavailable_reason(status: Dict[str, object], host: str, model: str) -> str:
+def unavailable_reason(status: Dict[str, object], setting: Dict[str, object]) -> str:
     """Why free-text answers don't work right now, in words an analyst can act on."""
+    host, model = setting.get("url"), setting.get("model")
+    ollama = setting.get("provider") == "ollama"
+    if status.get("refused"):
+        return (f"{status.get('error')} Until it's changed, the questions below are answered straight from the "
+                f"case files, without a model.")
     if not status.get("available"):
-        return (f"Smith's free-text answers come from a local language model served by Ollama, and Ollama isn't "
-                f"reachable at {host}, so it's either not installed or not running. Nothing is sent to a cloud "
-                f"service instead. Install and start Ollama, then `ollama pull {model}`; until then, the questions "
-                f"below are answered straight from the case files, without a model.")
+        if ollama:
+            return (f"Smith's free-text answers come from a language model on this machine or your network, and "
+                    f"Ollama isn't reachable at {host}, so it's either not installed or not running. Nothing is "
+                    f"sent to a cloud service instead. Install and start Ollama, then `ollama pull {model}`, or "
+                    f"point Smith at a model on another machine from Steward's Smith tab. Until then, the "
+                    f"questions below are answered straight from the case files, without a model.")
+        return (f"Smith's free-text answers come from the model server at {host}, and it isn't answering "
+                f"({status.get('error') or 'no reply'}). Check it's running and reachable from Rowanholt, or change "
+                f"it from Steward's Smith tab. Until then, the questions below are answered straight from the case "
+                f"files, without a model.")
     if not status.get("model_loaded"):
-        return (f"Ollama is running at {host}, but the model Rowanholt uses ({model}) isn't pulled. "
-                f"Run `ollama pull {model}` (or set ROWANHOLT_MODEL_NAME to one of: "
-                f"{', '.join(status.get('models') or []) or 'none installed'}). Until then, the questions below "
-                f"are answered straight from the case files.")
+        have = ", ".join(status.get("models") or []) or "none"
+        if ollama:
+            return (f"Ollama is running at {host}, but the model Smith uses ({model}) isn't pulled. Run "
+                    f"`ollama pull {model}`, or choose one it has ({have}) from Steward's Smith tab. Until then, "
+                    f"the questions below are answered straight from the case files.")
+        return (f"The model server at {host} doesn't have {model} loaded (it has: {have}). Load it there, or "
+                f"choose another from Steward's Smith tab. Until then, the questions below are answered straight "
+                f"from the case files.")
     return ""

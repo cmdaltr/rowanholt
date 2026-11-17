@@ -1285,12 +1285,14 @@ function Test-Docker([int]$Seconds = 20) {
     $info.UseShellExecute = $false; $info.CreateNoWindow = $true
     $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
     $probe = [System.Diagnostics.Process]::Start($info)
-    $probe.StandardOutput.ReadToEndAsync() | Out-Null; $probe.StandardError.ReadToEndAsync() | Out-Null
+    $out = $probe.StandardOutput.ReadToEndAsync(); $probe.StandardError.ReadToEndAsync() | Out-Null
     if (-not $probe.WaitForExit($Seconds * 1000)) {
         try { $probe.Kill() } catch { }
         return $false
     }
-    return $probe.ExitCode -eq 0
+    # An engine version, not only exit 0: a Docker Desktop whose WSL VM failed to start (its own error
+    # dialog up) let the clean-install test through to 'compose up', which then failed
+    return $probe.ExitCode -eq 0 -and $out.Wait(2000) -and [bool]$out.Result.Trim()
 }
 
 function Test-DockerDesktopRunning {

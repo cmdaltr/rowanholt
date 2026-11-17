@@ -1052,11 +1052,15 @@ A case's report brand (`/api/jobs/{job_id}/case/brand`) is an admin's: see [Admi
 
 **Authentication:** none locally. On a team server, anyone signed in, over the cases behind jobs they can see (`404` for another case); case folders in Smith's data directory with no job behind them are admins'. A `smith-mcp` token may call the GETs and the question POSTs (`/offline/answer`, `/query`, `/summary`, `/suggestions`), not `/chat`
 
-Ask Smith's back end. Free-text answers come from Ollama at `OLLAMA_HOST` (default `http://host.docker.internal:11434`) with the model `ROWANHOLT_MODEL_NAME` (default `llama3.2:3b`) and a `ROWANHOLT_NUM_CTX`-token window (default 8192). Without them, `/status` says why and the offline endpoints answer fixed questions from Ledger's output.
+Ask Smith's back end. Free-text answers come from the model an admin sets (`/api/ai/model`, Steward's Smith tab): Ollama, or an OpenAI-compatible server (LM Studio, vLLM, llama.cpp's server, LocalAI), on this machine or another on the network or tailnet. Until one is set, Ollama at `OLLAMA_HOST` (default `http://host.docker.internal:11434`) with the model `ROWANHOLT_MODEL_NAME` (default `llama3.2:3b`); Ollama gets a `ROWANHOLT_NUM_CTX`-token window (default 8192). The endpoint's host must resolve to a private address (loopback, 10/8, 172.16/12, 192.168/16, 100.64/10, link-local, IPv6 unique-local), checked before every request; otherwise nothing is sent (`ROWANHOLT_ALLOW_PUBLIC_MODEL=1` lifts that). Without a model, `/status` says why and the offline endpoints answer fixed questions from Ledger's output.
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/ai/status` | `llm_available`, `ollama_running`, `model_name`, `models`, `ollama_host`, `data_dir`, and `reason`: why free text won't work (empty when it will) |
+| `GET` | `/api/ai/status` | `llm_available`, `endpoint_answering`, `model_name`, `models`, `provider` (`ollama` or `openai`), `endpoint`, `data_dir`, and `reason`: why free text won't work (empty when it will) |
+| `GET` | `/api/ai/model` | Admins: the model setting, `provider`, `url`, `model`, `has_api_key` (the key itself is never returned), `saved` (false: the environment's), `public_allowed` |
+| `POST` | `/api/ai/model/test` | Admins: `{"provider", "url", "model", "api_key"}` tried without saving: `ok`, `answering`, `refused` (not a private address), `models`, `reason` |
+| `PUT` | `/api/ai/model` | Admins: saves the setting (`api_key`: `null` keeps the saved key, `""` removes it). `422` for a malformed one, `403` when the host isn't on a private address |
+| `DELETE` | `/api/ai/model` | Admins: back to the environment's setting |
 | `GET` | `/api/ai/offline/questions` | The fixed questions: `id`, `question`, `needs_case` (including `threat_intel` and `findings`) |
 | `POST` | `/api/ai/offline/answer` | `{"question_id": "techniques", "case_id": "CASE-001", "job_id": "..."}` (`case_id` only where `needs_case`; `job_id`, optional, reads that job's output, as for `/query`). Returns `{"answer", "rows", "job_id", "offline": true}`: `rows` are the rows the answer's shown lines came from (`host`, `file`, `row_ref`, `hash`, `line`), the reference a finding stores, so `POST /api/jobs/{job_id}/case/findings` can flag one; `job_id` is the job (one the caller can see) whose case was read, and `rows` is empty without one. Counts (hosts, IOCs, logins by user) cite nothing. `404` for an unknown question |
 | `GET` | `/api/ai/cases` | Cases Smith can see: one entry per completed job (`job_id`; two jobs can share a case number), with `indexed` and `has_artifacts`, and, for admins only on a team server, case folders in Smith's data directory, which have no job |
@@ -1066,7 +1070,7 @@ Ask Smith's back end. Free-text answers come from Ollama at `OLLAMA_HOST` (defau
 | `POST` | `/api/ai/cases/{case_id}/suggestions` | Five investigation paths from the model, each with the `rows` its text cites; `rows` and `job_id` for all of them, as for `/query` |
 | `POST` | `/api/ai/cases/{case_id}/summary` | An executive summary of the case, with the `rows` it cites and `job_id`, as for `/query` |
 
-The LLM endpoints return `503` when Ollama or the model isn't available.
+The LLM endpoints return `503` when the model server or the model isn't available, and `403` when the setting's host no longer resolves to a private address.
 
 ---
 
