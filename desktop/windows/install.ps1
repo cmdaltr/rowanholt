@@ -45,7 +45,7 @@ foreach ($link in $Shortcuts.Keys) {
     }
     $shortcut.WorkingDirectory = $Root
     $shortcut.IconLocation = "$Icon,0"
-    # The console shows the road to Rowanholt while the stack starts, then closes
+    # The console shows the start's progress while the stack starts, then closes
     $shortcut.WindowStyle = if ($Shortcuts[$link]) { 7 } else { 1 }
     $shortcut.Description = 'Rowanholt DFIR platform'
     $shortcut.Save()

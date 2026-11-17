@@ -128,7 +128,7 @@ function Show-Message([string]$Text, [string]$Buttons = 'OK', [string]$Icon = 'I
 # Everything the launcher asks or shows happens in one window, as an installer's pages do: a
 # white header with the icon, the page, then Back, Next and Cancel along the bottom. It's shown
 # without blocking (Show, not ShowDialog), and the launcher pumps its messages (Step-Gui) while it
-# waits for a click or works, so one window carries setup, downloads and the road to Rowanholt.
+# waits for a click or works, so one window carries setup, downloads and the start.
 # Laid out at 96 DPI; AutoScaleMode Dpi scales it to the display's
 $script:Wizard = $null
 

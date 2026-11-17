@@ -371,9 +371,9 @@ maybe_update "$ROOT"
 
 if ! up; then
     if has_zenity; then
-        # The road to Rowanholt: phases and an ETA from this machine's earlier starts
+        # Starting: phases and an ETA from this machine's earlier starts
         "$ROOT/rowanholt" start --progress=zenity 2>&1 | tee -a "$LOG" |
-            zenity --progress --title="The road to Rowanholt" --width=480 --auto-close --no-cancel \
+            zenity --progress --title="Starting Rowanholt" --width=480 --auto-close --no-cancel \
                 --text="Starting Rowanholt" --percentage=0 2>/dev/null
         status=${PIPESTATUS[0]}
     else
