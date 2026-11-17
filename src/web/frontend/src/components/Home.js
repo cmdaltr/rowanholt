@@ -13,14 +13,14 @@ const mordorOpenImage = `${process.env.PUBLIC_URL}/images/mordor_open.jpg`;
 // The banners, left to right (the Aragorn page itself is for admins). Insight is Smith.
 // drop lowers a figure in its frame; zoom closes in when it's open
 const JOURNEYS = [
-  { to: '/gandalf', image: gandalfImage, name: 'Gandalf', role: 'Acquisition',
+  { to: '/gandalf', image: gandalfImage, name: 'Custodian', role: 'Acquisition',
     text: 'Collect evidence from live or remote systems with encrypted packaging.' },
-  { to: '/elrond', image: elrondImage, name: 'Elrond', role: 'Analysis', drop: '12px', zoom: 1.1,
+  { to: '/elrond', image: elrondImage, name: 'Ledger', role: 'Analysis', drop: '12px', zoom: 1.1,
     text: 'Process timelines, memory and artifacts to map incidents to MITRE ATT&CK.' },
-  { to: '/pippin', image: pippinImage, name: 'Pippin', role: 'Threat Intelligence', drop: '12px',
+  { to: '/pippin', image: pippinImage, name: 'Lookout', role: 'Threat Intelligence', drop: '12px',
     text: 'Import indicators, match cases against them and see whose tradecraft the evidence resembles.' },
-  { to: '/aragorn', image: aragornImage, name: 'Aragorn', role: 'Administration',
-    text: "Keep the realm: Rowanholt's containers, users, settings and the test lab." },
+  { to: '/aragorn', image: aragornImage, name: 'Steward', role: 'Administration',
+    text: "Run Rowanholt itself: its containers, users, settings and the test lab." },
   { to: '/ai', image: smithImage, name: 'Smith', role: 'Insight',
     text: 'Ask about a case and get answers drawn from its own files, each citing the rows it came from.' },
 ];
@@ -177,11 +177,11 @@ const Home = ({ onScrollProgress }) => {
           <div className="journey-card__image">
             <img
               src={mordorHovered ? mordorOpenImage : mordorClosedImage}
-              alt="Mordor Recordings"
+              alt="Crucible Recordings"
             />
           </div>
           <div className="journey-card__content">
-            <h2>Mordor Recordings</h2>
+            <h2>Crucible Recordings</h2>
             <p>Access pre-recorded security event datasets for threat research, detection development, and testing.</p>
           </div>
         </Link>

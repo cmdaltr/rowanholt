@@ -262,8 +262,8 @@ function ThreatIntel() {
 
   return (
     <div className="job-list journey-detail pippin">
-      <PageHero title="Pippin">
-        Threat intelligence: the indicators Elrond matches cases against and Smith checks single values with,
+      <PageHero title="Lookout">
+        Threat intelligence: the indicators Ledger matches cases against and Smith checks single values with,
         from STIX 2.1 bundles, TAXII 2.1 collections, MITRESaw procedures or a watchlist.
       </PageHero>
 
@@ -278,8 +278,8 @@ function ThreatIntel() {
           <span className="pippin-meta">one value against every indicator</span>
         </div>
         <p className="pippin-lede">
-          Paste one value from a case: a command line, path, process name, IP, domain or hash. Pippin finds the
-          indicators that occur in it, matched as Elrond matches (IPs and hashes exactly, tools as whole words,
+          Paste one value from a case: a command line, path, process name, IP, domain or hash. Lookout finds the
+          indicators that occur in it, matched as Ledger matches (IPs and hashes exactly, tools as whole words,
           commands as phrases), and how many groups share each. Expired indicators are left out.
         </p>
         <form onSubmit={enrich} className="pippin-check">

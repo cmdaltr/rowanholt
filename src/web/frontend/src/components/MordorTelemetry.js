@@ -114,7 +114,7 @@ function Sources({ status, isAdmin, onUpdate }) {
           <div>
             <div className="mt-source-top"><strong>Your lab</strong><span className="mt-badge">{runs.length ? `${runs.length} run${runs.length === 1 ? '' : 's'}` : 'No runs yet'}</span></div>
             <div className="mt-source-meta">{count.lab || 0} recordings · yours, never committed</div>
-            <div className="mt-source-note">Atomic Red Team on the lab's own machines, each test's logs kept apart (Aragorn → Deploy)</div>
+            <div className="mt-source-note">Atomic Red Team on the lab's own machines, each test's logs kept apart (Steward → Deploy)</div>
           </div>
         </li>
         {SOURCES.filter(s => info[s.key]).map(s => (
@@ -168,10 +168,10 @@ function DownloadButton({ id, local, onDone }) {
     setState('busy');
     try { await downloadMordorDataset(id); setState('done'); onDone(); } catch (err) { setState('failed'); }
   };
-  if (state === 'done') return <span className="mt-seen"> · downloaded for Elrond</span>;
+  if (state === 'done') return <span className="mt-seen"> · downloaded for Ledger</span>;
   return (
-    <button className="mt-pill mt-inline" disabled={state === 'busy'} onClick={go} title="Download the raw events so Elrond can analyse them (--Mordor)">
-      {state === 'busy' ? 'Downloading…' : state === 'failed' ? 'Retry download' : 'Download for Elrond'}
+    <button className="mt-pill mt-inline" disabled={state === 'busy'} onClick={go} title="Download the raw events so Ledger can analyse them (--Mordor)">
+      {state === 'busy' ? 'Downloading…' : state === 'failed' ? 'Retry download' : 'Download for Ledger'}
     </button>
   );
 }
@@ -325,12 +325,12 @@ function MordorTelemetry() {
   return (
     <div className="journey-detail mt-page">
       <section className="hero-section">
-        <img src={`${process.env.PUBLIC_URL}/images/rowanholt-tm.png`} alt="Mordor Recordings" className="hero-image"
+        <img src={`${process.env.PUBLIC_URL}/images/rowanholt-tm.png`} alt="Crucible Recordings" className="hero-image"
              style={{ transform: 'scale(0.2)', transformOrigin: 'center top' }} />
       </section>
       <header>
-        <h2>Mordor Recordings</h2>
-        <p>Which logs record each ATT&amp;CK technique, from attacks emulated and recorded in labs, the lab that records your own, and the raw events to download for Elrond.</p>
+        <h2>Crucible Recordings</h2>
+        <p>Which logs record each ATT&amp;CK technique, from attacks emulated and recorded in labs, the lab that records your own, and the raw events to download for Ledger.</p>
       </header>
       {error && <div className="card lab-error">{error}</div>}
 
@@ -345,7 +345,7 @@ function MordorTelemetry() {
         <Pipeline />
         <p className="lab-note">
           Recordings are real attacks run in a lab with logging on: the public datasets that ship with Rowanholt, plus any you
-          record yourself in the lab (Aragorn → Deploy). Each is mapped to ATT&amp;CK, then Rowanholt checks whether the
+          record yourself in the lab (Steward → Deploy). Each is mapped to ATT&amp;CK, then Rowanholt checks whether the
           indicators a detection matches actually appear in the recorded events. The result is the <strong>Recorded telemetry</strong>
           {' '}view below. No AI is involved.
         </p>
@@ -354,7 +354,7 @@ function MordorTelemetry() {
         <h3 className="mt-labhead">Your lab</h3>
         <p className="lab-note">
           Record your own: the lab creates disposable containers and VMs, turns logging on, runs Atomic Red Team and brings
-          each test's logs back here as <strong>Your lab</strong>. The machines are managed in Aragorn, with the rest of what
+          each test's logs back here as <strong>Your lab</strong>. The machines are managed in Steward, with the rest of what
           Rowanholt runs on this host.
         </p>
         <a className="mt-pill-link" href="/aragorn#deploy">Record in the lab →</a>
@@ -362,7 +362,7 @@ function MordorTelemetry() {
 
       <div data-guide="mordor.recorded" className="card">
         <h2>Recorded telemetry</h2>
-        <p className="lab-note">Every recorded technique and the logs most of its recordings hold. Open one for its recordings, the event types they hold and Defender XDR's alerting on it; an OTRF recording can be downloaded for Elrond to analyse. Search finds the techniques whose recorded events contain a value. Datasets that span several techniques (APT29's days, for example) are in <a href="#datasets">Downloadable datasets</a> below, with bulk download.</p>
+        <p className="lab-note">Every recorded technique and the logs most of its recordings hold. Open one for its recordings, the event types they hold and Defender XDR's alerting on it; an OTRF recording can be downloaded for Ledger to analyse. Search finds the techniques whose recorded events contain a value. Datasets that span several techniques (APT29's days, for example) are in <a href="#datasets">Downloadable datasets</a> below, with bulk download.</p>
         <TelemetryViews refreshKey={refreshKey} />
       </div>
 

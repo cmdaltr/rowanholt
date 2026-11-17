@@ -785,7 +785,7 @@ function AIAssistant() {
           <strong>Note:</strong> AI results are never 100% accurate - always validate findings!
           {!llmStatus.available && (
             <span style={{ display: 'block', marginTop: '0.5rem' }}>
-              Answers marked "from the case files" are read from Elrond's output, not generated.
+              Answers marked "from the case files" are read from Ledger's output, not generated.
             </span>
           )}
         </div>

@@ -136,7 +136,7 @@ function IsoDialog({ hasLabWindows, onClose, onBuild }) {
         <li>
           {hasLabWindows
             ? <>The lab's Windows VM already exists. For another, use <strong>Clone</strong> on it: no reinstall.</>
-            : <>Let the lab build it unattended (<code>./lab.sh windows-vm create</code>: installs Windows, OpenSSH and the Gandalf target, about an hour), or build it yourself in UTM and use <strong>Set OS</strong> on it.</>}
+            : <>Let the lab build it unattended (<code>./lab.sh windows-vm create</code>: installs Windows, OpenSSH and the Custodian target, about an hour), or build it yourself in UTM and use <strong>Set OS</strong> on it.</>}
         </li>
       </ol>
       <div className="mt-modal-actions">

@@ -10,17 +10,17 @@ const doc = (name) => `${REPO}/blob/main/docs/${name}`;
 const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
 const architectureMap = `${process.env.PUBLIC_URL}/architecture/rowanholt-architecture.html`;
 const architecturePages = [
-  { href: `${architectureMap}#realm`, preview: 'realm.jpg', title: 'The realm: Gandalf to Elrond to Smith' },
-  { href: `${architectureMap}#elrond`, preview: 'elrond.jpg', title: "Elrond's roads: branching by evidence and OS" },
+  { href: `${architectureMap}#realm`, preview: 'realm.jpg', title: 'The platform: Custodian to Ledger to Smith' },
+  { href: `${architectureMap}#elrond`, preview: 'elrond.jpg', title: "Ledger's directed graph: branching by evidence and OS" },
   {
     href: `${process.env.PUBLIC_URL}/architecture/gandalf-acquisition.html`,
     preview: 'gandalf.jpg',
-    title: "Gandalf's acquisition flow",
+    title: "Custodian's acquisition flow",
   },
   {
     href: `${process.env.PUBLIC_URL}/architecture/rowanholt-journey.html`,
     preview: 'journey.jpg',
-    title: "The evidence's journey (interactive 3D)",
+    title: 'Startup stages: Docker, images, services, open',
   },
 ];
 
@@ -68,7 +68,7 @@ const Flow = ({ label, stages, caption, dense = false }) => (
 
 const investigationStages = [
   {
-    who: 'Gandalf',
+    who: 'Custodian',
     title: 'Collect from the host',
     tone: 'parchment',
     steps: [
@@ -80,7 +80,7 @@ const investigationStages = [
     ],
   },
   {
-    who: 'Elrond',
+    who: 'Ledger',
     title: 'Analyse the case',
     tone: 'green',
     via: <>archive + <code>log.meta</code></>,
@@ -122,7 +122,7 @@ const investigationStages = [
     via: 'confirmed findings',
     steps: [
       ['DOCX or Markdown', 'from the case browser'],
-      ['Findings first', 'then leads, then Elrond\'s report'],
+      ['Findings first', 'then leads, then Ledger\'s report'],
       ['Every claim cited', 'host, file, row, row hash'],
     ],
   },
@@ -135,7 +135,7 @@ const elrondStages = [
     tone: 'parchment',
     steps: [
       ['Disk and memory images', <><code>--Collect</code>: E01, raw, VMDK, VHD</>],
-      ['Gandalf archives', <><code>--Gandalf</code>: zip, 7z, tar.gz</>],
+      ['Custodian archives', <><code>--Gandalf</code>: zip, 7z, tar.gz</>],
       ['Captures and flows', <><code>--Network</code>: PCAP, Zeek, NetFlow</>],
       ['Phones', <><code>--Mobile</code>: backups, extractions</>],
       ['Attack datasets', <><code>--Mordor</code></>],
@@ -200,7 +200,7 @@ const elrondStages = [
 
 const gandalfStages = [
   {
-    who: 'Gandalf',
+    who: 'Custodian',
     title: 'Copy in order of volatility',
     tone: 'parchment',
     steps: [
@@ -213,7 +213,7 @@ const gandalfStages = [
     ],
   },
   {
-    who: 'Gandalf',
+    who: 'Custodian',
     title: 'Seal',
     tone: 'green',
     via: 'local working copy',
@@ -225,7 +225,7 @@ const gandalfStages = [
     ],
   },
   {
-    who: 'Elrond',
+    who: 'Ledger',
     title: 'Check on arrival',
     tone: 'teal',
     via: 'archive',
@@ -240,7 +240,7 @@ const gandalfStages = [
 const pippinStages = [
   {
     who: 'Sources',
-    title: 'What Pippin imports',
+    title: 'What Lookout imports',
     tone: 'parchment',
     steps: [
       ['XLSX', 'the ten-column layout, any sheet'],
@@ -251,7 +251,7 @@ const pippinStages = [
     ],
   },
   {
-    who: 'Pippin',
+    who: 'Lookout',
     title: 'Hold the indicators',
     tone: 'green',
     via: 'import',
@@ -267,7 +267,7 @@ const pippinStages = [
     tone: 'teal',
     via: 'live indicators',
     steps: [
-      ['Elrond', <><code>--threatIntel</code>: matches per host, groups ranked per case</>],
+      ['Ledger', <><code>--threatIntel</code>: matches per host, groups ranked per case</>],
       ['Check a value', 'one value, the indicators and groups it hits'],
       ['Smith', 'the threat intelligence question; single values'],
     ],
@@ -344,21 +344,21 @@ const HelpPage = () => {
           <section>
             <h3>Rowanholt</h3>
             <p>
-              Rowanholt is a DFIR platform in three parts. Gandalf acquires from live hosts, in order of volatility,
-              with a SHA-256 manifest. Elrond turns disk and memory images, Gandalf archives, captures and phone
+              Rowanholt is a DFIR platform in three parts. Custodian acquires from live hosts, in order of volatility,
+              with a SHA-256 manifest. Ledger turns disk and memory images, Custodian archives, captures and phone
               backups into a case directory of tables, tagged with ATT&amp;CK techniques. Smith answers questions
               about the case from those tables, with a local model through Ollama or fixed answers without one.
-              Around them: Pippin holds threat intelligence, Mordor holds attack datasets and the lab's recordings,
-              and Aragorn administers the stack.
+              Around them: Lookout holds threat intelligence, Crucible holds attack datasets and the lab's recordings,
+              and Steward administers the stack.
             </p>
           </section>
 
           <section>
             <h4>Architecture</h4>
             <p>
-              The whole platform drawn as a map of Middle-earth, Elrond's directed graph as it branches by evidence
-              type and operating system, how Gandalf acquires from a live host, and the whole platform as an
-              interactive 3D journey across Middle-earth. Open any of them full size.
+              The whole platform on one map, Ledger's directed graph as it branches by evidence type and operating
+              system, how Custodian acquires from a live host, and the stages Rowanholt goes through as it starts.
+              Open any of them full size.
             </p>
             <div className="hp-maps">
               {architecturePages.map((page) => (
@@ -373,15 +373,15 @@ const HelpPage = () => {
           <section>
             <h4>What it does</h4>
             <ul className="hp-cols">
-              <li><strong>Acquisition (Gandalf):</strong> Windows, Linux and macOS, locally or over SSH and PSRemoting</li>
-              <li><strong>Analysis (Elrond):</strong> 30+ forensic tools behind one command line</li>
+              <li><strong>Acquisition (Custodian):</strong> Windows, Linux and macOS, locally or over SSH and PSRemoting</li>
+              <li><strong>Analysis (Ledger):</strong> 30+ forensic tools behind one command line</li>
               <li><strong>ATT&amp;CK:</strong> techniques tagged on every row, Navigator layers per case</li>
               <li><strong>Memory:</strong> Volatility 3, with a memory timeline</li>
               <li><strong>Timelines:</strong> Plaso, and a time on every record</li>
               <li><strong>Cloud and containers:</strong> AWS, Azure, GCP, Docker hosts, Kubernetes audit logs</li>
               <li><strong>Network and phones:</strong> Zeek, NetFlow, iLEAPP and ALEAPP</li>
               <li><strong>Stacking:</strong> what few hosts of the same OS have, ranked with its reasons</li>
-              <li><strong>Threat intelligence (Pippin):</strong> STIX, TAXII, MITRESaw, watchlists</li>
+              <li><strong>Threat intelligence (Lookout):</strong> STIX, TAXII, MITRESaw, watchlists</li>
               <li><strong>Case browser:</strong> findings, notes and hosts shared by the team</li>
               <li><strong>Smith:</strong> questions answered from the case, every answer citing its rows</li>
               <li><strong>SIEMs:</strong> Splunk, Elastic, OpenSearch and Wazuh, Timesketch</li>
@@ -425,19 +425,19 @@ rowanholt stop`}</Code>
           <section>
             <h4>Watching the containers</h4>
             <Code>{`rowanholt anduril status                    # containers, state, health
-rowanholt anduril logs celery-worker -n 200 # Elrond's output
+rowanholt anduril logs celery-worker -n 200 # Ledger's output
 rowanholt anduril restart frontend
 rowanholt jobs status                       # the analysis jobs`}</Code>
             <p>
-              Anduril refuses to stop or rebuild the worker, Postgres or Redis while a job is running unless you
-              pass <code>--force</code>. The same administration is on the web under Aragorn, for admins.
+              Quartermaster refuses to stop or rebuild the worker, Postgres or Redis while a job is running unless you
+              pass <code>--force</code>. The same administration is on the web under Steward, for admins.
             </p>
           </section>
 
           <section>
             <h4>Updating</h4>
             <p>
-              A git checkout: pull, then rebuild the worker, which copies Elrond in when it's built. The web app
+              A git checkout: pull, then rebuild the worker, which copies Ledger in when it's built. The web app
               and API read the checkout directly and reload on their own.
             </p>
             <Code>{`git -C "$(rowanholt where)" pull
@@ -454,7 +454,7 @@ rowanholt anduril rebuild celery-worker`}</Code>
             <ul className="hp-cols hp-cols--2">
               <li><strong>Ollama:</strong> Smith's free-text answers, summaries and suggestions. Without it Smith still answers fixed questions</li>
               <li><strong>Splunk and Elastic:</strong> <code>rowanholt start</code> without <code>--testing</code>; OpenSearch, Wazuh and Timesketch are your own, set in <code>.env</code></li>
-              <li><strong>Online lookups:</strong> VirusTotal from Pippin and ClamAV's signature refresh, both off unless <code>.env</code> turns them on</li>
+              <li><strong>Online lookups:</strong> VirusTotal from Lookout and ClamAV's signature refresh, both off unless <code>.env</code> turns them on</li>
               <li><strong>A team server:</strong> <code>rowanholt server init</code> puts sign-in, TLS and per-user jobs in front</li>
             </ul>
           </section>
@@ -481,7 +481,7 @@ rowanholt anduril rebuild celery-worker`}</Code>
           <section>
             <h3>The rowanholt Command</h3>
             <p>
-              One command runs everything: the Docker stack, Gandalf, Elrond, Mordor, Anduril, the lab and every
+              One command runs everything: the Docker stack, Custodian, Ledger, Crucible, Quartermaster, the lab and every
               script under <code>scripts/</code>. Link it into a directory on your PATH once and it runs from anywhere.
             </p>
             <Code>{`cd rowanholt
@@ -495,9 +495,9 @@ rowanholt help`}</Code>
               <thead><tr><th>Command</th><th>Runs</th></tr></thead>
               <tbody>
                 <tr><td><code>rowanholt start | stop | restart | status</code></td><td>The Docker stack; <code>--testing</code> leaves out Splunk and Elastic, <code>--logs</code> follows the logs</td></tr>
-                <tr><td><code>rowanholt gandalf [bash|python] &lt;args&gt;</code></td><td>Gandalf on a Linux or macOS host (<code>gandalf.sh</code> by default)</td></tr>
-                <tr><td><code>rowanholt acquire &lt;args&gt;</code></td><td>Gandalf through the Python CLI</td></tr>
-                <tr><td><code>rowanholt analyse &lt;args&gt;</code></td><td>Elrond with the common phases (<code>-C</code>, <code>-P</code>, <code>-A</code>, <code>-B</code>, <code>-S</code>, <code>-E</code>); <code>elrond.py</code> takes the rest</td></tr>
+                <tr><td><code>rowanholt gandalf [bash|python] &lt;args&gt;</code></td><td>Custodian on a Linux or macOS host (<code>gandalf.sh</code> by default)</td></tr>
+                <tr><td><code>rowanholt acquire &lt;args&gt;</code></td><td>Custodian through the Python CLI</td></tr>
+                <tr><td><code>rowanholt analyse &lt;args&gt;</code></td><td>Ledger with the common phases (<code>-C</code>, <code>-P</code>, <code>-A</code>, <code>-B</code>, <code>-S</code>, <code>-E</code>); <code>elrond.py</code> takes the rest</td></tr>
                 <tr><td><code>rowanholt mordor &lt;command&gt;</code></td><td>Datasets: <code>list</code>, <code>download</code>, <code>info</code>, <code>local</code>, <code>verify</code>, <code>refresh</code></td></tr>
                 <tr><td><code>rowanholt anduril &lt;command&gt;</code></td><td>Rowanholt's containers and images</td></tr>
                 <tr><td><code>rowanholt mcp</code></td><td>Smith's MCP server over stdio</td></tr>
@@ -517,7 +517,7 @@ rowanholt help`}</Code>
           <section>
             <h4>Python modules</h4>
             <p>
-              Run these from the repository root, not from inside <code>src/analysis</code>, where Elrond's{' '}
+              Run these from the repository root, not from inside <code>src/analysis</code>, where Ledger's{' '}
               <code>platform/</code> package shadows the standard library's.
             </p>
             <Code>{`python3 src/analysis/elrond.py --help
@@ -529,18 +529,18 @@ python3 -m src.analysis.rowanholt.ai.cli --help`}</Code>
       ),
     },
     gandalf: {
-      title: 'Gandalf',
+      title: 'Custodian',
       content: (
         <>
           <section>
             <h3>Acquisition</h3>
             <p>
-              Gandalf collects from a live Windows, Linux or macOS host, locally or remotely, copying everything to
+              Custodian collects from a live Windows, Linux or macOS host, locally or remotely, copying everything to
               its working directory in order of volatility before it hashes anything, so hashing doesn't widen the
               window in which the host changes under it.
             </p>
             <Flow
-              label="Gandalf copies in order of volatility, hashes into log.meta, archives, and Elrond re-hashes on arrival"
+              label="Custodian copies in order of volatility, hashes into log.meta, archives, and Ledger re-hashes on arrival"
               stages={gandalfStages}
               caption="The collection still writes to the disk it collects from (C:\TEMP\gandalf, /tmp/gandalf). Writing to other media with -O avoids changing $MFT and the journals."
             />
@@ -599,20 +599,20 @@ sudo python3 python/gandalf.py Password Remote -O /evidence/CASE-001`}</Code>
       ),
     },
     elrond: {
-      title: 'Elrond',
+      title: 'Ledger',
       content: (
         <>
           <section>
             <h3>Analysis</h3>
             <p>
-              Elrond takes evidence of any kind it knows, branches by evidence type and operating system, and
+              Ledger takes evidence of any kind it knows, branches by evidence type and operating system, and
               writes one case directory: per host, <code>raw/</code> as collected, <code>cooked/</code> as JSON Lines
               tables and <code>analysis/</code>; for the case, the audit log, <code>mitre_techniques.txt</code> and
               the method. Every row starts with its host, artefact, source path, time (UTC) and ATT&amp;CK
               techniques.
             </p>
             <Flow
-              label="Elrond: evidence in, identified and mounted, collected, processed, analysed, and output"
+              label="Ledger: evidence in, identified and mounted, collected, processed, analysed, and output"
               stages={elrondStages}
               dense
               caption="Each step is a flag on elrond.py; the web app's New Analysis builds the same command."
@@ -631,7 +631,7 @@ sudo python3 python/gandalf.py Password Remote -O /evidence/CASE-001`}</Code>
               <li>Timestomping and unusual alternate data streams</li>
               <li>IOCs, YARA, ClamAV, keywords, misplaced binaries</li>
               <li>Stacking across hosts, ranked with its reasons</li>
-              <li>Threat intelligence matches against Pippin's indicators</li>
+              <li>Threat intelligence matches against Lookout's indicators</li>
               <li>Network captures through Zeek, NetFlow exports</li>
               <li>Phones through iLEAPP and ALEAPP</li>
             </ul>
@@ -640,7 +640,7 @@ sudo python3 python/gandalf.py Password Remote -O /evidence/CASE-001`}</Code>
           <section>
             <h4>From the command line</h4>
             <p>
-              Elrond takes the case ID, one or more sources and the output directory, then long options only (an
+              Ledger takes the case ID, one or more sources and the output directory, then long options only (an
               unambiguous prefix works: <code>--Coll</code>). Memory images are read from the source directory with
               the disk images. Full list: <ExternalLink href={doc('CLI.md#elrond---analysis')}>CLI.md</ExternalLink>.
             </p>
@@ -652,7 +652,7 @@ sudo python3 python/gandalf.py Password Remote -O /evidence/CASE-001`}</Code>
   --Collect --Process --Analysis`}</Code>
               </div>
               <div>
-                <h5>Gandalf archives, with memory</h5>
+                <h5>Custodian archives, with memory</h5>
                 <Code>{`python3 src/analysis/elrond.py CASE-001 \\
   /evidence/CASE-001/acquisitions/ /output/CASE-001 \\
   --Gandalf --Process --Analysis --Memory`}</Code>
@@ -694,19 +694,19 @@ sudo python3 python/gandalf.py Password Remote -O /evidence/CASE-001`}</Code>
       ),
     },
     pippin: {
-      title: 'Pippin',
+      title: 'Lookout',
       content: (
         <>
           <section>
             <h3>Threat Intelligence</h3>
             <p>
-              Pippin holds the indicators Elrond matches cases against and Smith checks single values with, in ten
+              Lookout holds the indicators Ledger matches cases against and Smith checks single values with, in ten
               columns: evidential element, threat group, procedure example, technique ID and name, tactic,
               contextual evidence, reference URL, Navigator layer URL and source type. Most of them come from
               MITRE ATT&amp;CK's procedures, through MITRESaw.
             </p>
             <Flow
-              label="Pippin imports XLSX, CSV, STIX, TAXII and watchlists, keeps them with their validity, and they are matched by Elrond, Check a value and Smith"
+              label="Lookout imports XLSX, CSV, STIX, TAXII and watchlists, keeps them with their validity, and they are matched by Ledger, Check a value and Smith"
               stages={pippinStages}
             />
           </section>
@@ -714,7 +714,7 @@ sudo python3 python/gandalf.py Password Remote -O /evidence/CASE-001`}</Code>
           <section>
             <h4>Matching a case</h4>
             <p>
-              Tick Threat Intelligence on Elrond's page, or give Elrond <code>--threatIntel</code> and the files.
+              Tick Threat Intelligence on Ledger's page, or give Ledger <code>--threatIntel</code> and the files.
               Each host gets <code>analysis/threat_intel_matches.jsonl</code>, and the case gets{' '}
               <code>threat_groups.jsonl</code>: groups ranked by what matched, each with the basis for its rank
               (atomic indicators, specific procedures, common tooling, or technique overlap only). Built-ins,
@@ -729,7 +729,7 @@ sudo python3 python/gandalf.py Password Remote -O /evidence/CASE-001`}</Code>
           <section>
             <h4>Checking one value</h4>
             <p>
-              Paste a process name, command line, path, IP, domain or hash into Check a value: Pippin lists the
+              Paste a process name, command line, path, IP, domain or hash into Check a value: Lookout lists the
               indicators it matches and how many groups share each one.
             </p>
           </section>
@@ -737,15 +737,15 @@ sudo python3 python/gandalf.py Password Remote -O /evidence/CASE-001`}</Code>
       ),
     },
     mordor: {
-      title: 'Mordor',
+      title: 'Crucible',
       content: (
         <>
           <section>
             <h3>Attack Datasets and Recorded Telemetry</h3>
             <p>
-              Mordor holds attack telemetry: public datasets recorded by others, and the lab's own recordings of
-              Atomic Red Team tests run on its machines (Aragorn → Deploy). Each recording is mapped to the
-              ATT&amp;CK technique it exercises, so the Mordor page shows which logs record each technique.
+              Crucible holds attack telemetry: public datasets recorded by others, and the lab's own recordings of
+              Atomic Red Team tests run on its machines (Steward → Deploy). Each recording is mapped to the
+              ATT&amp;CK technique it exercises, so the Crucible page shows which logs record each technique.
             </p>
             <h4>Sources</h4>
             <ul className="hp-cols">
@@ -761,7 +761,7 @@ sudo python3 python/gandalf.py Password Remote -O /evidence/CASE-001`}</Code>
           <section>
             <h4>From the command line</h4>
             <p>
-              Datasets download to <code>/tmp/rowanholt/mordor</code> by default. Elrond reads one as a case
+              Datasets download to <code>/tmp/rowanholt/mordor</code> by default. Ledger reads one as a case
               with <code>--Mordor</code>.
             </p>
             <Code>{`rowanholt mordor list --technique T1059.001
@@ -779,7 +779,7 @@ rowanholt mordor verify <dataset-id>`}</Code>
           <section>
             <h3>Smith, the AI Analyst</h3>
             <p>
-              Smith answers questions about a case from Elrond's output.
+              Smith answers questions about a case from Ledger's output.
             </p>
             <ul className="hp-cols hp-cols--2">
               <li><strong>With Ollama:</strong> free-text answers, summaries and suggestions from a local model. The model is given the case's rows tagged <code>[R1]</code>, <code>[R2]</code>…, and an answer lists only the rows it cites that it was actually given</li>
@@ -857,11 +857,11 @@ python3 -m src.analysis.rowanholt.ai.cli summary CASE-001 \\
             <p>
               Report (DOCX) and Report (Markdown) in the case browser download the case report: the case notes and
               confirmed findings first, each with its row and whether the row is unchanged since it was flagged; then
-              the open leads and dismissed rows; then Elrond's own report of the case. That part covers the hosts
+              the open leads and dismissed rows; then Ledger's own report of the case. That part covers the hosts
               and the timespan of their records, every ATT&amp;CK technique with the rows behind it, the indicators,
-              Gandalf's integrity check and the method: Elrond's options and the versions of its tools. Every claim
+              Custodian's integrity check and the method: Ledger's options and the versions of its tools. Every claim
               is cited by host, file, row and the row's hash. The first download of a large case reads all its tables
-              and takes a few minutes; the second format is quick. Elrond's <code>--Report</code> writes the same
+              and takes a few minutes; the second format is quick. Ledger's <code>--Report</code> writes the same
               report from the case alone into the case folder.
             </p>
             <Code>{`cd src/analysis
@@ -871,7 +871,7 @@ python3 -m rowanholt.report /cases/CASE-001 --out ~/reports`}</Code>
           <section>
             <h4>MITRE ATT&amp;CK</h4>
             <p>
-              Elrond tags each row with the techniques it shows and writes them to the case's{' '}
+              Ledger tags each row with the techniques it shows and writes them to the case's{' '}
               <code>mitre_techniques.txt</code>; <code>--Navigator</code> builds the case's Navigator layer. The
               ATT&amp;CK tools work on their own as well:
             </p>
@@ -894,7 +894,7 @@ python3 -m src.analysis.mitre.coverage_cli dashboard \\
           <section>
             <h4>Containers</h4>
             <p>
-              Gandalf and Elrond collect a Docker host's containers (configuration, mounts, logs, a hashed listing of
+              Custodian and Ledger collect a Docker host's containers (configuration, mounts, logs, a hashed listing of
               each writable layer and copies of the executables in it) and a Kubernetes node's static pods, pod logs
               and audit log. Containers are tagged for what they can reach, such as the host's root or the Docker
               socket.
@@ -931,7 +931,7 @@ python3 -m src.analysis.rowanholt.cloud.cli gcp acquire-disk \\
             </ul>
             <p>
               Every SIEM option fails fast if the service is unreachable. There is no separate exporter; it all runs
-              inside Elrond, or from a finished job in the web app.
+              inside Ledger, or from a finished job in the web app.
             </p>
           </section>
         </>
@@ -944,14 +944,14 @@ python3 -m src.analysis.rowanholt.cloud.cli gcp acquire-disk \\
           <section>
             <h3>An Investigation, End to End</h3>
             <p>
-              From a live host to a cited report. Gandalf's archive carries its own hashes; Elrond checks them before
+              From a live host to a cited report. Custodian's archive carries its own hashes; Ledger checks them before
               it does anything else, and every row it writes can be cited from then on: by the case browser, by Smith
               and in the report.
             </p>
             <Flow
-              label="Gandalf collects, Elrond analyses, the case browser holds findings and notes, Smith answers questions, and the report is written"
+              label="Custodian collects, Ledger analyses, the case browser holds findings and notes, Smith answers questions, and the report is written"
               stages={investigationStages}
-              caption="Disk and memory images, captures, phone backups and Mordor datasets go straight into Elrond; the rest is the same."
+              caption="Disk and memory images, captures, phone backups and Crucible datasets go straight into Ledger; the rest is the same."
             />
           </section>
 
@@ -995,7 +995,7 @@ python3 src/analysis/elrond.py CASE-001 /cases/CASE-001 \\
             <h4>Habits worth keeping</h4>
             <ul className="hp-cols">
               <li><strong>Key encryption:</strong> and keep the <code>.shadowfax.key</code> apart from the archive</li>
-              <li><strong>Other media:</strong> <code>-O</code> to a different disk keeps Gandalf off the host's own</li>
+              <li><strong>Other media:</strong> <code>-O</code> to a different disk keeps Custodian off the host's own</li>
               <li><strong>Check integrity:</strong> read <code>gandalf_integrity.jsonl</code> before trusting a host</li>
               <li><strong>Triage first:</strong> leave <code>--Timeline</code> and <code>--extractIocs</code> for a second pass</li>
               <li><strong>Leads are not verdicts:</strong> stacking rows and threat intelligence matches need an analyst</li>
@@ -1050,7 +1050,7 @@ rowanholt anduril stats celery-worker`}</Code>
               <div className="hp-issue">
                 <h4>A tool isn't found</h4>
                 <p>
-                  The worker image has every tool Elrond calls. Run Elrond there (the web app does), or see{' '}
+                  The worker image has every tool Ledger calls. Run Ledger there (the web app does), or see{' '}
                   <ExternalLink href={doc('CONFIG.md')}>CONFIG.md</ExternalLink> to install them on a host. For
                   Volatility 3 directly:
                 </p>
@@ -1072,7 +1072,7 @@ ollama pull qwen3:8b`}</Code>
               <div className="hp-issue">
                 <h4>SIEM export fails</h4>
                 <p>
-                  Elrond checks every SIEM before it processes anything and stops if one is unreachable. Start them
+                  Ledger checks every SIEM before it processes anything and stops if one is unreachable. Start them
                   (they're left out by <code>--testing</code>), then send a finished case again without reprocessing.
                 </p>
                 <Code>{`rowanholt start
@@ -1095,7 +1095,7 @@ python3 src/analysis/elrond.py CASE-001 /cases/CASE-001 \\
             <ul className="hp-cols">
               <li><ExternalLink href={`${REPO}/issues`}>GitHub issues</ExternalLink>: bugs and requests</li>
               <li><ExternalLink href={doc('CLI.md#troubleshooting')}>CLI.md</ExternalLink>: more of the above</li>
-              <li>Each case's <code>rowanholt_audit.log</code>: what Elrond did, and when</li>
+              <li>Each case's <code>rowanholt_audit.log</code>: what Ledger did, and when</li>
             </ul>
           </section>
         </>

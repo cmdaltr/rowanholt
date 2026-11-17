@@ -101,7 +101,7 @@ function NewAnalysis() {
           const downloaded = (result.datasets || []).filter(ds => ds.status === 'downloaded');
           setMordorDatasets(downloaded);
         } catch (err) {
-          console.error('Failed to load Mordor datasets:', err);
+          console.error('Failed to load Crucible datasets:', err);
           setMordorDatasets([]);
         } finally {
           setLoadingMordorDatasets(false);
@@ -197,7 +197,7 @@ function NewAnalysis() {
 
     if (selectedFiles.length === 0) {
       if (analysisMode === 'mordor') {
-        setError('Please select a Mordor dataset');
+        setError('Please select a Crucible dataset');
       } else if (analysisMode === 'cloud') {
         setError('Please enter a cloud storage URL');
       } else if (analysisMode === 'network') {
@@ -991,7 +991,7 @@ function NewAnalysis() {
                 </label>
                 <label
                   style={{ display: 'flex', alignItems: 'center', cursor: isCaseNumberValid ? 'pointer' : 'not-allowed', opacity: isCaseNumberValid ? 1 : 0.5, fontSize: '1.2rem', whiteSpace: 'nowrap' }}
-                  title="Gandalf Acquisition Jobs"
+                  title="Custodian Acquisition Jobs"
                 >
                   <input
                     type="radio"
@@ -1002,7 +1002,7 @@ function NewAnalysis() {
                     disabled={!isCaseNumberValid}
                     style={{ marginRight: '0.5rem', width: '16px', height: '16px' }}
                   />
-                  Gandalf
+                  Custodian
                 </label>
                 <label
                   style={{ display: 'flex', alignItems: 'center', cursor: isCaseNumberValid ? 'pointer' : 'not-allowed', opacity: isCaseNumberValid ? 1 : 0.5, fontSize: '1.2rem', whiteSpace: 'nowrap' }}
@@ -1047,7 +1047,7 @@ function NewAnalysis() {
                     disabled={!isCaseNumberValid}
                     style={{ marginRight: '0.5rem', width: '16px', height: '16px' }}
                   />
-                  Mordor
+                  Crucible
                 </label>
                 <label
                   style={{ display: 'flex', alignItems: 'center', cursor: isCaseNumberValid ? 'pointer' : 'not-allowed', opacity: isCaseNumberValid ? 1 : 0.5, fontSize: '1.2rem', whiteSpace: 'nowrap' }}
@@ -1102,10 +1102,10 @@ function NewAnalysis() {
           {analysisMode && analysisMode !== 'json' && (
             <div data-guide="elrond.browse" className="form-group">
               <label>
-                {analysisMode === 'gandalf' && 'Select Gandalf Acquisitions *'}
+                {analysisMode === 'gandalf' && 'Select Custodian Acquisitions *'}
                 {analysisMode === 'local' && 'Select Disk/Memory Images *'}
                 {analysisMode === 'network' && 'Select Captures, Zeek Logs or NetFlow Exports *'}
-                {analysisMode === 'mordor' && 'Select Mordor Dataset *'}
+                {analysisMode === 'mordor' && 'Select Crucible Dataset *'}
                 {analysisMode === 'mobile' && 'Select Phone Backups or Extractions *'}
                 {analysisMode === 'cloud' && 'Cloud Storage URL *'}
               </label>
@@ -1186,9 +1186,9 @@ function NewAnalysis() {
                     </div>
                   ) : mordorDatasets.length === 0 ? (
                     <div style={{ color: '#f0dba5', textAlign: 'center', padding: '1rem' }}>
-                      <p>No downloaded Mordor datasets found.</p>
+                      <p>No downloaded Crucible datasets found.</p>
                       <p style={{ color: '#888', fontSize: '0.9rem', marginTop: '0.5rem' }}>
-                        Visit the <a href="/mordor#datasets" style={{ color: '#66d9ef' }}>Mordor page</a> to download datasets first.
+                        Visit the <a href="/mordor#datasets" style={{ color: '#66d9ef' }}>Crucible page</a> to download datasets first.
                       </p>
                     </div>
                   ) : (
@@ -1319,11 +1319,11 @@ function NewAnalysis() {
             )}
             {isCaseNumberValid && analysisMode && selectedFiles.length === 0 && (
               <div className="info-message">
-                {analysisMode === 'mordor' && 'Please select a Mordor dataset to configure processing options.'}
+                {analysisMode === 'mordor' && 'Please select a Crucible dataset to configure processing options.'}
                 {analysisMode === 'cloud' && 'Please enter a cloud storage URL to configure processing options.'}
                 {analysisMode === 'local' && 'Please select at least one disk or memory image to configure processing options.'}
                 {analysisMode === 'network' && 'Please select at least one capture, Zeek log or NetFlow export to configure processing options.'}
-                {analysisMode === 'gandalf' && 'Please select a Gandalf acquisition to configure processing options.'}
+                {analysisMode === 'gandalf' && 'Please select a Custodian acquisition to configure processing options.'}
                 {analysisMode === 'mobile' && 'Please select a phone backup or extraction to configure processing options.'}
                 {analysisMode === 'json' && 'Please load a JSON configuration file to configure processing options.'}
               </div>

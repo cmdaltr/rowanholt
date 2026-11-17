@@ -19,7 +19,7 @@ const GandalfLanding = () => {
       </section>
 
       <header>
-        <h2>Gandalf Remote Acquisition</h2>
+        <h2>Custodian Remote Acquisition</h2>
         <p>
           Securely acquire artifacts with PowerShell, Python or Bash, run on the target itself or
           on a host that reaches it over SSH or PowerShell Remoting: choose what to collect, then

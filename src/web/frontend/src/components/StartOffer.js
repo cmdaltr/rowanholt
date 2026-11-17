@@ -75,10 +75,7 @@ function StartOffer({ offerRequested, onOfferClosed }) {
         <button type="button" className="guide-close" onClick={() => setOffer(false)} aria-label="Close">×</button>
         <div className="start-offer-head">
           <h2>Welcome to Rowanholt</h2>
-          <blockquote className="start-offer-quote">
-            “{quote.text}”
-            <cite>{quote.who}, {quote.where}</cite>
-          </blockquote>
+          <blockquote className="start-offer-quote">{quote.text}</blockquote>
         </div>
 
         <div className="start-offer-columns">

@@ -222,8 +222,8 @@ function CaseBrowser() {
       <PageHero title={title}>
         The case's cooked artefacts and analysis, read-only. Flag rows as findings, confirm or dismiss them,
         and keep notes; Findings and the Navigator layer are built from confirmed findings only. The case
-        report (DOCX or Markdown) puts confirmed findings first, then Elrond's own report of the case:
-        techniques with the rows behind them, indicators, Gandalf's integrity check and the method.
+        report (DOCX or Markdown) puts confirmed findings first, then Ledger's own report of the case:
+        techniques with the rows behind them, indicators, Custodian's integrity check and the method.
       </PageHero>
 
       <div className="card" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -236,7 +236,7 @@ function CaseBrowser() {
           await getCaseReport(jobId), 'text/markdown'))}>Findings</button>
         <span style={{ display: 'inline-flex', gap: '0.25rem', alignItems: 'center' }}>
           {building && <span style={{ color: '#888' }}>Building the report…</span>}
-          <button type="button" disabled={!!building} title="Confirmed findings first, then Elrond's report of the case"
+          <button type="button" disabled={!!building} title="Confirmed findings first, then Ledger's report of the case"
             onClick={() => caseReport('docx')}>Report (DOCX)</button>
           <button type="button" disabled={!!building} onClick={() => caseReport('markdown')}>Report (Markdown)</button>
         </span>

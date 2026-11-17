@@ -148,7 +148,7 @@ test.describe('Options Panel - Specific Options', () => {
 
   test('should have operation mode options', async ({ page }) => {
     await expect(page.locator('label', { hasText: 'Collect' })).toBeVisible();
-    await expect(page.locator('label', { hasText: 'Gandalf' })).toBeVisible();
+    await expect(page.locator('label', { hasText: 'Custodian' })).toBeVisible();
     await expect(page.locator('label', { hasText: 'Reorganise' })).toBeVisible();
     await expect(page.locator('label', { hasText: 'Process' })).toBeVisible();
   });

@@ -19,9 +19,9 @@ const ElrondLanding = () => {
       </section>
 
       <header>
-        <h2>Elrond Automated Analysis</h2>
+        <h2>Ledger Automated Analysis</h2>
         <p>
-          Launch artifact processing, analysis and ATT&CK mapping against evidence collected with Gandalf or other workflow.
+          Launch artifact processing, analysis and ATT&CK mapping against evidence collected with Custodian or other workflow.
         </p>
       </header>
 

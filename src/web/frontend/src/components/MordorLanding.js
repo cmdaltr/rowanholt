@@ -121,8 +121,8 @@ const MordorLanding = () => {
     <div className="card" id="datasets">
       <h2>Downloadable datasets</h2>
       <p className="lab-note">
-        The OTRF Security-Datasets catalogue, for the raw events: download a dataset and Elrond analyses it
-        (<code>python elrond.py CASE001 /tmp/elrond/output/mordor/SDWIN-xxx --Mordor</code>, or from the Elrond page).
+        The OTRF Security-Datasets catalogue, for the raw events: download a dataset and Ledger analyses it
+        (<code>python elrond.py CASE001 /tmp/elrond/output/mordor/SDWIN-xxx --Mordor</code>, or from the Ledger page).
         It includes the datasets that span several techniques (APT29's days), and bulk download.
       </p>
       <div>

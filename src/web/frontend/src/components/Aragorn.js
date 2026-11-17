@@ -60,16 +60,16 @@ function EnablePanel({ status, onRecheck }) {
 
   return (
     <div data-guide="aragorn.anduril" className="card aragorn-enable">
-      <h2>Anduril is not enabled</h2>
+      <h2>Quartermaster is not enabled</h2>
       {status?.reason === 'secret_key' ? (
         <p>
           The backend is still signing logins with the default JWT secret, so anyone could forge an admin
-          token. Anduril stays off until <code>SECRET_KEY</code> is set for the backend (in your shell or a
+          token. Quartermaster stays off until <code>SECRET_KEY</code> is set for the backend (in your shell or a
           <code> .env</code> file next to <code>docker-compose.yml</code>). Then run the command below on the host.
         </p>
       ) : (
         <p>
-          Anduril, Rowanholt's Docker manager, needs access to the Docker socket to manage Rowanholt's containers and images. Only the host
+          Quartermaster, Rowanholt's Docker manager, needs access to the Docker socket to manage Rowanholt's containers and images. Only the host
           can grant that, so run this on the machine running Docker Desktop or OrbStack. It explains what it
           grants and asks before changing anything.
         </p>
@@ -80,7 +80,7 @@ function EnablePanel({ status, onRecheck }) {
         <button className="aragorn-recheck" onClick={onRecheck}>Check again</button>
       </div>
       <p className="aragorn-note">
-        Anduril only sees containers labelled with the <code>rowanholt</code> compose project and named
+        Quartermaster only sees containers labelled with the <code>rowanholt</code> compose project and named
         <code> rowanholt-*</code>. Other containers and images on the same engine are never listed or touched.
       </p>
       {status?.detail && <p className="aragorn-note">Last error: {status.detail}</p>}
@@ -221,7 +221,7 @@ function AndurilPanel() {
     }
   };
 
-  if (loading) return <div className="loading">Checking Anduril…</div>;
+  if (loading) return <div className="loading">Checking Quartermaster…</div>;
 
   if (!isAdmin) {
     return (
@@ -280,7 +280,7 @@ function AndurilPanel() {
                 <tr key={c.id}>
                   <td>
                     {c.name}
-                    {c.job_processes.length > 0 && <span className="status-badge status-running aragorn-flag">Elrond running</span>}
+                    {c.job_processes.length > 0 && <span className="status-badge status-running aragorn-flag">Ledger running</span>}
                   </td>
                   <td><span className={`status-badge ${running ? 'status-completed' : 'status-cancelled'}`}>{c.state}</span></td>
                   <td>{c.status}</td>
@@ -388,9 +388,9 @@ function Aragorn() {
   const adminOnly = <div className="card"><p>The lab is limited to Rowanholt administrators. Sign in with an admin account.</p></div>;
   return (
     <div className="journey-detail">
-      <PageHero title="Aragorn">
-        Everything Rowanholt runs on this machine: the lab's targets and machines, runs that deploy Gandalf, Elrond
-        or Mordor against them, and Rowanholt's own containers and settings.
+      <PageHero title="Steward">
+        Everything Rowanholt runs on this machine: the lab's targets and machines, runs that deploy Custodian, Ledger
+        or Crucible against them, and Rowanholt's own containers and settings.
       </PageHero>
       <div data-guide="aragorn.tabs" className="aragorn-tabs" role="tablist">
         {TABS.map(([key, label]) => (
@@ -406,9 +406,9 @@ function Aragorn() {
           <div data-guide="aragorn.lab" className="card">
             <h2>Lab machines</h2>
             <p className="lab-note">
-              Create and manage the containers and VMs Gandalf collects from and Mordor records on. Rowanholt drives Docker
+              Create and manage the containers and VMs Custodian collects from and Crucible records on. Rowanholt drives Docker
               and Tart for Linux and macOS, and UTM for Windows. The machines are disposable: snapshot one before you turn
-              logging on or run atomics, and revert when you're done. Recordings appear on the Mordor page as Your lab.
+              logging on or run atomics, and revert when you're done. Recordings appear on the Crucible page as Your lab.
             </p>
             <LabMachines />
           </div>

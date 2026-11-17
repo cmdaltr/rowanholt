@@ -80,7 +80,7 @@ function OptionsPanel({ options, onChange, disabled = false, hasImages = false, 
         { key: 'extract_iocs', label: 'Extract IOCs', description: 'Extract Indicators of Compromise', time: 20 },
         // Off by default: the sealed system volume is read-only and Apple's, and where most of a macOS pass's time and noise come from (analysis/iocs.py)
         { key: 'ioc_system_volume', label: 'IOCs: macOS system volume', description: 'Also read /System, /bin, /sbin and /usr on a macOS\nimage, for when tampering below the OS is suspected', time: 60, slow: true },
-        { key: 'threat_intel', label: 'Threat Intelligence', description: 'Match artefacts and IOCs against\nthe indicators in Pippin', time: 10 },
+        { key: 'threat_intel', label: 'Threat Intelligence', description: 'Match artefacts and IOCs against\nthe indicators in Lookout', time: 10 },
         { key: 'memory', label: 'Memory Collection & Analysis', description: 'Analyze memory using Volatility', time: 45, slow: true },
         { key: 'timeline', label: 'Disk Image Timeline', description: 'Create timeline using plaso', time: 180, slow: true, disabledForGandalf: true },
         { key: 'memory_timeline', label: 'Memory Timeline', description: 'Create memory timeline using timeliner', time: 60, slow: true },

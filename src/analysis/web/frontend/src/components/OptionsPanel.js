@@ -9,7 +9,7 @@ function OptionsPanel({ options, onChange }) {
       description: 'Choose how you want to process the images',
       options: [
         { key: 'collect', label: 'Collect', description: 'Collect artifacts from disk image' },
-        { key: 'gandalf', label: 'Gandalf', description: 'Read artifacts acquired using gandalf' }
+        { key: 'gandalf', label: 'Custodian', description: 'Read artifacts acquired using Custodian' }
       ],
     },
     collection: {

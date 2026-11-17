@@ -64,7 +64,7 @@ function SymbolTables() {
     <div data-guide="aragorn.symbols" className="card">
       <h3>Memory symbol tables</h3>
       <p className="lab-note">
-        Volatility needs a symbol table for each Linux and macOS kernel it reads. Elrond finds one by the image's kernel
+        Volatility needs a symbol table for each Linux and macOS kernel it reads. Ledger finds one by the image's kernel
         banner: a prebuilt table, or one built from the distribution's debug package, each checked against its
         publisher's hash. {state && (state.downloads
           ? 'Downloads are on.'

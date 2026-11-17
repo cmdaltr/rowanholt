@@ -814,7 +814,7 @@ function JobDetails() {
                 className="secondary"
                 onClick={handleExportSiem}
                 disabled={actionLoading || exporting}
-                title="Index this job's output into the SIEMs its options name (Elrond --Index, in the worker)"
+                title="Index this job's output into the SIEMs its options name (Ledger --Index, in the worker)"
               >
                 {exporting ? 'Exporting to SIEM...' : 'Export to SIEM'}
               </button>

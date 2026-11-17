@@ -31,7 +31,7 @@ function GandalfJobBrowser({ onSelectJobs, selectedJobs, disabled = false }) {
       setJobs(directories);
     } catch (err) {
       // Check if it's a "path not found" or "access denied" error
-      const errorMsg = err.response?.data?.detail || 'Failed to load Gandalf acquisitions';
+      const errorMsg = err.response?.data?.detail || 'Failed to load Custodian acquisitions';
 
       // If the directory doesn't exist, don't show it as an error
       if (errorMsg.includes('Path not found') || errorMsg.includes('not found')) {
@@ -75,7 +75,7 @@ function GandalfJobBrowser({ onSelectJobs, selectedJobs, disabled = false }) {
   };
 
   if (loading) {
-    return <div className="loading">Loading Gandalf acquisition jobs...</div>;
+    return <div className="loading">Loading Custodian acquisition jobs...</div>;
   }
 
   return (
@@ -127,9 +127,9 @@ function GandalfJobBrowser({ onSelectJobs, selectedJobs, disabled = false }) {
       {jobs.length === 0 ? (
         <div className="empty-state">
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📁</div>
-          <p style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>No Gandalf acquisition jobs found</p>
+          <p style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>No Custodian acquisition jobs found</p>
           <p style={{ fontSize: '0.9rem', color: '#888', marginTop: '0.5rem' }}>
-            Gandalf acquisitions should be stored in {currentPath}
+            Custodian acquisitions should be stored in {currentPath}
           </p>
         </div>
       ) : (
@@ -185,7 +185,7 @@ function GandalfJobBrowser({ onSelectJobs, selectedJobs, disabled = false }) {
 
       {selectedJobs.length > 0 && (
         <div className="selected-jobs">
-          <h4>Selected Gandalf Acquisitions ({selectedJobs.length}):</h4>
+          <h4>Selected Custodian Acquisitions ({selectedJobs.length}):</h4>
           <ul>
             {selectedJobs.map((jobPath) => (
               <li key={jobPath}>

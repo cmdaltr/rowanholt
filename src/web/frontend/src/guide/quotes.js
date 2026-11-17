@@ -1,16 +1,37 @@
-// Short lines from Tolkien for the welcome, one picked at random each start
+// Dry DFIR one-liners for the welcome, one picked at random each start: the same list as
+// src/common/quips.py, which the CLI tools print
 const QUOTES = [
-  { text: 'All we have to decide is what to do with the time that is given us.', who: 'Gandalf', where: 'The Fellowship of the Ring' },
-  { text: 'Not all those who wander are lost.', who: 'Bilbo', where: 'The Fellowship of the Ring' },
-  { text: 'Even the very wise cannot see all ends.', who: 'Gandalf', where: 'The Fellowship of the Ring' },
-  { text: 'It\'s a dangerous business, Frodo, going out your door.', who: 'Bilbo', where: 'The Fellowship of the Ring' },
-  { text: 'Faithless is he that says farewell when the road darkens.', who: 'Gimli', where: 'The Fellowship of the Ring' },
-  { text: 'The road goes ever on and on.', who: 'Bilbo', where: 'The Fellowship of the Ring' },
-  { text: 'Do not meddle in the affairs of wizards, for they are subtle and quick to anger.', who: 'Gildor', where: 'The Fellowship of the Ring' },
-  { text: 'Oft hope is born when all is forlorn.', who: 'Legolas', where: 'The Return of the King' },
-  { text: 'Many that live deserve death. And some that die deserve life. Can you give it to them?', who: 'Gandalf', where: 'The Fellowship of the Ring' },
-  { text: 'So do all who live to see such times. But that is not for them to decide.', who: 'Gandalf', where: 'The Fellowship of the Ring' },
-];
+  'Hash it before you trust it.',
+  "Volatile first. The disk will wait; the RAM won't.",
+  "If it isn't in the timeline, it didn't happen. If it is, prove it.",
+  'Every artefact is innocent until correlated.',
+  'The attacker cleared the logs. The logs about the logs are still here.',
+  'Absence of evidence is a finding. Write it down.',
+  'Time zones: the oldest adversary.',
+  'Never analyse the original. Not even once. Especially not once.',
+  'Prefetch remembers what the user would rather forget.',
+  'The registry keeps secrets badly and grudges well.',
+  'A clean system is either clean or very well cleaned.',
+  'Your hypothesis is not your conclusion. Yet.',
+  'Write the report as if the defence will read it. They will.',
+  "Chain of custody: boring until the day it isn't.",
+  'Correlation is a lead. Causation needs a second source.',
+  'Timestamps lie. Four of them lie less.',
+  'The first alert is rarely the first event.',
+  'Living off the land still leaves footprints in the mud.',
+  'Assume the clock is wrong until it proves otherwise.',
+  'Scope creep is also an incident.',
+  'Read the ShimCache, then distrust it accordingly.',
+  'If the binary is signed, ask who signed it and why.',
+  "Every persistence mechanism was somebody's convenience feature.",
+  'The quietest host is worth a second look.',
+  'Collect broadly. Conclude narrowly.',
+  'No IOC survives contact with a competent adversary.',
+  'Lateral movement leaves logons. Logons leave 4624s.',
+  'Deleted is a state of mind. The MFT disagrees.',
+  'Document now. Your memory is not evidence.',
+  'The answer is in the data. The question is usually the problem.',
+].map((text) => ({ text }));
 
 export const randomQuote = () => QUOTES[Math.floor(Math.random() * QUOTES.length)];
 

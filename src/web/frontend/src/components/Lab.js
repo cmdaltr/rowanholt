@@ -18,7 +18,7 @@ const errorText = (err) => {
 };
 
 const SETTINGS = [
-  ['LAB_DATA_DIR', 'Lab data directory', 'Collected acquisitions and Mordor datasets go here.'],
+  ['LAB_DATA_DIR', 'Lab data directory', 'Collected acquisitions and Crucible datasets go here.'],
   ['TEST_IMAGES_PATH', 'Test images root', "Rowanholt's test root; the lab writes gandalf/ and mordor/ under it when set."],
   ['LAB_VM_DIR', 'VM directory', 'Vagrant boxes, VirtualBox and Tart VMs.'],
   ['WINDOWS_VM_CPUS', 'Windows VM CPUs', ''],
@@ -315,7 +315,7 @@ function LabManage({ section = 'lab', children = null }) {
   };
   const vmActions = ['create', 'start', 'stop', 'delete', 'status'];
   const ubuntuVm = { id: 'linux-vm', command: 'linux-vm', logo: 'ubuntu.png', name: 'the Linux VM', actions: vmActions,
-    tip: `Linux VM: Ubuntu with a real kernel (${tart ? 'Tart' : 'Vagrant'}), SSH on 127.0.0.1:2230. For memory acquisition and Mordor recording.` };
+    tip: `Linux VM: Ubuntu with a real kernel (${tart ? 'Tart' : 'Vagrant'}), SSH on 127.0.0.1:2230. For memory acquisition and Crucible recording.` };
   const macosVm = { id: 'macos-vm', command: 'macos-vm', logo: 'macos.png', name: 'the macOS VM', actions: vmActions,
     tip: 'macOS VM: Sequoia (Tart), SSH on 127.0.0.1:2231' };
   const windowsVm = tart

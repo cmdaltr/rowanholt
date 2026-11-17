@@ -38,13 +38,13 @@ function Navigation({ onGuide, serverMode }) {
   return (
     <nav>
       <div className="nav-left">
-        <Link to="/gandalf">Gandalf</Link>
-        <Link to="/elrond">Elrond</Link>
-        <Link to="/pippin">Pippin</Link>
+        <Link to="/gandalf">Custodian</Link>
+        <Link to="/elrond">Ledger</Link>
+        <Link to="/pippin">Lookout</Link>
         {/* The licence and what it turns on, in a menu under Aragorn so the bar fits: a team
             server's admins, or the analyst in local mode */}
         <div className="nav-menu">
-          <Link to="/aragorn">Aragorn</Link>
+          <Link to="/aragorn">Steward</Link>
           {serverMode != null && managesLicence(user, serverMode) && (
             <div className="nav-menu__items nav-menu__items--list">
               <Link to="/licence">Licence</Link>
@@ -57,7 +57,7 @@ function Navigation({ onGuide, serverMode }) {
       </div>
       {/* Mordor opens the right: the datasets sit beside the jobs they feed */}
       <div className="nav-right">
-        <Link to="/mordor">Mordor</Link>
+        <Link to="/mordor">Crucible</Link>
         <Link to="/jobs">Jobs</Link>
         <div className="nav-menu">
           <Link to="/help">About</Link>
