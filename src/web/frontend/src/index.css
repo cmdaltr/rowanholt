@@ -11,3 +11,13 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* A link with no colour of its own: the theme's green, not the browser's blue (or visited purple).
+   App.css loads after this, so any link styled there keeps its own colour */
+a, a:visited {
+  color: #8fb358;
+}
+
+a:hover {
+  color: #a9c97a;
+}

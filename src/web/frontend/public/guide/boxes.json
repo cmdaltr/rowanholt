@@ -313,7 +313,7 @@
  "aragorn": {
   "image": "aragorn.jpg",
   "width": 1440,
-  "height": 1500,
+  "height": 1345,
   "boxes": {
    "aragorn.tabs": [
     30,
@@ -325,20 +325,26 @@
     30,
     570,
     1379,
-    1377
+    751
    ]
   }
  },
  "aragorn-settings": {
   "image": "aragorn-settings.jpg",
   "width": 1440,
-  "height": 285,
+  "height": 1500,
   "boxes": {
    "aragorn.anduril": [
     30,
     24,
     1379,
     237
+   ],
+   "aragorn.samples": [
+    30,
+    307,
+    1379,
+    1252
    ]
   }
  },
