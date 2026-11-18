@@ -369,7 +369,13 @@ if [ -n "$SERVER" ]; then
 fi
 maybe_update "$ROOT"
 
-if ! up; then
+# Files updated but the images not yet rebuilt for them (the launcher writes .rowanholt-built after the
+# rebuild): a stack still running is the old version, so it's started again over it
+needs_rebuild() {
+    [ -f "$1/.rowanholt-version" ] && [ "$(cat "$1/.rowanholt-version")" != "$(cat "$1/.rowanholt-built" 2>/dev/null)" ]
+}
+
+if ! up || needs_rebuild "$ROOT"; then
     mark=$(wc -l < "$LOG" 2>/dev/null || echo 0)
     if has_zenity; then
         # Starting: phases and an ETA from this machine's earlier starts

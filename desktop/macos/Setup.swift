@@ -371,6 +371,14 @@ extension AppDelegate {
         return installed.trimmingCharacters(in: .whitespacesAndNewlines) != appVersion
     }
 
+    /// Files updated but the images not yet rebuilt for them ('rowanholt start' writes .rowanholt-built
+    /// after the rebuild): the stack still running is the old version, so it's started again over it
+    func needsRebuild(_ root: String) -> Bool {
+        guard let version = try? String(contentsOfFile: "\(root)/.rowanholt-version", encoding: .utf8) else { return false }
+        let built = (try? String(contentsOfFile: "\(root)/.rowanholt-built", encoding: .utf8)) ?? ""
+        return version.trimmingCharacters(in: .whitespacesAndNewlines) != built.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     func askToUpdate(_ root: String) {
         let alert = NSAlert()
         alert.messageText = "Update Rowanholt to \(appVersion)?"

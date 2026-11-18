@@ -1442,6 +1442,15 @@ function Invoke-Compose {
     }
 }
 
+function Test-NeedsRebuild {
+    # Files updated but the images not yet rebuilt for them: a stack still running is the old
+    # version, so it's started again over it (Initialize-AppCopy then asks for --build)
+    $versionFile = Join-Path $Root '.rowanholt-version'
+    if (-not (Test-Path $versionFile)) { return $false }
+    $built = Join-Path $Root '.rowanholt-built'
+    return -not ((Test-Path $built) -and (Get-Content $built -Raw).Trim() -eq (Get-Content $versionFile -Raw).Trim())
+}
+
 function Initialize-AppCopy {
     # Returns the extra 'up' arguments: --build once after the installer upgraded the copy
     $versionFile = Join-Path $Root '.rowanholt-version'
@@ -1961,7 +1970,7 @@ try {
     }
     if (-not $waited) { Update-Copy }
 
-    if (-not (Test-Frontend)) {
+    if (-not (Test-Frontend) -or (Test-NeedsRebuild)) {
         Assert-DockerInstalled
         $script:Journey = New-Journey 'warm'
         Show-Journey $script:Journey

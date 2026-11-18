@@ -138,8 +138,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     func startOrShow() {
         showSplash()
+        // An update made while the stack ran: what answers is the old version, so start it again (rebuilt)
+        let rebuild = root.map { needsRebuild($0) } ?? false
         probe { up in
-            if up { self.showUI() } else { self.startStack() }
+            if up && !rebuild { self.showUI() } else { self.startStack() }
         }
     }
 
