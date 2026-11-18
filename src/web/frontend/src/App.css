@@ -62,11 +62,14 @@ input, textarea, select, option { font-family: var(--font-body) !important; lett
 code, pre, kbd, samp { font-family: var(--font-mono); letter-spacing: 0; }
 
 .App {
-  height: 100vh;
+  --app-zoom: 0.95; /* Default zoom level - further out */
+  /* The zoom shrinks the height too: 100vh came out at 95% of the window, leaving a dark strip
+     under the footer and cutting its last line off */
+  height: calc(100vh / var(--app-zoom));
   display: flex;
   flex-direction: column;
   overflow-y: scroll;
-  zoom: 0.95; /* Default zoom level - further out */
+  zoom: var(--app-zoom);
 }
 
 .App-header {
@@ -203,6 +206,16 @@ code, pre, kbd, samp { font-family: var(--font-mono); letter-spacing: 0; }
 .App-footer p {
   margin: 0.25rem 0;
 }
+
+.App-footer .legal summary {
+  display: inline;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.75rem;
+  color: #a09580;
+}
+.App-footer .legal summary::-webkit-details-marker { display: none; }
+.App-footer .legal summary:hover { color: #d2c7a2; }
 
 .App-footer .attribution {
   margin-top: 0.5rem;

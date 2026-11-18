@@ -724,8 +724,8 @@ Case data itself stays in case directories on disk; nothing in Postgres copies e
 │   ├── POST   /logout                Logout current session
 │   ├── POST   /guest                 Login as guest
 │   ├── GET    /me                    Get current user info
-│   ├── POST   /forgot-password       Request password reset
-│   └── POST   /reset-password        Reset password with token
+│   ├── POST   /forgot-password       410: no email, says how to reset
+│   └── POST   /reset-password        App code + backup code set a new password
 │
 ├── /jobs                              [Job Management]
 │   ├── GET    /                      List all jobs

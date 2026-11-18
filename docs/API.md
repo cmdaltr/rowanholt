@@ -37,7 +37,7 @@ What a caller may do depends on the mode the backend runs in. Every request goes
 
 **Local mode** (the default: a stack on an analyst's own machine). Nothing needs a sign-in. A request without a token acts as the local analyst (`local`, role `admin`) and sees every job and case. The stack publishes the API on `127.0.0.1:5688` only, as it does every other port (Postgres, Redis, the web app, Splunk, Elastic, Kibana, the Navigator), so the open API is the machine's own. Signing in still works (login, guest and register are open), and a signed-in caller is that account: a non-admin one gets `403` from the admin-only routes (licence, brands, webhooks, users, symbol tables, sample data), which an anonymous request passes. A guest's token names no account, so a guest acts as the local analyst. Two areas want a signed-in admin even locally, since they drive the host: the lab (`/api/lab`, the Crucible lab and the Crucible telemetry Update) and Quartermaster (`/api/anduril`). Both are off (`503`) while the backend uses the default `SECRET_KEY`.
 
-**Server mode** (`ROWANHOLT_SERVER_MODE`, set by `deploy/server/docker-compose.server.yml`; see [SERVER.md](SERVER.md)). Every `/api` route needs a signed-in user (`401 Sign in required`) except `/api/health`, `/api/busy`, `/api/auth/config`, `/api/auth/login`, `/api/auth/login/mfa` (the sign-in's second step, whose challenge is its credential), `/api/auth/logout`, `/api/auth/oidc/login`, `/api/auth/oidc/callback` and `/api/auth/verify`. There are no guests and no open sign-up. With `ROWANHOLT_REQUIRE_MFA=true`, a password user's sign-in without MFA reaches only `/api/auth/me`, `/api/auth/session` and `/api/auth/mfa`, `/mfa/setup` and `/mfa/enable` until MFA is on: anything else, `/api/auth/verify` included, is `403` (with `"mfa_enrolment_required": true`; [Multi-Factor Authentication](#multi-factor-authentication)). On top of that:
+**Server mode** (`ROWANHOLT_SERVER_MODE`, set by `deploy/server/docker-compose.server.yml`; see [SERVER.md](SERVER.md)). Every `/api` route needs a signed-in user (`401 Sign in required`) except `/api/health`, `/api/busy`, `/api/auth/config`, `/api/auth/login`, `/api/auth/login/mfa` (the sign-in's second step, whose challenge is its credential), `/api/auth/logout`, `/api/auth/reset-password` (a forgotten password: an app code and a backup code are its credential), `/api/auth/forgot-password` (`410`), `/api/auth/oidc/login`, `/api/auth/oidc/callback` and `/api/auth/verify`. There are no guests and no open sign-up. With `ROWANHOLT_REQUIRE_MFA=true`, a password user's sign-in without MFA reaches only `/api/auth/me`, `/api/auth/session` and `/api/auth/mfa`, `/mfa/setup` and `/mfa/enable` until MFA is on: anything else, `/api/auth/verify` included, is `403` (with `"mfa_enrolment_required": true`; [Multi-Factor Authentication](#multi-factor-authentication)). On top of that:
 
 | Who | What |
 |---|---|
@@ -273,18 +273,28 @@ The challenge lasts five minutes and signs in once; it's not a JWT or an API tok
 
 ---
 
-### Forgot Password
+### Reset a Forgotten Password
 
-> **Stub.** Always returns the message; nothing is sent.
+**Endpoint:** `POST /auth/reset-password` (no sign-in)
 
-**Endpoint:** `POST /auth/forgot-password?email=user@example.com`
+**Description:** For a password account with MFA: its username (or email), a current code from its authenticator app and one of its backup codes set a new password, so neither the phone nor the printed codes is enough alone. The app code is checked first, and the backup code is used up only once both are right. A wrong pair counts towards the sign-in lockout, and every refusal reads the same, so the answer doesn't say which accounts exist or have MFA. It doesn't sign in: that takes the new password and a second factor. Audited as `mfa_password_reset`. Without MFA, or with the app or the codes lost, an administrator resets it (`rowanholt server users password <username>`).
 
-`email` is a query parameter, not a JSON body.
+```bash
+curl -X POST https://rowanholt.example/api/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{"username": "analyst", "code": "123456", "backup_code": "ABCDE-FGHJK", "new_password": "…"}'
+```
 
 **Response:** `200 OK`
 ```json
-{"message": "If the email exists, a password reset link has been sent"}
+{"message": "Password changed: sign in with it and your authenticator", "backup_codes_left": 9}
 ```
+
+**Errors:**
+- `400 Bad Request`: `That username and those codes don't match`, or a new password under 12 characters
+- `429 Too Many Requests`: the account is locked after failed sign-ins; wait and try again
+
+`POST /auth/forgot-password` answers `410 Gone`: Rowanholt sends no email, and the message says how to reset instead.
 
 ---
 

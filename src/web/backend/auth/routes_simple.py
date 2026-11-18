@@ -294,11 +294,61 @@ async def logout(response: Response):
     return {"message": "Logged out successfully"}
 
 
+NO_EMAIL = ("Rowanholt doesn't send email. Reset your password with one of your backup codes, or ask an "
+            "administrator: rowanholt server users password <username>")
+
+
 @router.post("/forgot-password")
-async def forgot_password(email: str):
-    """Request password reset (stub)."""
-    # Always return success to prevent email enumeration
-    return {"message": "If the email exists, a password reset link has been sent"}
+async def forgot_password():
+    """There's no email to send a link to: say how a password is reset instead of pretending."""
+    raise HTTPException(status_code=status.HTTP_410_GONE, detail=NO_EMAIL)
+
+
+class BackupCodeReset(BaseModel):
+    username: str
+    backup_code: str
+    code: str
+    new_password: str
+
+
+RESET_REFUSED = "That username and those codes don't match"
+
+
+@router.post("/reset-password")
+async def reset_password_with_backup_code(body: BackupCodeReset, request: Request):
+    """A forgotten password, for an account with MFA: its username (or email), a current code from
+    its authenticator app and one of its backup codes set a new one, so neither the phone nor the
+    printed codes is enough alone. The app code is checked first and a backup code is used up only
+    once it's right; a wrong one counts towards the sign-in lockout, and every refusal reads the
+    same, so it doesn't say which accounts exist or have MFA. It doesn't sign in: that still takes
+    the new password and a second factor."""
+    _check_password_strength(body.new_password)
+    if len(body.new_password) < MIN_PASSWORD:
+        raise HTTPException(status_code=400, detail=f"Passwords need at least {MIN_PASSWORD} characters")
+    users = _users_or_503()
+    record = find_user(users, body.username)
+    name = record["username"] if record else body.username
+    address = _address(request)
+    _refuse_if_locked(name, address)
+    usable = (record and record.get("is_active", True) and record.get("hashed_password")
+              and mfa.offered_to(record) and mfa.is_enabled(record)
+              and mfa.looks_like_backup_code(body.backup_code))
+    accepted = False
+    if usable and mfa.check_code(record, body.code, allow_backup=False)[0]:
+        accepted, how = mfa.check_code(record, body.backup_code)
+        accepted = accepted and how == "backup_code"
+    if not accepted:
+        throttle.failed(name, address)
+        if record:
+            mfa.audit("mfa_failed", record, record, address, stage="password reset")
+        raise HTTPException(status_code=400, detail=RESET_REFUSED)
+    record["hashed_password"] = hash_password(body.new_password)
+    save_users(users)
+    # The lockout's count stands: the sign-in that follows, password and code, is what clears it
+    mfa.audit("mfa_password_reset", record, record, address,
+              left=len(record.get("mfa_backup_codes") or []))
+    return {"message": "Password changed: sign in with it and your authenticator",
+            "backup_codes_left": len(record.get("mfa_backup_codes") or [])}
 
 
 @router.get("/me")

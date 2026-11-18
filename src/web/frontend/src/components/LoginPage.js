@@ -13,8 +13,9 @@ const LoginPage = () => {
   // One of the home page's five figures beside the form, a different one each visit
   const [figure] = useState(() => JOURNEYS[Math.floor(Math.random() * JOURNEYS.length)]);
   // Straight from Register: say the account was made and fill its username in
-  const registered = useLocation().state?.registered;
-  const [username, setUsername] = useState(registered || '');
+  // ... or from Forgot Password, with a new password set by a backup code
+  const { registered, reset } = useLocation().state || {};
+  const [username, setUsername] = useState(registered || reset || '');
   const [password, setPassword] = useState('');
   const [searchParams] = useSearchParams();
   const [error, setError] = useState(searchParams.get('sso_error') || '');
@@ -139,6 +140,12 @@ const LoginPage = () => {
           </div>
         )}
 
+        {reset && !error && !challenge && (
+          <div className="alert-success" data-testid="reset">
+            Password changed. Sign in with it, then a code from your authenticator app.
+          </div>
+        )}
+
         {challenge && (
           <form onSubmit={handleSecondFactor} data-testid="mfa-step">
             <p style={{ marginBottom: '1rem' }}>
@@ -209,7 +216,7 @@ const LoginPage = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter password"
-              autoFocus={Boolean(registered)}
+              autoFocus={Boolean(registered || reset)}
               required
               disabled={loading}
             />

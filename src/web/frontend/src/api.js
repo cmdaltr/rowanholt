@@ -303,14 +303,12 @@ export const getCurrentUser = async () => {
   return response.data;
 };
 
-export const forgotPassword = async (email) => {
-  const response = await api.post('/api/auth/forgot-password', { email });
-  return response.data;
-};
-
-export const resetPassword = async (token, newPassword) => {
+// A forgotten password on an account with MFA: its username, a code from its app and a backup code
+export const resetPasswordWithBackupCode = async (username, code, backupCode, newPassword) => {
   const response = await api.post('/api/auth/reset-password', {
-    token,
+    username,
+    code,
+    backup_code: backupCode,
     new_password: newPassword,
   });
   return response.data;

@@ -9,7 +9,6 @@ import LoginPage from './components/LoginPage';
 import SsoCallback from './components/SsoCallback';
 import RegisterPage from './components/RegisterPage';
 import ForgotPasswordPage from './components/ForgotPasswordPage';
-import ResetPasswordPage from './components/ResetPasswordPage';
 import HelpPage from './components/HelpPage';
 import AIAssistant from './components/AIAssistant';
 import JobList from './components/JobList';
@@ -141,7 +140,7 @@ function AppContent() {
             <Route path="/login/sso" element={<SsoCallback />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/reset-password" element={<Navigate to="/forgot-password" replace />} />
             <Route path="/help" element={<HelpPage />} />
             <Route path="/ai" element={<AIAssistant />} />
             <Route path="/pippin" element={<ThreatIntel />} />
@@ -163,11 +162,17 @@ function AppContent() {
           <p>
             Rowanholt v2.1.0 - Digital Forensics Acceleration Suite
           </p>
-          <p className="attribution">
-            This project contains references to "The Lord of the Rings" by J.R.R. Tolkien. This code is not affiliated with or endorsed by the Tolkien Estate or Peter Jackson.<br />
-            All trademarks and copyrights for that work belong to their respective owners.<br />
-            Rowanholt™ and the Rowanholt logo are trademarks of cmdaltr. The licence covers the software; it does not grant any right to use the Rowanholt name or logo.
-          </p>
+          {/* The small print opens in place rather than filling every page's footer */}
+          <details className="legal">
+            <summary>Licence and trademarks</summary>
+            <p className="attribution">
+              This project contains references to "The Lord of the Rings" by J.R.R. Tolkien. This code is not affiliated with or endorsed by the Tolkien Estate or Peter Jackson.<br />
+              All trademarks and copyrights for that work belong to their respective owners.<br />
+              Rowanholt™ and the Rowanholt logo are trademarks of cmdaltr. The licence covers the software; it does not grant any right to use the Rowanholt name or logo.<br />
+              <a href="https://github.com/cmdaltr/rowanholt/blob/main/LICENSE" target="_blank" rel="noopener noreferrer"
+                className="text-link">Read the licence</a>
+            </p>
+          </details>
           <p style={{
             marginTop: '1rem',
             display: 'flex',
