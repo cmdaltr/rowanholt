@@ -36,8 +36,9 @@ function AIAssistant() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Only once there's a conversation: on first load the page opens at the top like the others
   useEffect(() => {
-    scrollToBottom();
+    if (messages.length) scrollToBottom();
   }, [messages]);
 
   // Fetch available cases and LLM status on mount
