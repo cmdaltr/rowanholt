@@ -59,16 +59,16 @@ ctx.drawLinearGradient(background, start: CGPoint(x: 0, y: tile.maxY), end: CGPo
 // the bottom fades where the O reaches into it, and the R's bowl, behind the arch's left foot, goes
 // with both feet below y 462. The flourish is cropped about its gem (x 772)
 // and its arms faded before they meet the R and L swashes. Each is centred on its own middle, and
-// the arch nearly fills the tile's width
+// the art fills the tile as far as it can: the arch's sides run off its edges (Ben's call)
 let dome = faded(CGRect(x: 256, y: 20, width: 1009, height: 522), bottom: 0.2,
                  clear: [CGRect(x: 256, y: 462, width: 34, height: 80), CGRect(x: 1231, y: 462, width: 34, height: 80)])
 let flourish = faded(CGRect(x: 412, y: 770, width: 720, height: 205), left: 0.22, right: 0.22)
 
-let scale: CGFloat = 0.78
+let scale: CGFloat = 1.12
 let domeSize = CGSize(width: CGFloat(dome.width) * scale, height: CGFloat(dome.height) * scale)
-let flourishScale: CGFloat = 0.98
+let flourishScale: CGFloat = 1.08
 let flourishSize = CGSize(width: CGFloat(flourish.width) * flourishScale, height: CGFloat(flourish.height) * flourishScale)
-let overlap: CGFloat = 46
+let overlap: CGFloat = 64
 let total = domeSize.height + flourishSize.height - overlap
 let bottom = tile.midY - total / 2
 ctx.draw(flourish, in: CGRect(x: tile.midX - flourishSize.width / 2, y: bottom,
