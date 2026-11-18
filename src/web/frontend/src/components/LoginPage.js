@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { login as apiLogin, loginAsGuest as apiLoginAsGuest, getAuthConfig, completeMfaSignIn } from '../api';
 import { API_BASE_URL } from '../apiBase';
@@ -12,7 +12,9 @@ const LoginPage = () => {
   const { login: setUser } = useAuth();
   // One of the home page's five figures beside the form, a different one each visit
   const [figure] = useState(() => JOURNEYS[Math.floor(Math.random() * JOURNEYS.length)]);
-  const [username, setUsername] = useState('');
+  // Straight from Register: say the account was made and fill its username in
+  const registered = useLocation().state?.registered;
+  const [username, setUsername] = useState(registered || '');
   const [password, setPassword] = useState('');
   const [searchParams] = useSearchParams();
   const [error, setError] = useState(searchParams.get('sso_error') || '');
@@ -131,6 +133,12 @@ const LoginPage = () => {
           </div>
         )}
 
+        {registered && !error && !challenge && (
+          <div className="alert-success" data-testid="registered">
+            Account {registered} created. Sign in with its password.
+          </div>
+        )}
+
         {challenge && (
           <form onSubmit={handleSecondFactor} data-testid="mfa-step">
             <p style={{ marginBottom: '1rem' }}>
@@ -201,6 +209,7 @@ const LoginPage = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter password"
+              autoFocus={Boolean(registered)}
               required
               disabled={loading}
             />

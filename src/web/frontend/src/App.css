@@ -56,7 +56,9 @@ h1, h2, h3, h4, h5, h6, nav, button, th, label, legend, .App-footer {
   letter-spacing: 0.03em;
 }
 
-input, textarea, select { font-family: var(--font-body); letter-spacing: 0; }
+/* Cinzel has no lower case, so what someone types (an email, a password, a path) would lose its case:
+   form fields always take the body face, even where a component's own style names Cinzel */
+input, textarea, select, option { font-family: var(--font-body) !important; letter-spacing: 0 !important; text-transform: none !important; }
 code, pre, kbd, samp { font-family: var(--font-mono); letter-spacing: 0; }
 
 .App {
@@ -302,8 +304,6 @@ textarea {
   padding: 0.75rem;
   border-radius: 4px;
   font-size: 1rem;
-  font-family: 'Cinzel', 'Times New Roman', serif;
-  letter-spacing: 0.03em;
   width: 100%;
   transition: border-color 0.3s ease;
 }

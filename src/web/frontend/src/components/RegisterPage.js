@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { register } from '../api';
+import { JOURNEYS } from './Home';
 
 const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
 
 const RegisterPage = () => {
   const navigate = useNavigate();
+  // The same as the sign-in page: one of the home page's figures beside the form
+  const [figure] = useState(() => JOURNEYS[Math.floor(Math.random() * JOURNEYS.length)]);
   const [formData, setFormData] = useState({
     email: '',
     username: '',
@@ -34,8 +37,8 @@ const RegisterPage = () => {
     }
 
     // Validate password strength
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long');
+    if (formData.password.length < 12) {
+      setError('Passwords need at least 12 characters');
       return;
     }
 
@@ -49,8 +52,8 @@ const RegisterPage = () => {
         full_name: formData.fullName || null,
       });
 
-      // Redirect to login page on success
-      navigate('/login?registered=true');
+      // Sign-in says the account was made, with its username filled in
+      navigate('/login', { state: { registered: formData.username } });
     } catch (err) {
       const detail = err.response?.data?.detail;
       if (typeof detail === 'string') {
@@ -87,7 +90,15 @@ const RegisterPage = () => {
         </p>
       </header>
 
-      <div className="card">
+      <div className="login-layout">
+      <div className="journey-banner login-figure" aria-hidden="true">
+        <img src={figure.image} alt="" style={{ '--drop': figure.drop }} />
+        <span className="journey-banner__name">
+          <span>{figure.name}</span>
+          <span className="journey-banner__role">{figure.role}</span>
+        </span>
+      </div>
+      <div className="card login-card">
         <h3>Create Account</h3>
 
         {error && (
@@ -148,10 +159,10 @@ const RegisterPage = () => {
               name="password"
               value={formData.password}
               onChange={handleChange}
-              placeholder="Enter password (min 8 characters)"
+              placeholder="Enter password (min 12 characters)"
               required
               disabled={loading}
-              minLength={8}
+              minLength={12}
             />
           </div>
 
@@ -166,13 +177,15 @@ const RegisterPage = () => {
               placeholder="Re-enter password"
               required
               disabled={loading}
-              minLength={8}
+              minLength={12}
             />
           </div>
 
-          <button type="submit" disabled={loading} style={{ width: '100%' }}>
-            {loading ? 'Creating Account...' : 'Create Account'}
-          </button>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <button type="submit" disabled={loading} style={{ width: '100%' }}>
+              {loading ? 'Creating Account...' : 'Create Account'}
+            </button>
+          </div>
         </form>
 
         <div className="text-center" style={{ marginTop: '1.5rem' }}>
@@ -181,6 +194,7 @@ const RegisterPage = () => {
             Sign In
           </Link>
         </div>
+      </div>
       </div>
     </div>
   );
