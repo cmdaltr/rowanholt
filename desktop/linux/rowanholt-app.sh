@@ -370,6 +370,7 @@ fi
 maybe_update "$ROOT"
 
 if ! up; then
+    mark=$(wc -l < "$LOG" 2>/dev/null || echo 0)
     if has_zenity; then
         # Starting: phases and an ETA from this machine's earlier starts
         "$ROOT/rowanholt" start --progress=zenity 2>&1 | tee -a "$LOG" |
@@ -382,7 +383,14 @@ if ! up; then
         status=$?
     fi
     if [ "$status" -ne 0 ]; then
-        notify "'rowanholt start' failed. See $LOG"
+        # Say why (this start's last Error: line), not just where the log is; zenity reads Pango markup
+        reason="$(tail -n +$((mark + 1)) "$LOG" | grep -o 'Error: .*' | tail -1 | sed 's/^Error: //; s/&/\&amp;/g; s/</\&lt;/g')"
+        echo "[$(date '+%F %T')] 'rowanholt start' failed" >> "$LOG"
+        say error "Rowanholt didn't start.${reason:+
+
+$reason}
+
+The full log is $LOG."
         exit 1
     fi
     for _ in $(seq 1 450); do

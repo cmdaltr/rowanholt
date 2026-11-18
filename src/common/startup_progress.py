@@ -164,7 +164,8 @@ class Reporter:
     def line(self, text: str) -> None:
         with self.lock:
             if self.zenity:
-                print(f"# {text[:120]}", flush=True)
+                # Progress text is kept short for the bar; an error is kept whole, since the launcher shows it
+                print(f"# {text if text.startswith('Error:') else text[:120]}", flush=True)
             else:
                 print(text, flush=True)
 
