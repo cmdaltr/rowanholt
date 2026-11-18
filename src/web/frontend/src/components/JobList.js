@@ -4,7 +4,7 @@ import { bulkOffered, bulkPlan, skippedNote } from '../jobActions';
 import { Link } from 'react-router-dom';
 import { listJobs, bulkDeleteJobs, bulkArchiveJobs, bulkRestartJobs, bulkCancelJobs, countFindings } from '../api';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.webp`;
 
 function JobList() {
   const [jobs, setJobs] = useState([]);

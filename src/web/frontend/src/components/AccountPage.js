@@ -5,7 +5,7 @@ import { listApiTokens, createApiToken, revokeApiToken } from '../api';
 import { CSRF_HEADERS } from '../apiBase';
 import MfaPanels from './MfaPanels';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.webp`;
 
 const AccountPage = () => {
   const navigate = useNavigate();

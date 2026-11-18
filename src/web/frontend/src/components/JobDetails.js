@@ -7,7 +7,7 @@ import { statusLabel } from '../jobStatus';
 import { canManage, jobPageActions, restartFresh } from '../jobActions';
 import { exportActive, exportMessage, offersSiemExport } from '../siemExport';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.webp`;
 
 function JobDetails() {
   const { jobId } = useParams();

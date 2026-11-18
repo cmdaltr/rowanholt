@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
-const gandalfImage = `${process.env.PUBLIC_URL}/images/gandalf.png`;
-const pippinImage = `${process.env.PUBLIC_URL}/images/pippin.png`;
-const aragornImage = `${process.env.PUBLIC_URL}/images/aragorn.png`;
-const elrondImage = `${process.env.PUBLIC_URL}/images/elrond.png`;
-const smithImage = `${process.env.PUBLIC_URL}/images/smith.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.webp`;
+const gandalfImage = `${process.env.PUBLIC_URL}/images/gandalf.webp`;
+const pippinImage = `${process.env.PUBLIC_URL}/images/pippin.webp`;
+const aragornImage = `${process.env.PUBLIC_URL}/images/aragorn.webp`;
+const elrondImage = `${process.env.PUBLIC_URL}/images/elrond.webp`;
+const smithImage = `${process.env.PUBLIC_URL}/images/smith.webp`;
 const mordorClosedImage = `${process.env.PUBLIC_URL}/images/mordor_closed.jpg`;
 const mordorOpenImage = `${process.env.PUBLIC_URL}/images/mordor_open.jpg`;
 

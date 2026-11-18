@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { register } from '../api';
 import { JOURNEYS } from './Home';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.webp`;
 
 const RegisterPage = () => {
   const navigate = useNavigate();

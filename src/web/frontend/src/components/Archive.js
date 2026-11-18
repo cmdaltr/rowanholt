@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { listJobs, bulkUnarchiveJobs, bulkDeleteJobs } from '../api';
 import { bulkOffered, bulkPlan, canManage, skippedNote } from '../jobActions';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.webp`;
 
 // Where a job wrote, as the backend records it (output_removal.recorded_output)
 const outputFolder = (job) => job.destination_path || job.result?.output_directory || null;

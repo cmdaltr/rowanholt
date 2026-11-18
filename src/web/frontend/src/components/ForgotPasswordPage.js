@@ -1,29 +1,20 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { forgotPassword } from '../api';
+import { getAuthConfig } from '../api';
+import { JOURNEYS } from './Home';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.webp`;
 
+// Rowanholt sends no email, so a reset is an administrator's job: this says how, for a server or
+// for someone's own machine, rather than offering a form that would send nothing
 const ForgotPasswordPage = () => {
-  const [email, setEmail] = useState('');
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  // The same as the sign-in page: one of the home page's figures beside the card
+  const [figure] = useState(() => JOURNEYS[Math.floor(Math.random() * JOURNEYS.length)]);
+  const [server, setServer] = useState(null);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
-    try {
-      await forgotPassword(email);
-      setSuccess(true);
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to send reset link. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    getAuthConfig().then((config) => setServer(Boolean(config.server_mode))).catch(() => setServer(false));
+  }, []);
 
   return (
     <div className="journey-detail">
@@ -46,67 +37,47 @@ const ForgotPasswordPage = () => {
         </p>
       </header>
 
-      <div className="card">
-        {success ? (
-          <>
-            <div className="alert-success">
-              Password reset instructions have been sent to your email address.
-            </div>
-            <p style={{ color: '#e5e0d0' }}>
-              Please check your inbox and follow the instructions to reset your password.
-            </p>
-            <Link to="/login">
-              <button style={{ marginTop: '1rem' }}>Return to Login</button>
-            </Link>
-          </>
-        ) : (
-          <>
-            <h3>Reset Password</h3>
-            <p style={{ color: '#e5e0d0', marginBottom: '1.5rem' }}>
-              Enter your email address and we'll send you instructions to reset your password.
-            </p>
-
-            {error && (
-              <div className="alert-error">
-                {error}
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label htmlFor="email">Email Address</label>
-                <input
-                  type="email"
-                  id="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email address"
-                  required
-                  disabled={loading}
-                />
-              </div>
-
-              <button type="submit" disabled={loading} style={{ width: '100%' }}>
-                {loading ? 'Sending...' : 'Send Reset Link'}
-              </button>
-            </form>
-
-            <div className="text-center" style={{ marginTop: '1.5rem' }}>
-              Remember your password?{' '}
-              <Link to="/login" className="text-link">
-                Sign In
-              </Link>
-            </div>
-          </>
-        )}
+      <div className="login-layout">
+      <div className="journey-banner login-figure" aria-hidden="true">
+        <img src={figure.image} alt="" style={{ '--drop': figure.drop }} />
+        <span className="journey-banner__name">
+          <span>{figure.name}</span>
+          <span className="journey-banner__role">{figure.role}</span>
+        </span>
       </div>
+      <div className="card login-card">
+        <h3>Reset Password</h3>
 
-      <div className="card alert-info" style={{ marginTop: '2rem' }}>
-        <h4 style={{ marginTop: 0, color: '#c3e88d' }}>Note</h4>
-        <p style={{ fontSize: '0.9rem', marginBottom: 0 }}>
-          Email functionality is currently under development. In production, the reset token will be sent to your email.
-          For now, check the server logs for the reset token.
-        </p>
+        {server === true && (
+          <div data-testid="reset-server">
+            <p style={{ marginBottom: '1rem' }}>
+              Rowanholt doesn't send email, so an administrator sets a new password for you. Ask one to run
+              this on the server, with your username:
+            </p>
+            <pre style={{ marginBottom: '1rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}><code>rowanholt server users password &lt;username&gt;</code></pre>
+            <p style={{ marginBottom: '1.5rem', color: '#a09580', fontSize: '0.9rem' }}>
+              Lost your authenticator and your backup codes as well? They can turn MFA off for you
+              with <code>rowanholt server users mfa-reset &lt;username&gt;</code>.
+            </p>
+          </div>
+        )}
+
+        {server === false && (
+          <div data-testid="reset-local">
+            <p style={{ marginBottom: '1rem' }}>
+              Rowanholt doesn't send email. On your own machine, set a new password from a terminal, with
+              your username:
+            </p>
+            <pre style={{ marginBottom: '1.5rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}><code>docker exec -it rowanholt-backend python -m auth.manage_users password &lt;username&gt;</code></pre>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <Link to="/login" style={{ width: '100%' }}>
+            <button type="button" style={{ width: '100%' }}>Back to Sign In</button>
+          </Link>
+        </div>
+      </div>
       </div>
     </div>
   );

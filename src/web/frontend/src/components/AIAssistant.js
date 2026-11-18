@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { API_BASE_URL, CSRF_HEADERS } from '../apiBase';
 import { flagFinding } from '../api';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.webp`;
 
 // API base URL - adjust based on environment
 const API_BASE = API_BASE_URL;

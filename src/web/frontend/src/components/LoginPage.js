@@ -5,7 +5,7 @@ import { login as apiLogin, loginAsGuest as apiLoginAsGuest, getAuthConfig, comp
 import { API_BASE_URL } from '../apiBase';
 import { JOURNEYS } from './Home';
 
-const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.png`;
+const heroImage = `${process.env.PUBLIC_URL}/images/rowanholt-tm.webp`;
 
 const LoginPage = () => {
   const navigate = useNavigate();

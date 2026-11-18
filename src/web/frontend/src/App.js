@@ -106,7 +106,7 @@ function AppContent() {
   useEffect(() => {
     getAuthConfig().then((config) => setServerMode(!!config.server_mode)).catch(() => setServerMode(true));
   }, []);
-  const mapBackground = `${process.env.PUBLIC_URL}/images/middle_earth.png`;
+  const mapBackground = `${process.env.PUBLIC_URL}/images/middle_earth.webp`;
 
   return (
     <div
