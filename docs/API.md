@@ -265,7 +265,7 @@ The challenge lasts five minutes and signs in once; it's not a JWT or an API tok
 
 **Request Body:** `{"current_password": "...", "new_password": "..."}`
 
-**Response:** `200 OK`, `{"message": "Password changed"}`
+**Response:** `200 OK`, `{"message": "Password changed", "access_token": "...", "token_type": "bearer", "user": {...}}`. Every session signed in before the change ends (as after an admin sets the password or a reset); this caller carries on with the new token, and a browser's cookie is replaced.
 
 **Errors:**
 - `400 Bad Request`: the account signs in with single sign-on, the current password is wrong, or (on a team server) the new one is under 12 characters

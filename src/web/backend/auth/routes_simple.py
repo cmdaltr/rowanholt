@@ -19,17 +19,17 @@ from pydantic import BaseModel
 
 try:
     from ..config import settings
-    from .security import hash_password, verify_password, create_access_token
+    from .security import verify_password, create_access_token
     from .users import (AdminPasswordMissing, find_user, init_default_admin, load_users,  # noqa: F401
-                        new_user, public, save_users)
+                        new_user, public, save_users, set_password)
     from . import access, mfa, oidc, tokens
     from .throttle import throttle
     from .. import licence
 except ImportError:
     from config import settings
-    from auth.security import hash_password, verify_password, create_access_token
+    from auth.security import verify_password, create_access_token
     from auth.users import (AdminPasswordMissing, find_user, init_default_admin, load_users,  # noqa: F401
-                            new_user, public, save_users)
+                            new_user, public, save_users, set_password)
     from auth import access, mfa, oidc, tokens
     from auth.throttle import throttle
     import licence
@@ -342,7 +342,7 @@ async def reset_password_with_backup_code(body: BackupCodeReset, request: Reques
         if record:
             mfa.audit("mfa_failed", record, record, address, stage="password reset")
         raise HTTPException(status_code=400, detail=RESET_REFUSED)
-    record["hashed_password"] = hash_password(body.new_password)
+    set_password(record, body.new_password)
     save_users(users)
     # The lockout's count stands: the sign-in that follows, password and code, is what clears it
     mfa.audit("mfa_password_reset", record, record, address,
@@ -399,8 +399,9 @@ async def verify(request: Request, response: Response, login_redirect: bool = Fa
 
 
 @router.post("/change-password")
-async def change_password(body: PasswordChange, user: dict = Depends(access.current_user)):
-    """Change the caller's own password."""
+async def change_password(body: PasswordChange, response: Response, user: dict = Depends(access.current_user)):
+    """Change the caller's own password. Every other session ends; this one carries on with a new
+    token (a browser's cookie is replaced, a bearer caller takes it from the answer)."""
     users = load_users()
     record = users.get(user["id"])
     if not record or not record.get("hashed_password"):
@@ -408,9 +409,9 @@ async def change_password(body: PasswordChange, user: dict = Depends(access.curr
     if not verify_password(body.current_password, record["hashed_password"]):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
     _check_password_strength(body.new_password)
-    record["hashed_password"] = hash_password(body.new_password)
+    set_password(record, body.new_password)
     save_users(users)
-    return {"message": "Password changed"}
+    return {"message": "Password changed", **_session(response, record)}
 
 
 # ── Multi-factor authentication (auth/mfa.py) ────────────────────────────────
@@ -673,7 +674,7 @@ async def update_user(user_id: str, update: UserUpdate, admin: dict = Depends(ac
         user["is_active"] = update.is_active
     if update.password:
         _check_password_strength(update.password)
-        user["hashed_password"] = hash_password(update.password)
+        set_password(user, update.password)
     if update.full_name is not None:
         user["full_name"] = update.full_name
     save_users(users)

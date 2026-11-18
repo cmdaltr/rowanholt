@@ -4,6 +4,7 @@ Security Utilities
 Password hashing, JWT token generation, and verification.
 """
 
+import time
 import uuid
 from datetime import datetime, timedelta
 from typing import Optional
@@ -52,7 +53,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     else:
         expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
 
-    to_encode.update({"exp": expire, "jti": str(uuid.uuid4())})
+    # iat: when it was issued (to the millisecond: a sign-in and a password change can share a
+    # second), so a password change can end the sessions from before it
+    to_encode.update({"exp": expire, "iat": round(time.time(), 3), "jti": str(uuid.uuid4())})
 
     encoded_jwt = jwt.encode(
         to_encode,

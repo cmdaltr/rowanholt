@@ -8,6 +8,7 @@ Password users carry a bcrypt hash; single sign-on users carry their IdP subject
 import json
 import os
 import re
+import time
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -54,6 +55,13 @@ def save_users(users: dict) -> None:
     with os.fdopen(fd, "w") as f:
         json.dump(users, f, indent=2, default=str)
     os.replace(tmp, USERS_FILE)
+
+
+def set_password(record: dict, password: str) -> None:
+    """A new password, and an end to every session signed in before it: whoever had the old one
+    (the reason for a reset, often) is signed out too. auth.access refuses tokens issued earlier."""
+    record["hashed_password"] = hash_password(password)
+    record["sessions_after"] = round(time.time(), 3)
 
 
 def new_user(username: str, email: str, role: str = "user", password: Optional[str] = None,

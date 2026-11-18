@@ -5,6 +5,7 @@ FastAPI backend for the Rowanholt web interface; drives Elrond analysis jobs.
 """
 
 import os
+import re
 import uuid
 import logging
 from datetime import datetime
@@ -499,6 +500,7 @@ async def create_job(job_request: JobCreate, request: Request):
         options = job_request.options
         options.replaces_output_of = None
         options.output_marker = True
+        _job_file_options(request, options)
         user = access.current_user(request)
         dest_path = Path(destination_path)
         if dest_path.is_dir():
@@ -1463,19 +1465,53 @@ async def get_navigator_json(job_id: str, domain: Optional[str] = Query(None, pa
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# File requirements for advanced processing options
-FILE_REQUIREMENTS = {
-    'keywords': 'keywords.txt',
-    'yara': 'yara.yar',
-    'collectFiles': 'files.txt',
-}
-
 # Default directory for required files (OS-aware)
 import platform
 if platform.system() == 'Darwin' or platform.system() == 'Linux':
     REQUIRED_FILES_DIR = '/tmp/rowanholt'
 else:
     REQUIRED_FILES_DIR = os.path.join(os.environ.get('TEMP', 'C:\\Temp'), 'rowanholt')
+# Each user's own keywords, YARA rules and file list, below this: one analyst's upload never
+# replaces another's (they were one shared set, which anyone could swap for everyone's jobs)
+REQUIRED_FILES_ROOT = os.path.join(REQUIRED_FILES_DIR, 'required')
+# Where each file goes in the user's folder: Ledger's --Yara takes a folder of rules
+REQUIRED_FILE_PATHS = {
+    'keywords': 'keywords.txt',
+    'yara': os.path.join('yara', 'rules.yar'),
+    'collectFiles': 'files.txt',
+}
+
+
+def _required_files_dir(request: Request) -> str:
+    """The caller's own folder of required files."""
+    user = access.current_user(request)
+    owner = re.sub(r'[^A-Za-z0-9_-]', '', str(user.get('id') or 'local')) or 'local'
+    return os.path.join(REQUIRED_FILES_ROOT, owner)
+
+
+def _job_file_options(request: Request, options) -> None:
+    """The keyword, YARA and IOC files a job hands Ledger. Keywords or YARA turned on without a
+    path take the caller's uploaded ones (the web app sends only the switch, so they never reached
+    Ledger). A path given must be in an allowed folder and not in another user's required files."""
+    mine = _required_files_dir(request)
+    for switch, field in (('keywords', 'keywords_file'), ('yara', 'yara_dir')):
+        if getattr(options, switch) and not getattr(options, field):
+            uploaded = os.path.join(mine, REQUIRED_FILE_PATHS[switch])
+            if not os.path.isfile(uploaded):
+                raise HTTPException(status_code=400, detail=f"Upload a {switch} file first: {switch} is on and there's none")
+            setattr(options, field, uploaded if switch == 'keywords' else os.path.dirname(uploaded))
+    for field in ('keywords_file', 'yara_dir', 'iocs_file'):
+        value = getattr(options, field, None)
+        if not value:
+            continue
+        try:
+            path = output_removal.contained(value, settings.allowed_paths, allow_root=True, must_exist=True)
+        except output_removal.PathRefused as exc:
+            raise HTTPException(status_code=403, detail=f"Access denied to {field}: {exc}")
+        theirs = Path(REQUIRED_FILES_ROOT)
+        if path.is_relative_to(theirs) and not path.is_relative_to(Path(mine)):
+            raise HTTPException(status_code=403, detail=f"Access denied to {field}: another user's file")
+        setattr(options, field, str(path))
 
 
 @app.get("/api/jobs/{job_id}/sharing")
@@ -1507,7 +1543,7 @@ async def set_job_sharing(job_id: str, update: SharingUpdate, request: Request):
 
 
 @app.post("/api/check-required-files")
-async def check_required_files(request: dict):
+async def check_required_files(body: dict, request: Request):
     """
     Check if required files exist in the default location.
 
@@ -1518,24 +1554,21 @@ async def check_required_files(request: dict):
         {"missing": ["keywords", "yara"], "found": ["collectFiles"]}
     """
     try:
-        options = request.get('options', [])
+        options = body.get('options', [])
         missing = []
         found = []
-
-        # Ensure directory exists
-        os.makedirs(REQUIRED_FILES_DIR, exist_ok=True)
+        mine = _required_files_dir(request)
 
         for opt in options:
-            if opt in FILE_REQUIREMENTS:
-                filename = FILE_REQUIREMENTS[opt]
-                filepath = os.path.join(REQUIRED_FILES_DIR, filename)
+            if opt in REQUIRED_FILE_PATHS:
+                filepath = os.path.join(mine, REQUIRED_FILE_PATHS[opt])
 
                 if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
                     found.append(opt)
                 else:
                     missing.append(opt)
 
-        return {"missing": missing, "found": found, "directory": REQUIRED_FILES_DIR}
+        return {"missing": missing, "found": found, "directory": mine}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1545,6 +1578,7 @@ from fastapi import File, UploadFile
 
 @app.post("/api/upload-required-files")
 async def upload_required_files_impl(
+    request: Request,
     keywords: Optional[UploadFile] = File(None),
     yara: Optional[UploadFile] = File(None),
     collectFiles: Optional[UploadFile] = File(None),
@@ -1553,21 +1587,17 @@ async def upload_required_files_impl(
     Upload required files for advanced processing options.
     """
     try:
-        # Ensure directory exists
-        os.makedirs(REQUIRED_FILES_DIR, exist_ok=True)
-
+        mine = _required_files_dir(request)
         uploaded = []
 
-        file_mapping = {
-            'keywords': (keywords, 'keywords.txt'),
-            'yara': (yara, 'yara.yar'),
-            'collectFiles': (collectFiles, 'files.txt'),
-        }
+        file_mapping = {'keywords': keywords, 'yara': yara, 'collectFiles': collectFiles}
 
-        for key, (upload_file, target_filename) in file_mapping.items():
+        for key, upload_file in file_mapping.items():
             if upload_file and upload_file.filename:
                 content = await upload_file.read()
-                target_path = os.path.join(REQUIRED_FILES_DIR, target_filename)
+                target_filename = REQUIRED_FILE_PATHS[key]
+                target_path = os.path.join(mine, target_filename)
+                os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
                 with open(target_path, 'wb') as f:
                     f.write(content)
@@ -1579,10 +1609,21 @@ async def upload_required_files_impl(
                     'size': len(content)
                 })
 
-        return {"success": True, "uploaded": uploaded, "directory": REQUIRED_FILES_DIR}
+        return {"success": True, "uploaded": uploaded, "directory": mine}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def spa_file(build: Path, full_path: str) -> Path:
+    """The file the web app's catch-all serves for a path: a root-level build asset, only ever from
+    inside the build (the path is the browser's: `..`, an absolute `//etc/passwd`, and the route
+    has no sign-in), else index.html."""
+    root = build.resolve()
+    candidate = (root / full_path.lstrip("/")).resolve()
+    if candidate.is_relative_to(root) and candidate.is_file():
+        return candidate
+    return root / "index.html"
 
 
 # Serve React frontend build
@@ -1592,11 +1633,7 @@ if _BUILD_DIR.exists():
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str):
-        # Serve known root-level build assets directly
-        candidate = _BUILD_DIR / full_path
-        if candidate.is_file():
-            return FileResponse(str(candidate))
-        return FileResponse(str(_BUILD_DIR / "index.html"))
+        return FileResponse(str(spa_file(_BUILD_DIR, full_path)))
 
 
 if __name__ == "__main__":

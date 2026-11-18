@@ -128,7 +128,10 @@ const AccountPage = () => {
       });
 
       if (response.ok) {
-        setPasswordMessage({ type: 'success', text: 'Password changed successfully.' });
+        // Every other session ends with the old password; this one carries on with the new token
+        const body = await response.json();
+        if (body.access_token) localStorage.setItem('access_token', body.access_token);
+        setPasswordMessage({ type: 'success', text: 'Password changed. Other sessions have been signed out.' });
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');

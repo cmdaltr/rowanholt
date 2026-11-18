@@ -16,14 +16,12 @@ import sys
 
 try:
     from ..config import settings
-    from .security import hash_password
-    from .users import find_user, init_default_admin, load_users, new_user, save_users
+    from .users import find_user, init_default_admin, load_users, new_user, save_users, set_password
     from . import mfa
     from .. import licence
 except ImportError:
     from config import settings
-    from auth.security import hash_password
-    from auth.users import find_user, init_default_admin, load_users, new_user, save_users
+    from auth.users import find_user, init_default_admin, load_users, new_user, save_users, set_password
     from auth import mfa
     import licence
 
@@ -116,7 +114,7 @@ def main(argv: list) -> int:
         if losing_admin and len(active_admins) <= 1:
             raise SystemExit("That's the last active admin")
         if args.command == "password":
-            user["hashed_password"] = hash_password(_password("New password: "))
+            set_password(user, _password("New password: "))
         elif args.command == "role":
             user["role"] = args.role
         else:

@@ -113,6 +113,9 @@ def user_from_token(token: Optional[str]) -> Optional[dict]:
     user = load_users().get(payload.get("sub", ""))
     if not user or not user.get("is_active", True):
         return None
+    # Issued before the password last changed (a token from before this check has no iat)
+    if float(payload.get("iat") or 0) < float(user.get("sessions_after") or 0):
+        return None
     return public(user)
 
 

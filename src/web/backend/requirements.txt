@@ -1,19 +1,19 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==2.5.0
-pydantic-settings==2.1.0
+fastapi==0.162.5  # with starlette 1.x and python-multipart 0.0.3x: their advisories (pen test, Nov 2026)
+uvicorn[standard]==0.54.0
+pydantic==2.14.3
+pydantic-settings==2.15.0
 celery==5.3.4
 # celery 5.3.4 takes any kombu; kombu 5.7 refuses redis-py below 6.1 and stops the worker
 kombu==5.6.2
 redis==5.0.1
-python-multipart==0.0.6
+python-multipart==0.0.32
 passlib[bcrypt]==1.7.4
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]==3.5.0  # 3.5.0's open advisory needs unpinned algorithms: every decode pins them
 sqlalchemy==2.0.23
 alembic==1.13.1  # JobStorage migrates the schema on start (requirements/web.txt)
 psycopg2-binary==2.9.9
-httpx==0.25.2
-pillow==11.0.0  # report logos: an upload is read (PNG or JPEG only) and redrawn before it's kept (branding.py)
+httpx==0.28.1
+pillow==12.3.0  # 13 needs Python 3.11 (this image is 3.10); uploads are admin-only. report logos: an upload is read (PNG or JPEG only) and redrawn before it's kept (branding.py)
 samarkand==0.1.1  # the suite's wire formats: licence, webhooks, STIX, TAXII, Navigator layers (shared with Shikari and Ostraka)
 segno==1.6.6  # MFA enrolment's QR code, drawn as SVG on the server (auth/mfa.py): pure Python, no dependencies
 openpyxl>=3.0.0,<4.0.0  # the Iran APT threat intelligence workbook (requirements/base.txt has it for Elrond)

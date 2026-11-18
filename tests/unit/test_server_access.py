@@ -526,6 +526,10 @@ class ServerAccessTest(BackendCase):
         self.assertEqual(resp.status_code, 429)
 
     def test_username_and_email_share_a_lockout(self):
+        # Other files' tests share this user store: their accounts mustn't use up the free places
+        seats = mock.patch.object(sys.modules["auth.routes_simple"].licence, "seat_refusal", return_value=None)
+        seats.start()
+        self.addCleanup(seats.stop)
         resp = self.client.post("/api/auth/users", headers=self.admin, json={
             "username": "lockpair", "email": "lockpair@example.org", "password": "lockpair-password-1"})
         assert resp.status_code == 200 or "already taken" in resp.text, resp.text
