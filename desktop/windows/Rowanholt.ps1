@@ -124,6 +124,31 @@ function Show-Message([string]$Text, [string]$Buttons = 'OK', [string]$Icon = 'I
     return [string][System.Windows.Forms.MessageBox]::Show($Text, 'Rowanholt', $Buttons, $Icon)
 }
 
+function Show-Question([string]$Text, [string]$Yes = 'Yes', [string]$No = 'No') {
+    # A Yes/No that doesn't block, unlike Show-Message: the caller keeps working (Step-Gui) and reads
+    # .Tag, 'Yes' or 'No' once one is clicked, or closes it when the question no longer stands
+    Initialize-Gui
+    $form = New-Object System.Windows.Forms.Form
+    $form.AutoScaleDimensions = New-Object System.Drawing.SizeF(96, 96); $form.AutoScaleMode = 'Dpi'
+    $form.Font = New-Object System.Drawing.Font('Segoe UI', 9)
+    $form.Text = 'Rowanholt'; $form.FormBorderStyle = 'FixedDialog'; $form.TopMost = $true
+    $form.MaximizeBox = $false; $form.MinimizeBox = $false; $form.ControlBox = $false
+    $form.StartPosition = 'CenterScreen'; $form.ClientSize = New-Object System.Drawing.Size(420, 150)
+    $label = New-Object System.Windows.Forms.Label
+    $label.UseMnemonic = $false; $label.Text = $Text; $label.SetBounds(20, 16, 380, 80)
+    $form.Controls.Add($label)
+    $x = 214
+    foreach ($answer in @(@($Yes, 'Yes'), @($No, 'No'))) {
+        $button = New-Object System.Windows.Forms.Button
+        $button.Text = $answer[0]; $button.Tag = $answer[1]; $button.SetBounds($x, 108, 90, 28)
+        $button.Add_Click({ $this.FindForm().Tag = $this.Tag })
+        $form.Controls.Add($button); $x += 100
+    }
+    $form.Show()
+    Step-Gui
+    return $form
+}
+
 # ── The Rowanholt window ──────────────────────────────────────────────────────
 # Everything the launcher asks or shows happens in one window, as an installer's pages do: a
 # white header with the icon, the page, then Back, Next and Cancel along the bottom. It's shown
@@ -1318,7 +1343,8 @@ function Wait-Docker {
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
         throw 'The docker command isn''t on PATH. Install Docker Desktop and retry.'
     }
-    if (Test-Docker) { return }
+    $readyMark = Join-Path $State 'docker-answered'
+    if (Test-Docker) { Set-Content -Path $readyMark -Value (Get-Date).ToString('s') -ErrorAction SilentlyContinue; return }
     $desktop = Get-DockerDesktop
     if (-not $desktop) {
         throw "Docker isn't running and Docker Desktop isn't installed in $(Split-Path $DockerUserExe) or $(Split-Path $DockerMachineExe). Start Docker and retry."
@@ -1334,20 +1360,38 @@ function Wait-Docker {
         $ErrorActionPreference = 'Stop'
     }
     # Up to 4 minutes; after 90 seconds of Docker Desktop running without an engine that answers,
-    # offer to restart it, once (it stops every app's containers, not only Rowanholt's)
-    $started = Get-Date; $restarted = $false
-    while (((Get-Date) - $started).TotalSeconds -lt 240) {
-        for ($i = 0; $i -lt 10; $i++) { if ($script:Journey) { Show-Journey $script:Journey }; Start-Sleep -Milliseconds 200 }
-        if (Test-Docker 10) { Write-Step 'Docker started'; return }
-        if (-not $restarted -and ((Get-Date) - $started).TotalSeconds -ge 90 -and (Test-DockerDesktopRunning)) {
-            $answer = Show-Message ("Docker Desktop is open, but its engine isn't answering.`r`n`r`n" +
-                "Restart Docker Desktop? Any other app's containers stop and start again with it.") 'YesNo' 'Warning'
-            if ($answer -ne 'Yes') {
-                throw "Docker Desktop is open but its engine isn't answering. Quit Docker Desktop from its tray icon, then open Rowanholt again."
+    # offer to restart it, once (it stops every app's containers, not only Rowanholt's). Docker's
+    # first start creates its WSL VM and can take 10 minutes on a slow PC (11 on the clean-install
+    # VM), so until an engine has answered here once, 20 minutes and no offer before 12. The offer
+    # doesn't block: an engine that answers while it's up closes it and the start carries on
+    $first = -not (Test-Path $readyMark)
+    $limit, $offerAfter = if ($first) { 1200, 720 } else { 240, 90 }
+    if ($first) { Write-Step 'Waiting for Docker (its first start can take 10 minutes)' }
+    $started = Get-Date; $restarted = $false; $question = $null
+    try {
+        while (((Get-Date) - $started).TotalSeconds -lt $limit) {
+            for ($i = 0; $i -lt 10; $i++) { if ($script:Journey) { Show-Journey $script:Journey }; Start-Sleep -Milliseconds 200; if ($script:GuiReady) { Step-Gui } }
+            Assert-NotCancelled
+            if (Test-Docker 10) {
+                Set-Content -Path $readyMark -Value (Get-Date).ToString('s') -ErrorAction SilentlyContinue
+                Write-Step 'Docker started'; return
             }
-            Restart-DockerEngine
-            $started = Get-Date; $restarted = $true
+            if ($question -and $question.Tag) {
+                if ($question.Tag -ne 'Yes') {
+                    throw "Docker Desktop is open but its engine isn't answering. Quit Docker Desktop from its tray icon, then open Rowanholt again."
+                }
+                $question.Close(); $question = $null
+                Restart-DockerEngine
+                $started = Get-Date; $restarted = $true; $limit = 240
+            } elseif (-not $question -and -not $restarted -and ((Get-Date) - $started).TotalSeconds -ge $offerAfter -and
+                      (Test-DockerDesktopRunning)) {
+                $question = Show-Question ("Docker Desktop is open, but its engine isn't answering yet.`r`n`r`n" +
+                    "Restart Docker Desktop? Any other app's containers stop and start again with it. " +
+                    "Rowanholt keeps waiting meanwhile.") 'Restart' 'Stop'
+            }
         }
+    } finally {
+        if ($question) { $question.Close() }
     }
     if (-not (Test-WslReady)) {
         throw "Docker Desktop didn't start: WSL 2, which it runs on, isn't fully installed. Open Rowanholt again and it offers to install it."
