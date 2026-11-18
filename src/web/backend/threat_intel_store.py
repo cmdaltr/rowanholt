@@ -137,10 +137,15 @@ class ThreatIntelStore:
                 existing[key] = 0
                 new.append({f: getattr(indicator, f) for f in FIELDS})
                 keys.append(indicator)
+            rows = []
             for start in range(0, len(new), INSERT_BATCH):
-                # return_defaults fills in each new row's id, which its validity row is keyed by
-                session.bulk_insert_mappings(ThreatIntelIndicatorModel, new[start:start + INSERT_BATCH], return_defaults=True)
-            held = {**{mapping["id"]: indicator for mapping, indicator in zip(new, keys)}, **renewed}
+                # Objects and a flush, not bulk_insert_mappings: on SQLAlchemy 2.0 its return_defaults
+                # doesn't write the ids back, and each validity row is keyed by its indicator's id
+                batch = [ThreatIntelIndicatorModel(**mapping) for mapping in new[start:start + INSERT_BATCH]]
+                session.add_all(batch)
+                session.flush()
+                rows.extend(batch)
+            held = {**{row.id: indicator for row, indicator in zip(rows, keys)}, **renewed}
             self._hold(session, held, validity, lifetimes, now)
             session.commit()
         return len(new), len(indicators) - len(new)

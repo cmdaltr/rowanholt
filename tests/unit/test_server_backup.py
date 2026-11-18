@@ -1,6 +1,7 @@
 """rowanholt server backup: the database dump (read back before it counts), the user store and the
 settings into a dated, owner-only folder, the newest N kept. Run against a copy of the script in a
 temporary tree with a stand-in docker on PATH."""
+import pytest
 import os
 import shutil
 import stat
@@ -54,6 +55,8 @@ def test_state_backed_up_owner_only(tmp_path):
     assert stat.S_IMODE((out / ".env").stat().st_mode) == 0o600
 
 
+@pytest.mark.skipif(hasattr(os, "geteuid") and os.geteuid() == 0,
+                    reason="root reads a mode-0 file anyway, so there's no unreadable store to test")
 def test_root_owned_user_store_read_through_the_backend(tmp_path):
     """The backend writes users.json as root, mode 600: the Mini's nightly run, as the server's user,
     couldn't read it (5 November 2026)."""

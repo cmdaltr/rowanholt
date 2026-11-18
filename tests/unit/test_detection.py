@@ -165,7 +165,12 @@ class RunKeyRecordsTest(unittest.TestCase):
             here = os.getcwd()
             os.chdir(fake.parent)  # the profile writer looks for rip.pl in a few fixed places, ./rip.pl among them
             self.addCleanup(os.chdir, here)
-            with mock.patch.dict(os.environ, {"PATH": f"{fake.parent}:{os.environ['PATH']}"}):
+            # Where RegRipper is installed (the worker image), the profile writer would find the real
+            # one at its fixed paths before ./rip.pl: hide them, so this fake is the one it runs
+            real_exists = os.path.exists
+            hidden = {"/opt/regripper/rip.pl", "/usr/local/bin/rip.pl"}
+            with mock.patch.dict(os.environ, {"PATH": f"{fake.parent}:{os.environ['PATH']}"}), \
+                    mock.patch("os.path.exists", lambda p: p not in hidden and real_exists(p)):
                 extract_registry_system(out, "HOST::Windows", "/", f"{tmp}/SOFTWARE", {}, [], [])
                 extract_registry_profile(out, "HOST::Windows", "/", f"{tmp}/S-1-5-21-1000+NTUSER.DAT", {}, [], [],
                                          "S-1-5-21-1000", "NTUSER.DAT")

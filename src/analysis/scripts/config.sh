@@ -47,9 +47,7 @@ fi
 sudo dpkg -i /tmp/vscode.deb
 
 # installing ShimCacheParser if not installed
-if [ -f "/usr/local/bin/ShimCacheParser.py" ]; then
-    # skip
-else
+if [ ! -f "/usr/local/bin/ShimCacheParser.py" ]; then
     wget https://raw.githubusercontent.com/mandiant/ShimCacheParser/refs/heads/master/ShimCacheParser.py
     sudo mv ShimCacheParser.py /usr/local/bin/
     sudo chown -R root:root /usr/local/bin/ShimCacheParser.py 

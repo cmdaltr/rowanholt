@@ -143,7 +143,9 @@ function AndurilPanel() {
       await new Promise((r) => setTimeout(r, 1500));
       // eslint-disable-next-line no-await-in-loop
       current = await getAndurilOp(op.id);
-      setOps((prev) => [current, ...prev.filter((p) => p.id !== current.id)]);
+      // The updater runs later: give it this poll's answer, not whatever `current` is by then
+      const latest = current;
+      setOps((prev) => [latest, ...prev.filter((p) => p.id !== latest.id)]);
     }
     if (current.state === 'failed') setError(`${current.action} ${current.target}: ${current.error}`);
     loadData();

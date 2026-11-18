@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # The macOS sample case, sourced by tart-vm.sh for `tart-vm.sh sample macos-sample <dest>`
 # (./lab.sh macos-vm sample [dir]); the macOS twin of windows/qemu-vm.sh sample. A fresh Sequoia
 # VM of its own (rowan-lab-macos15-sample, so the lab's rowan-lab-macos is never touched), nothing

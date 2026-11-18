@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # What the lab does inside its Windows VM over SSH, whichever hypervisor runs it: sourced by
 # utm-vm.sh (Apple silicon) and qemu-vm.sh (x86-64). Each sets VM, PORT, SSH, SELF (its own
 # name, for messages), STUCK (where to look when the VM doesn't come up) and vm_status.
