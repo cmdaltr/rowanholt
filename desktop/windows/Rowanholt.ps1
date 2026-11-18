@@ -1467,7 +1467,8 @@ $Phases = @('docker', 'images', 'containers', 'ui')
 # Seconds, until this PC has history of its own
 $Defaults = @{
     warm = @{ docker = 20; images = 4; containers = 12; ui = 45 }
-    cold = @{ docker = 20; images = 900; containers = 25; ui = 90 }
+    # A first start: Docker Desktop's own first start took 6 and 10 minutes on a 4-core VM, the build 44 and 49
+    cold = @{ docker = 420; images = 2400; containers = 25; ui = 180 }
     # An update's rebuild: images there already, most of their steps cached
     rebuild = @{ docker = 20; images = 240; containers = 25; ui = 60 }
 }
@@ -1519,10 +1520,9 @@ function Show-Journey($J) {
     $inPhase = ((Get-Date) - $J.PhaseStarted).TotalSeconds
     $expected = $J.Expected[$J.Phase]
     if ($J.Phase -eq 'images' -and $J.BuildFraction -gt 0.05 -and $inPhase -gt 20) {
-        # Steps aren't equal, so the step count runs ahead early: its pace may lengthen history's
-        # estimate but only shortens it near the end (startup_progress.Journey.remaining)
-        $pace = $inPhase / $J.BuildFraction
-        $expected = if ($J.BuildFraction -ge 0.9) { $pace } else { [math]::Max($expected, $pace) }
+        # Steps aren't equal, so the step count's pace is trusted only near the end
+        # (startup_progress.Journey.remaining)
+        if ($J.BuildFraction -ge 0.9) { $expected = $inPhase / $J.BuildFraction }
     }
     $current = if ($inPhase -lt $expected) { $expected - $inPhase } else { [math]::Max(3, $expected * 0.1) }
     $index = [array]::IndexOf($Phases, $J.Phase)

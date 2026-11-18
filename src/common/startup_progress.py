@@ -39,7 +39,8 @@ PHASES = ["docker", "images", "containers", "ui"]
 # Seconds, until this machine has history of its own
 DEFAULTS = {
     "warm": {"docker": 20, "images": 4, "containers": 12, "ui": 45},
-    "cold": {"docker": 20, "images": 900, "containers": 25, "ui": 90},
+    # A first start's build: 44 and 49 minutes on a 4-core Windows VM; the release notes say 30 to 45
+    "cold": {"docker": 20, "images": 2400, "containers": 25, "ui": 90},
     # An update's rebuild: images there already, most of their steps cached
     "rebuild": {"docker": 20, "images": 240, "containers": 25, "ui": 60},
 }
@@ -132,10 +133,11 @@ class Journey:
         expected = self.expected[self.phase]
         if self.phase == "images" and self.build_fraction and self.build_fraction > 0.05 and elapsed > 20:
             # Steps aren't equal (the worker's apt and tool installs dwarf the rest), so the step
-            # count runs ahead early: its pace may lengthen history's estimate but only shortens
-            # it near the end. Trusted from the start, it said 2 minutes for a 15-minute build
-            pace = elapsed / self.build_fraction
-            expected = pace if self.build_fraction >= 0.9 else max(expected, pace)
+            # count's pace is trusted only near the end. Earlier it runs ahead (2 minutes for a
+            # 15-minute build), and allowed to lengthen the estimate it rose as the long steps
+            # came, holding "35 minutes left" for 40 minutes
+            if self.build_fraction >= 0.9:
+                expected = elapsed / self.build_fraction
         if elapsed < expected:
             current = expected - elapsed
         else:

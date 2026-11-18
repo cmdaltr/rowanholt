@@ -70,26 +70,26 @@ class JourneyTest(unittest.TestCase):
         self.assertEqual(journey.report()["phase"], "containers")
 
     def test_step_count_cannot_shorten_the_estimate_early(self):
-        journey = sp.Journey("cold")  # default 900s for images
+        journey = sp.Journey("cold")
         journey.enter("images")
         self.clock.now += 100
         journey.build_fraction = 0.5  # half the steps in 100s, but the long ones are still to come
         after = sp.DEFAULTS["cold"]["containers"] + sp.DEFAULTS["cold"]["ui"]
-        self.assertEqual(journey.report()["eta"], 800 + after)
+        self.assertEqual(journey.report()["eta"], sp.DEFAULTS["cold"]["images"] - 100 + after)
 
-    def test_a_slow_build_lengthens_the_estimate(self):
+    def test_step_count_cannot_lengthen_the_estimate_either(self):
         journey = sp.Journey("cold")
         journey.enter("images")
-        self.clock.now += 200
-        journey.build_fraction = 0.1  # 10% in 200s: 1800s more, not history's 700
+        self.clock.now += 1200
+        journey.build_fraction = 0.3  # the long steps: the pace says 2800s more, history 1200
         after = sp.DEFAULTS["cold"]["containers"] + sp.DEFAULTS["cold"]["ui"]
-        self.assertEqual(journey.report()["eta"], 1800 + after)
+        self.assertEqual(journey.report()["eta"], sp.DEFAULTS["cold"]["images"] - 1200 + after)
 
     def test_near_the_end_the_build_paces_itself(self):
         journey = sp.Journey("cold")
         journey.enter("images")
         self.clock.now += 180
-        journey.build_fraction = 0.9  # 90% in 180s: 20s more, not 720
+        journey.build_fraction = 0.9  # 90% in 180s: 20s more, not 2220
         after = sp.DEFAULTS["cold"]["containers"] + sp.DEFAULTS["cold"]["ui"]
         self.assertEqual(journey.report()["eta"], 20 + after)
 
