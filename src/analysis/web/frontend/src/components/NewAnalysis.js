@@ -28,7 +28,7 @@ function NewAnalysis() {
 
     // Check operation mode is selected
     if (!options.collect && !options.gandalf && !options.reorganise) {
-      setError('Please select an operation mode (Collect, Gandalf, or Reorganise)');
+      setError('Please select an operation mode (Collect, Custodian, or Reorganise)');
       return;
     }
 
