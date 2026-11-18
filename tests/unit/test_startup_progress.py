@@ -155,6 +155,24 @@ class JourneyTest(unittest.TestCase):
         match = sp.STEP.match("#9 [frontend build 3/6] RUN npm ci")
         self.assertEqual(match.groups(), ("frontend", "3", "6"))
 
+    def test_an_engine_that_goes_stops_compose(self):
+        import subprocess
+        import time
+        # compose, quiet: a sleep in its own session, as compose_up starts it
+        proc = subprocess.Popen(["sleep", "30"], start_new_session=True)
+        watch = sp.EngineWatch(proc, probe=lambda: False, quiet=0.05, every=0.05)
+        self.assertEqual(proc.wait(timeout=5), -9)
+        self.assertTrue(watch.gone)
+        # Quiet, but the engine answers: a long build step, left alone
+        proc = subprocess.Popen(["sleep", "30"], start_new_session=True)
+        watch = sp.EngineWatch(proc, probe=lambda: True, quiet=0.05, every=0.05)
+        time.sleep(0.4)
+        self.assertIsNone(proc.poll())
+        watch.done.set()
+        proc.kill()
+        proc.wait()
+        self.assertFalse(watch.gone)
+
 
 if __name__ == "__main__":
     unittest.main()

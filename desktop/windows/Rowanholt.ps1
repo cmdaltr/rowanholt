@@ -1543,7 +1543,7 @@ function Get-MissingImages {
 }
 
 function Invoke-ComposeUp($J, [string[]]$Extra, [int]$Builds) {
-    # Native output through the pipeline: 'Continue', or Windows PowerShell stops on stderr
+    # 'Continue': a stray error in pacing or the log isn't worth stopping a start for
     $ErrorActionPreference = 'Continue'
     $files = Get-ComposeFiles
     # A cached step is no work, so it counts on neither side (startup_progress.BuildPace): an
@@ -1553,49 +1553,89 @@ function Invoke-ComposeUp($J, [string[]]$Extra, [int]$Builds) {
     $log = Join-Path $State 'compose.log'
     Set-Content -Path $log -Value "$((Get-Date).ToString('s')) docker compose up -d $($Extra -join ' ')" -ErrorAction SilentlyContinue
     $tail = New-Object System.Collections.Generic.Queue[string]
-    Push-Location $Root
-    try {
-        # --progress plain: BuildKit's step counts, to pace a build by
-        docker compose --progress plain @files up -d @Extra 2>&1 | ForEach-Object {
-            $line = "$_"
-            # Windows PowerShell wraps each stderr line in an ErrorRecord; a blank one prints as its type
-            if ($line -eq 'System.Management.Automation.RemoteException') { $line = '' }
-            Add-Content -Path $log -Value $line -ErrorAction SilentlyContinue
-            if ($line.Trim()) { $tail.Enqueue($line.Trim()); if ($tail.Count -gt 12) { [void]$tail.Dequeue() } }
-            $paced = $false
-            if ($line -match $StepLine -and [int]$Matches[3] -gt 0) {
-                $service = $Matches[1]; $n = [int]$Matches[2]; $m = [int]$Matches[3]
-                $ids[$line.Split(' ')[0]] = @($service, $n)
-                $before = if ($steps.ContainsKey($service)) { $steps[$service][0] } else { 0 }
-                $steps[$service] = @([math]::Max($n, $before), $m)
-                $paced = $true
-            } elseif ($line -match '^(#\d+) CACHED\b' -and $ids.ContainsKey($Matches[1])) {
-                $id = $ids[$Matches[1]]
-                if (-not $cached.ContainsKey($id[0])) { $cached[$id[0]] = @{} }
-                $cached[$id[0]][$id[1]] = $true
-                $paced = $true
-            }
-            if ($paced) {
-                $done = 0.0
-                foreach ($service in $steps.Keys) {
-                    $n = $steps[$service][0]; $m = $steps[$service][1]
-                    $skipped = if ($cached.ContainsKey($service)) { $cached[$service].Count } else { 0 }
-                    $done += if ($m -le $skipped) { 1.0 } else { [math]::Max(0, $n - $skipped) / ($m - $skipped) }
-                }
-                $of = [math]::Max(1, [math]::Max($Builds, $steps.Count))
-                $J.BuildFraction = [math]::Min(1.0, $done / $of)
-                $J.Detail = "$($steps.Count) of $of images under way"
-            }
-            if ($line.StartsWith('#')) { Show-Journey $J; return }  # BuildKit's chatter isn't shown
-            if ($J.Phase -eq 'images' -and $line -match '\b(Creating|Created|Starting|Started|Recreate|Running)\b') {
-                Enter-Phase $J 'containers'
-            }
-            Write-Step $line.Trim()
-            Show-Journey $J
+    # Each line of compose's output: paced, logged, shown
+    $handle = {
+        param([string]$line)
+        Add-Content -Path $log -Value $line -ErrorAction SilentlyContinue
+        if ($line.Trim()) { $tail.Enqueue($line.Trim()); if ($tail.Count -gt 12) { [void]$tail.Dequeue() } }
+        $paced = $false
+        if ($line -match $StepLine -and [int]$Matches[3] -gt 0) {
+            $service = $Matches[1]; $n = [int]$Matches[2]; $m = [int]$Matches[3]
+            $ids[$line.Split(' ')[0]] = @($service, $n)
+            $before = if ($steps.ContainsKey($service)) { $steps[$service][0] } else { 0 }
+            $steps[$service] = @([math]::Max($n, $before), $m)
+            $paced = $true
+        } elseif ($line -match '^(#\d+) CACHED\b' -and $ids.ContainsKey($Matches[1])) {
+            $id = $ids[$Matches[1]]
+            if (-not $cached.ContainsKey($id[0])) { $cached[$id[0]] = @{} }
+            $cached[$id[0]][$id[1]] = $true
+            $paced = $true
         }
-        $code = $LASTEXITCODE
-    } finally {
-        Pop-Location
+        if ($paced) {
+            $done = 0.0
+            foreach ($service in $steps.Keys) {
+                $n = $steps[$service][0]; $m = $steps[$service][1]
+                $skipped = if ($cached.ContainsKey($service)) { $cached[$service].Count } else { 0 }
+                $done += if ($m -le $skipped) { 1.0 } else { [math]::Max(0, $n - $skipped) / ($m - $skipped) }
+            }
+            $of = [math]::Max(1, [math]::Max($Builds, $steps.Count))
+            $J.BuildFraction = [math]::Min(1.0, $done / $of)
+            $J.Detail = "$($steps.Count) of $of images under way"
+        }
+        if ($line.StartsWith('#')) { Show-Journey $J; return }  # BuildKit's chatter isn't shown
+        if ($J.Phase -eq 'images' -and $line -match '\b(Creating|Created|Starting|Started|Recreate|Running)\b') {
+            Enter-Phase $J 'containers'
+        }
+        Write-Step $line.Trim()
+        Show-Journey $J
+    }
+    # compose as a process read line by line, not a pipeline: the window keeps moving through a
+    # quiet build step, and an engine that dies mid-build (seen on Windows, its WSL VM gone) is
+    # noticed instead of leaving compose, and the window, waiting on it without a word. Once compose
+    # has been quiet for 2 minutes the engine is asked each minute; two misses in a row stop it
+    $argList = @('compose', '--progress', 'plain') + $files + @('up', '-d') + $Extra
+    $quoted = $argList | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }
+    $info = New-Object System.Diagnostics.ProcessStartInfo (Get-Command docker).Source, ($quoted -join ' ')
+    $info.UseShellExecute = $false; $info.CreateNoWindow = $true; $info.WorkingDirectory = $Root
+    $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
+    $proc = [System.Diagnostics.Process]::Start($info)
+    $readers = @(@{ Stream = $proc.StandardOutput }, @{ Stream = $proc.StandardError })
+    foreach ($r in $readers) { $r.Task = $r.Stream.ReadLineAsync() }
+    $heard = Get-Date; $probed = Get-Date; $misses = 0; $gone = $false
+    while ($readers | Where-Object { $_.Task }) {
+        $any = $false
+        foreach ($r in $readers) {
+            while ($r.Task -and $r.Task.IsCompleted) {
+                $line = $r.Task.Result
+                if ($null -eq $line) { $r.Task = $null; break }
+                & $handle $line
+                $r.Task = $r.Stream.ReadLineAsync()
+                $any = $true; $heard = Get-Date; $misses = 0
+            }
+        }
+        if ($any) { continue }
+        Start-Sleep -Milliseconds 200
+        Show-Journey $J
+        if (((Get-Date) - $heard).TotalSeconds -ge 120 -and ((Get-Date) - $probed).TotalSeconds -ge 60) {
+            $probed = Get-Date
+            $misses = if (Test-Docker 15) { 0 } else { $misses + 1 }
+            if ($misses -ge 2) {
+                # compose and the plugin it runs
+                & taskkill.exe /T /F /PID $proc.Id *> $null
+                $gone = $true
+                break
+            }
+        }
+    }
+    $proc.WaitForExit()
+    $code = $proc.ExitCode
+    # compose that failed because the engine went (its connection dropped rather than hung) says only
+    # what the build was doing: the engine not answering is the news
+    if ($gone -or ($code -ne 0 -and -not (Test-Docker 15))) {
+        Add-Content -Path $log -Value "$((Get-Date).ToString('s')) Docker's engine stopped answering" -ErrorAction SilentlyContinue
+        throw ("Docker's engine stopped answering part-way through the start: its WSL virtual machine has probably gone. " +
+               "Restart Docker Desktop (right-click its icon by the clock > Restart), or restart Windows, then open Rowanholt " +
+               "again: the build carries on from what it had done.")
     }
     if ($code -ne 0) {
         $lines = $tail.ToArray() -join "`n"
@@ -1604,6 +1644,10 @@ function Invoke-ComposeUp($J, [string[]]$Extra, [int]$Builds) {
         $hint = if ($lines -match 'mnt/host/\w+: file exists') {
             "Docker Desktop has lost track of this PC's drives, which happens after it's stopped and " +
             "started. Restart it (right-click its icon by the clock > Restart), then open Rowanholt again.`n`n"
+        } elseif ($lines -match 'rpc error: code = Unavailable|error reading from server: EOF') {
+            # Its VM restarted under the build (Docker Desktop brings it back by itself)
+            "Docker's engine restarted part-way through the build. Open Rowanholt again: the build carries on " +
+            "from what it had done.`n`n"
         } elseif (Select-String -Path $log -Quiet -Pattern 'is not valid yet', 'Not live until', 'certificate has expired or is not yet valid') {
             # A clock that's behind: package lists and certificates look like they're from the future.
             # Found earlier in the build than its last lines, so the whole log is searched

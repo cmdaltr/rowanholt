@@ -19,6 +19,7 @@ import argparse
 import json
 import os
 import re
+import signal
 import ssl
 import statistics
 import subprocess
@@ -47,6 +48,11 @@ MESSAGES = {
     "ui": "Opening Rowanholt",
 }
 HISTORY_KEEP = 20
+# An engine that dies mid-build (seen on Windows, its WSL VM gone) leaves compose waiting on it
+# without a word: once compose has been quiet this long, the engine is asked each ENGINE_PROBE
+# seconds, and two misses in a row stop compose. A quiet build step doesn't trip it: a live
+# engine answers while it builds
+ENGINE_QUIET, ENGINE_PROBE = 120, 60
 STEP = re.compile(r"^#\d+ \[([\w.-]+)(?:\s+[\w.-]+)?\s+(\d+)/(\d+)\]")
 
 
@@ -176,8 +182,43 @@ class Reporter:
             self.tick()
 
 
-def docker_up() -> bool:
-    return subprocess.run(["docker", "info"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+def docker_up(timeout: float = 30) -> bool:
+    # A wedged engine doesn't fail, it hangs
+    try:
+        return subprocess.run(["docker", "info"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                              timeout=timeout).returncode == 0
+    except subprocess.TimeoutExpired:
+        return False
+
+
+class EngineWatch:
+    """Stops proc (compose, and the plugin it runs, in their own session) when Docker's engine has
+    stopped answering: see ENGINE_QUIET."""
+
+    def __init__(self, proc, probe=docker_up, quiet: float = ENGINE_QUIET, every: float = ENGINE_PROBE):
+        self.proc, self.probe, self.quiet, self.every = proc, probe, quiet, every
+        self.last = time.monotonic()
+        self.gone = False
+        self.done = threading.Event()
+        threading.Thread(target=self.run, daemon=True).start()
+
+    def heard(self) -> None:
+        self.last = time.monotonic()
+
+    def run(self) -> None:
+        misses = 0
+        while not self.done.wait(self.every):
+            if time.monotonic() - self.last < self.quiet:
+                misses = 0
+                continue
+            misses = 0 if self.probe() else misses + 1
+            if misses >= 2:
+                self.gone = True
+                try:
+                    os.killpg(self.proc.pid, signal.SIGKILL)
+                except (AttributeError, OSError):
+                    self.proc.kill()
+                return
 
 
 def wake_docker(reporter: Reporter) -> bool:
@@ -295,8 +336,11 @@ def compose_up(compose: List[str], build: bool, journey: Journey, reporter: Repo
     pace = BuildPace(builds)
     logged: set = set()
     tails: Dict[str, deque] = {}
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
+                            start_new_session=True)
+    watch = EngineWatch(proc)
     for raw in proc.stdout:
+        watch.heard()
         text = raw.rstrip("\n")
         if pace.feed(text):
             journey.build_fraction = pace.fraction()
@@ -312,7 +356,13 @@ def compose_up(compose: List[str], build: bool, journey: Journey, reporter: Repo
         if journey.phase == "images" and re.search(r"\b(Creating|Created|Starting|Started|Recreate|Running)\b", text):
             journey.enter("containers")
         reporter.line(text)
-    return proc.wait()
+    watch.done.set()
+    status = proc.wait()
+    if watch.gone:
+        reporter.line("Error: Docker's engine stopped answering part-way through. Restart Docker (OrbStack or "
+                      "Docker Desktop), then start Rowanholt again: the build carries on from what it had done.")
+        return 1
+    return status
 
 
 def wait_for_ui(url: str, journey: Journey, timeout: float) -> bool:
