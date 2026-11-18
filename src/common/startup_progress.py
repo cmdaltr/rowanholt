@@ -92,8 +92,10 @@ def save_history(record: dict) -> None:
         pass
 
 
-def eta_text(seconds: int) -> str:
-    """The time left in words, as the Windows launcher puts it."""
+def eta_text(seconds: int, overrun: int = 0) -> str:
+    """The time left in words, as the Windows launcher puts it; a step well past its estimate says so."""
+    if overrun:
+        return f"Taking longer than expected; still working ({overrun} min on this step)"
     if seconds < 45:
         return "Less than a minute left"
     if seconds < 90:
@@ -128,7 +130,8 @@ class Journey:
             self.done[skipped] = 0.0
         self.phase, self.phase_started, self.detail = phase, now, ""
 
-    def remaining(self) -> float:
+    def phase_expected(self) -> float:
+        """This step's expected length: history's, or near the end of a build its own pace."""
         elapsed = time.time() - self.phase_started
         expected = self.expected[self.phase]
         if self.phase == "images" and self.build_fraction and self.build_fraction > 0.05 and elapsed > 20:
@@ -138,6 +141,18 @@ class Journey:
             # came, holding "35 minutes left" for 40 minutes
             if self.build_fraction >= 0.9:
                 expected = elapsed / self.build_fraction
+        return expected
+
+    def overrun(self) -> int:
+        """Minutes on this step once it's well past its estimate (a slow disk, a build cache that
+        missed), else 0: a time left that never moves reads as a hang. Half an hour of "about
+        2 minutes left" on a Mac whose update rebuilt the worker from scratch"""
+        elapsed = time.time() - self.phase_started
+        return int(round(elapsed / 60)) if elapsed > max(60.0, self.phase_expected() * 1.5) else 0
+
+    def remaining(self) -> float:
+        elapsed = time.time() - self.phase_started
+        expected = self.phase_expected()
         if elapsed < expected:
             current = expected - elapsed
         else:
@@ -152,7 +167,7 @@ class Journey:
         fraction = min(0.99, elapsed / (elapsed + remaining)) if elapsed + remaining > 0 else 0.0
         message = MESSAGES[self.phase] + (f" ({self.detail})" if self.detail else "")
         return {"fraction": round(fraction, 3), "eta": int(round(remaining)), "phase": self.phase,
-                "message": message, "learning": self.learning}
+                "message": message, "learning": self.learning, "overrun": self.overrun()}
 
     def finish(self, ok: bool) -> None:
         self.done[self.phase] = time.time() - self.phase_started
@@ -181,7 +196,7 @@ class Reporter:
         with self.lock:
             if self.zenity:
                 print(int(report["fraction"] * 100), flush=True)
-                print(f"# {report['message']}. {eta_text(report['eta'])}", flush=True)
+                print(f"# {report['message']}. {eta_text(report['eta'], report['overrun'])}", flush=True)
             else:
                 print("@@progress " + json.dumps(report), flush=True)
 

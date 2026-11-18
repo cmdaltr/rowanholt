@@ -109,6 +109,15 @@ class JourneyTest(unittest.TestCase):
         self.assertGreaterEqual(report["eta"], 3)
         self.assertLess(report["fraction"], 1.0)
 
+    def test_a_step_well_past_its_estimate_says_so(self):
+        journey = sp.Journey("rebuild")  # 240s for images
+        journey.enter("images")
+        self.clock.now += 300
+        self.assertEqual(journey.report()["overrun"], 0)
+        self.clock.now += 1500  # a cache that missed: 30 minutes
+        self.assertEqual(journey.report()["overrun"], 30)
+        self.assertEqual(sp.eta_text(60, 30), "Taking longer than expected; still working (30 min on this step)")
+
     def test_finish_records_history(self):
         journey = sp.Journey("warm-server")
         for phase in sp.PHASES[1:]:

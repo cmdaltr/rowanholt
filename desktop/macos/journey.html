@@ -79,7 +79,10 @@ function progress(r) {
   target = Math.max(target, r.fraction);
   finished = r.fraction >= 1;
   document.getElementById('where').textContent = finished ? 'Rowanholt is ready' : 'Starting Rowanholt';
-  document.getElementById('eta').textContent = formatEta(r.eta) + (r.learning && !finished ? ' (a first guess: this Mac has no timings yet)' : '');
+  // A step well past its estimate says so (startup_progress.Journey.overrun), as on Windows
+  document.getElementById('eta').textContent = r.overrun && !finished
+    ? `Taking longer than expected; still working (${r.overrun} min on this step)`
+    : formatEta(r.eta) + (r.learning && !finished ? ' (a first guess: this Mac has no timings yet)' : '');
   document.getElementById('phase').textContent = r.message;
 }
 
