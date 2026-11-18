@@ -53,6 +53,29 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(found.stops, [])
         self.assertEqual(len(found.warnings), 2)
 
+    def test_an_updates_old_images_count_as_free(self):
+        self.assertEqual(len(resources.check(16, 4, 24, building=True).stops), 1)
+        self.assertEqual(resources.check(16, 4, 24, building=True, reclaimable=8).stops, [])
+        found = resources.check(16, 4, 10, building=True, reclaimable=8)
+        self.assertIn("8 GB in Rowanholt's images", found.stops[0])
+
+    def test_own_images_are_only_rowanholts(self):
+        images = ('[{"Repository":"rowanholt-celery-worker","UniqueSize":"6.001GB"},'
+                  '{"Repository":"rowanholt-backend","UniqueSize":"835.4MB"},'
+                  '{"Repository":"rowanholt-frontend","UniqueSize":"2.3GB"},'
+                  '{"Repository":"postgres","UniqueSize":"420.5MB"}]')
+        done = mock.Mock(stdout=images)
+        with mock.patch.object(resources.subprocess, "run", return_value=done):
+            self.assertEqual(resources.own_images_gb(), int(9.1364e9 // resources.GB))
+        with mock.patch.object(resources.subprocess, "run", side_effect=OSError):
+            self.assertEqual(resources.own_images_gb(), 0)
+
+    def test_dockers_sizes(self):
+        self.assertEqual(resources.size_bytes("6.001GB"), 6.001e9)
+        self.assertEqual(resources.size_bytes("59.59MB"), 59.59e6)
+        self.assertEqual(resources.size_bytes("0B"), 0)
+        self.assertEqual(resources.size_bytes("n/a"), 0)
+
     def test_main_exits_1_on_a_stop(self):
         with mock.patch.object(resources, "memory_gb", return_value=4), \
                 mock.patch.object(resources, "free_gb", return_value=100), \

@@ -69,13 +69,36 @@ class JourneyTest(unittest.TestCase):
         self.assertEqual(journey.report()["eta"], 5 + 40)
         self.assertEqual(journey.report()["phase"], "containers")
 
-    def test_build_paces_itself_once_under_way(self):
+    def test_step_count_cannot_shorten_the_estimate_early(self):
         journey = sp.Journey("cold")  # default 900s for images
         journey.enter("images")
         self.clock.now += 100
-        journey.build_fraction = 0.5  # half built in 100s: ~100s more, not 800
-        eta = journey.report()["eta"]
-        self.assertEqual(eta, 100 + sp.DEFAULTS["cold"]["containers"] + sp.DEFAULTS["cold"]["ui"])
+        journey.build_fraction = 0.5  # half the steps in 100s, but the long ones are still to come
+        after = sp.DEFAULTS["cold"]["containers"] + sp.DEFAULTS["cold"]["ui"]
+        self.assertEqual(journey.report()["eta"], 800 + after)
+
+    def test_a_slow_build_lengthens_the_estimate(self):
+        journey = sp.Journey("cold")
+        journey.enter("images")
+        self.clock.now += 200
+        journey.build_fraction = 0.1  # 10% in 200s: 1800s more, not history's 700
+        after = sp.DEFAULTS["cold"]["containers"] + sp.DEFAULTS["cold"]["ui"]
+        self.assertEqual(journey.report()["eta"], 1800 + after)
+
+    def test_near_the_end_the_build_paces_itself(self):
+        journey = sp.Journey("cold")
+        journey.enter("images")
+        self.clock.now += 180
+        journey.build_fraction = 0.9  # 90% in 180s: 20s more, not 720
+        after = sp.DEFAULTS["cold"]["containers"] + sp.DEFAULTS["cold"]["ui"]
+        self.assertEqual(journey.report()["eta"], 20 + after)
+
+    def test_an_updates_rebuild_keeps_its_own_history(self):
+        self.history("cold", (1, 900, 20, 90))
+        self.history("rebuild", (1, 30, 5, 30))
+        self.assertEqual(sp.Journey("cold").expected["images"], 900)
+        self.assertEqual(sp.Journey("rebuild").expected["images"], 30)
+        self.assertEqual(sp.Journey("rebuild-server").expected["images"], sp.DEFAULTS["rebuild"]["images"])
 
     def test_overrun_never_shows_zero(self):
         self.history("warm", (1, 1, 5, 10))

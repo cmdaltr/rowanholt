@@ -618,8 +618,9 @@ function Test-Virtualisation {
 
 # This PC against docs/REQUIREMENTS.md, the numbers src/common/resources.py holds for macOS and
 # Linux: stop under 8 GB of memory, or under 30 GB free on Docker's drive when there are images to
-# build (the build and its cache took 20 GB); warn under 16 GB, 4 processors or 60 GB free.
-# ROWANHOLT_SKIP_CHECKS=1 makes the stops warnings
+# build (the build and its cache took 20 GB); warn under 16 GB, 4 processors or 60 GB free. An
+# update's rebuild counts Rowanholt's own images as free: the start removes them once the new ones
+# are built. ROWANHOLT_SKIP_CHECKS=1 makes the stops warnings
 $MemoryFloorGB = 8; $MemoryMinGB = 16; $CoresMin = 4; $DiskFloorGB = 30; $DiskMinGB = 60
 
 function Get-Resources {
@@ -635,7 +636,27 @@ function Get-Resources {
     }
 }
 
-function Test-Resources($R, [bool]$Building) {
+function Get-OwnImagesGB {
+    # Space Rowanholt's own images hold, each image's unique size (resources.own_images_gb)
+    $ErrorActionPreference = 'Continue'
+    $units = @{ B = 1; KB = 1e3; MB = 1e6; GB = 1e9; TB = 1e12 }
+    try { $images = docker system df -v --format '{{json .Images}}' 2>$null | ConvertFrom-Json } catch { return 0 }
+    $bytes = 0.0
+    foreach ($image in @($images | Where-Object { "$($_.Repository)" -like 'rowanholt-*' })) {
+        if ("$($image.UniqueSize)" -match '^([\d.]+)\s*([kKMGT]?B)$') {
+            $bytes += [double]::Parse($Matches[1], [Globalization.CultureInfo]::InvariantCulture) * $units[$Matches[2]]
+        }
+    }
+    return [int][math]::Floor($bytes / 1GB)
+}
+
+function Remove-ReplacedImages {
+    # The images an update's rebuild replaced, left untagged: Compose's own for this project only
+    $ErrorActionPreference = 'Continue'
+    docker image prune -f --filter label=com.docker.compose.project=rowanholt *> $null
+}
+
+function Test-Resources($R, [bool]$Building, [int]$Reclaimable = 0) {
     $stops = @(); $warnings = @()
     if ($R.MemoryGB -lt $MemoryFloorGB) {
         $stops += "This PC has $($R.MemoryGB) GB of memory; Rowanholt needs at least $MemoryMinGB GB and won't start on less than $MemoryFloorGB GB."
@@ -644,8 +665,9 @@ function Test-Resources($R, [bool]$Building) {
     }
     if ($R.Cores -lt $CoresMin) { $warnings += "This PC has $($R.Cores) processors; Rowanholt needs $CoresMin. Expect it to be slow." }
     if ($null -ne $R.FreeGB) {
-        if ($Building -and $R.FreeGB -lt $DiskFloorGB) {
-            $stops += "$($R.FreeGB) GB is free on $($R.Drive); building Rowanholt's images needs at least $DiskFloorGB GB ($DiskMinGB GB with room for cases). Free some space and open Rowanholt again."
+        if ($Building -and $R.FreeGB + $Reclaimable -lt $DiskFloorGB) {
+            $mine = if ($Reclaimable) { " (and $Reclaimable GB in Rowanholt's images, which the update replaces)" } else { '' }
+            $stops += "$($R.FreeGB) GB is free on $($R.Drive)$mine; building Rowanholt's images needs at least $DiskFloorGB GB ($DiskMinGB GB with room for cases). Free some space and open Rowanholt again."
         } elseif ($R.FreeGB -lt $DiskMinGB) {
             $warnings += "$($R.FreeGB) GB is free on $($R.Drive); Rowanholt needs $DiskMinGB GB with room for cases."
         }
@@ -1446,6 +1468,8 @@ $Phases = @('docker', 'images', 'containers', 'ui')
 $Defaults = @{
     warm = @{ docker = 20; images = 4; containers = 12; ui = 45 }
     cold = @{ docker = 20; images = 900; containers = 25; ui = 90 }
+    # An update's rebuild: images there already, most of their steps cached
+    rebuild = @{ docker = 20; images = 240; containers = 25; ui = 60 }
 }
 $Messages = @{ docker = 'Starting Docker'; images = 'Building images'; containers = 'Starting services'; ui = 'Opening Rowanholt' }
 $HistoryFile = Join-Path $State 'start-history.jsonl'
@@ -1466,7 +1490,7 @@ function New-Journey([string]$Kind) {
         $script:Progress = Show-ProgressPage 'Starting Rowanholt' 'Working out how long it will take' $null
         $script:ProgressKind = 'journey'
     }
-    $base = if ($Kind -like 'cold*') { $Defaults.cold } else { $Defaults.warm }
+    $base = $Defaults[($Kind -split '-')[0]]
     $history = @()
     if (Test-Path $HistoryFile) {
         $history = @(Get-Content $HistoryFile | ForEach-Object { try { $_ | ConvertFrom-Json } catch { $null } } |
@@ -1495,8 +1519,10 @@ function Show-Journey($J) {
     $inPhase = ((Get-Date) - $J.PhaseStarted).TotalSeconds
     $expected = $J.Expected[$J.Phase]
     if ($J.Phase -eq 'images' -and $J.BuildFraction -gt 0.05 -and $inPhase -gt 20) {
-        # The build's own pace beats history once it's under way
-        $expected = $inPhase / $J.BuildFraction
+        # Steps aren't equal, so the step count runs ahead early: its pace may lengthen history's
+        # estimate but only shortens it near the end (startup_progress.Journey.remaining)
+        $pace = $inPhase / $J.BuildFraction
+        $expected = if ($J.BuildFraction -ge 0.9) { $pace } else { [math]::Max($expected, $pace) }
     }
     $current = if ($inPhase -lt $expected) { $expected - $inPhase } else { [math]::Max(3, $expected * 0.1) }
     $index = [array]::IndexOf($Phases, $J.Phase)
@@ -1942,22 +1968,26 @@ try {
         Wait-Docker
         $extra = @(Initialize-AppCopy)
         $missing = @(Get-MissingImages)
-        $kind = if ($missing.Count -or ($extra -contains '--build')) { 'cold' } else { 'warm' }
+        # cold: images to fetch or build; rebuild: an update's, over images already here
+        $rebuilding = $extra -contains '--build'
+        $kind = if ($missing.Count) { 'cold' } elseif ($rebuilding) { 'rebuild' } else { 'warm' }
         if ($kind -ne $script:Journey.Kind) {
             $fresh = New-Journey $kind
             $fresh.Started = $script:Journey.Started
             $fresh.PhaseStarted = $script:Journey.PhaseStarted
             $script:Journey = $fresh
         }
-        $found = Test-Resources (Get-Resources) ($kind -eq 'cold')
+        $reclaimable = if ($rebuilding) { Get-OwnImagesGB } else { 0 }
+        $found = Test-Resources (Get-Resources) ($kind -ne 'warm') $reclaimable
         if ($found.Stops.Count) { throw ($found.Stops -join ' ') }
         if ($missing.Count) { Write-Step "$($missing.Count) images to fetch or build: the first start takes a while" }
         else { Write-Step 'Starting the containers' }
         Enter-Phase $script:Journey 'images'
         Invoke-ComposeUp $script:Journey $extra $missing.Count
         if ($script:Journey.Phase -eq 'images') { Enter-Phase $script:Journey 'containers' }
-        if ($extra -contains '--build') {
+        if ($rebuilding) {
             Copy-Item (Join-Path $Root '.rowanholt-version') (Join-Path $Root '.rowanholt-built') -Force
+            Remove-ReplacedImages
         }
         Enter-Phase $script:Journey 'ui'
         $deadline = (Get-Date).AddMinutes(15)

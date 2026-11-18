@@ -40,6 +40,8 @@ PHASES = ["docker", "images", "containers", "ui"]
 DEFAULTS = {
     "warm": {"docker": 20, "images": 4, "containers": 12, "ui": 45},
     "cold": {"docker": 20, "images": 900, "containers": 25, "ui": 90},
+    # An update's rebuild: images there already, most of their steps cached
+    "rebuild": {"docker": 20, "images": 240, "containers": 25, "ui": 60},
 }
 MESSAGES = {
     "docker": "Starting Docker",
@@ -105,7 +107,7 @@ class Journey:
         self.kind = kind
         history = load_history(kind)
         self.learning = len(history) == 0
-        base = DEFAULTS["cold" if kind.startswith("cold") else "warm"]
+        base = DEFAULTS[kind.split("-")[0]]
         self.expected = {}
         for phase in PHASES:
             seen = [r["phases"][phase] for r in history if phase in r.get("phases", {})]
@@ -129,8 +131,11 @@ class Journey:
         elapsed = time.time() - self.phase_started
         expected = self.expected[self.phase]
         if self.phase == "images" and self.build_fraction and self.build_fraction > 0.05 and elapsed > 20:
-            # The build's own pace beats history once it's under way
-            expected = elapsed / self.build_fraction
+            # Steps aren't equal (the worker's apt and tool installs dwarf the rest), so the step
+            # count runs ahead early: its pace may lengthen history's estimate but only shortens
+            # it near the end. Trusted from the start, it said 2 minutes for a 15-minute build
+            pace = elapsed / self.build_fraction
+            expected = pace if self.build_fraction >= 0.9 else max(expected, pace)
         if elapsed < expected:
             current = expected - elapsed
         else:
@@ -242,6 +247,17 @@ def wake_docker(reporter: Reporter) -> bool:
             return True
     reporter.line("Error: Docker did not start in time. Please start it manually.")
     return False
+
+
+def remove_replaced_images() -> None:
+    """The images an update's rebuild replaced, left untagged: each update would otherwise keep
+    its predecessor's 8 to 15 GB for good. Only Compose's own for this project."""
+    try:
+        subprocess.run(["docker", "image", "prune", "-f", "--filter",
+                        f"label=com.docker.compose.project={resources.PROJECT}"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=300)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
 
 
 def missing_images(compose: List[str]) -> List[str]:
@@ -408,14 +424,15 @@ def main(argv: List[str]) -> int:
         if not wake_docker(reporter):
             return 1
         missing = missing_images(compose)
-        cold = bool(missing) or args.build
-        kind = ("cold" if cold else "warm") + ("-server" if args.server else "")
+        # cold: images to fetch or build; rebuild: an update's, over images already here
+        cold = bool(missing)
+        kind = ("cold" if cold else "rebuild" if args.build else "warm") + ("-server" if args.server else "")
         if kind != journey.kind:
             fresh = Journey(kind)
             fresh.started, fresh.phase_started = journey.started, journey.phase_started
             journey = reporter.journey = fresh
         builds = len(missing) if missing else 0
-        found = resources.check_here(cold)
+        found = resources.check_here(cold, rebuilding=args.build)
         for text in found.stops:
             reporter.line(f"Error: {text}")
         for text in found.warnings:
@@ -428,6 +445,8 @@ def main(argv: List[str]) -> int:
         status = compose_up(compose, args.build, journey, reporter, builds)
         if status != 0:
             return status
+        if args.build:
+            remove_replaced_images()
         if journey.phase == "images":
             journey.enter("containers")
         journey.enter("ui")

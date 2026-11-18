@@ -704,13 +704,13 @@ let startHistory: URL = {
 }()
 
 /// The median of this Mac's last 20 local starts, in seconds: startup_progress.py's
-/// (warm, cold) and the app's own when it had no progress reports (app)
+/// (warm, cold, rebuild) and the app's own when it had no progress reports (app)
 func typicalStart() -> Double? {
     guard let text = try? String(contentsOf: startHistory, encoding: .utf8) else { return nil }
     let totals = text.split(whereSeparator: \.isNewline).compactMap { line -> Double? in
         guard let data = line.data(using: .utf8),
               let record = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let kind = record["kind"] as? String, ["warm", "cold", "app"].contains(kind) else { return nil }
+              let kind = record["kind"] as? String, ["warm", "cold", "rebuild", "app"].contains(kind) else { return nil }
         return (record["total"] as? NSNumber)?.doubleValue
     }.suffix(20).sorted()
     guard !totals.isEmpty else { return nil }

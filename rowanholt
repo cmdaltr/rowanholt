@@ -251,6 +251,7 @@ stack() {
             check_resources || exit 1
             compose_cmd up -d $BUILD_FLAG || exit 1
             [ -n "$BUILD_FLAG" ] && printf '%s\n' "$BUILT_VERSION" > "$ROOT/.rowanholt-built"
+            [ -n "$BUILD_FLAG" ] && remove_replaced_images
             print_urls
             # Not `$FOLLOW_LOGS && ...`: without --logs that leaves start's exit status at 1
             if $FOLLOW_LOGS; then compose_cmd logs -f; fi
@@ -357,7 +358,8 @@ check_resources() {
     progress_python || return 0
     local building=() image
     if [ -n "$BUILD_FLAG" ]; then
-        building=(--building)
+        # An update's rebuild: the images it replaces count as free
+        building=(--rebuilding)
     else
         while read -r image; do
             [ -n "$image" ] || continue
@@ -365,6 +367,12 @@ check_resources() {
         done < <(compose_cmd config --images 2>/dev/null)
     fi
     "$PYTHON" "$ROOT/src/common/resources.py" "${building[@]}"
+}
+
+# The images an update's rebuild replaced, left untagged (startup_progress.remove_replaced_images):
+# Compose's own for this project only
+remove_replaced_images() {
+    docker image prune -f --filter label=com.docker.compose.project=rowanholt &>/dev/null || true
 }
 
 # start --progress: src/common/startup_progress.py wakes Docker, starts the stack and
