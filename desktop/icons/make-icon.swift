@@ -55,26 +55,26 @@ let background = CGGradient(colorsSpace: sRGB,
                             locations: [0, 1])!
 ctx.drawLinearGradient(background, start: CGPoint(x: 0, y: tile.maxY), end: CGPoint(x: 0, y: tile.minY), options: [])
 
-// The whole arch (x 258 to 1263 in the logo, so its middle is x 760), stopping above the lettering:
-// the bottom fades where the O reaches into it, and the R's bowl, behind the arch's left foot, goes
-// with both feet below y 462. The flourish is cropped about its gem (x 772)
-// and its arms faded before they meet the R and L swashes. Each is centred on its own middle, and
-// the art fills the tile as far as it can: the arch's sides run off its edges (Ben's call)
-let dome = faded(CGRect(x: 256, y: 20, width: 1009, height: 522), bottom: 0.2,
+// The arch (x 258 to 1263 in the logo, so its middle is x 760) from below its gold band (y 26 to 56,
+// its inner edge narrower still: from y 90, the sky) down to the lettering: the bottom fades where the
+// O reaches into it, and the R's bowl, behind the arch's left foot, goes with both feet below y 462.
+// The flourish is cropped about its gem (x 772) and its arms faded before they meet the R and L
+// swashes. The scene fills the tile from its top edge, big enough that the arch's sides fall outside
+// the corners (Ben's call: no gold at the top, and the cabin cut at the right)
+let dome = faded(CGRect(x: 256, y: 90, width: 1009, height: 452), bottom: 0.2,
                  clear: [CGRect(x: 256, y: 462, width: 34, height: 80), CGRect(x: 1231, y: 462, width: 34, height: 80)])
 let flourish = faded(CGRect(x: 412, y: 770, width: 720, height: 205), left: 0.22, right: 0.22)
 
-let scale: CGFloat = 1.12
+let scale: CGFloat = 1.45
 let domeSize = CGSize(width: CGFloat(dome.width) * scale, height: CGFloat(dome.height) * scale)
-let flourishScale: CGFloat = 1.08
+let flourishScale: CGFloat = 1.0
 let flourishSize = CGSize(width: CGFloat(flourish.width) * flourishScale, height: CGFloat(flourish.height) * flourishScale)
-let overlap: CGFloat = 64
-let total = domeSize.height + flourishSize.height - overlap
-let bottom = tile.midY - total / 2
-ctx.draw(flourish, in: CGRect(x: tile.midX - flourishSize.width / 2, y: bottom,
-                              width: flourishSize.width, height: flourishSize.height))
-ctx.draw(dome, in: CGRect(x: tile.midX - domeSize.width / 2, y: bottom + flourishSize.height - overlap,
+let overlap: CGFloat = 50
+let domeBottom = tile.maxY - domeSize.height
+ctx.draw(dome, in: CGRect(x: tile.midX - domeSize.width / 2, y: domeBottom,
                           width: domeSize.width, height: domeSize.height))
+ctx.draw(flourish, in: CGRect(x: tile.midX - flourishSize.width / 2, y: domeBottom + overlap - flourishSize.height,
+                              width: flourishSize.width, height: flourishSize.height))
 
 let rep = NSBitmapImageRep(cgImage: ctx.makeImage()!)
 try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: args[2]))
