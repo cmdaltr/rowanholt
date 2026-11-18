@@ -405,8 +405,9 @@ const AccountPage = () => {
           )}
 
           {/* Security Tab */}
-          {activeTab === 'security' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1px 1fr', gap: '2rem' }}>
+          {/* Always there, only hidden: MFA is read once as the page opens, not on every visit to the tab */}
+          {(
+            <div style={{ display: activeTab === 'security' ? 'grid' : 'none', gridTemplateColumns: '1fr 1px 1fr', gap: '2rem' }}>
               {/* Left side - Change Password */}
               <div>
                 <h3 style={{ marginBottom: '1.5rem' }}>Change Password</h3>

@@ -127,6 +127,7 @@ const MfaPanels = () => {
       <div>
         <h3 style={{ marginBottom: '1.5rem' }}>Multi-Factor Authentication</h3>
         {alert}
+        {intro}
       </div>
     );
   }
@@ -138,7 +139,7 @@ const MfaPanels = () => {
         {alert}
         {intro}
         <p data-testid="mfa-unavailable" style={{ color: '#66d9ef', fontSize: '0.9rem' }}>{status.message}</p>
-        <h4 style={{ color: '#f0dba5', marginBottom: '1rem', marginTop: '3rem', paddingTop: '3rem', borderTop: '1px solid #3f4b2a' }}>Backup Codes</h4>
+        <h4 style={{ color: '#f0dba5', marginBottom: '1rem', marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid #3f4b2a' }}>Backup Codes</h4>
         <p style={{ color: '#a09580', fontSize: '0.9rem' }}>
           {status.reason === 'sso'
             ? 'Your identity provider handles recovery if you lose your device.'
@@ -151,13 +152,13 @@ const MfaPanels = () => {
   const codeInput = (label, hint) => (
     <div className="form-group">
       <label htmlFor="mfa-code">{label}</label>
-      <input id="mfa-code" type="text" inputMode="text" autoComplete="one-time-code" value={code}
+      <input id="mfa-code" type="text" inputMode="text" autoComplete="one-time-code" value={code} autoFocus
         onChange={(e) => setCode(e.target.value)} placeholder={hint} required disabled={busy} />
     </div>
   );
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
       <h3 style={{ marginBottom: '1.5rem' }}>Multi-Factor Authentication</h3>
       {alert}
       {status.required && !status.enabled && (
@@ -232,7 +233,9 @@ const MfaPanels = () => {
         </form>
       )}
 
-      <h4 style={{ color: '#f0dba5', marginBottom: '1rem', marginTop: '3rem', paddingTop: '3rem', borderTop: '1px solid #3f4b2a' }}>Backup Codes</h4>
+      {/* At the foot of the column, so Generate lines up with Change Password */}
+      <div style={{ marginTop: 'auto', paddingTop: '1.5rem' }}>
+      <h4 style={{ color: '#f0dba5', marginBottom: '1rem', paddingTop: '1.5rem', borderTop: '1px solid #3f4b2a' }}>Backup Codes</h4>
 
       <p style={{ marginBottom: '1rem', color: '#a09580', fontSize: '0.9rem' }}>
         Each signs in once if you lose your authenticator. Making new ones replaces them all.
@@ -263,6 +266,7 @@ const MfaPanels = () => {
           </div>
         </form>
       )}
+      </div>
     </div>
   );
 };
