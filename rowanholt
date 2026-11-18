@@ -417,7 +417,9 @@ other_stack_running() {
 # rowanholt-app, its stack is replaced, its data copied into rowanholt-app's volumes and its images
 # tagged with the new names, so it carries on where it was rather than starting empty and building
 # from scratch. The old volumes stay, since a git clone here may share them: the last line says how
-# to remove them. Caches, Redis's queue and Andúril's token are made afresh. .rowanholt-project marks
+# to remove them. Caches, Redis's queue and Andúril's token are made afresh, and Splunk's and
+# Elastic's indexes aren't copied: an export rebuilds them, and those under rowanholt are often a
+# clone's, gigabytes of them, which the app never ran. .rowanholt-project marks
 # it done; until then Docker is started first, so the check can't pass for want of an engine
 move_to_app_project() {
     $APP_COPY && [ ! -f "$ROOT/.rowanholt-project" ] || return 0
@@ -441,7 +443,7 @@ copy_to_app_project() {
         --filter "label=com.docker.compose.project.working_dir=$ROOT")
     # shellcheck disable=SC2086 # one container ID per word
     [ -n "$old" ] && docker rm -f $old >/dev/null
-    for name in postgres_data rowanholt_uploads navigator_data splunk_etc splunk_var elastic_data; do
+    for name in postgres_data rowanholt_uploads navigator_data; do
         from="rowanholt_$name"
         to="${APP_PROJECT}_$name"
         docker volume inspect "$from" &>/dev/null || continue

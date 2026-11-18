@@ -674,7 +674,8 @@ function Set-ComposeProject {
 # A copy from before rowanholt-app, on its first start as it: its stack replaced, its data copied
 # into rowanholt-app's volumes and its images tagged with the new names, so it carries on where it
 # was rather than starting empty and building from scratch. The old volumes stay (a git clone may
-# share them); caches, Redis's queue and Andúril's token are made afresh. .rowanholt-project marks
+# share them); caches, Redis's queue and Andúril's token are made afresh, and Splunk's and Elastic's
+# indexes aren't copied (an export rebuilds them). .rowanholt-project marks
 # it done. Docker must be up (Wait-Docker), or the check would pass for want of an engine
 function Move-ToAppProject {
     if (-not $script:AppCopy -or (Test-Path (Join-Path $Root '.rowanholt-project'))) { return }
@@ -689,7 +690,7 @@ function Move-ToAppProject {
             $ids = @(docker ps -aq --filter label=com.docker.compose.project=rowanholt 2>$null | Where-Object { $_ } | Where-Object {
                 (docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' $_ 2>$null) -eq $Root })
             if ($ids.Count) { docker rm -f $ids *> $null }
-            foreach ($name in 'postgres_data', 'rowanholt_uploads', 'navigator_data', 'splunk_etc', 'splunk_var', 'elastic_data') {
+            foreach ($name in 'postgres_data', 'rowanholt_uploads', 'navigator_data') {
                 $from = "rowanholt_$name"; $to = "${AppProject}_$name"
                 docker volume inspect $from *> $null; if ($LASTEXITCODE -ne 0) { continue }
                 docker volume inspect $to *> $null; if ($LASTEXITCODE -eq 0) { continue }
