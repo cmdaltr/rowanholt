@@ -59,11 +59,17 @@ if [ -z "$root" ]; then
 fi
 [ -n "$root" ] || root="$HOME/Rowanholt"
 
-# Whose stack is running: compose records the folder it was started from on each container. The app's
-# copy is ours to stop and clear; a git checkout's is someone's working tree, and shares the volume
-# names, so then the Docker data is left alone too
+# The app's copy runs as the Compose project rowanholt-app (the launcher's compose_project), all of
+# it ours to stop and clear. A copy from before that (2.1.0) ran as rowanholt, which is also a git
+# checkout's: compose records the folder each container was started from, and a checkout's is
+# someone's working tree, so then the rowanholt stack and data are left alone. Once the copy has
+# moved to rowanholt-app (.rowanholt-project), rowanholt's data is never the app's to remove
 docker_ok=
 command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1 && docker_ok=1
+moved=
+[ -f "$root/.rowanholt-project" ] && moved=1
+app_stack=
+[ -n "$docker_ok" ] && app_stack=$(docker ps -aq --filter label=com.docker.compose.project=rowanholt-app 2>/dev/null || true)
 stack_dirs=
 [ -n "$docker_ok" ] && stack_dirs=$(docker ps -a --filter label=com.docker.compose.project=rowanholt \
     --format '{{.Label "com.docker.compose.project.working_dir"}}' 2>/dev/null | sort -u || true)
@@ -82,14 +88,20 @@ if [ $os = mac ] && pgrep -xq Rowanholt; then
 fi
 if [ -z "$docker_ok" ]; then
     ok "Docker isn't running: nothing to stop"
-elif [ -n "$checkout_stack" ]; then
-    ok "The stack running is the checkout at $checkout_stack, not the app's: left running"
-elif [ -n "$stack_dirs" ]; then
-    # Stopping ends any analysis mid-run, as `rowanholt stop` does; the volumes stay until step 4
-    docker compose -p rowanholt down --remove-orphans >/dev/null 2>&1 || die "couldn't stop the stack (docker compose -p rowanholt down)"
-    ok "Stack stopped"
 else
-    ok "Not running"
+    # Stopping ends any analysis mid-run, as `rowanholt stop` does; the volumes stay until step 4
+    if [ -n "$app_stack" ]; then
+        docker compose -p rowanholt-app down --remove-orphans >/dev/null 2>&1 || die "couldn't stop the stack (docker compose -p rowanholt-app down)"
+        ok "Stack stopped"
+    fi
+    if [ -n "$checkout_stack" ]; then
+        ok "The stack running is the checkout at $checkout_stack, not the app's: left running"
+    elif [ -n "$stack_dirs" ] && [ -z "$moved" ]; then
+        docker compose -p rowanholt down --remove-orphans >/dev/null 2>&1 || die "couldn't stop the stack (docker compose -p rowanholt down)"
+        ok "Stack stopped"
+    elif [ -z "$app_stack" ]; then
+        ok "Not running"
+    fi
 fi
 
 step "Removing the app"
@@ -163,12 +175,20 @@ fi
 step "Rowanholt's Docker data"
 if [ -z "$docker_ok" ]; then
     ok "Docker isn't running: nothing checked (start it and run this again to remove the data)"
-elif [ -n "$checkout_stack" ]; then
-    ok "Kept: the checkout at $checkout_stack uses the same volumes"
 else
-    volumes=$(docker volume ls -q --filter label=com.docker.compose.project=rowanholt 2>/dev/null || true)
-    images=$( { docker images -q --filter label=com.docker.compose.project=rowanholt
-                docker images --format '{{.Repository}} {{.ID}}' | awk '$1 ~ /^rowanholt-/ { print $2 }'; } 2>/dev/null | sort -u)
+    projects=rowanholt-app
+    if [ -n "$moved" ]; then
+        :
+    elif [ -n "$checkout_stack" ]; then
+        note "Kept: rowanholt's volumes, which the checkout at $checkout_stack uses"
+    else
+        projects="rowanholt-app rowanholt"  # a copy from before rowanholt-app
+    fi
+    volumes=$(for p in $projects; do docker volume ls -q --filter label=com.docker.compose.project=$p; done 2>/dev/null || true)
+    pattern='^rowanholt-app-'
+    case "$projects" in *" rowanholt") pattern='^rowanholt-' ;; esac
+    images=$( { for p in $projects; do docker images -q --filter label=com.docker.compose.project=$p; done
+                docker images --format '{{.Repository}} {{.ID}}' | awk -v re="$pattern" '$1 ~ re { print $2 }'; } 2>/dev/null | sort -u)
     nv=$(printf '%s\n' "$volumes" | grep -c . || true)
     ni=$(printf '%s\n' "$images" | grep -c . || true)
     if [ "$nv" -eq 0 ] && [ "$ni" -eq 0 ]; then

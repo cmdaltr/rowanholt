@@ -31,7 +31,9 @@ CORES_MIN = 4
 DISK_FLOOR_GB = 30
 DISK_MIN_GB = 60
 GB = 1024 ** 3
-PROJECT = "rowanholt"  # docker-compose.yml's name, which Compose labels its images with
+# The Compose project, which Compose labels its images with: docker-compose.yml's name, or the desktop
+# app's copy's own (rowanholt-app), which the launcher sets in COMPOSE_PROJECT_NAME
+PROJECT = os.environ.get("COMPOSE_PROJECT_NAME") or "rowanholt"
 UNITS = {"B": 1, "kB": 1e3, "KB": 1e3, "MB": 1e6, "GB": 1e9, "TB": 1e12}
 
 

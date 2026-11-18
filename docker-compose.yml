@@ -124,7 +124,8 @@ services:
   # Opt-in: it holds the Docker socket, which is root-equivalent on the Docker
   # VM. Enable with `rowanholt anduril enable` (or --profile anduril). It is only
   # reachable from the backend over the internal rowanholt-anduril network and
-  # refuses anything not labelled com.docker.compose.project=rowanholt.
+  # refuses anything not labelled with this stack's project: rowanholt, or the desktop
+  # app's copy's rowanholt-app (the launcher's compose_project).
   anduril:
     profiles: [anduril]
     build:
@@ -132,7 +133,7 @@ services:
       dockerfile: src/web/anduril/Dockerfile
     container_name: rowanholt-anduril
     environment:
-      - ROWANHOLT_COMPOSE_PROJECT=rowanholt
+      - ROWANHOLT_COMPOSE_PROJECT=${COMPOSE_PROJECT_NAME:-rowanholt}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock # Docker Desktop and OrbStack both expose this path
       - anduril_token:/run/anduril

@@ -174,6 +174,7 @@ src/acquisition/tools/disk_tools.zip
 docker-compose.local.yml
 .rowanholt-version
 .rowanholt-built
+.rowanholt-project
 
 # A server's own TLS certificate and key (deploy/server/certs/README)
 deploy/server/certs/*

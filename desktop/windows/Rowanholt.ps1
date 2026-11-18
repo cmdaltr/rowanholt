@@ -653,7 +653,63 @@ function Get-OwnImagesGB {
 function Remove-ReplacedImages {
     # The images an update's rebuild replaced, left untagged: Compose's own for this project only
     $ErrorActionPreference = 'Continue'
-    docker image prune -f --filter label=com.docker.compose.project=rowanholt *> $null
+    docker image prune -f --filter "label=com.docker.compose.project=$script:Project" *> $null
+}
+
+# The app's copy (.rowanholt-version, no .git) runs as the Compose project rowanholt-app, so a git
+# clone on the same PC, which keeps docker-compose.yml's rowanholt, never shares its images or
+# volumes (the launcher's compose_project). A copy that ran before rowanholt-app (2.1.0) stays
+# rowanholt, for Stop too, until its next start moves it across (Move-ToAppProject)
+$AppProject = 'rowanholt-app'
+$script:Project = 'rowanholt'
+function Set-ComposeProject {
+    $script:AppCopy = (Test-Path (Join-Path $Root '.rowanholt-version')) -and -not (Test-Path (Join-Path $Root '.git'))
+    $moved = Test-Path (Join-Path $Root '.rowanholt-project')
+    $built = Test-Path (Join-Path $Root '.rowanholt-built')
+    if ($script:AppCopy -and ($moved -or -not $built)) { $env:COMPOSE_PROJECT_NAME = $AppProject }
+    else { Remove-Item Env:COMPOSE_PROJECT_NAME -ErrorAction SilentlyContinue }
+    $script:Project = if ($env:COMPOSE_PROJECT_NAME) { $env:COMPOSE_PROJECT_NAME } else { 'rowanholt' }
+}
+
+# A copy from before rowanholt-app, on its first start as it: its stack replaced, its data copied
+# into rowanholt-app's volumes and its images tagged with the new names, so it carries on where it
+# was rather than starting empty and building from scratch. The old volumes stay (a git clone may
+# share them); caches, Redis's queue and Andúril's token are made afresh. .rowanholt-project marks
+# it done. Docker must be up (Wait-Docker), or the check would pass for want of an engine
+function Move-ToAppProject {
+    if (-not $script:AppCopy -or (Test-Path (Join-Path $Root '.rowanholt-project'))) { return }
+    $env:COMPOSE_PROJECT_NAME = $AppProject
+    $script:Project = $AppProject
+    $ErrorActionPreference = 'Continue'
+    if (Test-Path (Join-Path $Root '.rowanholt-built')) {
+        docker volume inspect "${AppProject}_postgres_data" *> $null; $have = $LASTEXITCODE -eq 0
+        docker volume inspect rowanholt_postgres_data *> $null; $old = $LASTEXITCODE -eq 0
+        if (-not $have -and $old) {
+            Write-Step "This copy now runs as its own Docker project ($AppProject): moving its stack, data and images across (once)"
+            $ids = @(docker ps -aq --filter label=com.docker.compose.project=rowanholt 2>$null | Where-Object { $_ } | Where-Object {
+                (docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' $_ 2>$null) -eq $Root })
+            if ($ids.Count) { docker rm -f $ids *> $null }
+            foreach ($name in 'postgres_data', 'rowanholt_uploads', 'navigator_data', 'splunk_etc', 'splunk_var', 'elastic_data') {
+                $from = "rowanholt_$name"; $to = "${AppProject}_$name"
+                docker volume inspect $from *> $null; if ($LASTEXITCODE -ne 0) { continue }
+                docker volume inspect $to *> $null; if ($LASTEXITCODE -eq 0) { continue }
+                docker volume create --label "com.docker.compose.project=$AppProject" --label "com.docker.compose.volume=$name" $to *> $null
+                docker run --rm -v "${from}:/from:ro" -v "${to}:/to" postgres:16-alpine sh -c 'cp -a /from/. /to/' *> $null
+                if ($LASTEXITCODE -ne 0) { throw "Couldn't copy the Docker volume $from to $to." }
+                Write-Step "$from copied to $to"
+            }
+            $files = Get-ComposeFiles
+            Push-Location $Root
+            try { $images = docker compose @files config --images 2>$null } finally { Pop-Location }
+            foreach ($image in @($images | Where-Object { $_ -like "$AppProject-*" })) {
+                docker image inspect $image *> $null; if ($LASTEXITCODE -eq 0) { continue }
+                $was = 'rowanholt-' + $image.Substring($AppProject.Length + 1)
+                docker image inspect $was *> $null; if ($LASTEXITCODE -ne 0) { continue }
+                docker tag $was $image *> $null
+            }
+        }
+    }
+    Set-Content -Path (Join-Path $Root '.rowanholt-project') -Value $AppProject -Encoding ASCII
 }
 
 function Test-Resources($R, [bool]$Building, [int]$Reclaimable = 0) {
@@ -1939,6 +1995,7 @@ try {
             Start-Sleep -Seconds 4
             exit 0
         }
+        Set-ComposeProject
         Wait-Docker
         Write-Host 'Stopping Rowanholt...'
         Invoke-Compose @('down', '--remove-orphans')
@@ -1954,6 +2011,7 @@ try {
         if ($Server) { $Url = $Server; Close-Wizard; Open-Window; Invoke-UpdateCheck }
         exit 0
     }
+    Set-ComposeProject
     # One start at a time: a second launch (a double-click) waits for the first, then finds the
     # frontend answering and only opens a window, instead of a second 'up' racing the first. The
     # first one has answered the update offer, so a launch that waited doesn't ask it again
@@ -1975,6 +2033,7 @@ try {
         $script:Journey = New-Journey 'warm'
         Show-Journey $script:Journey
         Wait-Docker
+        Move-ToAppProject
         $extra = @(Initialize-AppCopy)
         $missing = @(Get-MissingImages)
         # cold: images to fetch or build; rebuild: an update's, over images already here

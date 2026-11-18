@@ -769,7 +769,7 @@ In Docker the worker gets `SPLUNK_HOST`, `SPLUNK_PASSWORD` and `ELASTICSEARCH_HO
 
 ## Docker Administration (Quartermaster)
 
-`rowanholt quartermaster` (alias of `rowanholt anduril`) manages Rowanholt's own containers and images on Docker Desktop or OrbStack. It finds the engine running Rowanholt, even when another Docker context is active. It only lists or touches containers labelled with the `rowanholt` compose project and named `rowanholt-*`, plus the images they use. Nothing else on the engine is visible to it. `rowanholt aragorn` still works as an alias, from before Quartermaster had its own name.
+`rowanholt quartermaster` (alias of `rowanholt anduril`) manages Rowanholt's own containers and images on Docker Desktop or OrbStack. It finds the engine running Rowanholt, even when another Docker context is active. It only lists or touches containers labelled with this copy's compose project (`rowanholt`, or `rowanholt-app` for a copy the desktop app unpacked) and named `rowanholt-*`, plus the images they use. Nothing else on the engine is visible to it. `rowanholt aragorn` still works as an alias, from before Quartermaster had its own name.
 
 ```bash
 rowanholt anduril status                    # containers, state, health, image

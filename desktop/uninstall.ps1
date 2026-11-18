@@ -34,6 +34,11 @@ $rootFile = Join-Path $state "root"
 $root = if (Test-Path $rootFile) { (Get-Content $rootFile -Raw).Trim() } else { $null }
 # Only a copy setup unpacked is Rowanholt's to delete; a clone is the user's
 $ours = $root -and (Test-Path (Join-Path $root ".rowanholt-version")) -and -not (Test-Path (Join-Path $root ".git"))
+# The app's copy runs as the Compose project rowanholt-app (Rowanholt.ps1's Set-ComposeProject). A copy
+# from before that (2.1.0) ran as rowanholt, a git clone's project too: once the copy has moved across
+# (.rowanholt-project), rowanholt's stack and volumes are never the app's to stop or remove
+$moved = $root -and (Test-Path (Join-Path $root ".rowanholt-project"))
+$projects = if ($moved) { @("rowanholt-app") } else { @("rowanholt-app", "rowanholt") }
 
 function Test-Docker {
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { return $false }
@@ -53,7 +58,7 @@ if (-not $docker) {
     Done "Docker isn't running: nothing to stop"
 } else {
     $ErrorActionPreference = "Continue"
-    $running = @(docker ps -q --filter "label=com.docker.compose.project=rowanholt" 2>$null)
+    $running = @(foreach ($p in $projects) { docker ps -q --filter "label=com.docker.compose.project=$p" 2>$null })
     if ($running.Count) {
         docker stop $running *> $null
         docker rm $running *> $null
@@ -92,7 +97,7 @@ Step "The data"
 $volumes = @()
 if ($docker) {
     $ErrorActionPreference = "Continue"
-    $volumes = @(docker volume ls -q --filter "label=com.docker.compose.project=rowanholt" 2>$null | Where-Object { $_ })
+    $volumes = @(@(foreach ($p in $projects) { docker volume ls -q --filter "label=com.docker.compose.project=$p" 2>$null }) | Where-Object { $_ })
     $ErrorActionPreference = "Stop"
 }
 $folders = @(@($(if ($ours) { $root }), $state) | Where-Object { $_ -and (Test-Path $_) })
@@ -120,7 +125,7 @@ if (-not $folders -and -not $volumes) {
         }
         Done "Deleted ($size, $($volumes.Count) volume(s)). Evidence folders were only mounted: they're untouched"
         # Not removed here: an image prune would take other projects' images with Rowanholt's
-        Note "Rowanholt's images (rowanholt-*) stay in Docker until you remove them with docker rmi"
+        Note "Rowanholt's images (rowanholt-app-*) stay in Docker until you remove them with docker rmi"
     } else {
         Done "Kept: reinstall to carry on, or delete them to start again"
     }

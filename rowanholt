@@ -216,6 +216,7 @@ stack() {
         esac
     done
     detect_compose
+    compose_project
     COMPOSE_FILES="-f docker-compose.yml"
     if $TESTING; then
         COMPOSE_FILES="$COMPOSE_FILES -f tests/docker-compose.testing.yml"
@@ -246,6 +247,8 @@ stack() {
         start)
             not_migrated && exit 1
             echo "Starting Rowanholt..."
+            other_stack_running && exit 1
+            move_to_app_project
             prepare_app_copy
             $SERVER && remove_renamed_containers
             check_resources || exit 1
@@ -372,7 +375,91 @@ check_resources() {
 # The images an update's rebuild replaced, left untagged (startup_progress.remove_replaced_images):
 # Compose's own for this project only
 remove_replaced_images() {
-    docker image prune -f --filter label=com.docker.compose.project=rowanholt &>/dev/null || true
+    docker image prune -f --filter "label=com.docker.compose.project=$PROJECT" &>/dev/null || true
+}
+
+# ── The desktop app's own Compose project ─────────────────────────────────────
+# A copy the desktop app installed (.rowanholt-version, no .git) runs as the project rowanholt-app,
+# so a git clone on the same machine, which keeps docker-compose.yml's rowanholt, never shares its
+# images or volumes. A team server keeps rowanholt whatever it was installed from. Both still use
+# the same container names and ports, so only one runs at a time (other_stack_running). A copy that
+# ran before rowanholt-app (2.1.0) stays rowanholt, for stop and status too, until its next start
+# moves it across (move_to_app_project)
+APP_PROJECT="rowanholt-app"
+compose_project() {
+    APP_COPY=false
+    ! $SERVER && [ -f "$ROOT/.rowanholt-version" ] && [ ! -d "$ROOT/.git" ] && APP_COPY=true
+    if $APP_COPY && { [ -f "$ROOT/.rowanholt-project" ] || [ ! -f "$ROOT/.rowanholt-built" ]; }; then
+        export COMPOSE_PROJECT_NAME="$APP_PROJECT"
+    else
+        unset COMPOSE_PROJECT_NAME
+    fi
+    PROJECT="${COMPOSE_PROJECT_NAME:-rowanholt}"
+}
+
+# Another copy's stack (the app's, a clone's) holding the names of containers this start makes (the
+# profiles in use: a clone's Splunk or Navigator left running doesn't clash): say which and where,
+# rather than let Compose fail on a name
+other_stack_running() {
+    local name dir
+    while read -r name; do
+        dir=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' "$name" 2>/dev/null) || continue
+        [ -n "$dir" ] && [ "$dir" != "$ROOT" ] && [ "$dir" != "$(cd "$ROOT" && pwd -P)" ] || continue
+        # Stopped or not, its container holds the name; stop there removes it
+        echo "Error: another Rowanholt's containers are in the way, from $dir. Stop it first:" >&2
+        echo "  cd \"$dir\" && ./rowanholt stop" >&2
+        return 0
+    done < <(compose_cmd config 2>/dev/null | sed -n 's/^ *container_name: //p')
+    return 1
+}
+
+# An app copy from before rowanholt-app (2.1.0) ran as rowanholt: on its first start as
+# rowanholt-app, its stack is replaced, its data copied into rowanholt-app's volumes and its images
+# tagged with the new names, so it carries on where it was rather than starting empty and building
+# from scratch. The old volumes stay, since a git clone here may share them: the last line says how
+# to remove them. Caches, Redis's queue and Andúril's token are made afresh. .rowanholt-project marks
+# it done; until then Docker is started first, so the check can't pass for want of an engine
+move_to_app_project() {
+    $APP_COPY && [ ! -f "$ROOT/.rowanholt-project" ] || return 0
+    export COMPOSE_PROJECT_NAME="$APP_PROJECT"
+    PROJECT="$APP_PROJECT"
+    if [ -f "$ROOT/.rowanholt-built" ]; then  # started before, as rowanholt
+        ensure_docker
+        if ! docker volume inspect "${APP_PROJECT}_postgres_data" &>/dev/null \
+            && docker volume inspect rowanholt_postgres_data &>/dev/null; then
+            copy_to_app_project
+        fi
+    fi
+    printf '%s\n' "$APP_PROJECT" > "$ROOT/.rowanholt-project"
+}
+
+copy_to_app_project() {
+    local old name from to image
+    echo "This copy now runs as its own Docker project ($APP_PROJECT), apart from any git clone of"
+    echo "Rowanholt here: moving its stack, data and images across (once)..."
+    old=$(docker ps -aq --filter label=com.docker.compose.project=rowanholt \
+        --filter "label=com.docker.compose.project.working_dir=$ROOT")
+    # shellcheck disable=SC2086 # one container ID per word
+    [ -n "$old" ] && docker rm -f $old >/dev/null
+    for name in postgres_data rowanholt_uploads navigator_data splunk_etc splunk_var elastic_data; do
+        from="rowanholt_$name"
+        to="${APP_PROJECT}_$name"
+        docker volume inspect "$from" &>/dev/null || continue
+        docker volume inspect "$to" &>/dev/null && continue
+        docker volume create --label "com.docker.compose.project=$APP_PROJECT" \
+            --label "com.docker.compose.volume=$name" "$to" >/dev/null
+        docker run --rm -v "$from":/from:ro -v "$to":/to postgres:16-alpine sh -c 'cp -a /from/. /to/' \
+            || { echo "Error: couldn't copy the volume $from to $to." >&2; exit 1; }
+        echo "  $from copied to $to"
+    done
+    while read -r image; do
+        case "$image" in "$APP_PROJECT"-*) ;; *) continue ;; esac
+        docker image inspect "$image" &>/dev/null && continue
+        docker image inspect "rowanholt-${image#"$APP_PROJECT"-}" &>/dev/null || continue
+        docker tag "rowanholt-${image#"$APP_PROJECT"-}" "$image"
+    done < <(compose_cmd config --images 2>/dev/null)
+    echo "  The old volumes are left as they were. If no git clone of Rowanholt here uses them:"
+    echo "    docker volume rm \$(docker volume ls -q --filter label=com.docker.compose.project=rowanholt)"
 }
 
 # start --progress: src/common/startup_progress.py wakes Docker, starts the stack and
@@ -390,6 +477,8 @@ start_with_progress() {
     local url="http://localhost:5687" status
     not_migrated && exit 1
     $SERVER && url="https://localhost"
+    other_stack_running && exit 1
+    move_to_app_project
     prepare_app_copy
     $SERVER && remove_renamed_containers
     local args=(--root "$ROOT" --url "$url")
@@ -613,7 +702,13 @@ case "$COMMAND" in
         ;;
     acquire|web) exec "$PYTHON" "$ROOT/src/cli/rowanholt.py" "$COMMAND" "$@" ;;
     analyse|analyze) exec "$PYTHON" "$ROOT/src/cli/rowanholt.py" analyze "$@" ;;
-    quartermaster|anduril|aragorn) exec "$PYTHON" "$ROOT/src/cli/rowanholt.py" quartermaster "$@" ;;
+    quartermaster|anduril|aragorn)
+        # Scoped to this copy's project (compose_project): the app's is rowanholt-app
+        SERVER=false
+        grep -q '^ROWANHOLT_DEPLOYMENT=server' "$ROOT/.env" 2>/dev/null && SERVER=true
+        compose_project
+        ROWANHOLT_COMPOSE_PROJECT="$PROJECT" exec "$PYTHON" "$ROOT/src/cli/rowanholt.py" quartermaster "$@"
+        ;;
     mordor) exec "$PYTHON" "$ROOT/src/cli/mordor.py" "$@" ;;
     samples) exec "$PYTHON" "$ROOT/src/cli/samples.py" "$@" ;;
     # In the worker, which has Volatility, dwarf2json and the symbols folders; an image or file
