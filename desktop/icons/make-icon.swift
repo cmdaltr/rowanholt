@@ -13,7 +13,8 @@ let sRGB = CGColorSpace(name: CGColorSpace.sRGB)!
 
 /// A crop of the logo (rect in logo pixels from the top left) with its edges faded out,
 /// so cuts through the artwork don't show as hard lines
-func faded(_ crop: CGRect, left: CGFloat = 0, right: CGFloat = 0, bottom: CGFloat = 0) -> CGImage {
+/// (and anything in `clear`, rects in logo pixels too, removed)
+func faded(_ crop: CGRect, left: CGFloat = 0, right: CGFloat = 0, bottom: CGFloat = 0, clear: [CGRect] = []) -> CGImage {
     let part = logoCG.cropping(to: crop)!
     let w = part.width, h = part.height
     let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0, space: sRGB,
@@ -34,6 +35,9 @@ func faded(_ crop: CGRect, left: CGFloat = 0, right: CGFloat = 0, bottom: CGFloa
     fade(CGRect(x: W * (1 - right), y: 0, width: W * right, height: H), from: CGPoint(x: W, y: 0), to: CGPoint(x: W * (1 - right), y: 0))
     // CG's origin is bottom left, so the bottom strip starts at y 0
     fade(CGRect(x: 0, y: 0, width: W, height: H * bottom), from: .zero, to: CGPoint(x: 0, y: H * bottom))
+    for rect in clear {
+        ctx.clear(CGRect(x: rect.minX - crop.minX, y: crop.maxY - rect.maxY, width: rect.width, height: rect.height))
+    }
     return ctx.makeImage()!
 }
 
@@ -51,16 +55,20 @@ let background = CGGradient(colorsSpace: sRGB,
                             locations: [0, 1])!
 ctx.drawLinearGradient(background, start: CGPoint(x: 0, y: tile.maxY), end: CGPoint(x: 0, y: tile.minY), options: [])
 
-// The dome stops above the lettering (the D's top reaches into its lower left, so that
-// corner fades); the flourish is cropped about its gem (x 770) and its arms faded before
-// they meet the R and L swashes
-let dome = faded(CGRect(x: 296, y: 24, width: 964, height: 512), left: 0.14, bottom: 0.22)
-let flourish = faded(CGRect(x: 410, y: 770, width: 720, height: 205), left: 0.22, right: 0.22)
+// The whole arch (x 258 to 1263 in the logo, so its middle is x 760), stopping above the lettering:
+// the bottom fades where the O reaches into it, and the R's bowl, behind the arch's left foot, goes
+// with both feet below y 462. The flourish is cropped about its gem (x 772)
+// and its arms faded before they meet the R and L swashes. Each is centred on its own middle, and
+// the arch nearly fills the tile's width
+let dome = faded(CGRect(x: 256, y: 20, width: 1009, height: 522), bottom: 0.2,
+                 clear: [CGRect(x: 256, y: 462, width: 34, height: 80), CGRect(x: 1231, y: 462, width: 34, height: 80)])
+let flourish = faded(CGRect(x: 412, y: 770, width: 720, height: 205), left: 0.22, right: 0.22)
 
-let scale: CGFloat = 0.8
+let scale: CGFloat = 0.78
 let domeSize = CGSize(width: CGFloat(dome.width) * scale, height: CGFloat(dome.height) * scale)
-let flourishSize = CGSize(width: CGFloat(flourish.width) * scale, height: CGFloat(flourish.height) * scale)
-let overlap: CGFloat = 18
+let flourishScale: CGFloat = 0.98
+let flourishSize = CGSize(width: CGFloat(flourish.width) * flourishScale, height: CGFloat(flourish.height) * flourishScale)
+let overlap: CGFloat = 46
 let total = domeSize.height + flourishSize.height - overlap
 let bottom = tile.midY - total / 2
 ctx.draw(flourish, in: CGRect(x: tile.midX - flourishSize.width / 2, y: bottom,
