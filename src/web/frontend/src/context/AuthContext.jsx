@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { getStoredUser, isAuthenticated, logout as apiLogout } from '../api';
+import { getCurrentUser, getStoredUser, isAuthenticated, logout as apiLogout } from '../api';
 
 const AuthContext = createContext(null);
 
@@ -12,16 +12,27 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  // The stored user from the first render, so a page that opens at once (Account, after a reload)
+  // already knows whether MFA must be set up first
+  const [user, setUser] = useState(() => (isAuthenticated() ? getStoredUser() : null));
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Check if user is authenticated on mount
-    if (isAuthenticated()) {
-      const storedUser = getStoredUser();
-      setUser(storedUser);
+  // The server's view of the user: whether ROWANHOLT_REQUIRE_MFA still holds them to setting MFA up
+  // (mfa_enrolment_required, which the app's pages are gated on) changes without a new sign-in
+  const refresh = async () => {
+    if (!isAuthenticated()) return;
+    try {
+      const current = await getCurrentUser();
+      localStorage.setItem('user', JSON.stringify(current));
+      setUser(current);
+    } catch (err) {
+      // A 401 signs out (api.js); anything else keeps the stored user
     }
+  };
+
+  useEffect(() => {
     setLoading(false);
+    refresh();
   }, []);
 
   const login = (userData) => {
@@ -37,6 +48,7 @@ export const AuthProvider = ({ children }) => {
     user,
     login,
     logout,
+    refresh,
     isAuthenticated: !!user,
     loading,
   };

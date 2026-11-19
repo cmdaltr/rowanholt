@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   getMfaStatus, startMfaSetup, enableMfa, disableMfa, regenerateBackupCodes,
 } from '../api';
+import { useAuth } from '../context/AuthContext';
 
 // The Account page's Multi-Factor Authentication and Backup Codes panels, over auth/mfa.py. MFA here is
 // for a team server's password accounts: single sign-on accounts have their identity provider's, and on
@@ -38,6 +39,7 @@ const BackupCodeList = ({ codes, onDone }) => {
 };
 
 const MfaPanels = () => {
+  const { refresh } = useAuth();
   const [status, setStatus] = useState(null);
   const [message, setMessage] = useState({ type: '', text: '' });
   // What's open: null, 'reauth' (a current code before a new authenticator), 'setup', 'disable', 'regenerate'
@@ -87,6 +89,7 @@ const MfaPanels = () => {
       if (done.backup_codes) setShownCodes(done.backup_codes);
       setMessage({ type: 'success', text: again ? 'Your new authenticator is set up.' : 'MFA is on.' });
       await load();
+      await refresh();
     });
   };
 
@@ -98,6 +101,7 @@ const MfaPanels = () => {
       setShownCodes(null);
       setMessage({ type: 'success', text: 'MFA is off.' });
       await load();
+      await refresh();
     });
   };
 

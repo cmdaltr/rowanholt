@@ -13,7 +13,7 @@ const AccountPage = () => {
   const { user, logout, isAuthenticated } = useAuth();
 
   // Tab state: sign-in sends someone a server requires MFA of straight to Security
-  const [activeTab, setActiveTab] = useState(location.state?.tab || 'profile');
+  const [activeTab, setActiveTab] = useState(location.state?.tab || (user?.mfa_enrolment_required ? 'security' : 'profile'));
 
   // Profile state
   const [displayName, setDisplayName] = useState('');

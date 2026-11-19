@@ -401,7 +401,10 @@ class MfaTest(BackendCase):
         signed_in = self.password_step(name)
         self.assertEqual(signed_in.status_code, 200)
         self.assertTrue(signed_in.json()["mfa_enrolment_required"])
+        # On the user too, which the web app stores and gates its pages on, and from /me after a reload
+        self.assertTrue(signed_in.json()["user"]["mfa_enrolment_required"])
         headers = bearer(signed_in.json()["access_token"])
+        self.assertTrue(self.client.get("/api/auth/me", headers=headers).json()["mfa_enrolment_required"])
         refused = self.client.get("/api/jobs", headers=headers)
         self.assertEqual(refused.status_code, 403)
         self.assertTrue(refused.json()["mfa_enrolment_required"])
@@ -413,6 +416,7 @@ class MfaTest(BackendCase):
         self.assertTrue(self.client.get("/api/auth/mfa", headers=headers).json()["required"])
         secret, _ = self.enrol(headers)
         self.assertEqual(self.client.get("/api/jobs", headers=headers).status_code, 200)
+        self.assertNotIn("mfa_enrolment_required", self.client.get("/api/auth/me", headers=headers).json())
         # With the policy on, turning MFA off isn't offered; an admin's reset still is
         self.assertEqual(self.client.post("/api/auth/mfa/disable", headers=headers,
                                           json={"password": PASSWORD, "code": self.code(secret)}).status_code, 400)

@@ -15,6 +15,10 @@ vi.mock('../api', () => ({
   regenerateBackupCodes: vi.fn(),
 }));
 
+// Turning MFA on or off re-reads the user, which lifts (or sets) ROWANHOLT_REQUIRE_MFA's gate on the app
+const mockRefresh = vi.fn();
+vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ refresh: mockRefresh }) }));
+
 const OFF = { available: true, required: false, enabled: false, backup_codes_left: 0, backup_codes_total: 10 };
 const ON = { ...OFF, enabled: true, backup_codes_left: 10 };
 const CODES = ['ABCDE-FGHJK', 'MNPQR-STUVW'];
@@ -36,6 +40,7 @@ test('enrolment shows the QR code and key, and MFA goes on only with a code', as
   fireEvent.change(screen.getByLabelText('Code from the app'), { target: { value: '123456' } });
   await act(async () => { fireEvent.click(turnOn); });
   expect(api.enableMfa).toHaveBeenCalledWith('123456');
+  expect(mockRefresh).toHaveBeenCalled();
   expect(screen.getByTestId('backup-codes')).toHaveTextContent('ABCDE-FGHJK');
   expect(screen.getByText('Enabled')).toBeInTheDocument();
   // Shown once: dismissed, they're gone

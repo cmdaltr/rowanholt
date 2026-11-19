@@ -32,6 +32,14 @@ api.interceptors.response.use(
       localStorage.removeItem('user');
       window.location.href = '/login';
     }
+    // ROWANHOLT_REQUIRE_MFA turned on since this sign-in: keep the user's copy in step, and go to Account
+    if (error.response?.status === 403 && error.response.data?.mfa_enrolment_required) {
+      const stored = JSON.parse(localStorage.getItem('user') || 'null');
+      if (stored && !stored.mfa_enrolment_required) {
+        localStorage.setItem('user', JSON.stringify({ ...stored, mfa_enrolment_required: true }));
+        if (window.location.pathname !== '/account') window.location.href = '/account';
+      }
+    }
     return Promise.reject(error);
   }
 );

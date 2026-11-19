@@ -93,7 +93,9 @@ def _session(response: Response, user: dict) -> dict:
     )
     body = {"access_token": access_token, "token_type": "bearer", "user": public(user)}
     if access.enrolment_pending(body["user"]):
-        body["mfa_enrolment_required"] = True  # ROWANHOLT_REQUIRE_MFA: the web app goes to Account
+        # ROWANHOLT_REQUIRE_MFA: the web app goes to Account, and keeps the user there (the user's
+        # copy, which it stores) until MFA is on
+        body["mfa_enrolment_required"] = body["user"]["mfa_enrolment_required"] = True
     return body
 
 
@@ -353,8 +355,9 @@ async def reset_password_with_backup_code(body: BackupCodeReset, request: Reques
 
 @router.get("/me")
 async def get_current_user(user: dict = Depends(access.current_user)):
-    """The signed-in user (the local analyst on a local stack without a sign-in)."""
-    return user
+    """The signed-in user (the local analyst on a local stack without a sign-in), and whether
+    ROWANHOLT_REQUIRE_MFA holds them to setting MFA up first, which the web app keeps them to"""
+    return {**user, "mfa_enrolment_required": True} if access.enrolment_pending(user) else user
 
 
 @router.post("/session", response_model=LoginResponse)

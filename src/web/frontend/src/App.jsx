@@ -94,6 +94,19 @@ function useLogoGoesHome() {
   }, [navigate, pathname]);
 }
 
+// ROWANHOLT_REQUIRE_MFA: the server answers nothing else until MFA is set up, so every page but
+// Account (and signing in) sends the user to its Security tab rather than open half working
+const ENROLMENT_PAGES = ['/account', '/login'];
+
+export function EnrolmentGate({ children }) {
+  const { user } = useAuth();
+  const { pathname } = useLocation();
+  if (user?.mfa_enrolment_required && !ENROLMENT_PAGES.includes(pathname)) {
+    return <Navigate to="/account" state={{ tab: 'security' }} replace />;
+  }
+  return children;
+}
+
 function AppContent() {
   const goHome = useLogoGoesHome();
   const { pathname } = useLocation();
@@ -129,33 +142,35 @@ function AppContent() {
         <StartOffer offerRequested={offerRequested} onOfferClosed={closeOfferRequest} />
 
         <main className="App-main">
-          <Routes>
-            <Route path="/" element={<Home onScrollProgress={setScrollProgress} />} />
-            <Route path="/gandalf" element={<GandalfLanding />} />
-            <Route path="/elrond" element={<ElrondLanding />} />
-            <Route path="/mordor" element={<MordorTelemetry />} />
-            <Route path="/mordor/datasets" element={<Navigate to="/mordor" replace />} />
-            <Route path="/mordor/telemetry" element={<Navigate to="/mordor" replace />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/login/sso" element={<SsoCallback />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/reset-password" element={<Navigate to="/forgot-password" replace />} />
-            <Route path="/help" element={<HelpPage />} />
-            <Route path="/ai" element={<AIAssistant />} />
-            <Route path="/pippin" element={<ThreatIntel />} />
-            <Route path="/intel" element={<Navigate to="/pippin" replace />} />
-            <Route path="/jobs" element={<JobList />} />
-            <Route path="/jobs/:jobId" element={<JobDetails />} />
-            <Route path="/jobs/:jobId/case" element={<CaseBrowser />} />
-            <Route path="/archive" element={<Archive />} />
-            <Route path="/account" element={<AccountPage />} />
-            <Route path="/aragorn" element={<Aragorn />} />
-            <Route path="/licence" element={<Licence serverMode={serverMode} />} />
-            <Route path="/branding" element={<Branding serverMode={serverMode} />} />
-            <Route path="/webhooks" element={<Webhooks serverMode={serverMode} />} />
-            <Route path="/lab" element={<Navigate to="/aragorn#lab" replace />} />
-          </Routes>
+          <EnrolmentGate>
+            <Routes>
+              <Route path="/" element={<Home onScrollProgress={setScrollProgress} />} />
+              <Route path="/gandalf" element={<GandalfLanding />} />
+              <Route path="/elrond" element={<ElrondLanding />} />
+              <Route path="/mordor" element={<MordorTelemetry />} />
+              <Route path="/mordor/datasets" element={<Navigate to="/mordor" replace />} />
+              <Route path="/mordor/telemetry" element={<Navigate to="/mordor" replace />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/login/sso" element={<SsoCallback />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<Navigate to="/forgot-password" replace />} />
+              <Route path="/help" element={<HelpPage />} />
+              <Route path="/ai" element={<AIAssistant />} />
+              <Route path="/pippin" element={<ThreatIntel />} />
+              <Route path="/intel" element={<Navigate to="/pippin" replace />} />
+              <Route path="/jobs" element={<JobList />} />
+              <Route path="/jobs/:jobId" element={<JobDetails />} />
+              <Route path="/jobs/:jobId/case" element={<CaseBrowser />} />
+              <Route path="/archive" element={<Archive />} />
+              <Route path="/account" element={<AccountPage />} />
+              <Route path="/aragorn" element={<Aragorn />} />
+              <Route path="/licence" element={<Licence serverMode={serverMode} />} />
+              <Route path="/branding" element={<Branding serverMode={serverMode} />} />
+              <Route path="/webhooks" element={<Webhooks serverMode={serverMode} />} />
+              <Route path="/lab" element={<Navigate to="/aragorn#lab" replace />} />
+            </Routes>
+          </EnrolmentGate>
         </main>
 
         <footer className="App-footer">
