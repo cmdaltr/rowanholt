@@ -312,6 +312,32 @@ export const resetPasswordWithBackupCode = async (username, code, backupCode, ne
   return response.data;
 };
 
+// An admin's reset link (/reset-access#<token>, auth/reset_access.py): start gives the new authenticator
+// to set up; complete, with the new password and a code from it, signs in and returns new backup codes
+export const startAccessReset = async (token) => (await api.post('/api/auth/reset-access/start', { token })).data;
+
+export const completeAccessReset = async (token, newPassword, code) => {
+  const response = await api.post('/api/auth/reset-access/complete', { token, new_password: newPassword, code });
+  localStorage.setItem('access_token', response.data.access_token);
+  localStorage.setItem('user', JSON.stringify(response.data.user));
+  return response.data;
+};
+
+// An admin's invitation (/accept-invite#<token>, auth/invitations.py): preview says who it's for,
+// start checks the chosen username and gives the authenticator, accept makes the account and signs in
+export const previewInvitation = async (token) => (await api.post('/api/auth/invitations/accept', { token })).data;
+export const startInvitation = async (token, username) =>
+  (await api.post('/api/auth/invitations/accept/start', { token, username })).data;
+
+export const acceptInvitation = async (token, username, fullName, newPassword, code) => {
+  const response = await api.post('/api/auth/invitations/accept/complete', {
+    token, username, full_name: fullName || null, new_password: newPassword, code,
+  });
+  localStorage.setItem('access_token', response.data.access_token);
+  localStorage.setItem('user', JSON.stringify(response.data.user));
+  return response.data;
+};
+
 // Helper to check if user is authenticated
 export const isAuthenticated = () => {
   return !!localStorage.getItem('access_token');

@@ -113,8 +113,8 @@ const ForgotPasswordPage = () => {
             <div className="divider" data-text="or"></div>
 
             <p data-testid="reset-server" style={{ color: '#a09580', fontSize: '0.9rem', marginBottom: 0 }}>
-              No MFA, or lost your app or your backup codes? Rowanholt doesn't send email, so ask an administrator to
-              run <code>rowanholt server users password &lt;username&gt;</code> on the server.
+              No MFA, or lost your app or your backup codes? Rowanholt doesn't send email, so ask an administrator for
+              a reset link: <code>rowanholt server users reset-access &lt;username&gt;</code> on the server.
             </p>
           </>
         )}

@@ -179,10 +179,10 @@ Single sign-on stays free because gating it would sign people out, which the sha
 - **Terms.** The server reads `src/web/backend/legal/COMMERCIAL-LICENSE.md` (the Docker build
   context is the backend folder, so it can't see the repository root); a test keeps it identical to
   the root file.
-- **Seats** count enabled accounts in users.json (Rowanholt has no invitations), checked only when
-  someone is added: an account created through the API (`/api/auth/register` and `/api/auth/users`
-  on a server), re-enabled (`PATCH /api/auth/users/{id}`), provisioned on a first single sign-on
-  (`auth/oidc.py`), or added or enabled with `rowanholt server users`. A refusal is 402 with the
+- **Seats** count enabled accounts in users.json plus pending invitations (invitations.json),
+  checked only when someone is added: invited (`POST /api/auth/users/invitations`, `rowanholt server
+  users invite`), an invitation accepted, re-enabled (`PATCH /api/auth/users/{id}`, `users enable`),
+  or provisioned on a first single sign-on (`auth/oidc.py`). A refusal is 402 with the
   reason; nobody already in is ever disabled.
 - **Report branding.** A brand is a name, a primary and optional secondary colour, "Prepared for",
   and up to three logos (cover, header, client), managed by admins on the Branding page

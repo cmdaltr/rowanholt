@@ -22,7 +22,7 @@ try:
     from .security import verify_password, create_access_token
     from .users import (AdminPasswordMissing, find_user, init_default_admin, load_users,  # noqa: F401
                         new_user, public, save_users, set_password)
-    from . import access, mfa, oidc, tokens
+    from . import access, invitations, mfa, oidc, reset_access, tokens
     from .throttle import throttle
     from .. import licence
 except ImportError:
@@ -30,7 +30,7 @@ except ImportError:
     from auth.security import verify_password, create_access_token
     from auth.users import (AdminPasswordMissing, find_user, init_default_admin, load_users,  # noqa: F401
                             new_user, public, save_users, set_password)
-    from auth import access, mfa, oidc, tokens
+    from auth import access, invitations, mfa, oidc, reset_access, tokens
     from auth.throttle import throttle
     import licence
 
@@ -257,11 +257,11 @@ async def login_as_guest(response: Response):
 
 @router.post("/register", response_model=UserResponse)
 async def register(request: RegisterRequest, http_request: Request):
-    """Register a new user account. On a server, only admins create accounts."""
+    """Register a new user account: a local stack's own sign-up. A server's accounts come by invitation."""
     role = "user"
     if settings.rowanholt_server_mode:
         access.require_admin(http_request)
-        role = request.role
+        raise HTTPException(status_code=400, detail=invitations.INVITE_INSTEAD)
     _check_password_strength(request.password)
     users = _users_or_503()
 
@@ -297,7 +297,7 @@ async def logout(response: Response):
 
 
 NO_EMAIL = ("Rowanholt doesn't send email. Reset your password with one of your backup codes, or ask an "
-            "administrator: rowanholt server users password <username>")
+            "administrator for a reset link: rowanholt server users reset-access <username>")
 
 
 @router.post("/forgot-password")
@@ -569,6 +569,81 @@ async def mfa_admin_reset(user_id: str, request: Request, admin: dict = Depends(
     return public(record)
 
 
+# ── Reset access (auth/reset_access.py) ──────────────────────────────────────
+
+@router.post("/users/{user_id}/reset-access")
+async def reset_access_link(user_id: str, request: Request, admin: dict = Depends(access.require_admin)):
+    """A one-time link for someone who's lost their password, authenticator or backup codes (admins):
+    they choose a new password and set up a new authenticator. Their sessions end and their API
+    tokens are revoked now, and any earlier link stops working. Pass the link on: it's shown once."""
+    users = load_users()
+    record = users.get(user_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="User not found")
+    try:
+        link, expires = reset_access.issue(record, admin, _address(request), storage=access._storage)
+    except reset_access.ResetRefused as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    save_users(users)
+    return {"link": link, "expires_at": datetime.fromtimestamp(expires, timezone.utc).replace(tzinfo=None).isoformat(),
+            "user": public(record)}
+
+
+class ResetStart(BaseModel):
+    token: str
+
+
+class ResetComplete(BaseModel):
+    token: str
+    new_password: str
+    code: str
+
+
+def _reset_record(token: str) -> tuple:
+    """(users, the record a reset link is for); 400 for a link that's unknown or used, 410 expired.
+    Never 401, which the web app reads as a session that's ended."""
+    users = _users_or_503()
+    try:
+        return users, reset_access.find(users, token)
+    except reset_access.ResetRefused as exc:
+        raise HTTPException(status_code=410 if str(exc) == reset_access.EXPIRED else 400, detail=str(exc))
+
+
+@router.post("/reset-access/start")
+async def reset_access_start(body: ResetStart):
+    """Opening a reset link: the account's username and a new authenticator to set up (a secret, as
+    text and a QR code). Nothing changes until /reset-access/complete; opening it again shows the same one."""
+    users, record = _reset_record(body.token)
+    enrolment = reset_access.start(record)
+    save_users(users)
+    return {**enrolment, "expires_in": int(float(record["access_reset_expires"]) - mfa._now())}
+
+
+@router.post("/reset-access/complete")
+async def reset_access_complete(body: ResetComplete, request: Request, response: Response):
+    """Finishing a reset: the new password and a code from the new authenticator. Signs the person in,
+    with MFA on and ten new backup codes, returned this once; the link is used up. A wrong code counts
+    towards the sign-in lockout."""
+    if len(body.new_password) < MIN_PASSWORD:
+        raise HTTPException(status_code=400, detail=f"Passwords need at least {MIN_PASSWORD} characters")
+    users, record = _reset_record(body.token)
+    name, address = record["username"], _address(request)
+    _refuse_if_locked(name, address)
+    try:
+        step = reset_access.pending_step(record, body.code)
+    except reset_access.ResetRefused as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if step is None:
+        throttle.failed(name, address)
+        mfa.audit("mfa_failed", record, record, address, stage="reset access")
+        raise HTTPException(status_code=400, detail="Incorrect code: check the app's clock and try the next one")
+    codes = reset_access.complete(record, body.new_password, step, address, storage=access._storage)
+    throttle.succeeded(name, address)
+    record["last_login"] = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+    save_users(users)
+    return {**_session(response, record), "backup_codes": codes}
+
+
 # ── API tokens (auth/tokens.py) ──────────────────────────────────────────────
 
 class TokenRequest(BaseModel):
@@ -630,6 +705,111 @@ async def directory(user: dict = Depends(access.current_user)):
             for u in load_users().values() if u.get("is_active", True)]
 
 
+# ── Invitations (auth/invitations.py): how a team server's accounts are made ──
+
+class InvitationRequest(BaseModel):
+    email: str
+    role: str = "user"
+    full_name: Optional[str] = None
+
+
+@router.post("/users/invitations")
+async def create_invitation(body: InvitationRequest, request: Request, admin: dict = Depends(access.require_admin)):
+    """Invite someone (admins): a one-time link where they choose a username, a password and an
+    authenticator. Returns the invitation and `link`, shown this once. A newer invitation for the
+    same email replaces an older one. 409 for an email with an account, 402 with no free place."""
+    try:
+        invitation, link = invitations.create(_users_or_503(), body.email, body.role, body.full_name, admin,
+                                              _address(request), storage=access._storage)
+    except invitations.InvitationRefused as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc))
+    return {**invitation, "link": link}
+
+
+@router.get("/users/invitations")
+async def list_invitations(admin: dict = Depends(access.require_admin)):
+    """Pending invitations (admins), newest first; never their links."""
+    if not settings.rowanholt_server_mode:
+        raise HTTPException(status_code=400, detail=invitations.LOCAL)
+    return invitations.pending()
+
+
+@router.delete("/users/invitations/{invitation_id}")
+async def revoke_invitation(invitation_id: str, request: Request, admin: dict = Depends(access.require_admin)):
+    """Withdraw a pending invitation (admins): its link stops working."""
+    revoked = invitations.revoke(invitation_id, admin, _address(request), storage=access._storage)
+    if not revoked:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+    return revoked
+
+
+class InvitationToken(BaseModel):
+    token: str
+
+
+class InvitationStart(InvitationToken):
+    username: str
+
+
+class InvitationAccept(InvitationStart):
+    full_name: Optional[str] = None
+    new_password: str
+    code: str
+
+
+def _open_invitation(token: str) -> tuple:
+    """(invitations, the one a link is for); 400 unknown or used, 410 expired (never 401: see _reset_record)."""
+    try:
+        return invitations.find(token)
+    except invitations.InvitationRefused as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc))
+
+
+@router.post("/invitations/accept")
+async def invitation_preview(body: InvitationToken):
+    """Opening an invitation: the email, role and name it's for, and a username to suggest."""
+    _, invitation = _open_invitation(body.token)
+    return invitations.preview(_users_or_503(), invitation)
+
+
+@router.post("/invitations/accept/start")
+async def invitation_start(body: InvitationStart):
+    """The username chosen (checked: well formed and free), the authenticator to set up. Nothing is
+    made until /invitations/accept/complete; starting again makes another."""
+    pending, invitation = _open_invitation(body.token)
+    try:
+        enrolment = invitations.start(_users_or_503(), pending, invitation, body.username)
+    except invitations.InvitationRefused as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc))
+    invitations.save(pending)
+    return enrolment
+
+
+@router.post("/invitations/accept/complete")
+async def invitation_complete(body: InvitationAccept, request: Request, response: Response):
+    """The account made, once a code from the new authenticator is confirmed: the invited role, MFA
+    on, ten backup codes (returned this once), signed in. The invitation is used up. A wrong code
+    counts towards the lockout, against the invitation's email."""
+    if len(body.new_password) < MIN_PASSWORD:
+        raise HTTPException(status_code=400, detail=f"Passwords need at least {MIN_PASSWORD} characters")
+    pending, invitation = _open_invitation(body.token)
+    name, address = invitation["email"], _address(request)
+    _refuse_if_locked(name, address)
+    users = _users_or_503()
+    try:
+        step = invitations.pending_step(invitation, body.code)
+        if step is None:
+            throttle.failed(name, address)
+            invitations.audit("mfa_failed", None, invitation, address, stage="invitation")
+            raise HTTPException(status_code=400, detail="Incorrect code: check the app's clock and try the next one")
+        record, codes = invitations.complete(users, pending, invitation, body.username, body.full_name,
+                                             body.new_password, step, address, storage=access._storage)
+    except invitations.InvitationRefused as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc))
+    throttle.succeeded(name, address)
+    return {**_session(response, record), "backup_codes": codes}
+
+
 @router.get("/users")
 async def list_users(admin: dict = Depends(access.require_admin)):
     """Every user (admins)."""
@@ -638,8 +818,11 @@ async def list_users(admin: dict = Depends(access.require_admin)):
 
 @router.post("/users", response_model=UserResponse)
 async def create_user(request: RegisterRequest, http_request: Request):
-    """Create a user (admins)."""
+    """Create a user with a password (admins). Local mode only: a team server's accounts come by
+    invitation (POST /users/invitations), so nobody chooses another person's password."""
     access.require_admin(http_request)
+    if settings.rowanholt_server_mode:
+        raise HTTPException(status_code=400, detail=invitations.INVITE_INSTEAD)
     _check_password_strength(request.password)
     users = _users_or_503()
     if find_user(users, request.username) or find_user(users, request.email):
@@ -657,7 +840,10 @@ async def create_user(request: RegisterRequest, http_request: Request):
 
 @router.patch("/users/{user_id}")
 async def update_user(user_id: str, update: UserUpdate, admin: dict = Depends(access.require_admin)):
-    """Change a user's role, status, password or name (admins). The last active admin stays one."""
+    """Change a user's role, status, password or name (admins). The last active admin stays one. A team
+    server doesn't let an admin choose someone's password: a reset link lets them choose it."""
+    if update.password and settings.rowanholt_server_mode:
+        raise HTTPException(status_code=400, detail=reset_access.RESET_INSTEAD)
     users = load_users()
     user = users.get(user_id)
     if not user:

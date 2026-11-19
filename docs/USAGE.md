@@ -119,14 +119,15 @@ python3 src/analysis/elrond.py MEMORY-001 /evidence/memory /output/MEMORY-001 --
 
 ### Create New User
 
-**Via Web Interface** (Admin only):
-1. Navigate to Admin → Users
-2. Click "Create User"
-3. Fill in details
-4. Assign role (Admin/User/Guest)
-5. Click "Create"
+**On a team server**, an admin invites people: there's no page for it, and admins don't choose anyone's password.
 
-**Via API:**
+```bash
+rowanholt server users invite analyst@company.com                 # or --role admin, --name "…"
+```
+
+It prints a link to pass on, which works once, for 24 hours: the person opens it, chooses a username and password, sets up an authenticator app, saves their backup codes, and is signed in ([SERVER.md](SERVER.md#inviting-people)). The API is `POST /api/auth/users/invitations` ([API.md](API.md#invitations)).
+
+**On your own machine**, the sign-up page makes an account, or the API:
 ```bash
 curl -X POST http://localhost:5688/api/auth/register \
   -H "Content-Type: application/json" \
@@ -150,7 +151,7 @@ On a team server, a password account can add a code from an authenticator app (M
 
 From then on, signing in asks for the app's code (or a backup code) after the password. The Backup Codes panel shows how many are left, and **Generate** makes ten new ones in place of the rest, for a code from the app. **New authenticator** moves MFA to another phone (a current code first, then the new QR code), and **Disable MFA** needs your password and a code.
 
-If you've lost the phone and the backup codes, an admin turns MFA off for you (`rowanholt server users mfa-reset <username>`, or `DELETE /api/auth/users/{id}/mfa`) and you set it up again. A server with `ROWANHOLT_REQUIRE_MFA=true` lets a password account without MFA in only to set it up, and doesn't offer turning it off.
+If you've lost the phone and the backup codes (or your password as well), an admin gives you a reset link (`rowanholt server users reset-access <username>`): open it, choose a new password, set up your authenticator again and save the new backup codes, and you're signed in. Or they turn MFA off for you (`rowanholt server users mfa-reset <username>`, or `DELETE /api/auth/users/{id}/mfa`) and you set it up again. A server with `ROWANHOLT_REQUIRE_MFA=true` lets a password account without MFA in only to set it up, and doesn't offer turning it off.
 
 Accounts that sign in with single sign-on get MFA from the identity provider (require it there: Entra ID Conditional Access, Okta's sign-on policies, Keycloak's OTP), and the panel says so; with `ROWANHOLT_LOCAL_LOGIN=false` only admins keep a password, for break-glass use. API tokens need no second factor. On your own machine there's no sign-in for MFA to protect: the panels say it applies to a team server's sign-in. See [SECURITY.md](SECURITY.md#multi-factor-authentication).
 

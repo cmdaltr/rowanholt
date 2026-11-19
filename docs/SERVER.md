@@ -157,15 +157,29 @@ Several are separated by commas. Without it, only `/mnt`, `/media` and `/tmp/row
 
 ```bash
 rowanholt server users list
-rowanholt server users add alice alice@example.org            # prompts for a password
-rowanholt server users add bob bob@example.org --admin
+rowanholt server users invite alice@example.org                # a link: she chooses her username and password
+rowanholt server users invite bob@example.org --role admin --name "Bob Smith"
+rowanholt server users invitations                             # pending ones
+rowanholt server users revoke-invitation <id>
 rowanholt server users role alice admin
 rowanholt server users disable bob
-rowanholt server users password admin                          # a locked-out admin
 rowanholt server users mfa-reset alice                         # lost her phone and backup codes
+rowanholt server users reset-access alice                      # a link to a new password and authenticator (a locked-out admin too)
 ```
 
 These work inside the backend container, so they work when nobody can sign in. Admins can do the same through the API (`/api/auth/users`). Passwords on a server need at least 12 characters, and repeated failures lock the username (`max_login_attempts`, `lockout_duration_minutes`; see below).
+
+### Inviting people
+
+Accounts on a server are made by invitation, so nobody chooses another person's password: `users add` and `POST /api/auth/users` are refused there, and so are `users password` and a `password` in `PATCH /api/auth/users/{id}` (give a [reset link](#resetting-someones-access) instead). A local stack, with its one analyst, keeps `add` and `password`. `invite` (or `POST /api/auth/users/invitations` from an admin) prints a one-time link, `<ROWANHOLT_PUBLIC_URL>/accept-invite#<token>`, for an email and a role (`user` unless `--role admin`). Pass it on by a channel you trust; it works once, for 24 hours, and a newer invitation for the same email replaces an older one. Opening it, they choose a username (the email's first part is suggested), their name and a password, set up an authenticator, which is required whatever `ROWANHOLT_REQUIRE_MFA` says, and only once a code from it is right is the account made, with the role it was invited as. They see ten backup codes, once, and are signed in. An email that already has an account is refused: give that person a [reset link](#resetting-someones-access) instead. Each pending invitation holds one of the licence's places, so inviting past the seats is refused at once, and the places are checked again when it's accepted. Pending invitations are kept in `invitations.json` beside `users.json`; `invitations` lists them and `revoke-invitation` withdraws one. Making, withdrawing and accepting are in the audit log (`invitation_created`, `invitation_revoked`, `account_created`).
+
+The first admin is still `admin`, with `ROWANHOLT_ADMIN_PASSWORD` from `.env` (`server init` makes one and shows it once). To have your own account with MFA instead, sign in as `admin`, invite yourself with `--role admin`, accept it, and then `rowanholt server users disable admin`.
+
+### Resetting someone's access
+
+When someone has lost their password, their authenticator or their backup codes, `reset-access` (or `POST /api/auth/users/{id}/reset-access` from an admin) prints a one-time link, `<ROWANHOLT_PUBLIC_URL>/reset-access#<token>`. It ends their sessions and revokes their API tokens at once, and a new link replaces an earlier one. Pass it on by a channel you trust; it works once, for 24 hours. Opening it, they choose a new password and set up a new authenticator, which is required whatever `ROWANHOLT_REQUIRE_MFA` says, then see ten new backup codes, once, and are signed in. The old backup codes stop working. Until they finish, their old password and authenticator still work. Single sign-on accounts have no password here to reset: their identity provider handles recovery. Issuing and finishing are in the audit log (`access_reset_issued`, `access_reset_completed`).
+
+`password` and `mfa-reset` are still there for a password alone or MFA alone, done for them rather than by them.
 
 ### Multi-factor authentication
 
@@ -175,7 +189,7 @@ Password accounts can turn on MFA under Account → Security: a code from an aut
 ROWANHOLT_REQUIRE_MFA=true
 ```
 
-A password account without MFA is then signed in only to set it up: every other route, the proxy's check in front of Splunk, Kibana and the Navigator included, answers 403 until it has, and turning MFA off isn't offered. Single sign-on accounts aren't affected (their MFA is the identity provider's), nor are API tokens. Someone who has lost their authenticator and backup codes gets `rowanholt server users mfa-reset <username>` (or `DELETE /api/auth/users/{id}/mfa` from an admin) and sets it up again; every reset is in the audit log. `rowanholt server users list` shows who has MFA on.
+A password account without MFA is then signed in only to set it up: every other route, the proxy's check in front of Splunk, Kibana and the Navigator included, answers 403 until it has, and turning MFA off isn't offered. Single sign-on accounts aren't affected (their MFA is the identity provider's), nor are API tokens. Someone who has lost their authenticator and backup codes gets a link from `rowanholt server users reset-access <username>` ([above](#resetting-someones-access)), or `rowanholt server users mfa-reset <username>` (or `DELETE /api/auth/users/{id}/mfa` from an admin) and sets it up again; every reset is in the audit log. `rowanholt server users list` shows who has MFA on.
 
 The TOTP secrets are encrypted with a key derived from `SECRET_KEY` and kept in `users.json`: a backup holds both, and restoring one with another `SECRET_KEY` leaves those accounts needing a reset.
 
@@ -216,7 +230,7 @@ rowanholt server licence install northwind.licence --accept-terms "Your Name <yo
 rowanholt server licence remove
 ```
 
-The places are checked only when someone is added (an account created or re-enabled, a first single sign-on, `rowanholt server users add|enable`); a licence ending, or being removed, never disables anyone. After the expiry date it keeps working for 30 days' grace, with a warning to admins on every page. Installs and removals, with the version of the terms accepted, are in the `audit_logs` table. See [LICENSING_MODEL.md](LICENSING_MODEL.md).
+The places are checked only when someone is added (invited, an invitation accepted, an account re-enabled, a first single sign-on, `rowanholt server users invite|enable`), and a pending invitation holds one; a licence ending, or being removed, never disables anyone. After the expiry date it keeps working for 30 days' grace, with a warning to admins on every page. Installs and removals, with the version of the terms accepted, are in the `audit_logs` table. See [LICENSING_MODEL.md](LICENSING_MODEL.md).
 
 ## Working cases as a team
 

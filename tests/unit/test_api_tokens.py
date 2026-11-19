@@ -68,9 +68,7 @@ class ApiTokenTest(BackendCase):
         self.assertEqual(self.client.get("/api/auth/me", headers=bearer(made["token"])).status_code, 401)
 
     def test_a_deactivated_users_tokens_stop(self):
-        resp = self.client.post("/api/auth/users", headers=self.admin, json={
-            "username": "carol", "email": "carol@example.org", "password": "carol-password-123"})
-        self.assertIn(resp.status_code, (200, 400), resp.text)
+        self.make_user("carol", "carol-password-123")
         carol = self.login("carol", "carol-password-123")
         made = self.make(carol)
         carol_id = self.client.get("/api/auth/me", headers=carol).json()["id"]

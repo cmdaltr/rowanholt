@@ -9,6 +9,7 @@ import LoginPage from './components/LoginPage';
 import SsoCallback from './components/SsoCallback';
 import RegisterPage from './components/RegisterPage';
 import ForgotPasswordPage from './components/ForgotPasswordPage';
+import ResetAccessPage from './components/ResetAccessPage';
 import HelpPage from './components/HelpPage';
 import AIAssistant from './components/AIAssistant';
 import JobList from './components/JobList';
@@ -95,8 +96,9 @@ function useLogoGoesHome() {
 }
 
 // ROWANHOLT_REQUIRE_MFA: the server answers nothing else until MFA is set up, so every page but
-// Account (and signing in) sends the user to its Security tab rather than open half working
-const ENROLMENT_PAGES = ['/account', '/login'];
+// Account (and signing in, and an admin's reset link or invitation, which set MFA up themselves) sends the user to its
+// Security tab rather than open half working
+const ENROLMENT_PAGES = ['/account', '/login', '/reset-access', '/accept-invite'];
 
 export function EnrolmentGate({ children }) {
   const { user } = useAuth();
@@ -155,6 +157,8 @@ function AppContent() {
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<Navigate to="/forgot-password" replace />} />
+              <Route path="/reset-access" element={<ResetAccessPage />} />
+              <Route path="/accept-invite" element={<ResetAccessPage mode="invite" />} />
               <Route path="/help" element={<HelpPage />} />
               <Route path="/ai" element={<AIAssistant />} />
               <Route path="/pippin" element={<ThreatIntel />} />

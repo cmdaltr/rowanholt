@@ -156,7 +156,9 @@ class InstalledTest(unittest.TestCase):
         self.key = Ed25519PrivateKey.generate()
         public = self.key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw).hex()
         for patch in (mock.patch.object(licence, "PUBLIC_KEYS", (public,)),
-                      mock.patch.dict(os.environ, {"ROWANHOLT_LICENCE": f"{tempfile.mkdtemp()}/licence.json"})):
+                      mock.patch.dict(os.environ, {"ROWANHOLT_LICENCE": f"{tempfile.mkdtemp()}/licence.json"}),
+                      # Accounts only: invitations other tests left pending aren't these tests' (test_invitations)
+                      mock.patch.object(licence, "_invitations_pending", return_value=0)):
             patch.start()
             self.addCleanup(patch.stop)
 
