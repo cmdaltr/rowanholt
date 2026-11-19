@@ -1182,6 +1182,16 @@ function Expand-Bundle([string]$Target) {
         -ArgumentList '-xzf', "`"$Bundled`"", '-C', "`"$Target`"", '--strip-components', '1'
     $code = Wait-Exit $tar
     if (-not (Test-Copy $Target)) { throw "Couldn't unpack Rowanholt into $Target (tar exited with status $code)" }
+    # Files later releases dropped stay after unpacking over an earlier copy (a .js beside the .jsx
+    # that replaced it, which Vite serves); the tarball lists them. Files only, inside the copy
+    $removed = Join-Path $Target '.rowanholt-removed'
+    if (Test-Path -LiteralPath $removed -PathType Leaf) {
+        foreach ($path in Get-Content -LiteralPath $removed) {
+            if (-not $path -or $path.StartsWith('/') -or ($path -split '/') -contains '..') { continue }
+            $file = Join-Path $Target ($path -replace '/', '\')
+            if (Test-Path -LiteralPath $file -PathType Leaf) { Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue }
+        }
+    }
     Set-Content -Path (Join-Path $Target '.rowanholt-version') -Value (Get-AppVersion) -Encoding ASCII -NoNewline
 }
 

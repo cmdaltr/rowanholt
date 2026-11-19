@@ -362,7 +362,24 @@ extension AppDelegate {
         try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
         let unpack = run("/usr/bin/tar", ["-xzf", source.path, "-C", target.path, "--strip-components", "1"])
         guard unpack.status == 0 else { throw SetupError(message: "Couldn't unpack Rowanholt into \(target.path): \(unpack.output)") }
+        removeDroppedFiles(in: target)
         try appVersion.write(to: target.appendingPathComponent(".rowanholt-version"), atomically: true, encoding: .utf8)
+    }
+
+    /// Unpacking over an earlier copy leaves the files later releases dropped (a .js beside the .jsx
+    /// that replaced it, which Vite serves): the tarball lists them in .rowanholt-removed
+    /// (desktop/source-tarball.sh). Files only: nothing outside the copy, no folders
+    func removeDroppedFiles(in target: URL) {
+        guard let list = try? String(contentsOf: target.appendingPathComponent(".rowanholt-removed"), encoding: .utf8) else { return }
+        let fm = FileManager.default
+        for line in list.split(separator: "\n") {
+            let path = String(line)
+            guard !path.hasPrefix("/"), !path.split(separator: "/").contains("..") else { continue }
+            let file = target.appendingPathComponent(path)
+            guard let type = try? fm.attributesOfItem(atPath: file.path)[.type] as? FileAttributeType,
+                  type == .typeRegular || type == .typeSymbolicLink else { continue }
+            try? fm.removeItem(at: file)
+        }
     }
 
     func needsUpdate(_ root: String) -> Bool {

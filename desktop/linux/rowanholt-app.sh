@@ -140,6 +140,15 @@ unpack_to() {
     local target="$1"
     mkdir -p "$target" || return 1
     tar -xzf "$BUNDLED" -C "$target" --strip-components 1 || return 1
+    # Files later releases dropped stay after unpacking over an earlier copy (a .js beside the
+    # .jsx that replaced it, which Vite serves); the tarball lists them. Files only, inside the copy
+    local path
+    if [ -f "$target/.rowanholt-removed" ]; then
+        while IFS= read -r path; do
+            case "/$path/" in /|//*|*/../*) continue ;; esac
+            if [ -f "$target/$path" ] || [ -L "$target/$path" ]; then rm -f "$target/$path"; fi
+        done < "$target/.rowanholt-removed"
+    fi
     app_version > "$target/.rowanholt-version"
 }
 

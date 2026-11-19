@@ -20,6 +20,18 @@ exclude=(.claude tests)
 pathspec=(.)
 for p in "${exclude[@]}"; do pathspec+=(":(exclude)$p"); done
 
+# The launchers unpack over the copy already there, so a file a release dropped would stay
+# (a .js beside the .jsx that replaced it, which Vite then serves). .rowanholt-removed lists every
+# path git has ever deleted that HEAD doesn't have, for the launchers to remove after unpacking;
+# ignored paths are local state (src/web/backend/data/users.json was once tracked) and never listed
+removed_dir="$(mktemp -d)"
+trap 'rm -rf "$removed_dir"' EXIT
+git -C "$ROOT" log --no-renames --diff-filter=D --name-only --pretty=format: HEAD | sed '/^$/d' | sort -u \
+    | comm -23 - <(git -C "$ROOT" ls-files | sort) \
+    | grep -vE "^($(IFS='|'; echo "${exclude[*]}"))/" \
+    | git -C "$ROOT" check-ignore --no-index --stdin --non-matching --verbose \
+    | sed -n 's/^::\t//p' > "$removed_dir/.rowanholt-removed" || true
+
 mkdir -p "$(dirname "$OUT")"
-git -C "$ROOT" archive --format=tar.gz --prefix="rowanholt-$VERSION/" \
+git -C "$ROOT" archive --format=tar.gz --prefix="rowanholt-$VERSION/" --add-file="$removed_dir/.rowanholt-removed" \
     -o "$(cd "$(dirname "$OUT")" && pwd)/$(basename "$OUT")" HEAD -- "${pathspec[@]}"
