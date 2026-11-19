@@ -105,7 +105,8 @@ class JobDeleteTest(BackendCase):
     def test_a_refused_delete_leaves_everything(self):
         job_id = self.finished_job_with_a_case("CASE-DEL-5")
         before = self.rows(job_id)
-        self.assertEqual(self.client.delete(f"/api/jobs/{job_id}", headers=self.bob).status_code, 404)
+        # Bob sees the case (it's the team's) but deleting it is its owner's or an admin's
+        self.assertEqual(self.client.delete(f"/api/jobs/{job_id}", headers=self.bob).status_code, 403)
         self.assertEqual(self.rows(job_id), before)
 
 

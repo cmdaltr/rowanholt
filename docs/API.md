@@ -42,9 +42,9 @@ What a caller may do depends on the mode the backend runs in. Every request goes
 | Who | What |
 |---|---|
 | Admins only (`403`) | Everything under `/api/lab`, `/api/anduril` (and its old name `/api/aragorn`), `/api/auth/users`, `/api/symbols`, `/api/samples`, `/api/licence`, `/api/brands` and `/api/webhooks`, and a case's brand; anything but GET under `/api/mordor` and `/api/threat-intel`, apart from `POST /api/threat-intel/lookup` |
-| Whoever can see the job (`404` otherwise, so job IDs can't be probed) | Everything under `/api/jobs/{job_id}`: its owner, the users it's shared with, and admins. A job from before server mode has no owner, so only admins see it until one shares it |
-| Whoever can see the case (`404`) | `/api/ai/cases/{case_id}/…`: a case number behind a job they can see. A case folder in Smith's data directory with no job behind it is for admins |
-| The job's owner or an admin (`403`) | Cancel, pause, resume, delete, archive, restart with fresh output, add a note (`PATCH`), change its sharing, confirm or give up a failed removal; the bulk actions check each job the same way |
+| Anyone signed in | Everything under `/api/jobs/{job_id}` and `/api/ai/cases/{case_id}/…`: every case is the team's ([SERVER.md](SERVER.md#working-cases-as-a-team)) |
+| Anyone but another analyst | Disk and memory images in an analyst's own evidence folder (`/srv/evidence/<username>/`): as a job's source, its keyword, YARA or IOC file, or in `/api/fs/browse` (`403`, and left out of a listing). The case output in that folder is everyone's; a destination there is its owner's (`403`) |
+| The job's owner or an admin (`403`) | Cancel, pause, resume, delete, archive, restart with fresh output, add a note (`PATCH`), confirm or give up a failed removal; the bulk actions check each job the same way. A job from before server mode has no owner: admins only |
 
 A job's `can_manage` says which side of the last row the caller is on ([List Jobs](#list-jobs)).
 
@@ -438,7 +438,7 @@ Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, whic
 
 **Endpoint:** `GET /api/jobs`
 
-**Description:** The jobs the caller can see: in server mode their own, the ones shared with them, and every job for an admin; every job in local mode.
+**Description:** Every job: on a team server every case is the team's.
 
 **Query Parameters:**
 - `status` (optional): one of pending, running, paused, awaiting_confirmation, removing, completed, failed, cancelled, archived
@@ -762,7 +762,7 @@ The export's notable lines (each target's phase, warnings and errors, and the ou
 - `409 Conflict`: an export of this job is already queued or running
 - `503 Service Unavailable`: Redis (the export's state, the queue) can't be reached; nothing is queued
 
-**Who:** whoever can see the job (its owner, the people it's shared with, admins); a `smith-mcp` token is refused (`403`). Each `POST` is recorded in the audit log (`job.siem_export`).
+**Who:** anyone signed in; a `smith-mcp` token is refused (`403`). Each `POST` is recorded in the audit log (`job.siem_export`).
 
 **Busy:** a running export counts for [`/api/busy`](#busy) as `siem-exports` (its worker's heartbeat in Redis, refreshed every 15 seconds, expiring after 60). A queued one doesn't, as a pending job doesn't: its message waits out a rebuild in Redis's queue.
 
@@ -803,7 +803,7 @@ The export's notable lines (each target's phase, warnings and errors, and the ou
 
 **Endpoints:** `GET /api/jobs/{job_id}/sharing`, `PUT /api/jobs/{job_id}/sharing`
 
-**Description:** Who owns a job and who it's shared with. `GET` (whoever can see the job) returns `{"owner", "shared_with", "can_manage"}`. `PUT` (the owner or an admin; `403` otherwise) takes `{"usernames": ["bob", "carol"]}`, which replaces the list, and returns the same shape; `400` names any that isn't an active user. The people a job is shared with can see it and work on its case; see [SERVER.md](SERVER.md#sharing-jobs).
+**Description:** Who owns a job. `GET` returns `{"owner", "shared_with", "can_manage"}`. Every case is the team's now ([SERVER.md](SERVER.md#working-cases-as-a-team)), so `shared_with` no longer changes who sees a job: `PUT` (the owner or an admin) still records it, for scripts written against the older rule.
 
 ---
 
@@ -1033,7 +1033,7 @@ The indicators in `threat_intel_indicators`, in the fixed ten-column schema (Evi
 
 ## Case Browser and Collaboration
 
-**Authentication:** whoever can see the job (its owner, the people it's shared with, admins); everyone in local mode. Smith (a `smith-mcp` token, or the `X-Rowanholt-Agent` header: [API Tokens](#api-tokens)) may read, flag leads and add notes, recorded as "Smith (for <user>)"; it can't confirm or dismiss, change or remove a finding, or assign a host (`403`)
+**Authentication:** anyone signed in; everyone in local mode. Smith (a `smith-mcp` token, or the `X-Rowanholt-Agent` header: [API Tokens](#api-tokens)) may read, flag leads and add notes, recorded as "Smith (for <user>)"; it can't confirm or dismiss, change or remove a finding, or assign a host (`403`)
 
 A job's output, read-only, and the team's findings, notes, host assignments and activity on it (`case_routes.py`, `case_files.py`). Only `<host>/artefacts/cooked/`, `<host>/analysis/` and the case's top-level CSVs are readable; `raw/` never is, and nothing writes to the case directory. Findings reference a row by file, row (`2` onwards for a CSV line, `#0` onwards for a JSON record) and the SHA-256 of the row, so a re-run that changes it shows up.
 
@@ -1394,7 +1394,7 @@ Job progress has no socket of its own: poll `GET /api/jobs/{job_id}`.
 ---
 
 **For additional support, see:**
-- [SERVER.md](SERVER.md) - Running Rowanholt as a team server: sign-in, users, sharing
+- [SERVER.md](SERVER.md) - Running Rowanholt as a team server: sign-in, users, shared cases, evidence folders
 - [SECURITY.md](SECURITY.md) - Security implementation details
 - [QUICKSTART.md](QUICKSTART.md) - Getting started guide
 - [USAGE.md](USAGE.md) - Complete user documentation

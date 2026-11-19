@@ -283,16 +283,6 @@ export const createApiToken = async (name, scope, days) =>
   (await api.post('/api/auth/tokens', { name, scope, days })).data;
 export const revokeApiToken = async (id) => (await api.delete(`/api/auth/tokens/${id}`)).data;
 
-export const getJobSharing = async (jobId) => {
-  const response = await api.get(`/api/jobs/${jobId}/sharing`);
-  return response.data;
-};
-
-export const setJobSharing = async (jobId, usernames) => {
-  const response = await api.put(`/api/jobs/${jobId}/sharing`, { usernames });
-  return response.data;
-};
-
 export const getUserDirectory = async () => {
   const response = await api.get('/api/auth/directory');
   return response.data;

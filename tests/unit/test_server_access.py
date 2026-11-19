@@ -129,21 +129,16 @@ class ServerAccessTest(BackendCase):
         resp = self.client.post("/api/auth/login", data={"username": "admin", "password": self.settings.default_admin_password})
         self.assertEqual(resp.status_code, 401)
 
-    def test_jobs_visible_to_owner_shared_users_and_admins(self):
+    def test_every_case_is_the_teams_and_only_its_owner_or_an_admin_manages_it(self):
         job = self.create_job(self.alice, "CASE-ALICE-1")
-        self.assertIn(job, self.ids(self.alice))
-        self.assertIn(job, self.ids(self.admin))
-        self.assertNotIn(job, self.ids(self.bob))
-        self.assertEqual(self.client.get(f"/api/jobs/{job}", headers=self.bob).status_code, 404)
-        self.assertEqual(self.client.get(f"/api/jobs/{job}", headers=self.alice).json()["owner"], "alice")
-
-        resp = self.client.put(f"/api/jobs/{job}/sharing", headers=self.alice, json={"usernames": ["bob"]})
-        self.assertEqual(resp.status_code, 200, resp.text)
-        self.assertIn(job, self.ids(self.bob))
+        for headers in (self.alice, self.admin, self.bob):
+            self.assertIn(job, self.ids(headers))
         self.assertEqual(self.client.get(f"/api/jobs/{job}", headers=self.bob).status_code, 200)
-        # Shared with, not owner: can't reshare
-        resp = self.client.put(f"/api/jobs/{job}/sharing", headers=self.bob, json={"usernames": []})
-        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(self.client.get(f"/api/jobs/{job}", headers=self.alice).json()["owner"], "alice")
+        # Seen and worked by the team, managed by its owner or an admin
+        self.assertEqual(self.client.post(f"/api/jobs/{job}/cancel", headers=self.bob).status_code, 403)
+        self.assertEqual(self.client.delete(f"/api/jobs/{job}", headers=self.bob).status_code, 403)
+        self.assertEqual(self.client.put(f"/api/jobs/{job}/sharing", headers=self.bob, json={"usernames": []}).status_code, 403)
 
     def test_the_list_says_who_may_manage_each_job(self):
         # The web app hides cancel, delete, share and the rest from the people a job is only
@@ -356,7 +351,8 @@ class ServerAccessTest(BackendCase):
         self.assertEqual(results[0], {"job_id": failed, "success": True, "status": "failed"})
         self.assertEqual(results[1], {"job_id": done, "success": True, "status": "completed"})
         self.assertEqual(results[2], {"job_id": done, "success": False, "error": "Job is not archived"})
-        self.assertEqual(results[3], {"job_id": stranger, "success": False, "error": "Job not found"})
+        self.assertEqual(results[3], {"job_id": stranger, "success": False,
+                                      "error": "Only the job's owner or an admin can restore it from the archive"})
         self.assertEqual(self.main.job_storage.get_job(failed).status, JobStatus.FAILED)
         self.assertNotIn(failed, archived(self.alice))
         self.assertIn(failed, self.ids(self.alice))
@@ -374,10 +370,11 @@ class ServerAccessTest(BackendCase):
         resp = self.client.put(f"/api/jobs/{job}/sharing", headers=self.alice, json={"usernames": ["nobody"]})
         self.assertEqual(resp.status_code, 400)
 
-    def test_bulk_actions_skip_other_peoples_jobs(self):
+    def test_bulk_actions_leave_other_peoples_jobs_alone(self):
         job = self.create_job(self.alice, "CASE-ALICE-3")
         resp = self.client.post("/api/jobs/bulk/cancel", headers=self.bob, json=[job])
-        self.assertEqual(resp.json()["results"][0]["error"], "Job not found")
+        self.assertEqual(resp.json()["results"][0]["error"], "Only the job's owner or an admin can cancel it")
+        self.assertEqual(self.main.job_storage.get_job(job).status.value, "pending")
 
     def test_live_case_updates_follow_job_access(self):
         import case_routes
@@ -391,23 +388,18 @@ class ServerAccessTest(BackendCase):
                 resp = self.client.post(f"/api/jobs/{job}/case/notes", headers=self.alice, json={"body": "seen"})
                 self.assertEqual(resp.status_code, 200, resp.text)
                 self.assertGreater(ws.receive_json()["activity"], 0)
-            # Not signed in, not shared, or opened by a page on another site: refused at the handshake
+            # Not signed in, or opened by a page on another site: refused at the handshake
             origin = {**self.alice, "Origin": "https://evil.example"}
-            for headers in ({}, self.bob, origin):
+            for headers in ({}, origin):
                 with self.assertRaises(WebSocketDisconnect) as refused:
                     with self.client.websocket_connect(path, headers=headers) as ws:
                         ws.receive_json()
                 self.assertEqual(refused.exception.code, 1008)
             with self.client.websocket_connect(path, headers={**self.alice, "Origin": self.settings.cors_origins[0]}) as ws:
                 ws.receive_json()
-            # Sharing taken away closes a socket already open
-            self.client.put(f"/api/jobs/{job}/sharing", headers=self.alice, json={"usernames": ["bob"]})
+            # The rest of the team follows the case too
             with self.client.websocket_connect(path, headers=self.bob) as ws:
                 ws.receive_json()
-                self.client.put(f"/api/jobs/{job}/sharing", headers=self.alice, json={"usernames": []})
-                with self.assertRaises(WebSocketDisconnect):
-                    while True:
-                        ws.receive_json()
 
     def test_restart_with_findings_needs_confirm(self):
         import case_routes
@@ -450,19 +442,20 @@ class ServerAccessTest(BackendCase):
         self.client.post(f"/api/jobs/{job}/restart", headers=self.alice)
         self.assertFalse(self.main.job_storage.get_job(job).options.force_overwrite)
 
-    def test_case_clash_reported_without_listing_others_jobs(self):
-        self.create_job(self.alice, "CASE-CLASH-1")
+    def test_case_clash_lists_the_teams_jobs(self):
+        job = self.create_job(self.alice, "CASE-CLASH-1")
         body = self.client.get("/api/validate/case-id/CASE-CLASH-1", headers=self.bob).json()
         self.assertTrue(body["exists"])
-        self.assertEqual(body["jobs"], [])
+        self.assertEqual([j["id"] for j in body["jobs"]], [job])
 
-    def test_job_from_before_server_mode_is_admin_only(self):
+    def test_job_from_before_server_mode_is_the_teams_and_an_admins_to_manage(self):
         from models.job import Job, JobStatus, AnalysisOptions
         legacy = Job(id="00000000-0000-0000-0000-000000000001", case_number="LEGACY-01", source_paths=[],
                      destination_path=None, options=AnalysisOptions(), status=JobStatus.COMPLETED)
         self.main.job_storage.save_job(legacy)
         self.assertIn(legacy.id, self.ids(self.admin))
-        self.assertNotIn(legacy.id, self.ids(self.alice))
+        self.assertIn(legacy.id, self.ids(self.alice))
+        self.assertEqual(self.client.delete(f"/api/jobs/{legacy.id}", headers=self.alice).status_code, 403)
 
     def test_admin_areas(self):
         self.assertEqual(self.client.get("/api/lab/status", headers=self.alice).status_code, 403)
@@ -489,35 +482,57 @@ class ServerAccessTest(BackendCase):
         resp = self.client.get("/api/auth/verify", headers=self.bob)
         self.assertEqual(resp.headers["X-Rowanholt-User"], "bob")
 
-    def test_navigator_layers_follow_the_case(self):
+    def test_navigator_layers_are_for_anyone_signed_in(self):
         self.create_job(self.alice, "CASE-LAYER-1")
 
         def layer(headers, uri):
             return self.client.get("/api/auth/verify?service=navigator",
                                    headers={**headers, "X-Forwarded-Uri": uri}).status_code
-        self.assertEqual(layer(self.alice, "/assets/CASE-LAYER-1.json"), 200)
-        self.assertEqual(layer(self.admin, "/assets/CASE-LAYER-1.json"), 200)
-        self.assertEqual(layer(self.bob, "/assets/CASE-LAYER-1.json"), 403)
-        self.assertEqual(layer(self.bob, "/assets/CASE%2DLAYER%2D1.json?x=1"), 403)
-        # Other spellings of the same file, which the Navigator's nginx normalises and serves
-        for uri in ("/assets//CASE-LAYER-1.json", "/assets/./CASE-LAYER-1.json", "//assets/CASE-LAYER-1.json",
-                    "/assets/x/../CASE-LAYER-1.json", "/assets/%2E/CASE-LAYER-1.json"):
-            self.assertEqual(layer(self.bob, uri), 403, uri)
-        # The case's Mobile layer (a phone case's) follows it too
-        self.assertEqual(layer(self.alice, "/assets/CASE-LAYER-1.mobile.json"), 200)
-        self.assertEqual(layer(self.bob, "/assets/CASE-LAYER-1.mobile.json"), 403)
-        self.assertEqual(layer(self.bob, "/assets/x/../CASE-LAYER-1.mobile.json"), 403)
-        # A case named X.mobile is still its own case: Bob can't reach Alice's through it
-        self.create_job(self.alice, "CASE-LAYER-2.mobile")
-        self.assertEqual(layer(self.bob, "/assets/CASE-LAYER-2.mobile.json"), 403)
-        # The Navigator itself, and its ATT&CK data (both domains)
+        for headers in (self.alice, self.bob, self.admin):
+            self.assertEqual(layer(headers, "/assets/CASE-LAYER-1.json"), 200)
         self.assertEqual(layer(self.bob, "/assets/enterprise-attack.json"), 200)
-        self.assertEqual(layer(self.bob, "/assets/mobile-attack.json"), 200)
-        self.assertEqual(layer(self.bob, "/"), 200)
-        # A case run from the command line, with no job: admins only
-        (self.settings.output_dir / "CLI-CASE-9").mkdir(parents=True, exist_ok=True)
-        self.assertEqual(layer(self.bob, "/assets/CLI-CASE-9.json"), 403)
-        self.assertEqual(layer(self.admin, "/assets/CLI-CASE-9.json"), 200)
+        self.assertEqual(layer({}, "/assets/CASE-LAYER-1.json"), 401)
+
+    def test_an_analysts_images_are_theirs_and_their_case_output_the_teams(self):
+        """docs/SERVER.md: a folder named after an analyst holds their disk and memory images, which
+        only they (and admins) see or run jobs on; the case output in it is the team's."""
+        import output_removal
+        home = self.evidence / "alice"
+        home.mkdir(exist_ok=True)
+        image = home / "laptop.E01"
+        image.write_bytes(b"")
+        job = self.client.post("/api/jobs", headers=self.alice, json={
+            "case_number": "CASE-EV-1", "source_paths": [str(image)]}).json()
+        output = Path(job["destination_path"])
+        self.assertEqual(output.parent, home)  # beside her image, in her folder
+        (output / "artefacts" / "cooked").mkdir(parents=True)
+        output_removal.write_marker(output, job["id"])
+        (self.evidence / "shared").mkdir(exist_ok=True)
+        (self.evidence / "shared" / "training.E01").write_bytes(b"")
+
+        def browse(headers, path):
+            resp = self.client.get("/api/fs/browse", headers=headers, params={"path": str(path)})
+            return resp.status_code, {item["name"] for item in resp.json().get("items", [])}
+
+        # Bob: her folder lists only the case, never the image; the case's artefacts are his to read
+        self.assertEqual(browse(self.bob, home), (200, {"..", output.name}))
+        self.assertEqual(browse(self.bob, output)[0], 200)
+        self.assertEqual(browse(self.alice, home)[1], {"..", "laptop.E01", output.name})
+        self.assertIn("laptop.E01", browse(self.admin, home)[1])
+
+        def run(headers, case, source, **extra):
+            return self.client.post("/api/jobs", headers=headers, json={
+                "case_number": case, "source_paths": [str(source)], **extra}).status_code
+        self.assertEqual(run(self.bob, "CASE-EV-BOB1", image), 403)
+        cooked = output / "artefacts" / "cooked"
+        from_her_case = self.client.post("/api/jobs", headers=self.bob, json={
+            "case_number": "CASE-EV-BOB2", "source_paths": [str(cooked)]})
+        self.assertEqual(from_her_case.status_code, 200, from_her_case.text)
+        self.assertEqual(run(self.bob, "CASE-EV-BOB3", self.evidence / "shared" / "training.E01"), 200)
+        # ...but never writes into her folder: the default place instead, and naming it is refused
+        self.assertNotIn(home, Path(from_her_case.json()["destination_path"]).parents)
+        self.assertEqual(run(self.bob, "CASE-EV-BOB4", cooked, destination_path=str(home / "BOB-OUT")), 403)
+        self.assertEqual(run(self.admin, "CASE-EV-ADM1", image), 200)
 
     def test_lockout_after_repeated_failures(self):
         for _ in range(self.settings.max_login_attempts):

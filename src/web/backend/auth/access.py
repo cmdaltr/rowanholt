@@ -17,6 +17,7 @@ import logging
 import posixpath
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import Iterable, Optional
 from urllib.parse import unquote
 
@@ -247,21 +248,15 @@ def require_admin(request: Request) -> dict:
 
 
 def allowed(user: dict, access: Optional[dict]) -> bool:
-    """Whether `user` may see a job with this access record (owner, shared_with)."""
-    if not server_mode() or is_admin(user):
-        return True
-    if not access:
-        return False
-    return access.get("owner_id") == user["id"] or user["username"] in (access.get("shared_with") or [])
+    """Whether `user` may see a job and work its case: on a team server every signed-in analyst
+    may, as the team shares its cases (artefacts, findings, notes, Smith). What's kept to a job's
+    owner and admins is managing it (manages); what's kept to each analyst is their own disk and
+    memory images (evidence_refusal)."""
+    return True
 
 
 def can_access_job(user: dict, job_id: str) -> bool:
-    if not server_mode() or is_admin(user):
-        return True
-    if _storage is None:
-        logger.error("Access checks used before configure(); refusing")
-        return False
-    return allowed(user, _storage.get_access(job_id))
+    return allowed(user, None)
 
 
 def manages(user: dict, access: Optional[dict]) -> bool:
@@ -280,10 +275,8 @@ def can_manage_job(user: dict, job_id: str) -> bool:
 
 
 def visible_job_ids(user: dict) -> Optional[set]:
-    """The job IDs `user` may see, or None for all of them."""
-    if not server_mode() or is_admin(user):
-        return None
-    return {job_id for job_id, access in _storage.all_access().items() if allowed(user, access)}
+    """The job IDs `user` may see, or None for all of them: every case is the team's."""
+    return None
 
 
 def filter_job_ids(user: dict, job_ids: Iterable[str]) -> list:
@@ -304,6 +297,56 @@ def visible_cases(user: dict) -> Optional[set]:
 # /assets/<case>.mobile.json (Mobile) (post/mitre/layers.py)
 LAYER_PATH = re.compile(r"^/assets/([^/]+)\.json$")
 MOBILE_LAYER = ".mobile"
+
+
+def evidence_owner(path, roots: Iterable[str]) -> Optional[str]:
+    """The analyst whose folder this path is in: inside an evidence folder, a folder named after
+    an account (/srv/evidence/alice/...) is that analyst's, and anything else is the team's."""
+    path = Path(path)
+    names = {u["username"].lower(): u["username"] for u in load_users().values()}
+    for root in roots:
+        try:
+            parts = path.relative_to(Path(root)).parts
+        except ValueError:
+            continue
+        if parts and parts[0].lower() in names:
+            return names[parts[0].lower()]
+    return None
+
+
+def shared_output(path, stop, jobs: Optional[list] = None) -> bool:
+    """Whether the path is in, or is, a case's output folder below `stop`: extracted evidence
+    (raw and cooked artefacts), which the team shares, unlike the images it came from."""
+    try:
+        from .. import output_removal
+    except ImportError:
+        import output_removal
+    if jobs is None:
+        jobs = _storage.list_jobs(limit=1_000_000) if _storage else []
+    path, stop = Path(path), Path(stop)
+    for folder in (path, *path.parents):
+        if folder == stop or stop not in folder.parents:
+            return False
+        if folder.is_dir() and output_removal.folder_owner(folder, jobs):
+            return True
+    return False
+
+
+def evidence_refusal(user: dict, path, roots: Iterable[str], jobs: Optional[list] = None) -> Optional[str]:
+    """Why `user` mayn't read this path, or None. On a team server an analyst's own folder
+    (evidence_owner) holds their disk and memory images: another analyst may read only the case
+    output in it. Admins, and a local stack, read anything the allowed folders hold."""
+    if not server_mode() or is_admin(user):
+        return None
+    roots = list(roots)
+    owner = evidence_owner(path, roots)
+    if owner is None or owner.lower() == user["username"].lower():
+        return None
+    home = next(Path(r) / Path(path).relative_to(Path(r)).parts[0] for r in roots
+                if Path(path).is_relative_to(Path(r)) and Path(path) != Path(r))
+    if shared_output(path, home, jobs):
+        return None
+    return f"{home} holds {owner}'s evidence: only the case output in it is shared"
 
 
 def layer_allowed(user: dict, uri: str) -> bool:

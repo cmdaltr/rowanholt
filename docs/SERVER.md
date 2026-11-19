@@ -11,7 +11,8 @@ A local install (an analyst's own machine, the lab) is unchanged. Everything her
 | Network | Every service's port published | Caddy only: 443 (and 80 for redirects and ACME); Splunk, Kibana and the Navigator on 7755, 5601 and 5602 through Caddy, behind the Rowanholt sign-in |
 | TLS | None | Caddy: its own CA, Let's Encrypt, or your organisation's certificate |
 | Sign-in | Optional; guest access; open sign-up | Required for every API route; no guests; admins create accounts; single sign-on (OIDC) optional |
-| Jobs | Everyone sees everything | Each job is visible to its owner, the users it's shared with, and admins |
+| Jobs | Everyone sees everything | Every analyst sees every case; managing a job (cancel, delete, a fresh restart) is its owner's or an admin's |
+| Disk and memory images | Wherever they are | An analyst's own folder (`/srv/evidence/<username>/`) is theirs: others see only the case output in it |
 | Smith | Every case | The cases behind jobs you can see |
 | Admin areas | — | Lab, Quartermaster and Crucible downloads are admin-only |
 | Frontend | Development server | Production build (nginx), same origin as the API |
@@ -150,6 +151,8 @@ ROWANHOLT_EVIDENCE_PATHS=/srv/evidence
 
 Several are separated by commas. Without it, only `/mnt`, `/media` and `/tmp/rowanholt` are accepted. Custodian archives copied to the share are picked up like any other source.
 
+**Whose images are whose.** Inside an evidence folder, a folder named after an account is that analyst's: put alice's disk and memory images in `/srv/evidence/alice/`. Only she (and admins) can list them or run a job on them. A job writes its output beside its source, so her cases land in her folder too, and those the team shares: anyone can browse a case's output there (its raw and cooked artefacts) and start a job from it, writing their own output elsewhere, never into her folder. Any other folder (`/srv/evidence/shared/`, say) is the whole team's.
+
 ## Users
 
 ```bash
@@ -215,13 +218,13 @@ rowanholt server licence remove
 
 The places are checked only when someone is added (an account created or re-enabled, a first single sign-on, `rowanholt server users add|enable`); a licence ending, or being removed, never disables anyone. After the expiry date it keeps working for 30 days' grace, with a warning to admins on every page. Installs and removals, with the version of the terms accepted, are in the `audit_logs` table. See [LICENSING_MODEL.md](LICENSING_MODEL.md).
 
-## Sharing jobs
+## Working cases as a team
 
-A job belongs to the user who created it. On its page, the Access panel shows the owner and who it's shared with; the owner or an admin adds and removes people. The people it's shared with can see and work on it (restart into its output with `fresh=false`, export, ask Smith), but can't reshare it, cancel, pause or resume it, delete or archive it, or restart it with fresh output: those stop or lose the owner's work, so they're the owner's or an admin's. Jobs created before the server existed have no owner: admins see them and can share them.
+Every case on the server is the team's: every analyst sees every job and can work on it (restart it into its output with `fresh=false`, export it, ask Smith). A job belongs to the user who created it, and only they or an admin can cancel, pause or resume it, delete or archive it, or restart it with fresh output: those stop or lose the owner's work. Jobs created before the server existed have no owner: only admins manage them. What isn't shared is the evidence it came from: each analyst's disk and memory images (see [Evidence](#evidence)).
 
-Everyone who can see a job can work the case together from **Browse Case** on its page. They can flag rows as findings, confirm or dismiss them, assign hosts, keep notes, and follow the activity feed. All of that lives in Postgres and points at rows of the case's output; it never changes the case directory.
+Everyone can work a case together from **Browse Case** on its page. They can flag rows as findings, confirm or dismiss them, assign hosts, keep notes, and follow the activity feed. All of that lives in Postgres and points at rows of the case's output; it never changes the case directory.
 
-Case numbers name output directories, so they're unique across the server: creating a job with a case number someone else used is reported as a clash, without showing their job.
+Case numbers name output directories, so they're unique across the server: creating a job with a case number someone else used is reported as a clash, with the job that has it.
 
 ## The desktop app
 
@@ -230,8 +233,8 @@ People can use the server from the desktop app instead of a browser tab: in setu
 ## Limits worth knowing
 
 - **Quartermaster holds the Docker socket.** It's opt-in (`rowanholt anduril enable`) and admin-only on a server, but whoever administers it administers the host's Docker.
-- **Splunk and Kibana** have their own users and indexes. Rowanholt's sign-in in front of them keeps out anyone without a Rowanholt account, but doesn't map job sharing onto their data. The Navigator does follow it: a case's layer is served only to people who can see the case, and layers from command-line runs (no job) only to admins.
-- **Sessions are 24-hour tokens** (`access_token_expire_minutes`); disabling a user stops their next request, since every request checks the user store.
+- **Splunk and Kibana** have their own users and indexes. Rowanholt's sign-in in front of them keeps out anyone without a Rowanholt account, and every case's data in them is the team's, as in Rowanholt itself. The Navigator's layers are for anyone signed in.
+- **Sessions are 24-hour tokens** (`access_token_expire_minutes`); disabling a user stops their next request, since every request checks the user store, and a new password (changed, set by an admin or reset) ends every session from before it. API tokens are left alone: revoke one under Account.
 - **Accounts live in the checkout, not the database.** The user store is `src/web/backend/data/users.json` (the installed licence, `licence.json`, sits beside it), on the host through the backend's bind mount and kept out of the images by `.dockerignore`, so a rebuild or a pull leaves accounts alone. It's gitignored, so `git clean -x` deletes it: `rowanholt server backup` (below) keeps it with `.env` and the database.
 
 ## Backups

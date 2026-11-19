@@ -56,7 +56,7 @@ Container forensics goes first because half of it is written. ML goes last becau
 
 ## Collaborative investigation
 
-**Built.** It works the same on one analyst's machine as on a team server, where access follows job sharing (`auth/access.py`'s job check covers every route, since they're all under `/api/jobs/{id}/case`).
+**Built.** It works the same on one analyst's machine as on a team server, where every case is the team's (`auth/access.py`'s job check covers every route, since they're all under `/api/jobs/{id}/case`).
 
 - **Case browser.** **Browse Case** on a completed job opens `/jobs/{id}/case`. It lists each host's cooked artefacts and analysis files, plus the case's own CSVs (`threat_groups.csv`), in paged tables you can filter on any field. It is read-only by construction (`case_files.py`): requests are resolved against `artefacts/cooked/`, `analysis/` and the case root, `raw/` is never reachable, and nothing opens a file for writing.
 - **Findings.** ⚑ on any row flags it as a lead or confirms it outright, with a title and an optional technique. The server reads the row itself and stores its file, row reference, SHA-256 and an excerpt. If a re-run or an edited file changes the row, the finding shows "row changed" rather than silently pointing at something else.
@@ -171,7 +171,7 @@ Each feature's "Still to do" above, as work to schedule, then the Smith MCP serv
 **What it is.** One MCP server, built with FastMCP (mcp 2's `MCPServer`), through which an MCP host (Claude Desktop, Claude Code, OpenClaw) works a Rowanholt case. It registers every Smith capability; nothing else registers tools.
 
 **How it's built.** A thin client of Rowanholt's own API, not a second way into the case files.
-- On a team server, every call carries the analyst's token, so job sharing (`auth/access.py`) decides what the server can see, exactly as for the web app.
+- On a team server, every call carries the analyst's token, so `auth/access.py` decides what the server can see, exactly as for the web app.
 - The case browser's guarantees carry over: read-only over `cooked/`, `analysis/` and the case root, and `raw/` never reachable.
 - It calls nothing but the Rowanholt API, so it adds no outbound access.
 - It runs over stdio on the analyst's machine (`src/smith_mcp/server.py`, `rowanholt mcp` to start it), and optionally over streamable HTTP behind Caddy on a team server.

@@ -1,6 +1,6 @@
 // What the signed-in user may do to a job, so the web app offers only what the server allows.
-// On a team server the people a job is shared with can see it, restart it into its output, export
-// it and ask Smith; cancelling, pausing, deleting, archiving, a fresh restart, sharing and settling
+// On a team server everyone can see a job and work its case, restart it into its output, export
+// it and ask Smith; cancelling, pausing, deleting, archiving, a fresh restart and settling
 // a failed removal are its owner's or an admin's (main._manager_refusal). The API says which per
 // job (`can_manage`); hidden actions are still refused by the server, this only stops offering them.
 

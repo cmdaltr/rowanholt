@@ -177,15 +177,8 @@ class SiemExportRoutes(ExportCase):
         self.assertIsNone(self.se.read(gone, self.redis))
 
     def test_whoever_can_see_the_job_may_export_it(self):
-        # docs/API.md: the owner, the people it's shared with and admins; anyone else gets 404
+        # docs/API.md: every case is the team's, so anyone signed in may export it
         job_id = self.completed_job("CASE-SIEM-9")
-        resp, queued = self.export(job_id, self.bob)
-        self.assertEqual(resp.status_code, 404)
-        queued.assert_not_called()
-        self.assertEqual(self.client.get(f"/api/jobs/{job_id}/export-siem", headers=self.bob).status_code, 404)
-
-        self.assertEqual(self.client.put(f"/api/jobs/{job_id}/sharing", headers=self.alice,
-                                         json={"usernames": ["bob"]}).status_code, 200)
         for headers in (self.bob, self.admin):
             self.redis.delete(self.se.record_key(job_id))
             resp, queued = self.export(job_id, headers)

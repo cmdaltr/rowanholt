@@ -138,9 +138,9 @@ class SmithQueryTest(BackendCase):
             self.assertEqual([r["file"] for r in suggestions["rows"]], ["artefacts/cooked/autostart.csv"])
             # Each suggestion carries the rows its own text cites
             self.assertEqual([len(s["rows"]) for s in suggestions["suggestions"]], [1, 0])
-            # Bob can't see the case, so he can't ask about it
+            # The case is the team's: Bob may ask about it too
             self.assertEqual(self.client.post("/api/ai/cases/CASE-CTX-1/query", headers=self.bob,
-                                              json={"question": "x7kq.exe"}).status_code, 404)
+                                              json={"question": "x7kq.exe"}).status_code, 200)
 
 
 if __name__ == "__main__":

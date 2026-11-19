@@ -309,7 +309,7 @@ def busy_status() -> dict:
 
 # File System API
 @app.get("/api/fs/browse", response_model=FileSystemBrowseResponse)
-async def browse_filesystem(path: str = Query("/", description="Path to browse")):
+async def browse_filesystem(request: Request, path: str = Query("/", description="Path to browse")):
     """
     Browse filesystem to select disk/memory images.
 
@@ -334,6 +334,14 @@ async def browse_filesystem(path: str = Query("/", description="Path to browse")
         if not path_obj.is_dir():
             raise HTTPException(status_code=400, detail="Path is not a directory")
 
+        # Another analyst's own folder lists only its case output (the team's), never their images
+        user = access.current_user(request)
+        roots = settings.allowed_paths
+        jobs = job_storage.list_jobs(limit=1_000_000) if access.server_mode() else []
+        refusal = access.evidence_refusal(user, path_obj, roots, jobs)
+        if refusal and not any(path_obj.parent == Path(root) for root in roots):
+            raise HTTPException(status_code=403, detail=f"Access denied: {refusal}")
+
         items = []
         skipped_count = 0
         permission_warning = None
@@ -354,6 +362,8 @@ async def browse_filesystem(path: str = Query("/", description="Path to browse")
             try:
                 # Skip macOS metadata files (._* files) and hidden files
                 if item.name.startswith("._") or item.name == ".DS_Store":
+                    continue
+                if access.evidence_refusal(user, item, roots, jobs):
                     continue
                 # Test if we can access this item
                 is_dir = item.is_dir()
@@ -466,6 +476,9 @@ async def create_job(job_request: JobCreate, request: Request):
                     status_code=400,
                     detail=f"Source path does not exist: {path}",
                 )
+            refusal = access.evidence_refusal(access.current_user(request), sanitized, roots)
+            if refusal:
+                raise HTTPException(status_code=403, detail=f"Access denied to path: {refusal}")
             sanitized_source_paths.append(sanitized)
 
         # Generate job ID
@@ -481,12 +494,22 @@ async def create_job(job_request: JobCreate, request: Request):
                 destination_path = str(first_source.parent / case_number)
             else:
                 destination_path = str(first_source / case_number)
+        caller = access.current_user(request)
+        if destination_path and not job_request.destination_path:
+            # Beside a source in another analyst's folder isn't the caller's to write: the default place
+            owner = access.evidence_owner(destination_path, roots)
+            if access.server_mode() and owner and owner.lower() != caller["username"].lower() and not access.is_admin(caller):
+                destination_path = None
         if destination_path:
             # Inside an allowed folder, never one of them or above one: a fresh run removes it
             try:
                 destination_path = str(output_removal.contained(destination_path, roots))
             except output_removal.PathRefused as exc:
                 raise HTTPException(status_code=403, detail=f"Access denied to destination path: {exc}")
+            owner = access.evidence_owner(destination_path, roots)
+            if access.server_mode() and owner and owner.lower() != caller["username"].lower() and not access.is_admin(caller):
+                raise HTTPException(status_code=403, detail=(
+                    f"Access denied to destination path: it's in {owner}'s folder; write to your own or a shared one"))
         else:
             destination_path = str(Path(settings.output_dir) / case_number)
 
@@ -1508,6 +1531,9 @@ def _job_file_options(request: Request, options) -> None:
             path = output_removal.contained(value, settings.allowed_paths, allow_root=True, must_exist=True)
         except output_removal.PathRefused as exc:
             raise HTTPException(status_code=403, detail=f"Access denied to {field}: {exc}")
+        refusal = access.evidence_refusal(access.current_user(request), path, settings.allowed_paths)
+        if refusal:
+            raise HTTPException(status_code=403, detail=f"Access denied to {field}: {refusal}")
         theirs = Path(REQUIRED_FILES_ROOT)
         if path.is_relative_to(theirs) and not path.is_relative_to(Path(mine)):
             raise HTTPException(status_code=403, detail=f"Access denied to {field}: another user's file")

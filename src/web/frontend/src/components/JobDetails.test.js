@@ -51,11 +51,11 @@ test('the owner can pause and cancel a running job', async () => {
   expect(screen.queryByText(/shared with you/)).not.toBeInTheDocument();
 });
 
-test('someone it is shared with is not offered pause or cancel, and is told why', async () => {
+test('someone else on the team is not offered pause or cancel, and is told why', async () => {
   await show({ ...JOB, can_manage: false });
   expect(screen.queryByText('Pause Job')).not.toBeInTheDocument();
   expect(screen.queryByText('Cancel Job')).not.toBeInTheDocument();
-  expect(screen.getByRole('note')).toHaveTextContent("alice's job, shared with you");
+  expect(screen.getByRole('note')).toHaveTextContent("alice's case: the whole team can watch it");
 });
 
 test('their restart keeps the output, and there is no delete', async () => {

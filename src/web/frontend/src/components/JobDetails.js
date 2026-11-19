@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getJob, cancelJob, pauseJob, resumeJob, deleteJob, restartJob, exportSiem, getSiemExport, confirmRemoval, cancelRemoval } from '../api';
 import { serviceUrl } from '../apiBase';
-import JobSharing from './JobSharing';
 import { statusLabel } from '../jobStatus';
 import { canManage, jobPageActions, restartFresh } from '../jobActions';
 import { exportActive, exportMessage, offersSiemExport } from '../siemExport';
@@ -837,9 +836,9 @@ function JobDetails() {
 
         {!canManage(job) && (
           <div className="info" role="note" style={{ marginBottom: '1rem' }}>
-            {job.owner ? `${job.owner}'s job, shared with you` : 'Shared with you'}: you can watch it, restart it into
-            its output, export it and ask Smith. Cancelling, pausing, deleting, a fresh restart and sharing are
-            for its owner or an admin.
+            {job.owner ? `${job.owner}'s case` : 'A case from before accounts'}: the whole team can watch it, work
+            the case, restart it into its output, export it and ask Smith. Cancelling, pausing, deleting, archiving
+            and a fresh restart are for its owner or an admin.
           </div>
         )}
 
@@ -889,8 +888,6 @@ function JobDetails() {
             <div className="error">{job.error}</div>
           </div>
         )}
-
-        <JobSharing jobId={job.id} />
 
         <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '2rem' }}>
           <div data-guide="job.sources" className="source-paths-section" style={{ flex: '1', minWidth: '0' }}>
