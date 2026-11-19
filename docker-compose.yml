@@ -99,6 +99,7 @@ services:
       # - D:/:/mnt/d:ro             # Windows: Mount D: drive (example, adjust as needed)
       - /tmp/rowanholt:/tmp/elrond/output # Output directory (accessible at /tmp/rowanholt on host)
       - /tmp/rowanholt:/tmp/rowanholt:ro # Mount for test images in /tmp/rowanholt
+      - /tmp/rowanholt/required:/tmp/rowanholt/required # Each user's keywords and YARA uploads: written here, read by the worker at the same path
       - /tmp/rowanholt:/host/tmp/rowanholt # Also mount at /host/tmp/rowanholt for frontend compatibility
       - rowanholt_uploads:/tmp/elrond/uploads # Upload directory
     depends_on:
