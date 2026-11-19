@@ -266,7 +266,8 @@ services:
     deploy:
       resources:
         limits:
-          # The dev server's webpack compile peaks above 512M (Rocky 9 on arm64 was OOM-killed)
+          # Create React App's webpack dev server peaked above 512M (Rocky 9 on arm64 was OOM-killed);
+          # Vite's needs less, the limit stays
           memory: 1G
 
   # Splunk Enterprise

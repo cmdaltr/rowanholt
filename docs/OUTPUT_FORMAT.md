@@ -108,7 +108,7 @@ It replaces the two copies of `_append_rows` (`windows_artefacts.py:49`, `linux_
 - **Lab**: `verify-expected.py` reads `.jsonl` and matches against decoded values (JSON escaping of `\` would otherwise break substring matches on Windows paths); the Linux seed's 19 `"cooked": "<name>.csv"` entries are renamed; `stacking_eval.py` reads `stacking.jsonl`. Not touched while a lab run is going.
 - **A format check**: a test, and a step in `verify-expected`, that every `.jsonl` file in a case parses line by line and every record has the five envelope fields. That's the "consistent" part held in place.
 - **Tests**: about 30 test files build or assert on cooked CSV/JSON (the largest: `test_smith_offline` 33, `test_linux_artefacts` 21, `test_smith_mcp` 21, `test_stacking` 20, `test_containers` 18, `test_case_browser` 17, `test_threat_intel` 15); updated with the code they test, plus tests that old-format cases still read.
-- **Docs and help text**: `docs/CLI.md` (output structure), `USAGE.md`, `README.md`, `QUICKSTART.md`, `SMITH.md` and the rest that name CSVs; `elrond.py`'s help; the About page (`HelpPage.js`), the guide and the architecture pages.
+- **Docs and help text**: `docs/CLI.md` (output structure), `USAGE.md`, `README.md`, `QUICKSTART.md`, `SMITH.md` and the rest that name CSVs; `elrond.py`'s help; the About page (`HelpPage.jsx`), the guide and the architecture pages.
 
 ### 6. Bugs fixed on the way
 

@@ -9,8 +9,8 @@ The modules' display names and the code names that stay in paths, identifiers an
 | Custodian (acquisition) | Gandalf | `src/acquisition/`: `bash/gandalf.sh`, `python/gandalf.py`, `windows/Invoke-Gandalf.ps1`; web page `/gandalf` |
 | Ledger (analysis) | Elrond | `src/analysis/elrond.py`, `src/analysis/rowanholt/`; web page `/elrond` |
 | Smith (AI analyst) | Smith | `src/analysis/rowanholt/ai/`, `src/web/backend/ai_routes.py`, `src/smith_mcp/` |
-| Lookout (threat intelligence) | Pippin | `src/analysis/rowanholt/threat_intel/`, `src/web/backend/threat_intel_routes.py`; web page `/pippin` (`ThreatIntel.js`) |
-| Steward (administration) | Aragorn | web page `/aragorn` (`Aragorn.js`), `src/web/backend/lab_routes.py` |
+| Lookout (threat intelligence) | Pippin | `src/analysis/rowanholt/threat_intel/`, `src/web/backend/threat_intel_routes.py`; web page `/pippin` (`ThreatIntel.jsx`) |
+| Steward (administration) | Aragorn | web page `/aragorn` (`Aragorn.jsx`), `src/web/backend/lab_routes.py` |
 | Quartermaster (Docker manager) | Andúril | `src/common/anduril/`, `src/cli/anduril_cli.py`, `src/web/backend/anduril_routes.py`; `rowanholt quartermaster` (or `anduril`) |
 | Crucible (lab and recorded attack telemetry) | Mordor | `src/mordor/`, `src/web/backend/mordor_routes.py`, `lab/`; web page `/mordor` |
 
@@ -46,7 +46,7 @@ elrond-web/
 ├── frontend/         # React frontend
 │   ├── src/
 │   │   ├── components/  # React components
-│   │   ├── App.js       # Main application
+│   │   ├── App.jsx       # Main application
 │   │   └── api.js       # API client
 │   └── public/
 └── docker-compose.yml
@@ -362,7 +362,7 @@ Both frontend and backend support hot reload in development mode:
 
 1. Add to `AnalysisOptions` in `backend/models/job.py`
 2. Update `build_elrond_command()` in `backend/tasks.py`
-3. Add to appropriate section in `frontend/src/components/OptionsPanel.js`
+3. Add to appropriate section in `frontend/src/components/OptionsPanel.jsx`
 
 ## Production Deployment
 

@@ -226,4 +226,4 @@ Single sign-on stays free because gating it would sign people out, which the sha
   text and joins the line with `line_of`; samarkand itself never signs) and `issue-licence.sh` (key in
   `ROWANHOLT_LICENCE_KEY`, ledger with `LICENCE_LEDGER_DIR`); `tests/unit/test_licence_units.py`,
   `tests/unit/test_licence.py`, `tests/unit/test_branding.py`, `tests/unit/test_webhooks.py`, and the
-  frontend's `Licence.test.js`, `Webhooks.test.js` and `Branding.test.js`.
+  frontend's `Licence.test.jsx`, `Webhooks.test.jsx` and `Branding.test.jsx`.

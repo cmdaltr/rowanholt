@@ -23,15 +23,15 @@ Custodian (acquisition) → Ledger (analysis) → Smith (AI analyst)
 
 ## Naming: code names stay in identifiers; display names in anything user-facing
 
-Each module has a display name and a code name (Ben's decision, 12 November 2026; the plan is `docs/DISPLAY-NAMES-PLAN.md`). Display names go in anything a user reads: the web UI, CLI help and output, log messages, Smith's answers and MCP tool descriptions, docs, the desktop apps and the installer. Bare names, no "The"; possessives swap too ("Ledger's"). Code names stay in Python and JS identifiers, module and directory paths, component file names (`Aragorn.js`), URL routes (`/gandalf`, `/pippin`), API paths and JSON fields, database values, CLI subcommands and flags, env vars, container and network names (`rowanholt-anduril`), code comments and docstrings, and the evidence formats written into cases (`gandalf_integrity.jsonl`, the `log.meta` fields, the collectors' output on target hosts): changing those breaks older cases. New aliases sit beside the old spellings, which keep working: `rowanholt quartermaster` (`rowanholt anduril`), `--Custodian` and `--Crucible` (`--Gandalf` and `--Mordor`).
+Each module has a display name and a code name (Ben's decision, 12 November 2026; the plan is `docs/DISPLAY-NAMES-PLAN.md`). Display names go in anything a user reads: the web UI, CLI help and output, log messages, Smith's answers and MCP tool descriptions, docs, the desktop apps and the installer. Bare names, no "The"; possessives swap too ("Ledger's"). Code names stay in Python and JS identifiers, module and directory paths, component file names (`Aragorn.jsx`), URL routes (`/gandalf`, `/pippin`), API paths and JSON fields, database values, CLI subcommands and flags, env vars, container and network names (`rowanholt-anduril`), code comments and docstrings, and the evidence formats written into cases (`gandalf_integrity.jsonl`, the `log.meta` fields, the collectors' output on target hosts): changing those breaks older cases. New aliases sit beside the old spellings, which keep working: `rowanholt quartermaster` (`rowanholt anduril`), `--Custodian` and `--Crucible` (`--Gandalf` and `--Mordor`).
 
 | Display name | Code name | Module | Where the code lives |
 |---|---|---|---|
 | Custodian | Gandalf | Acquisition | `src/acquisition/`; web page `/gandalf` |
 | Ledger | Elrond | Analysis | `src/analysis/elrond.py`, `src/analysis/rowanholt/`; web page `/elrond` |
 | Smith | Smith | AI analyst | `src/analysis/rowanholt/ai/`, `ai_routes.py`, `smith_offline.py`, `src/smith_mcp/` |
-| Lookout | Pippin | Threat intelligence | `src/analysis/rowanholt/threat_intel/`, `threat_intel_routes.py`; web page `/pippin` (`ThreatIntel.js`) |
-| Steward | Aragorn | Administration | web page `/aragorn` (`Aragorn.js`), `lab_routes.py` |
+| Lookout | Pippin | Threat intelligence | `src/analysis/rowanholt/threat_intel/`, `threat_intel_routes.py`; web page `/pippin` (`ThreatIntel.jsx`) |
+| Steward | Aragorn | Administration | web page `/aragorn` (`Aragorn.jsx`), `lab_routes.py` |
 | Quartermaster | Andúril | Docker manager | `src/common/anduril/`, `src/cli/anduril_cli.py`, `anduril_routes.py` |
 | Crucible | Mordor | Lab and recorded attack telemetry | `src/mordor/`, `mordor_routes.py`, `lab/`; web page `/mordor` |
 
@@ -49,7 +49,7 @@ Each module has a display name and a code name (Ben's decision, 12 November 2026
 | `src/analysis/elrond.py`, `src/analysis/rowanholt/` | Ledger: `core/` (incl. Custodian ingest and manifest check, `mobile.py` for phones), `memory/` (incl. `symbols/`: Volatility symbol tables found or fetched by kernel banner, `rowanholt symbols`), `collect/`, `process/` (incl. `network.py`: Zeek, NetFlow; `mobile.py`: iLEAPP, ALEAPP), `analysis/`, `post/` (Splunk, Elastic, OpenSearch/Wazuh, Timesketch, ATT&CK), `report/` (the case report, shared with the backend), `cloud/`, `ai/` (Smith's CLI) |
 | `src/analysis/tools/definitions.py` | Forensic tool definitions (executables, paths, platforms) |
 | `src/web/backend/` | FastAPI (:5688): jobs, auth, `busy.py` (`GET /api/busy`, no sign-in: the homelab's check before a rebuild; register a check there for any new work a restart would interrupt), `job_liveness.py` (the worker's heartbeat per job and the queue, so a job left `running` or `pending` by a crash is failed with a reason; only `running` and `paused` jobs with a live heartbeat, or one lapsed under 90 s, are busy: a pending job waits out a rebuild in Redis's queue, Ben 12 November 2026), `output_removal.py` (where a job may write, and the only folder removal: a fresh run's old output, checked in the worker) and `removal_routes.py` (confirming or giving up a failed removal, owner or admin; `removing` counts for `/api/busy`), `ai_routes.py` + `smith_offline.py` (fixed answers) + `smith_context.py` (the model's numbered context) (Smith), Crucible, lab, Quartermaster proxy |
-| `src/web/frontend/` | React (:5687); About is `components/HelpPage.js` |
+| `src/web/frontend/` | React (:5687); About is `components/HelpPage.jsx` |
 | `deploy/linux/`, `deploy/windows/`, `deploy/server/`, `scripts/server/` | Team server: `deploy/linux/install.sh` (`rowanholt server init`) and `deploy/linux/uninstall.sh` (`server uninstall`, keeps data; `--purge`), `deploy/windows/install-service.ps1` and `uninstall-service.ps1` (Windows Server through WSL 2), at Shikari's and Ostraka's paths; `deploy/server/`: the Compose override (Caddy in front, nothing else published, production frontend), Caddyfile, a Tailscale Service name (`server init --service`: `Caddyfile.service` and `docker-compose.service.yml`, loopback 5680–5683); Rocky/RHEL (`deploy/docker-compose.selinux.yml`); `scripts/server/`: the helpers (`server users/licence/ca/cert/backup`); guide in `docs/SERVER.md` |
 | `src/web/backend/auth/` | Sign-in: `users.py` (file store), `access.py` (the server-mode middleware: every route, job ownership and sharing via the `job_access` table), `tokens.py` (long-lived API tokens, `full` or `smith-mcp` scope), `oidc.py` (SSO), `mfa.py` (TOTP and backup codes for password accounts: secrets HKDF/Fernet-encrypted in the user store, the sign-in's challenge; `ROWANHOLT_REQUIRE_MFA`; Ben's decision 12 November 2026), `manage_users.py` (`server users`, incl. `mfa-reset`) |
 | `src/common/startup_progress.py` | `rowanholt start --progress`: phases and the ETA from start history, which the apps show |
@@ -62,13 +62,13 @@ Each module has a display name and a code name (Ben's decision, 12 November 2026
 
 ## Stack
 
-- Python 3.10 in the backend image (`python:3.10-slim`) and the worker (Ubuntu 22.04's python3; Python 3.12 there is only iLEAPP's and ALEAPP's venvs, from deadsnakes), 3.12 in the smith-mcp and Quartermaster images; the package needs 3.10+ (`requires-python`, for samarkand); host-side scripts that import nothing of the backend's or Ledger's (the launcher's helpers, `startup_progress.py`, `samples.py`) and Custodian's Python collector stay Python 3.8-compatible
+- Python 3.12 in the backend image (`python:3.12-slim`, since 19 November 2026, for Pillow 13), 3.10 in the worker (Ubuntu 22.04's python3; Python 3.12 there is only iLEAPP's and ALEAPP's venvs, from deadsnakes), 3.12 in the smith-mcp and Quartermaster images; the package needs 3.10+ (`requires-python`, for samarkand); host-side scripts that import nothing of the backend's or Ledger's (the launcher's helpers, `startup_progress.py`, `samples.py`) and Custodian's Python collector stay Python 3.8-compatible
 - FastAPI, SQLAlchemy and Alembic over Postgres (users, jobs, history); Redis + Celery for the job queue; case data in case directories on disk
 - argparse for CLIs (`src/cli/rowanholt.py`, `elrond.py`)
 - openpyxl for XLSX output
 - Volatility 3, Plaso (psteal), Artemis, RegRipper, YARA, The Sleuth Kit, ClamAV, ewfmount/qemu-nbd/apfs-fuse as subprocess calls
 - Smith's LLM backend (`src/web/backend/smith_model.py`): Ollama or an OpenAI-compatible server (LM Studio, vLLM, llama.cpp, LocalAI), on this machine or another, set by an admin on Steward's Smith tab (`/api/ai/model`), else the environment (`OLLAMA_HOST`, `ROWANHOLT_MODEL_NAME`, default `llama3.2:3b`); the CLI can also use llama.cpp through LangChain. Private addresses only, checked per request (`ROWANHOLT_ALLOW_PUBLIC_MODEL=1` overrides; Ben's decision 17 November 2026): no cloud backend
-- React 18 front end; Docker Compose for everything (`docker-compose.yml`)
+- React 18 front end with React Router 7, built by Vite (`vite.config.js`; JSX in `.jsx` files; tests with Vitest), since 19 November 2026; Docker Compose for everything (`docker-compose.yml`)
 
 ## Code conventions
 

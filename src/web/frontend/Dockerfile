@@ -2,7 +2,7 @@
 # Multi-stage build for optimized production image
 
 # Stage 1: Build stage
-FROM node:18-alpine AS build
+FROM node:22-alpine AS build
 
 LABEL maintainer="Elrond Team"
 LABEL description="Elrond Web Frontend"
@@ -13,8 +13,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production && \
+# Install dependencies (Vite, which builds it, is a dev dependency)
+RUN npm ci && \
     npm cache clean --force
 
 # Copy application code
@@ -24,7 +24,7 @@ COPY . .
 RUN npm run build
 
 # Stage 2: Production stage
-FROM node:18-alpine AS production
+FROM node:22-alpine AS production
 
 WORKDIR /app
 
@@ -52,7 +52,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 CMD ["serve", "-s", "build", "-l", "3000"]
 
 # Stage 3: Development stage
-FROM node:18-alpine AS development
+FROM node:22-alpine AS development
 
 WORKDIR /app
 
@@ -61,7 +61,7 @@ COPY package*.json ./
 
 # Install all dependencies (including dev). Offline, npm can exit 0 with empty packages:
 # fail instead, so that layer is never cached
-RUN npm install && test -x node_modules/.bin/react-scripts
+RUN npm ci && test -x node_modules/.bin/vite
 
 # Copy application code
 COPY . .
@@ -69,5 +69,5 @@ COPY . .
 # Expose port
 EXPOSE 3000
 
-# Start development server
+# Start the development server (Vite, on 0.0.0.0:3000: vite.config.js)
 CMD ["npm", "start"]

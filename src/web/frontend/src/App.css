@@ -3040,7 +3040,7 @@ select.large-select:disabled {
 .lab-error { border-color: #ed5565; }
 .lab-message { border-color: #8cc152; }
 
-/* ---- Mordor: recorded telemetry and its lab (components/MordorTelemetry.js, from Archer's Emulate page) */
+/* ---- Mordor: recorded telemetry and its lab (components/MordorTelemetry.jsx, from Archer's Emulate page) */
 .mt-page .lab-note { color: #999; margin: 0.5rem 0 1rem; line-height: 1.5; }
 .mt-dim { color: #888; font-size: 0.9rem; }
 .mt-bad { color: #ed5565; }
@@ -3129,7 +3129,7 @@ button.mt-close { background: none; color: #aaa; font-size: 1.4rem; padding: 0 0
 button.mt-close:hover { background: none; box-shadow: none; color: #fff; }
 .mt-modal-body { padding: 1rem; color: #ccc; }
 .mt-modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
-/* A lab VM's console (LabConsole.js): noVNC draws into .lab-console-screen */
+/* A lab VM's console (LabConsole.jsx): noVNC draws into .lab-console-screen */
 .mt-modal-box.lab-console-box { width: 96vw; height: 92vh; max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; }
 .lab-console-tools { align-items: center; gap: 0.6rem; margin: 0; }
 .lab-console-scale { color: #ccc; font-size: 0.85rem; display: flex; align-items: center; gap: 0.3rem; }
@@ -3274,7 +3274,7 @@ select.large-select.lb-select { width: auto; min-width: 16rem; padding: 0.45rem 
 a.mt-pill-link { display: inline-block; padding: 0.4rem 1rem; border: 1px solid #636a3a; border-radius: 999px; color: #66d9ef; text-decoration: none; }
 a.mt-pill-link:hover { border-color: #66d9ef; }
 
-/* ── The guide and the start-up offer (components/Guide.js, StartOffer.js) ───────────── */
+/* ── The guide and the start-up offer (components/Guide.jsx, StartOffer.jsx) ───────────── */
 .App-header nav .nav-guide {
   background: transparent;
   color: #f0dba5;

@@ -1,6 +1,6 @@
 """
 Photographs every page the in-app guide covers, and records where each of its sections
-sits, for components/Guide.js. Run it against a running stack after changing a page's
+sits, for components/Guide.jsx. Run it against a running stack after changing a page's
 layout:
 
     pip install playwright && python3 -m playwright install chromium

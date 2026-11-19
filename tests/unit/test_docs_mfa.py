@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DOCS = sorted((ROOT / "docs").glob("*.md")) + [ROOT / "README.md", ROOT / "INSTALL.md"]
-WEB_COPY = [ROOT / "src/web/frontend/src/components/HelpPage.js", ROOT / "src/web/frontend/src/guide/content.js"]
+WEB_COPY = [ROOT / "src/web/frontend/src/components/HelpPage.jsx", ROOT / "src/web/frontend/src/guide/content.js"]
 
 # Each says Rowanholt has no MFA of its own, which is no longer true
 NONE_CLAIMS = (

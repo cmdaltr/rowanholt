@@ -1,4 +1,4 @@
-/* The About page (HelpPage.js). Everything is scoped to .help-page so the shared .code-block,
+/* The About page (HelpPage.jsx). Everything is scoped to .help-page so the shared .code-block,
    table and .card rules elsewhere in the app are left alone. */
 
 .help-page {

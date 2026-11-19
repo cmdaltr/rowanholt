@@ -1,20 +1,20 @@
 # Production Dockerfile for React Frontend
 
 # Build stage
-FROM node:18-alpine AS build
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install dependencies (Vite, which builds it, is a dev dependency)
+RUN npm ci
 
 # Copy source code
 COPY . .
 
-# Build for production
+# Build for production (vite.config.js reads REACT_APP_API_URL)
 ARG REACT_APP_API_URL
 ENV REACT_APP_API_URL=${REACT_APP_API_URL}
 RUN npm run build
