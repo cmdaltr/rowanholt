@@ -9,7 +9,6 @@
 #
 # ROWANHOLT_HTTPS_PORT moves the web app off 443 (and the proxy off 80), for a host where
 # something else is the front door (rowanholt server init --https-port)
-
 {
 	admin off
 	# A Tailscale Service name's requests (Caddyfile.service) reach :5680 from Docker's gateway on
