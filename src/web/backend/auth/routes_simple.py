@@ -297,7 +297,7 @@ async def logout(response: Response):
 
 
 NO_EMAIL = ("Rowanholt doesn't send email. Reset your password with one of your backup codes, or ask an "
-            "administrator: rowanholt server users password <username>")
+            "administrator for a reset link: rowanholt server users reset-access <username>")
 
 
 @router.post("/forgot-password")
@@ -612,7 +612,7 @@ def _reset_record(token: str) -> tuple:
 @router.post("/reset-access/start")
 async def reset_access_start(body: ResetStart):
     """Opening a reset link: the account's username and a new authenticator to set up (a secret, as
-    text and a QR code). Nothing changes until /reset-access/complete; opening it again starts afresh."""
+    text and a QR code). Nothing changes until /reset-access/complete; opening it again shows the same one."""
     users, record = _reset_record(body.token)
     enrolment = reset_access.start(record)
     save_users(users)
@@ -800,6 +800,7 @@ async def invitation_complete(body: InvitationAccept, request: Request, response
         step = invitations.pending_step(invitation, body.code)
         if step is None:
             throttle.failed(name, address)
+            invitations.audit("mfa_failed", None, invitation, address, stage="invitation")
             raise HTTPException(status_code=400, detail="Incorrect code: check the app's clock and try the next one")
         record, codes = invitations.complete(users, pending, invitation, body.username, body.full_name,
                                              body.new_password, step, address, storage=access._storage)
@@ -839,7 +840,10 @@ async def create_user(request: RegisterRequest, http_request: Request):
 
 @router.patch("/users/{user_id}")
 async def update_user(user_id: str, update: UserUpdate, admin: dict = Depends(access.require_admin)):
-    """Change a user's role, status, password or name (admins). The last active admin stays one."""
+    """Change a user's role, status, password or name (admins). The last active admin stays one. A team
+    server doesn't let an admin choose someone's password: a reset link lets them choose it."""
+    if update.password and settings.rowanholt_server_mode:
+        raise HTTPException(status_code=400, detail=reset_access.RESET_INSTEAD)
     users = load_users()
     user = users.get(user_id)
     if not user:

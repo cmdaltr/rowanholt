@@ -7,7 +7,7 @@ Run inside the backend container (`rowanholt server users ...` does this):
     python -m auth.manage_users invitations                        (pending ones)
     python -m auth.manage_users revoke-invitation <id>
     python -m auth.manage_users add <username> <email> [--admin]   (local mode only; password prompted)
-    python -m auth.manage_users password <username>                (prompted)
+    python -m auth.manage_users password <username>                (local mode only; prompted)
     python -m auth.manage_users role <username> admin|user
     python -m auth.manage_users disable|enable <username>
     python -m auth.manage_users mfa-reset <username>               (lost authenticator; audited)
@@ -19,7 +19,8 @@ end and their API tokens are revoked at once; a new link replaces an earlier one
 
 On a team server accounts are made by invitation (auth/invitations.py): invite prints a link where
 the person chooses their username, password and authenticator, so `add`, which has an admin choose
-someone's password, is refused there. A local stack keeps `add`.
+someone's password, is refused there, and so is `password`: reset-access instead, where they choose
+it. A local stack keeps both.
 """
 
 import argparse
@@ -169,7 +170,7 @@ def main(argv: list) -> int:
         return 0
     if args.command == "add":
         if settings.rowanholt_server_mode:
-            raise SystemExit(invitations.INVITE_INSTEAD.replace(" (or POST /api/auth/users/invitations)", ""))
+            raise SystemExit(invitations.INVITE_INSTEAD_CLI)
         if find_user(users, args.username) or find_user(users, args.email):
             raise SystemExit("Username or email already taken")
         _room_for_one_more(users)
@@ -182,6 +183,8 @@ def main(argv: list) -> int:
         if losing_admin and len(active_admins) <= 1:
             raise SystemExit("That's the last active admin")
         if args.command == "password":
+            if settings.rowanholt_server_mode:
+                raise SystemExit(reset_access.RESET_INSTEAD_CLI)
             set_password(user, _password("New password: "))
         elif args.command == "role":
             user["role"] = args.role

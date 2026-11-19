@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Administer a server's users from the host (list, invite, invitations, revoke-invitation, password,
+# Administer a server's users from the host (list, invite, invitations, revoke-invitation,
 # role, disable, enable, mfa-reset, reset-access)
 #
 #   rowanholt server users list
 #   rowanholt server users invite <email> [--role user|admin] [--name NAME]   (a one-time link)
 #   rowanholt server users invitations                 (pending ones)
 #   rowanholt server users revoke-invitation <id>
-#   rowanholt server users password|disable|enable <username>
+#   rowanholt server users disable|enable <username>
 #   rowanholt server users role <username> admin|user
 #   rowanholt server users mfa-reset <username>   (lost authenticator and backup codes)
 #   rowanholt server users reset-access <username|email>   (a one-time link: new password and authenticator)

@@ -16,7 +16,7 @@ Pending invitations are kept in their own file beside the users (invitations.jso
 backend's user only), not in users.json: everything that reads the users (licence places, the
 directory, sign-in, single sign-on's matching, evidence folders named after accounts) would otherwise
 have to learn to skip them. A new invitation for an email replaces an earlier one, and expired ones
-are dropped whenever the file is written.
+are dropped when the file is written a day after they expired.
 """
 
 import hmac
@@ -41,12 +41,14 @@ except ImportError:
 PATH = "/accept-invite"
 ROLES = ("admin", "user")
 EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+KEEP_EXPIRED_SECONDS = 24 * 3600
 
 INVALID = "This invitation isn't valid or has been used: ask an administrator for a new one"
 EXPIRED = "This invitation has expired: ask an administrator for a new one"
 LOCAL = "Invitations are for a team server: on your own machine, Rowanholt has one analyst"
-INVITE_INSTEAD = ("Accounts on a team server are made by invitation, so nobody else sets their password: "
-                  "rowanholt server users invite <email> (or POST /api/auth/users/invitations)")
+_INVITE = "Accounts on a team server are made by invitation, so nobody else sets their password: "
+INVITE_INSTEAD = _INVITE + "rowanholt server users invite <email> (or POST /api/auth/users/invitations)"
+INVITE_INSTEAD_CLI = _INVITE + "rowanholt server users invite <email>"
 
 
 class InvitationRefused(ValueError):
@@ -74,9 +76,10 @@ def load() -> dict:
 
 
 def save(invitations: dict) -> None:
-    """Write the invitations, dropping expired ones, readable by the backend's user only."""
-    now = mfa._now()
-    live = {key: inv for key, inv in invitations.items() if float(inv.get("expires") or 0) >= now}
+    """Write the invitations, readable by the backend's user only. Expired ones are dropped once they're
+    a day past it: until then their link still says it's expired (410), not that it was never valid."""
+    keep_after = mfa._now() - KEEP_EXPIRED_SECONDS
+    live = {key: inv for key, inv in invitations.items() if float(inv.get("expires") or 0) >= keep_after}
     path = _file()
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f"{path.name}.tmp")
@@ -103,7 +106,7 @@ def _iso(epoch: float) -> str:
     return datetime.fromtimestamp(float(epoch), timezone.utc).replace(tzinfo=None).isoformat()
 
 
-def _audit(action: str, actor: dict | None, invitation: dict, ip: str | None, storage=None, **details) -> None:
+def audit(action: str, actor: dict | None, invitation: dict, ip: str | None, storage=None, **details) -> None:
     mfa.audit(action, actor, {"id": invitation["id"], "username": invitation["email"]}, ip, storage=storage,
               email=invitation["email"], role=invitation["role"], **details)
 
@@ -146,7 +149,7 @@ def create(users: dict, email: str, role: str = "user", full_name: str | None = 
     invitations = {key: inv for key, inv in load().items() if inv["email"] != email}  # replaces an earlier one
     invitations[invitation["id"]] = invitation
     save(invitations)
-    _audit("invitation_created", actor, invitation, ip, storage, **details)
+    audit("invitation_created", actor, invitation, ip, storage, **details)
     return public(invitation), reset_access.link(PATH, token)
 
 
@@ -158,7 +161,7 @@ def revoke(invitation_id: str, actor: dict | None = None, ip: str | None = None,
     if invitation is None:
         return None
     save(invitations)
-    _audit("invitation_revoked", actor, invitation, ip, storage, **details)
+    audit("invitation_revoked", actor, invitation, ip, storage, **details)
     return public(invitation)
 
 
@@ -204,12 +207,17 @@ def preview(users: dict, invitation: dict) -> dict:
             "expires_in": int(float(invitation["expires"]) - mfa._now())}
 
 
-def check_username(users: dict, username: str) -> str:
-    """The username, if it's well formed and free."""
+def check_username(users: dict, invitations: dict, invitation: dict, username: str) -> str:
+    """The username, if it's well formed and free. Sign-in finds an account by username or email, so a
+    username can't be another account's email, nor the email another pending invitation is for."""
     username = (username or "").strip()
     if not user_store.USERNAME_PATTERN.match(username):
         raise InvitationRefused("Usernames are 2-64 letters, digits and . _ @ -")
-    if user_store.find_user(users, username):
+    folded = username.lower()
+    taken = {(u.get("username") or "").lower() for u in users.values()}
+    taken |= {(u.get("email") or "").lower() for u in users.values()}
+    taken |= {inv["email"] for key, inv in invitations.items() if key != invitation["id"]}
+    if folded in taken:
         raise InvitationRefused(f"The username {username} is taken: choose another")
     return username
 
@@ -217,7 +225,7 @@ def check_username(users: dict, username: str) -> str:
 def start(users: dict, invitations: dict, invitation: dict, username: str) -> dict:
     """The authenticator to set up, labelled with the chosen username; its secret is kept on the
     invitation (encrypted) until `complete`. Starting again makes another. The caller saves."""
-    username = check_username(users, username)
+    username = check_username(users, invitations, invitation, username)
     secret = mfa.new_secret()
     invitation["pending_secret"] = mfa.encrypt_secret(secret)
     invitations[invitation["id"]] = invitation
@@ -238,8 +246,9 @@ def complete(users: dict, invitations: dict, invitation: dict, username: str, fu
     """Make the account, once `pending_step` has accepted a code: (the new user record; its ten
     backup codes, to be shown once). The username, the email and a place are checked again, since
     any may have gone since the invitation was made. Saves both files: the invitation is used up."""
-    username = check_username(users, username)
-    if any((u.get("email") or "").lower() == invitation["email"] for u in users.values()):
+    username = check_username(users, invitations, invitation, username)
+    if any(invitation["email"] in ((u.get("email") or "").lower(), (u.get("username") or "").lower())
+           for u in users.values()):
         raise InvitationRefused(f"{invitation['email']} already has an account: sign in instead", 409)
     refusal = licence.seat_refusal(users, settings.rowanholt_server_mode, excluding={invitation["id"]})
     if refusal:

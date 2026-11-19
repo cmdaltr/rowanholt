@@ -46,7 +46,7 @@ With single sign-on, `ROWANHOLT_LOCAL_LOGIN=false` leaves passwords to admins as
 #### Password Requirements
 - At least 12 characters on a team server (checked by the backend)
 - Chosen by the account's owner: on a server, a new account's password is set by the person accepting the invitation, never by an admin
-- No password reset by email: an admin issues a reset link (`rowanholt server users reset-access <user>`) or sets a new password (`rowanholt server users password <user>`, or `/api/auth/users`)
+- No password reset by email: an admin issues a reset link (`rowanholt server users reset-access <user>`), where the person chooses the new password; on a server no admin sets one for them
 - Failed sign-ins lock the username ([SERVER.md](SERVER.md#how-sign-in-lockouts-work))
 
 ### Session Management

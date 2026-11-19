@@ -117,6 +117,17 @@ class ResetAccessTest(BackendCase):
         self.assertEqual(self.start(first).status_code, 400)
         self.assertEqual(self.start(second).status_code, 200)
 
+    def test_opening_the_link_again_shows_the_same_authenticator(self):
+        # A reload or a second tab mustn't replace the secret a phone has already scanned
+        _, user_id, _ = self.new_user()
+        token = self.issue(user_id)
+        first = self.start(token).json()["secret"]
+        self.assertEqual(self.start(token).json()["secret"], first)
+        self.assertEqual(self.complete(token, self.code(first)).status_code, 200)
+        # A new link is a new authenticator
+        again = self.issue(user_id)
+        self.assertNotEqual(self.start(again).json()["secret"], first)
+
     def test_only_admins_issue_a_link(self):
         _, user_id, headers = self.new_user()
         for who in (headers, self.alice):

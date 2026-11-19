@@ -208,11 +208,13 @@ def places_held(users: dict, excluding: Iterable[str] = ()) -> int:
 
 
 def _invitations_pending(excluding: set) -> int:
-    try:
-        from auth import invitations
-    except ImportError:  # imported as a package (src.web.backend)
+    try:  # the order every module imports in, so there's one copy of auth (and of its USERS_FILE)
         from .auth import invitations
-    return sum(1 for inv in invitations.pending() if inv["id"] not in excluding)
+    except ImportError:
+        from auth import invitations
+    now = invitations.mfa._now()
+    return sum(1 for key, inv in invitations.load().items()
+               if key not in excluding and float(inv.get("expires") or 0) >= now)
 
 
 def seat_refusal(users: dict, server_mode: bool, now: Optional[datetime] = None,

@@ -43,6 +43,9 @@ INVALID = "This link isn't valid or has been used: ask an administrator for a ne
 EXPIRED = "This link has expired: ask an administrator for a new one"
 LOCAL = ("Reset access is for a team server: on your own machine, set a new password with "
          "rowanholt server users password <username>")
+_RESET = "On a team server people choose their own passwords: give them a reset link instead, "
+RESET_INSTEAD = _RESET + "POST /api/auth/users/{id}/reset-access (or rowanholt server users reset-access <user>)"
+RESET_INSTEAD_CLI = _RESET + "rowanholt server users reset-access <user>"
 
 
 class ResetRefused(ValueError):
@@ -124,9 +127,11 @@ def find(users: dict, token: str) -> dict:
 
 
 def start(record: dict) -> dict:
-    """A new authenticator for the reset: the secret (kept on the record until `complete`), its
-    otpauth:// URI and QR code. Opening the page again starts afresh. The caller saves the users."""
-    secret = mfa.new_secret()
+    """The reset's new authenticator: the secret (kept on the record until `complete`), its otpauth://
+    URI and QR code. Opening the page again (a reload, a second tab) shows the same one, so a phone that
+    has already scanned it isn't left with a secret that's been replaced. The caller saves the users."""
+    stored = record.get("access_reset_pending_secret")
+    secret = (mfa.decrypt_secret(stored) if stored else None) or mfa.new_secret()
     record["access_reset_pending_secret"] = mfa.encrypt_secret(secret)
     return {"username": record["username"], **enrolment(secret, record["username"])}
 

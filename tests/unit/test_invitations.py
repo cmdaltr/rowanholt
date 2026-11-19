@@ -155,6 +155,32 @@ class InvitationTest(BackendCase):
         self.assertEqual(self.complete(token, "chosen-name-x", self.code(secret)).status_code, 400)
         self.assertEqual(self.preview(token).status_code, 200)
 
+    def test_a_username_cant_be_an_email_another_account_or_invitation_is_for(self):
+        # Sign-in finds an account by username or email: two accounts mustn't answer to one name
+        pending = self.email()
+        self.issue(pending)
+        _, token = self.issue(self.email())
+        for taken in (pending, pending.upper(), "alice@example.org", "ALICE"):
+            self.assertEqual(self.start(token, taken).status_code, 400, taken)
+
+    def test_an_email_someone_took_as_a_username_cant_be_accepted(self):
+        email = self.email()
+        _, token = self.issue(email)
+        username = email.split("@")[0]
+        secret = self.start(token, username).json()["secret"]
+        accounts = self.users_module.load_users()
+        self.users_module.find_user(accounts, "bob")["username"] = email  # an account made before the fix
+        self.users_module.save_users(accounts)
+        self.addCleanup(self._rename, email, "bob")
+        refused = self.complete(token, username, self.code(secret))
+        self.assertEqual(refused.status_code, 409, refused.text)
+        self.assertIsNone(self.find(username))
+
+    def _rename(self, old, new):
+        accounts = self.users_module.load_users()
+        self.users_module.find_user(accounts, old)["username"] = new
+        self.users_module.save_users(accounts)
+
     def test_a_suggested_username_avoids_one_taken(self):
         _, token = self.issue("alice@elsewhere.example")
         self.assertEqual(self.preview(token).json()["username"], "alice2")
@@ -177,6 +203,13 @@ class InvitationTest(BackendCase):
         self.assertEqual(self.preview(token).status_code, 410)
         self.assertEqual(self.complete(token, username, self.code(secret)).status_code, 410)
         self.assertIsNone(self.find(username))
+        # Another invitation written meanwhile doesn't turn "expired" into "never valid"
+        self.issue(self.email())
+        self.assertEqual(self.preview(token).status_code, 410)
+        # A day later it's dropped
+        self.now += self.invitations.KEEP_EXPIRED_SECONDS
+        self.issue(self.email())
+        self.assertEqual(self.preview(token).status_code, 400)
 
     def test_a_newer_invitation_replaces_an_older_one(self):
         email = self.email()
@@ -205,9 +238,13 @@ class InvitationTest(BackendCase):
         _, token = self.issue(email)
         username = email.split("@")[0]
         secret = self.start(token, username).json()["secret"]
+        invitation_id = next(inv["id"] for inv in self.invitations.load().values() if inv["email"] == email)
         for _ in range(self.settings.max_login_attempts):
             self.assertEqual(self.complete(token, username, "000000").status_code, 400)
         self.assertEqual(self.complete(token, username, self.code(secret)).status_code, 429)
+        failed = self.audited(invitation_id, "mfa_failed")
+        self.assertEqual(len(failed), self.settings.max_login_attempts)
+        self.assertEqual(failed[0]["details"]["stage"], "invitation")
 
     def test_only_admins_invite_list_and_revoke_and_never_with_a_token(self):
         for who in (self.alice, self.bob):
@@ -264,8 +301,22 @@ class InvitationTest(BackendCase):
             self.assertIn("invitation", refused.json()["detail"])
         self.assertIsNone(self.find("pwmade"))
         from auth import manage_users
-        with self.assertRaisesRegex(SystemExit, "invite"):
+        with self.assertRaisesRegex(SystemExit, "invite <email>$"):
             manage_users.main(["add", "pwmade", "pwmade@example.org"])
+
+    def test_a_server_refuses_an_admin_setting_someones_password(self):
+        alice = self.find("alice")
+        before = alice["hashed_password"]
+        refused = self.client.patch(f"/api/auth/users/{alice['id']}", headers=self.admin,
+                                    json={"password": "chosen-by-admin-2", "full_name": "Alice"})
+        self.assertEqual(refused.status_code, 400, refused.text)
+        self.assertIn("reset-access", refused.json()["detail"])
+        self.assertEqual(self.find("alice")["hashed_password"], before)
+        self.assertNotEqual(self.find("alice").get("full_name"), "Alice")  # nothing else changed either
+        from auth import manage_users
+        with self.assertRaisesRegex(SystemExit, "reset-access <user>$"):
+            manage_users.main(["password", "alice"])
+        self.assertEqual(self.find("alice")["hashed_password"], before)
 
     def test_a_local_stack_keeps_its_own_sign_up_and_has_no_invitations(self):
         self.settings.rowanholt_server_mode = False
