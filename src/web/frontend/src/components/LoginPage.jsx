@@ -146,7 +146,7 @@ const LoginPage = () => {
 
         {reset && !error && !challenge && (
           <div className="alert-success" data-testid="reset">
-            Password changed. Sign in with it, then a code from your authenticator app.
+            Password changed. Please sign in.
           </div>
         )}
 
