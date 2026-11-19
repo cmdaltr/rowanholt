@@ -475,7 +475,8 @@ extension AppDelegate {
         }
         var yaml = "\(localComposeHeader): evidence folders, mounted at the same path inside the containers.\n"
         yaml += "# Change them in Rowanholt › Set Up Rowanholt…\nservices:\n"
-        for (service, readOnly) in [("backend", true), ("celery-worker", false)] {
+        // Splunk too: it reads a case's files itself, at the worker's paths (the "siem" profile)
+        for (service, readOnly) in [("backend", true), ("celery-worker", false), ("splunk", true)] {
             yaml += "  \(service):\n    volumes:\n"
             for folder in folders {
                 yaml += "      - type: bind\n        source: \(quote(folder))\n        target: \(quote(folder))\n"

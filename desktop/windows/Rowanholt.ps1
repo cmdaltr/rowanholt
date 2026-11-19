@@ -1212,12 +1212,13 @@ function Write-Evidence([string]$Dir, [string[]]$Folders) {
     }
     if (-not $Folders) { Remove-Item $file -ErrorAction SilentlyContinue; return }
     $lines = @("${LocalHeader}: evidence folders, read-only in the backend.", 'services:')
-    foreach ($service in 'backend', 'celery-worker') {
+    # Splunk too: it reads a case's files itself, at the worker's paths (the siem profile)
+    foreach ($service in 'backend', 'celery-worker', 'splunk') {
         $lines += "  ${service}:", '    volumes:'
         foreach ($folder in $Folders) {
             $lines += '      - type: bind', "        source: `"$($folder.Replace('\', '/'))`"",
                       "        target: `"$(ConvertTo-ContainerPath $folder)`""
-            if ($service -eq 'backend') { $lines += '        read_only: true' }
+            if ($service -ne 'celery-worker') { $lines += '        read_only: true' }
         }
     }
     # LF and no BOM: compose reads either, but the file matches the other platforms'

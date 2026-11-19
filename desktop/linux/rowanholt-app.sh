@@ -170,14 +170,15 @@ write_evidence() {
     {
         echo "$LOCAL_HEADER: evidence folders, mounted at the same path inside the containers."
         echo "services:"
-        for service in backend celery-worker; do
+        # Splunk too: it reads a case's files itself, at the worker's paths (the siem profile)
+        for service in backend celery-worker splunk; do
             echo "  $service:"
             echo "    volumes:"
             for folder in "$@"; do
                 echo "      - type: bind"
                 echo "        source: $(json_quote "$folder")"
                 echo "        target: $(json_quote "$folder")"
-                [ "$service" = backend ] && echo "        read_only: true"
+                [ "$service" != celery-worker ] && echo "        read_only: true"
             done
         done
     } > "$file"
