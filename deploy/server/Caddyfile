@@ -12,6 +12,14 @@
 
 {
 	admin off
+	# A Tailscale Service name's requests (Caddyfile.service) reach :5680 from Docker's gateway on
+	# rowanholt-edge, so every browser would share the gateway's address and one lockout count.
+	# Tailscale Serve sets X-Forwarded-For to the tailnet address (replacing any the browser sent):
+	# believed there from rowanholt-edge only, whose other member is the backend
+	servers :5680 {
+		trusted_proxies static {$ROWANHOLT_EDGE_SUBNET:10.213.47.0/29}
+		trusted_proxies_strict
+	}
 }
 
 # Splunk, Kibana and the Navigator have no idea who Rowanholt's users are, so the
@@ -22,6 +30,7 @@
 	forward_auth backend-edge:5688 {
 		uri /api/auth/verify?login_redirect=1&service={args[0]}
 		copy_headers X-Rowanholt-User
+		header_up X-Forwarded-For {client_ip}
 	}
 }
 
@@ -56,6 +65,9 @@
 	handle /api/* {
 		reverse_proxy backend-edge:5688 {
 			header_up X-Forwarded-Proto https
+			# One address, the client's: after a trusted hop Caddy would append the gateway's,
+			# and uvicorn takes the rightmost
+			header_up X-Forwarded-For {client_ip}
 			# Evidence uploads and long analyses
 			transport http {
 				read_timeout 30m

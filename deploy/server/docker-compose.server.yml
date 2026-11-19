@@ -26,6 +26,7 @@ services:
       - ROWANHOLT_HOSTNAME=${ROWANHOLT_HOSTNAME:?Run rowanholt server init first}
       - ROWANHOLT_HTTPS_PORT=${ROWANHOLT_HTTPS_PORT:-443}
       - ROWANHOLT_TLS=${ROWANHOLT_TLS:-internal}
+      - ROWANHOLT_EDGE_SUBNET=${ROWANHOLT_EDGE_SUBNET:-10.213.47.0/29}
     volumes:
       - ./deploy/server/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./deploy/server/certs:/certs:ro
@@ -38,6 +39,9 @@ services:
       rowanholt-network:
       rowanholt-edge:
         ipv4_address: ${ROWANHOLT_EDGE_PROXY:-10.213.47.2}
+        # The default route, so what Docker forwards from the host's loopback (the Service
+        # sites) arrives from rowanholt-edge's gateway, which the Caddyfile trusts on :5680
+        gw_priority: 1
 
   backend:
     ports: !reset []
