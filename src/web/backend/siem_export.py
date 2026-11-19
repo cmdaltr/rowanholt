@@ -86,7 +86,8 @@ def _queued_task_ids(task_ids: Iterable[str]) -> set:
     return job_liveness.queued_task_ids(task_ids)
 
 
-def _now() -> str:
+def now() -> str:
+    """The record's times (queued_at, started_at, finished_at), as the API shows them"""
     return datetime.now().isoformat(timespec="seconds")
 
 
@@ -149,7 +150,7 @@ def claim(job_id: str, task_id: str, names: list[str], requested_by: str, client
         if status(job_id, client, **status_options)["state"] in ACTIVE:
             return None
         record = {"task_id": task_id, "state": QUEUED, "targets": names, "requested_by": requested_by,
-                  "queued_at": _now(), "queued_epoch": time.time(), "phase": None, "hosts": [],
+                  "queued_at": now(), "queued_epoch": time.time(), "phase": None, "hosts": [],
                   "results": {}, "error": None}
         _write(job_id, record, client)
     return record

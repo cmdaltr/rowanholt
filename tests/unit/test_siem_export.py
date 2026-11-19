@@ -466,6 +466,9 @@ class WorkerExportTest(unittest.TestCase):
         record = self.se.status(job.id, self.redis)
         self.assertEqual(record["state"], "succeeded")
         self.assertEqual(record["hosts"], ["win10"])
+        # One form for the record's times, the API's (2026-11-12T10:00:00), not the job log's
+        for key in ("queued_at", "started_at", "finished_at"):
+            self.assertRegex(record[key], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d$", key)
         self.assertEqual(record["results"]["Elastic"], {"ok": True, "total": 4242})
         self.assertTrue(record["results"]["Splunk"]["ok"])
         self.assertIn("index=case-w-1", record["results"]["Splunk"]["note"])

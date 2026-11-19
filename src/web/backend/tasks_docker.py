@@ -679,7 +679,7 @@ def export_siem(self, job_id: str) -> dict:
         return _run_siem_export(job_id, task_id, record["targets"])
     except Exception as exc:  # whatever happened, the record must say it ended
         logger.exception(f"Job {job_id}: SIEM export failed")
-        final = {"state": siem_export.FAILED, "error": str(exc), "finished_at": _stamp()}
+        final = {"state": siem_export.FAILED, "error": str(exc), "finished_at": siem_export.now()}
         siem_export.update(job_id, task_id, **final)
         _export_log(job_id, f"SIEM export failed: {exc}")
         return final
@@ -694,11 +694,11 @@ def _export_log(job_id: str, line: str) -> bool:
 
 
 def _run_siem_export(job_id: str, task_id: str, names: list) -> dict:
-    started = {"state": siem_export.RUNNING, "started_at": _stamp()}
+    started = {"state": siem_export.RUNNING, "started_at": siem_export.now()}
     siem_export.update(job_id, task_id, **started)
 
     def fail(reason: str) -> dict:
-        final = {"state": siem_export.FAILED, "error": reason, "finished_at": _stamp()}
+        final = {"state": siem_export.FAILED, "error": reason, "finished_at": siem_export.now()}
         siem_export.update(job_id, task_id, **final)
         _export_log(job_id, f"SIEM export failed: {reason}")
         return final
@@ -762,7 +762,7 @@ def _run_siem_export(job_id: str, task_id: str, names: list) -> dict:
     failed = [name for name, result in results.items() if not result["ok"]]
     final = {"state": siem_export.FAILED if failed else siem_export.SUCCEEDED, "results": results,
              "hosts": progress.hosts, "phase": None, "returncode": process.returncode,
-             "error": progress.error if failed else None, "finished_at": _stamp()}
+             "error": progress.error if failed else None, "finished_at": siem_export.now()}
     siem_export.update(job_id, task_id, **final)
     _export_log(job_id, siem_export.summary(final))
     return final
