@@ -8,6 +8,7 @@ import os
 import re
 import uuid
 import logging
+from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List
@@ -64,11 +65,24 @@ def sanitize_case_number(case_number: str) -> str:
 # Initialize logger
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Jobs left pending, running or paused by a crash or a host restart are failed within a few
+    # minutes of start-up, and any that die later within a few minutes of dying (job_liveness)
+    stop_liveness = job_liveness_check.start()
+    try:
+        yield
+    finally:
+        stop_liveness.set()
+
+
 # Initialize FastAPI app
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     debug=settings.debug,
+    lifespan=lifespan,
 )
 
 # Added before access's middleware, so inside it: only requests access let through are counted,
@@ -235,23 +249,6 @@ def _with_access(jobs: List[Job], request: Request) -> List[Job]:
         job.shared_with = (record or {}).get("shared_with") or []
         job.can_manage = access.manages(user, record)
     return jobs
-
-
-# Startup event
-@app.on_event("startup")
-async def on_startup():
-    """Run startup tasks."""
-    # Jobs left pending, running or paused by a crash or a host restart are failed within a few
-    # minutes of start-up, and any that die later within a few minutes of dying (job_liveness)
-    app.state.stop_liveness = job_liveness_check.start()
-
-
-@app.on_event("shutdown")
-async def on_shutdown():
-    """Stop the background passes."""
-    stop = getattr(app.state, "stop_liveness", None)
-    if stop is not None:
-        stop.set()
 
 
 # Include authentication routes

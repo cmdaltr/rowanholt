@@ -4,6 +4,7 @@
 pytest>=7.0
 pytest-cov>=3.0
 pytest-mock>=3.6
+httpx2>=2.16; python_version >= "3.11"  # Starlette's TestClient (it warns on plain httpx)
 black>=22.0
 flake8>=4.0
 mypy>=0.950

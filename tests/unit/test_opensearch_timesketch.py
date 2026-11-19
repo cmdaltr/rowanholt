@@ -218,6 +218,7 @@ def server():
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{httpd.server_port}"
     httpd.shutdown()
+    httpd.server_close()
 
 
 def test_sign_in_and_send_a_timeline_per_host(tmp_path, server):

@@ -263,7 +263,8 @@ class SignerTest(unittest.TestCase):
         filed = self.ledger / "issued" / "rowanholt" / f"{parsed.licence_id}.licence"
         self.assertEqual(filed.read_text().strip(), line)
         import csv
-        rows = list(csv.DictReader((self.ledger / "ledger.csv").open()))
+        with (self.ledger / "ledger.csv").open() as f:
+            rows = list(csv.DictReader(f))
         self.assertEqual(len(rows), 1)
         self.assertEqual((rows[0]["licence_id"], rows[0]["product"], rows[0]["seats"], rows[0]["terms_version"],
                           rows[0]["file"]),

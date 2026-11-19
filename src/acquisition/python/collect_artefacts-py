@@ -942,6 +942,7 @@ def collect_live_containers(gandalf_artefact_destination, gandalf_host):
                         taken += len(chunk)
                 export.kill()
                 export.wait()
+                export.stdout.close()
             except OSError:
                 continue
             audit_ran(gandalf_host, "{} export {}{}".format(

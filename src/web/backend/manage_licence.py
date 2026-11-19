@@ -12,6 +12,7 @@ an admin's, with the name given for whoever accepted the terms.
 
 import argparse
 import sys
+from pathlib import Path
 
 try:
     from .auth.users import load_users
@@ -45,7 +46,7 @@ def _install(source: str, accepted_by: str) -> int:
               "licensee's behalf. Read COMMERCIAL-LICENSE.md, then run this again with "
               '--accept-terms "Your Name <you@example.org>".', file=sys.stderr)
         return 1
-    text = (sys.stdin.read() if source == "-" else open(source).read()).strip()
+    text = (sys.stdin.read() if source == "-" else Path(source).read_text()).strip()
     try:
         lic = licence.parse(text)
     except licence.LicenceProblem as exc:

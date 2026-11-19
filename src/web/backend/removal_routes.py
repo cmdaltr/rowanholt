@@ -14,6 +14,7 @@ Nothing was ever escalated: the routes were `confirm-sudo` and `cancel-sudo` unt
 """
 
 import logging
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
 
@@ -34,7 +35,23 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["jobs"])
+
+@asynccontextmanager
+async def _lifespan(_app):
+    """The removals' liveness pass, for as long as the app runs (merged into the app's lifespan
+    by include_router)"""
+    if _liveness is not None:
+        router.stop_liveness = _liveness.start()
+    try:
+        yield
+    finally:
+        stop = getattr(router, "stop_liveness", None)
+        if stop is not None:
+            stop.set()
+            router.stop_liveness = None
+
+
+router = APIRouter(tags=["jobs"], lifespan=_lifespan)
 
 NOT_AWAITING = "Job is not awaiting confirmation"
 INTERRUPTED = ("Interrupted: the worker removing this job's old output stopped before it finished "
@@ -79,22 +96,6 @@ def check() -> bool:
         return False
     _liveness.check()
     return bool(_storage.active_jobs((JobStatus.REMOVING,)))
-
-
-# Some FastAPI versions run an included router's handlers twice (its own and the app's copy):
-# one background pass is enough, so starting is a no-op once started
-@router.on_event("startup")
-def _start_liveness() -> None:
-    if _liveness is not None and getattr(router, "stop_liveness", None) is None:
-        router.stop_liveness = _liveness.start()
-
-
-@router.on_event("shutdown")
-def _stop_liveness() -> None:
-    stop = getattr(router, "stop_liveness", None)
-    if stop is not None:
-        stop.set()
-        router.stop_liveness = None
 
 
 def _ip(request: Request) -> Optional[str]:
