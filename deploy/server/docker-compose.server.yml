@@ -125,9 +125,12 @@ volumes:
 
 networks:
   # The proxy and the backend only, so the backend can tell the proxy's requests from the rest.
-  # ROWANHOLT_EDGE_SUBNET and ROWANHOLT_EDGE_PROXY move it if 10.213.47.0/29 is taken on the host
+  # Docker hands out addresses from ip_range only, so the backend (which starts first) never takes
+  # the proxy's. ROWANHOLT_EDGE_SUBNET, ROWANHOLT_EDGE_RANGE and ROWANHOLT_EDGE_PROXY move it if
+  # 10.213.47.0/29 is taken on the host
   rowanholt-edge:
     driver: bridge
     ipam:
       config:
         - subnet: ${ROWANHOLT_EDGE_SUBNET:-10.213.47.0/29}
+          ip_range: ${ROWANHOLT_EDGE_RANGE:-10.213.47.4/30}
