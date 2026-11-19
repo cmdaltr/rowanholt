@@ -153,11 +153,6 @@ class Job(BaseModel):
     # when local), so the web app offers only what the server would allow. Per caller, never stored
     can_manage: Optional[bool] = Field(None, description="Whether the caller owns it or is an admin")
 
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
-
 
 # Set by the worker or a job's own routes, never through PATCH: `status` would skip what cancel,
 # pause and the removal routes do (kill the process group, release the image locks, audit), and
@@ -198,11 +193,6 @@ class FileSystemItem(BaseModel):
     size: Optional[int] = None
     modified: Optional[datetime] = None
     is_image: bool = False
-
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class FileSystemBrowseResponse(BaseModel):

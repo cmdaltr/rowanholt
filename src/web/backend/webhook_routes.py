@@ -76,7 +76,7 @@ async def edit_webhook(hook_id: str, body: WebhookEdit, request: Request,
                                 body.events if body.events is not None else current["events"])
     if problem:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, problem)
-    fields = {k: v for k, v in body.dict().items() if v is not None}
+    fields = {k: v for k, v in body.model_dump().items() if v is not None}
     hook = webhooks.update(hook_id, **fields)
     licence.audit("webhook_changed", admin, _ip(request), resource_type="webhook", resource_id=hook_id, **fields)
     return webhooks.public(hook)

@@ -189,7 +189,7 @@ class CheckRemovalTest(Folders):
         (folder / orm.JOB_LOG).write_text("log\n")
         self.assertIsNone(orm.folder_owner(folder, [old]))
         with self.assertRaisesRegex(orm.PathRefused, "isn't the recorded output folder"):
-            self.remove(folder, old.copy(update={"destination_path": str(self.root / "elsewhere")}), [old])
+            self.remove(folder, old.model_copy(update={"destination_path": str(self.root / "elsewhere")}), [old])
 
     def test_a_folder_holding_evidence_is_refused_by_path_and_by_inode(self):
         job = make_job(self.root / "client-a", sources=[self.image])

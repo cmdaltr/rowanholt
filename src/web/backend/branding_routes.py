@@ -107,13 +107,13 @@ async def create_brand(body: BrandIn, request: Request, admin: dict = Depends(ac
 async def edit_brand(brand_id: str, body: BrandEdit, request: Request,
                      admin: dict = Depends(access.require_admin)) -> Dict:
     try:
-        brand = branding.update(brand_id, **body.dict())
+        brand = branding.update(brand_id, **body.model_dump())
     except branding.BrandProblem as exc:
         raise _problem(exc)
     if not brand:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such brand")
     licence.audit("brand_changed", admin, _ip(request), resource_type="brand", resource_id=brand_id,
-                  **{k: v for k, v in body.dict().items() if v is not None})
+                  **{k: v for k, v in body.model_dump().items() if v is not None})
     return _with_notes(brand)
 
 

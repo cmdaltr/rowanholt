@@ -59,11 +59,12 @@ class ApiTokenTest(BackendCase):
 
     def test_an_expired_token_is_refused(self):
         made = self.make(self.alice, days=1)
-        from sqlalchemy import text
+        from sqlalchemy import DateTime, bindparam, text
         storage = sys.modules["auth.access"]._storage
+        # Typed, so SQLAlchemy stores it (sqlite3's own datetime adapter is deprecated)
+        update = text("UPDATE api_tokens SET expires_at = :t WHERE id = :id").bindparams(bindparam("t", type_=DateTime))
         with storage.engine.begin() as connection:
-            connection.execute(text("UPDATE api_tokens SET expires_at = :t WHERE id = :id"),
-                               {"t": datetime.now() - timedelta(seconds=1), "id": made["id"]})
+            connection.execute(update, {"t": datetime.now() - timedelta(seconds=1), "id": made["id"]})
         self.assertEqual(self.client.get("/api/auth/me", headers=bearer(made["token"])).status_code, 401)
 
     def test_a_deactivated_users_tokens_stop(self):
