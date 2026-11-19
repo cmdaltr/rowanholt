@@ -10,7 +10,7 @@ Version: 2.1.0
 
 import json
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Any
 from collections import defaultdict
@@ -229,7 +229,7 @@ class CoverageDatabase:
             (artifact_type, artifact_path, processed_timestamp, technique_count)
             VALUES (?, ?, ?, ?)
         """,
-            (artifact_type, artifact_path, datetime.utcnow().isoformat(), technique_count),
+            (artifact_type, artifact_path, datetime.now(timezone.utc).replace(tzinfo=None).isoformat(), technique_count),
         )
 
         self.conn.commit()
@@ -245,7 +245,7 @@ class CoverageDatabase:
             VALUES (?, ?, ?, ?, ?)
         """,
             (
-                datetime.utcnow().isoformat(),
+                datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                 stats["total_techniques"],
                 stats["detected_techniques"],
                 stats["coverage_percentage"],
@@ -392,7 +392,7 @@ class MitreCoverageAnalyzer:
         self.db = CoverageDatabase(db_path)
 
         # Track processing
-        self.start_time = datetime.utcnow()
+        self.start_time = datetime.now(timezone.utc).replace(tzinfo=None)
         self.artifact_count = 0
 
     def analyze_artifact(
@@ -420,7 +420,7 @@ class MitreCoverageAnalyzer:
         )
 
         detections = []
-        now = datetime.utcnow().isoformat() + "Z"
+        now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + "Z"
 
         for mapping in mappings:
             # Create evidence
@@ -473,9 +473,9 @@ class MitreCoverageAnalyzer:
         # Build report
         report = {
             "case_id": self.case_id,
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + "Z",
             "attck_version": self.attck_data.get("version", "unknown"),
-            "analysis_duration": (datetime.utcnow() - self.start_time).total_seconds(),
+            "analysis_duration": (datetime.now(timezone.utc).replace(tzinfo=None) - self.start_time).total_seconds(),
             "statistics": stats,
             "techniques": [d.to_dict() for d in detections],
             "tactics_summary": self._get_tactics_summary(detections),

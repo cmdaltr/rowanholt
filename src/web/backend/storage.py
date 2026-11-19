@@ -6,13 +6,19 @@ PostgreSQL-based storage for jobs using SQLAlchemy.
 
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 from sqlalchemy import create_engine, text, Column, String, Integer, Text, DateTime, Enum as SQLEnum, JSON, \
     UniqueConstraint
 from sqlalchemy.orm import sessionmaker, declarative_base, defer
 from sqlalchemy.pool import NullPool
+
+
+def utcnow() -> datetime:
+    """Naive UTC, as the columns store it (datetime.utcnow is deprecated)"""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
 
 try:
     from .models.job import Job, JobStatus
@@ -185,7 +191,7 @@ class AuditLogModel(Base):
     resource_id = Column(String(36), nullable=True)
     details = Column(JSON, nullable=True)
     ip_address = Column(String(45), nullable=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    timestamp = Column(DateTime, default=utcnow, nullable=False, index=True)
 
 
 class JobStorage:
@@ -582,7 +588,7 @@ class JobStorage:
                 resource_id=resource_id,
                 details=details,
                 ip_address=ip,
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
             ))
             session.commit()
         except Exception:  # noqa: BLE001 - see the docstring

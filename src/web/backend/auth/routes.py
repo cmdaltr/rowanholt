@@ -5,7 +5,7 @@ Login, registration, password reset, and session management.
 """
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie
 from fastapi.security import OAuth2PasswordRequestForm
@@ -118,7 +118,7 @@ async def register(
             full_name=full_name,
             role=UserRole.USER,
             is_active=True,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
     except ValueError as e:
         raise HTTPException(
@@ -176,14 +176,14 @@ async def login(
         user_id=user.id,
         token=access_token,
         is_active=True,
-        created_at=datetime.utcnow(),
-        expires_at=datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes),
-        last_activity=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=settings.access_token_expire_minutes),
+        last_activity=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     db.add(session)
 
     # Update last login
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
 
     # Set session cookie
@@ -295,7 +295,7 @@ async def forgot_password(
     # Generate reset token
     reset_token = str(uuid.uuid4())
     user.password_reset_token = reset_token
-    user.password_reset_expires = datetime.utcnow() + timedelta(hours=1)
+    user.password_reset_expires = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=1)
     db.commit()
 
     # TODO: Send email with reset link
@@ -315,7 +315,7 @@ async def reset_password(
     """
     user = db.query(User).filter(
         User.password_reset_token == request.token,
-        User.password_reset_expires > datetime.utcnow()
+        User.password_reset_expires > datetime.now(timezone.utc).replace(tzinfo=None)
     ).first()
 
     if not user:
@@ -488,7 +488,7 @@ async def verify_mfa(
         )
 
     # Update last verification time
-    current_user.last_mfa_verification = datetime.utcnow()
+    current_user.last_mfa_verification = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
 
     return {"message": "MFA verification successful"}

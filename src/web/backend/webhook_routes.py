@@ -61,7 +61,7 @@ async def create_webhook(body: WebhookIn, request: Request, admin: dict = Depend
     whether there is one."""
     problem = webhooks.validate(body.url, body.events)
     if problem:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, problem)
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, problem)
     hook = webhooks.add(body.url, body.events, body.secret, body.description)
     licence.audit("webhook_created", admin, _ip(request), resource_type="webhook", resource_id=hook["id"],
                   url=hook["url"], events=hook["events"])
@@ -75,7 +75,7 @@ async def edit_webhook(hook_id: str, body: WebhookEdit, request: Request,
     problem = webhooks.validate(body.url if body.url is not None else current["url"],
                                 body.events if body.events is not None else current["events"])
     if problem:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, problem)
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, problem)
     fields = {k: v for k, v in body.dict().items() if v is not None}
     hook = webhooks.update(hook_id, **fields)
     licence.audit("webhook_changed", admin, _ip(request), resource_type="webhook", resource_id=hook_id, **fields)

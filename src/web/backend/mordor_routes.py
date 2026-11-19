@@ -7,7 +7,7 @@ import os
 import shutil
 import yaml
 import httpx
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -824,7 +824,7 @@ async def telemetry_build(user: dict = Depends(require_lab_admin)):
     with _build_lock:
         if _build_job["state"] == "running":
             raise HTTPException(status_code=409, detail="An update is already running")
-        _build_job.update(state="running", started=datetime.utcnow().isoformat() + "Z", finished=None,
+        _build_job.update(state="running", started=datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + "Z", finished=None,
                           error=None, sources=sources)
         _build_log.clear()
 
@@ -838,9 +838,9 @@ async def telemetry_build(user: dict = Depends(require_lab_admin)):
             say(f"Updating {', '.join(sources)} (only what changed is fetched)")
             build(tuple(sources), log=say)
             check._haystack.clear()
-            _build_job.update(state="done", finished=datetime.utcnow().isoformat() + "Z")
+            _build_job.update(state="done", finished=datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + "Z")
         except Exception as e:  # noqa: BLE001 — a failed fetch must not take the API down
-            _build_job.update(state="error", finished=datetime.utcnow().isoformat() + "Z", error=str(e))
+            _build_job.update(state="error", finished=datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + "Z", error=str(e))
             say(f"Failed: {e}")
 
     threading.Thread(target=work, daemon=True).start()

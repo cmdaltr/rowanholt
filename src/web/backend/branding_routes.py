@@ -82,7 +82,7 @@ def _what_reports_do() -> Dict:
 
 
 def _problem(exc: branding.BrandProblem) -> HTTPException:
-    return HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc))
+    return HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc))
 
 
 @router.get("")

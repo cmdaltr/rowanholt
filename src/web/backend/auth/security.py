@@ -6,7 +6,7 @@ Password hashing, JWT token generation, and verification.
 
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 import bcrypt
 from jose import JWTError, jwt
@@ -49,9 +49,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     to_encode = data.copy()
 
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc).replace(tzinfo=None) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
+        expire = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=settings.access_token_expire_minutes)
 
     # iat: when it was issued (to the millisecond: a sign-in and a password change can share a
     # second), so a password change can end the sessions from before it

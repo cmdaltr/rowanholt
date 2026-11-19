@@ -9,7 +9,7 @@ Version: 2.1.0
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -56,7 +56,7 @@ class StandaloneDashboard:
         html = html.replace("{{COVERAGE_DATA}}", json.dumps(coverage_data))
         html = html.replace("{{CASE_ID}}", coverage_data.get("case_id", "Unknown"))
         html = html.replace(
-            "{{TIMESTAMP}}", coverage_data.get("timestamp", datetime.utcnow().isoformat())
+            "{{TIMESTAMP}}", coverage_data.get("timestamp", datetime.now(timezone.utc).replace(tzinfo=None).isoformat())
         )
         html = html.replace("{{ATTCK_VERSION}}", coverage_data.get("attck_version", "unknown"))
 

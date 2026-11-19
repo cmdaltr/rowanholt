@@ -12,7 +12,7 @@ import json
 import logging
 from typing import Dict, List, Optional, Set
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from collections import defaultdict
 
 from .attck_updater import MitreAttackUpdater
@@ -67,7 +67,7 @@ class MitreDashboardGenerator:
 
         result = {
             "statistics": coverage["statistics"],
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + "Z",
             "attck_version": self.attck_data.get("version", "unknown"),
         }
 
@@ -499,7 +499,7 @@ class MitreDashboardGenerator:
                 {"label": "Low Confidence (<0.5)", "color": "#e74c3c"},
             ],
             "metadata": [
-                {"name": "Generated", "value": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")},
+                {"name": "Generated", "value": datetime.now(timezone.utc).replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S UTC")},
                 {"name": "ATT&CK Version", "value": str(self.attck_data.get("version", "unknown"))},
                 {
                     "name": "Total Techniques",
@@ -564,7 +564,7 @@ class MitreDashboardGenerator:
         stats_file.write_text(
             json.dumps(
                 {
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + "Z",
                     "attck_version": self.attck_data.get("version", "unknown"),
                     "statistics": coverage["statistics"],
                 },

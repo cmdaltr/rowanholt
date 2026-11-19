@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db_dependency
 from ..models.database import User, Session as UserSession, UserRole
 from .security import verify_token
-from datetime import datetime
+from datetime import datetime, timezone
 
 security = HTTPBearer(auto_error=False)
 
@@ -58,7 +58,7 @@ async def get_current_user(
             UserSession.is_active == True
         ).first()
         if session:
-            session.last_activity = datetime.utcnow()
+            session.last_activity = datetime.now(timezone.utc).replace(tzinfo=None)
             db.commit()
 
     return user

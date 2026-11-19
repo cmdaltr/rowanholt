@@ -4,7 +4,7 @@ Database Models
 SQLAlchemy models for PostgreSQL database.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy import (
     Column, String, Integer, Float, DateTime, Boolean,
@@ -13,6 +13,12 @@ from sqlalchemy import (
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 import enum
+
+
+def utcnow() -> datetime:
+    """Naive UTC, as the columns store it (datetime.utcnow is deprecated)"""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
 
 Base = declarative_base()
 
@@ -46,7 +52,7 @@ class User(Base):
     full_name = Column(String(255))
     role = Column(SQLEnum(UserRole), default=UserRole.USER, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
     last_login = Column(DateTime)
     password_reset_token = Column(String(255))
     password_reset_expires = Column(DateTime)
@@ -81,8 +87,8 @@ class UserSettings(Base):
     auto_refresh_interval = Column(Integer, default=5000)  # milliseconds
     default_analysis_options = Column(JSON)
     custom_settings = Column(JSON)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
     # Relationships
     user = relationship("User", back_populates="settings")
@@ -99,8 +105,8 @@ class Account(Base):
     credentials = Column(JSON, nullable=False)  # Encrypted credentials
     endpoint_url = Column(String(512))
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
     # Relationships
     user = relationship("User", back_populates="accounts")
@@ -128,7 +134,7 @@ class Job(Base):
     result = Column(JSON)
     error = Column(Text)
     celery_task_id = Column(String(255), index=True)  # For job control
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
     started_at = Column(DateTime)
     completed_at = Column(DateTime)
     archived_at = Column(DateTime)
@@ -155,9 +161,9 @@ class Session(Base):
     ip_address = Column(String(45))
     user_agent = Column(String(512))
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
     expires_at = Column(DateTime, nullable=False)
-    last_activity = Column(DateTime, default=datetime.utcnow)
+    last_activity = Column(DateTime, default=utcnow)
 
     # Indexes
     __table_args__ = (
@@ -178,7 +184,7 @@ class AuditLog(Base):
     resource_id = Column(String(36))
     details = Column(JSON)
     ip_address = Column(String(45))
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    timestamp = Column(DateTime, default=utcnow, nullable=False, index=True)
 
     # Indexes
     __table_args__ = (

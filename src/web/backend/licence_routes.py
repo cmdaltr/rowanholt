@@ -106,9 +106,9 @@ def _parsed(text: str) -> licence.Licence:
     try:
         lic = licence.parse(text)
     except licence.LicenceProblem as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc))
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc))
     if licence.standing(lic).state == "lapsed":
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"That licence ran out on {lic.expires}.")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"That licence ran out on {lic.expires}.")
     return lic
 
 
@@ -152,7 +152,7 @@ async def install_licence(body: LicenceIn, request: Request,
     lic = _parsed(body.text)
     version = licence.terms()[0]
     if not body.accept_terms:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
                             f"Accept the commercial licence terms for {lic.licensee} to install this licence.")
     if body.terms_version != version:
         raise HTTPException(status.HTTP_409_CONFLICT,

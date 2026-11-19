@@ -8,7 +8,7 @@ admins in place of open sign-up.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import quote, urlsplit
 
@@ -182,7 +182,7 @@ async def login(
         return {"mfa_required": True, "challenge": mfa.new_challenge(user),
                 "expires_in": mfa.CHALLENGE_SECONDS, "methods": ["totp", "backup_code"]}
     throttle.succeeded(name, address)
-    user["last_login"] = datetime.utcnow().isoformat()
+    user["last_login"] = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     save_users(users)
     return _session(response, user)
 
@@ -213,7 +213,7 @@ async def login_second_factor(body: SecondFactor, request: Request, response: Re
     if not mfa.spend_challenge(nonce):
         raise HTTPException(status_code=401, detail="That sign-in has been used; start again")
     throttle.succeeded(name, address)
-    record["last_login"] = datetime.utcnow().isoformat()
+    record["last_login"] = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     save_users(users)
     if how == "backup_code":
         mfa.audit("mfa_backup_code_used", record, record, address, stage="sign-in",
@@ -487,7 +487,7 @@ async def mfa_setup(body: MfaCode, request: Request, user: dict = Depends(access
         _second_factor(record, body.code, request, "re-enrolment")
     secret = mfa.new_secret()
     record["mfa_pending_secret"] = mfa.encrypt_secret(secret)
-    record["mfa_pending_at"] = datetime.utcnow().isoformat()
+    record["mfa_pending_at"] = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     save_users(users)
     uri = mfa.provisioning_uri(secret, record["username"])
     return {"secret": secret, "otpauth_uri": uri, "qr_svg": mfa.qr_svg_data_uri(uri)}

@@ -256,7 +256,7 @@ def audit(action: str, actor: Optional[dict], ip: Optional[str] = None, resource
             resource_id=resource_id or details.get("licence"),
             details=details,
             ip_address=ip,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
         ))
         session.commit()
     except Exception:  # noqa: BLE001 - the audit write must not hide the install's outcome

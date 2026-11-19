@@ -10,7 +10,7 @@ import os
 import re
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 try:
@@ -79,7 +79,7 @@ def new_user(username: str, email: str, role: str = "user", password: Optional[s
         "full_name": full_name,
         "role": role,
         "is_active": True,
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         "last_login": None,
         **extra,
     }
