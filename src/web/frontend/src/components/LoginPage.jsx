@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link, useSearchParams, useLocation } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { login as apiLogin, loginAsGuest as apiLoginAsGuest, getAuthConfig, completeMfaSignIn } from '../api';
@@ -23,6 +23,9 @@ const LoginPage = () => {
   // The second step, when the account has MFA: the challenge the password step gave, and the code
   const [challenge, setChallenge] = useState('');
   const [code, setCode] = useState('');
+  // The card keeps the password step's height for the code step, as tall as the other sign-in pages
+  const card = useRef(null);
+  const [cardHeight, setCardHeight] = useState(null);
   // What this Rowanholt offers: a local stack has guests and sign-up, a server may have SSO
   const [config, setConfig] = useState({ local_login: true, guest: true, register: true, sso: { enabled: false } });
 
@@ -39,6 +42,7 @@ const LoginPage = () => {
       const response = await apiLogin(username, password);
       if (response.mfa_required) {
         setPassword('');
+        setCardHeight(card.current?.offsetHeight || null);
         setChallenge(response.challenge);
         return;
       }
@@ -125,7 +129,7 @@ const LoginPage = () => {
           <span className="journey-banner__role">{figure.role}</span>
         </span>
       </div>
-      <div className="card login-card">
+      <div className="card login-card" ref={card} style={challenge && cardHeight ? { minHeight: cardHeight } : undefined}>
         <h3>Sign In</h3>
 
         {error && (

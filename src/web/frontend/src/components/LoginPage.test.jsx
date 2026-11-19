@@ -58,6 +58,18 @@ test('with MFA the password step asks for a code, and only the code signs in', a
   expect(mockNavigate).toHaveBeenCalledWith('/jobs');
 });
 
+test('the code step keeps the password step\'s height; starting again lets it go', async () => {
+  api.login.mockResolvedValue({ mfa_required: true, challenge: 'mfa_abc.def', expires_in: 300 });
+  // jsdom lays nothing out: the card as tall as the password form made it
+  const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(413);
+  await signIn();
+  const card = screen.getByTestId('mfa-step').closest('.login-card');
+  expect(card).toHaveStyle({ minHeight: '413px' });
+  fireEvent.click(screen.getByText('Start again'));
+  expect(card.style.minHeight).toBe('');
+  height.mockRestore();
+});
+
 test('a wrong code keeps the second step; an expired challenge goes back to the password', async () => {
   api.login.mockResolvedValue({ mfa_required: true, challenge: 'mfa_abc.def', expires_in: 300 });
   api.completeMfaSignIn.mockRejectedValueOnce({ response: { status: 401, data: { detail: 'Incorrect code' } } });
