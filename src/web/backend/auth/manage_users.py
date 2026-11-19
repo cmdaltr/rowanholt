@@ -3,11 +3,23 @@ User Administration CLI
 
 Run inside the backend container (`rowanholt server users ...` does this):
     python -m auth.manage_users list
-    python -m auth.manage_users add <username> <email> [--admin]   (password prompted)
+    python -m auth.manage_users invite <email> [--role user|admin] [--name NAME]   (a one-time link)
+    python -m auth.manage_users invitations                        (pending ones)
+    python -m auth.manage_users revoke-invitation <id>
+    python -m auth.manage_users add <username> <email> [--admin]   (local mode only; password prompted)
     python -m auth.manage_users password <username>                (prompted)
     python -m auth.manage_users role <username> admin|user
     python -m auth.manage_users disable|enable <username>
     python -m auth.manage_users mfa-reset <username>               (lost authenticator; audited)
+    python -m auth.manage_users reset-access <username|email>      (a one-time link; audited)
+
+reset-access is for someone who's lost their password, authenticator or backup codes: it prints a
+link to choose a new password and set up a new authenticator (auth/reset_access.py). Their sessions
+end and their API tokens are revoked at once; a new link replaces an earlier one.
+
+On a team server accounts are made by invitation (auth/invitations.py): invite prints a link where
+the person chooses their username, password and authenticator, so `add`, which has an admin choose
+someone's password, is refused there. A local stack keeps `add`.
 """
 
 import argparse
@@ -17,12 +29,12 @@ import sys
 try:
     from ..config import settings
     from .users import find_user, init_default_admin, load_users, new_user, save_users, set_password
-    from . import mfa
+    from . import invitations, mfa, reset_access
     from .. import licence
 except ImportError:
     from config import settings
     from auth.users import find_user, init_default_admin, load_users, new_user, save_users, set_password
-    from auth import mfa
+    from auth import invitations, mfa, reset_access
     import licence
 
 MIN_PASSWORD = 12
@@ -72,24 +84,75 @@ def _mfa_reset(users: dict, user: dict) -> None:
     mfa.audit("mfa_admin_reset", {"username": "server-cli"}, user, storage=_audit_storage(), via="cli")
 
 
+def _reset_access(users: dict, user: dict) -> None:
+    storage = _audit_storage()
+    try:
+        link, _ = reset_access.issue(user, {"username": "server-cli"}, storage=storage, via="cli")
+    except reset_access.ResetRefused as exc:
+        raise SystemExit(str(exc))
+    save_users(users)
+    print(f"Reset for {user['username']}: their sessions have ended"
+          f"{'' if storage else ' (API tokens not revoked: the database is unavailable)'}. Pass this link on; "
+          f"it works once, for {reset_access.RESET_HOURS} hours:\n\n  {link}\n")
+    if not link.startswith("http"):
+        print("ROWANHOLT_PUBLIC_URL isn't set: open the link on the server's own address.", file=sys.stderr)
+
+
+def _invite(users: dict, email: str, role: str, name: str | None) -> None:
+    try:
+        invitation, link = invitations.create(users, email, role, name, {"username": "server-cli"},
+                                              storage=_audit_storage(), via="cli")
+    except invitations.InvitationRefused as exc:
+        raise SystemExit(str(exc))
+    print(f"Invited {invitation['email']} as {invitation['role']}. Pass this link on; it works once, for "
+          f"{reset_access.RESET_HOURS} hours:\n\n  {link}\n")
+    if not link.startswith("http"):
+        print("ROWANHOLT_PUBLIC_URL isn't set: open the link on the server's own address.", file=sys.stderr)
+
+
+def _list_invitations() -> None:
+    print(f"{'ID':<36}  {'EMAIL':<32} {'ROLE':<6} {'BY':<16} EXPIRES")
+    for inv in invitations.pending():
+        print(f"{inv['id']:<36}  {inv['email']:<32} {inv['role']:<6} {inv['invited_by'] or '-':<16} "
+              f"{inv['expires_at'][:16].replace('T', ' ')}")
+
+
 def main(argv: list) -> int:
     """Entry point; returns the exit status."""
     parser = argparse.ArgumentParser(prog="rowanholt server users", description="Administer Rowanholt's users")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("list", help="Every user")
-    add = sub.add_parser("add", help="Create a password user")
+    invite = sub.add_parser("invite", help="Invite someone: a one-time link to make their account")
+    invite.add_argument("email")
+    invite.add_argument("--role", choices=["user", "admin"], default="user")
+    invite.add_argument("--name", help="their full name, which they can change")
+    sub.add_parser("invitations", help="Pending invitations")
+    sub.add_parser("revoke-invitation", help="Withdraw a pending invitation").add_argument("id")
+    add = sub.add_parser("add", help="Create a password user (local mode; a server invites)")
     add.add_argument("username")
     add.add_argument("email")
     add.add_argument("--admin", action="store_true")
     for name in ("password", "disable", "enable"):
         sub.add_parser(name).add_argument("username")
     sub.add_parser("mfa-reset", help="Turn a user's MFA off (a lost authenticator)").add_argument("username")
+    sub.add_parser("reset-access", help="A one-time link to a new password and authenticator").add_argument("username")
     role = sub.add_parser("role")
     role.add_argument("username")
     role.add_argument("role", choices=["admin", "user"])
     args = parser.parse_args(argv)
 
+    if args.command == "invitations":
+        _list_invitations()
+        return 0
+    if args.command == "revoke-invitation":
+        if not invitations.revoke(args.id, {"username": "server-cli"}, storage=_audit_storage(), via="cli"):
+            raise SystemExit(f"No pending invitation {args.id}")
+        print(f"Done: invitation {args.id} withdrawn")
+        return 0
     users = init_default_admin() if args.command != "list" else load_users()
+    if args.command == "invite":
+        _invite(users, args.email, args.role, args.name)
+        return 0
     if args.command == "list":
         print(f"{'USERNAME':<28} {'ROLE':<6} {'SIGN-IN':<9} {'ACTIVE':<7} {'MFA':<4} LAST SIGN-IN")
         for u in sorted(users.values(), key=lambda u: u["username"]):
@@ -101,7 +164,12 @@ def main(argv: list) -> int:
         _mfa_reset(users, _user(users, args.username))
         print(f"Done: MFA is off for {args.username}; they set it up again from Account")
         return 0
+    if args.command == "reset-access":
+        _reset_access(users, _user(users, args.username))
+        return 0
     if args.command == "add":
+        if settings.rowanholt_server_mode:
+            raise SystemExit(invitations.INVITE_INSTEAD.replace(" (or POST /api/auth/users/invitations)", ""))
         if find_user(users, args.username) or find_user(users, args.email):
             raise SystemExit("Username or email already taken")
         _room_for_one_more(users)

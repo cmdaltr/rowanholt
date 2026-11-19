@@ -37,7 +37,7 @@ What a caller may do depends on the mode the backend runs in. Every request goes
 
 **Local mode** (the default: a stack on an analyst's own machine). Nothing needs a sign-in. A request without a token acts as the local analyst (`local`, role `admin`) and sees every job and case. The stack publishes the API on `127.0.0.1:5688` only, as it does every other port (Postgres, Redis, the web app, Splunk, Elastic, Kibana, the Navigator), so the open API is the machine's own. Signing in still works (login, guest and register are open), and a signed-in caller is that account: a non-admin one gets `403` from the admin-only routes (licence, brands, webhooks, users, symbol tables, sample data), which an anonymous request passes. A guest's token names no account, so a guest acts as the local analyst. Two areas want a signed-in admin even locally, since they drive the host: the lab (`/api/lab`, the Crucible lab and the Crucible telemetry Update) and Quartermaster (`/api/anduril`). Both are off (`503`) while the backend uses the default `SECRET_KEY`.
 
-**Server mode** (`ROWANHOLT_SERVER_MODE`, set by `deploy/server/docker-compose.server.yml`; see [SERVER.md](SERVER.md)). Every `/api` route needs a signed-in user (`401 Sign in required`) except `/api/health`, `/api/busy`, `/api/auth/config`, `/api/auth/login`, `/api/auth/login/mfa` (the sign-in's second step, whose challenge is its credential), `/api/auth/logout`, `/api/auth/reset-password` (a forgotten password: an app code and a backup code are its credential), `/api/auth/forgot-password` (`410`), `/api/auth/oidc/login`, `/api/auth/oidc/callback` and `/api/auth/verify`. There are no guests and no open sign-up. With `ROWANHOLT_REQUIRE_MFA=true`, a password user's sign-in without MFA reaches only `/api/auth/me`, `/api/auth/session` and `/api/auth/mfa`, `/mfa/setup` and `/mfa/enable` until MFA is on: anything else, `/api/auth/verify` included, is `403` (with `"mfa_enrolment_required": true`; [Multi-Factor Authentication](#multi-factor-authentication)). On top of that:
+**Server mode** (`ROWANHOLT_SERVER_MODE`, set by `deploy/server/docker-compose.server.yml`; see [SERVER.md](SERVER.md)). Every `/api` route needs a signed-in user (`401 Sign in required`) except `/api/health`, `/api/busy`, `/api/auth/config`, `/api/auth/login`, `/api/auth/login/mfa` (the sign-in's second step, whose challenge is its credential), `/api/auth/logout`, `/api/auth/reset-password` (a forgotten password: an app code and a backup code are its credential), `/api/auth/forgot-password` (`410`), `/api/auth/reset-access/start` and `/complete` and `/api/auth/invitations/accept`, `/accept/start` and `/accept/complete` (an admin's reset link or invitation, whose token is the credential), `/api/auth/oidc/login`, `/api/auth/oidc/callback` and `/api/auth/verify`. There are no guests and no open sign-up. With `ROWANHOLT_REQUIRE_MFA=true`, a password user's sign-in without MFA reaches only `/api/auth/me`, `/api/auth/session` and `/api/auth/mfa`, `/mfa/setup` and `/mfa/enable` until MFA is on: anything else, `/api/auth/verify` included, is `403` (with `"mfa_enrolment_required": true`; [Multi-Factor Authentication](#multi-factor-authentication)). On top of that:
 
 | Who | What |
 |---|---|
@@ -61,7 +61,7 @@ The lab and Quartermaster check a sign-in's JWT against the user store themselve
 
 The routes under `/api/auth` (`src/web/backend/auth/routes_simple.py`). Accounts are kept in a JSON file (`USERS_FILE`, default `/app/data/users.json`; on a team server `src/web/backend/data/users.json` through the backend's bind mount), not the database. The first sign-in on an empty store creates `admin`: locally with the built-in password, on a server with `ROWANHOLT_ADMIN_PASSWORD` (`503` without it).
 
-Password accounts on a team server can add TOTP multi-factor authentication ([Multi-Factor Authentication](#multi-factor-authentication), `auth/mfa.py`). There is no password reset by email and no `/auth/admin/*` route in this build: those endpoints, which this reference used to list, are in `auth/routes.py`, which the backend doesn't mount (its `/auth/mfa/*` routes too: the ones below replace them). Admins manage accounts through [Users](#users) or `rowanholt server users`.
+Password accounts on a team server can add TOTP multi-factor authentication ([Multi-Factor Authentication](#multi-factor-authentication), `auth/mfa.py`). There is no password reset by email and no `/auth/admin/*` route in this build: those endpoints, which this reference used to list, are in `auth/routes.py`, which the backend doesn't mount (its `/auth/mfa/*` routes too: the ones below replace them). Admins manage accounts through [Users](#users) or `rowanholt server users`; on a team server they're made by [invitation](#invitations).
 
 #### Cross-site requests: the `X-Rowanholt` header
 
@@ -90,7 +90,7 @@ A state-changing request (anything but GET, HEAD and OPTIONS) under `/api` that 
 
 **Endpoint:** `POST /auth/register`
 
-**Description:** Create an account. Locally anyone may, and the account is always a `user`. On a team server only an admin may (as with `POST /api/auth/users`), and `role` is honoured.
+**Description:** Create an account on a local stack: anyone may, and the account is always a `user`. A team server refuses it (`401` signed out, `400` for an admin): its accounts are made by [invitation](#invitations), so nobody chooses another person's password.
 
 **Request Body:**
 ```json
@@ -277,7 +277,7 @@ The challenge lasts five minutes and signs in once; it's not a JWT or an API tok
 
 **Endpoint:** `POST /auth/reset-password` (no sign-in)
 
-**Description:** For a password account with MFA: its username (or email), a current code from its authenticator app and one of its backup codes set a new password, so neither the phone nor the printed codes is enough alone. The app code is checked first, and the backup code is used up only once both are right. A wrong pair counts towards the sign-in lockout, and every refusal reads the same, so the answer doesn't say which accounts exist or have MFA. It doesn't sign in: that takes the new password and a second factor. Audited as `mfa_password_reset`. Without MFA, or with the app or the codes lost, an administrator resets it (`rowanholt server users password <username>`).
+**Description:** For a password account with MFA: its username (or email), a current code from its authenticator app and one of its backup codes set a new password, so neither the phone nor the printed codes is enough alone. The app code is checked first, and the backup code is used up only once both are right. A wrong pair counts towards the sign-in lockout, and every refusal reads the same, so the answer doesn't say which accounts exist or have MFA. It doesn't sign in: that takes the new password and a second factor. Audited as `mfa_password_reset`. Without MFA, or with the app or the codes lost, an administrator gives them a [reset link](#reset-access).
 
 ```bash
 curl -X POST https://rowanholt.example/api/auth/reset-password \
@@ -295,6 +295,31 @@ curl -X POST https://rowanholt.example/api/auth/reset-password \
 - `429 Too Many Requests`: the account is locked after failed sign-ins; wait and try again
 
 `POST /auth/forgot-password` answers `410 Gone`: Rowanholt sends no email, and the message says how to reset instead.
+
+---
+
+### Reset Access
+
+**Endpoints:** `POST /auth/reset-access/start`, `POST /auth/reset-access/complete` (no sign-in: the link's token is the credential)
+
+**Description:** The page behind an admin's reset link (`/reset-access#<token>`, from `rowanholt server users reset-access` or [`POST /api/auth/users/{user_id}/reset-access`](#users)). `start` takes `{"token"}` and returns the account's `username` and a new authenticator to set up: `secret`, `otpauth_uri`, `qr_svg` and the link's `expires_in` (seconds). The server keeps the secret, encrypted, until `complete`; calling `start` again makes another. `complete` takes `{"token", "new_password", "code"}`, with a code from that new authenticator: the password changes (every other session ends), MFA goes on with the new secret whether or not the server requires it, ten new backup codes replace the old ones, the link is used up, and the person is signed in. Audited as `access_reset_completed`.
+
+```bash
+curl -X POST https://rowanholt.example/api/auth/reset-access/complete \
+  -H "Content-Type: application/json" \
+  -d '{"token": "…", "new_password": "…", "code": "123456"}'
+```
+
+**Response:** `200 OK`, the [Login](#login) answer plus the codes, shown this once
+```json
+{"access_token": "eyJ…", "token_type": "bearer", "user": {"username": "analyst", "mfa_enabled": true, "…": "…"},
+ "backup_codes": ["ABCDE-FGHJK", "…"]}
+```
+
+**Errors:**
+- `400 Bad Request`: the link isn't valid or has been used, the code is wrong, `start` wasn't called, or a new password under 12 characters
+- `410 Gone`: the link has expired (24 hours after it was issued); ask an admin for a new one
+- `429 Too Many Requests`: the account is locked after failed sign-ins; wait and try again
 
 ---
 
@@ -358,11 +383,28 @@ A caller that sends `X-Rowanholt-Agent: smith-mcp` (or `aule-mcp`, `eru-mcp`, or
 |---|---|---|---|
 | `GET` | `/api/auth/directory` | Anyone signed in | Active users' `username` and `full_name`, for sharing a job |
 | `GET` | `/api/auth/users` | Admins | Every account, with the fields in [Login](#login) |
-| `POST` | `/api/auth/users` | Admins | `{"username", "email", "password", "full_name", "role"}`, validated as [Register](#register-new-user). `400` when the username or email is taken, `402` when the licence has no free place |
+| `POST` | `/api/auth/users` | Admins | Local stack only: `{"username", "email", "password", "full_name", "role"}`, validated as [Register](#register-new-user). `400` when the username or email is taken, `402` when the licence has no free place. A team server answers `400`: invite instead |
+| `POST` | `/api/auth/users/invitations` | Admins | `{"email", "role": "user", "full_name"}`: an invitation, as listed below, plus `link` (`<ROWANHOLT_PUBLIC_URL>/accept-invite#<token>`), shown this once. A newer one for the email replaces an older one. `409` for an email with an account (give them a reset link), `402` with no free place (pending invitations hold one each), `400` for a bad email or role, or on a local stack. Audited as `invitation_created` |
+| `GET` | `/api/auth/users/invitations` | Admins | Pending invitations, newest first: `id`, `email`, `role`, `full_name`, `invited_by`, `created_at`, `expires_at`; never the link |
+| `DELETE` | `/api/auth/users/invitations/{invitation_id}` | Admins | Withdraw one: its link stops working. `404` if there's no such pending invitation. Audited as `invitation_revoked` |
 | `PATCH` | `/api/auth/users/{user_id}` | Admins | Any of `role` (`admin` or `user`), `is_active`, `password`, `full_name`. The last active admin can't be demoted or disabled (`400`); re-enabling an account needs a free place (`402`); `404` for no such user |
+| `POST` | `/api/auth/users/{user_id}/reset-access` | Admins | A one-time link for someone who's lost their password, authenticator or backup codes: `{"link": "<ROWANHOLT_PUBLIC_URL>/reset-access#<token>", "expires_at", "user"}`, shown this once. Their sessions end and their API tokens are revoked now, and an earlier link stops working. `400` for a disabled or single sign-on account, `404` for no such user. Audited as `access_reset_issued` ([Reset access](#reset-access)) |
 | `DELETE` | `/api/auth/users/{user_id}/mfa` | Admins | Turn someone's MFA off (a lost authenticator and backup codes): its secret and codes are removed and they sign in with their password, then set it up again. Returns the user; `400` if MFA isn't on, `404` for no such user. Audited as `mfa_admin_reset` |
 
-The same can be done from the host with `rowanholt server users` ([SERVER.md](SERVER.md#users)), which works when nobody can sign in; `rowanholt server users mfa-reset <username>` is the MFA reset.
+The same can be done from the host with `rowanholt server users` ([SERVER.md](SERVER.md#users)), which works when nobody can sign in; `rowanholt server users mfa-reset <username>` is the MFA reset, `rowanholt server users reset-access <username>` the reset link and `rowanholt server users invite <email>` an invitation.
+
+### Invitations
+
+**Endpoints:** `POST /api/auth/invitations/accept`, `/accept/start`, `/accept/complete` (no sign-in: the link's token is the credential)
+
+**Description:** The page behind an invitation (`/accept-invite#<token>`, `auth/invitations.py`). `accept` takes `{"token"}` and returns `email`, `role`, `full_name`, a suggested `username` (the email's first part, made free) and `expires_in` (seconds). `start` takes `{"token", "username"}`, checks the username is well formed and free, and returns an authenticator to set up (`username`, `secret`, `otpauth_uri`, `qr_svg`), kept encrypted with the invitation; calling it again makes another. `complete` takes `{"token", "username", "full_name", "new_password", "code"}` with a code from that authenticator, and only then is the account made, with the invited role and MFA on whether or not the server requires it. The answer is the [Login](#login) answer plus `backup_codes`, shown this once; the invitation is used up. Audited as `account_created`.
+
+**Errors:**
+- `400 Bad Request`: the invitation isn't valid or has been used, the username is taken or malformed, the code is wrong, `start` wasn't called, or a password under 12 characters
+- `402 Payment Required`: the licence's places filled since the invitation was made
+- `409 Conflict`: the email has an account now
+- `410 Gone`: the invitation has expired (24 hours after it was made)
+- `429 Too Many Requests`: too many wrong codes; wait and try again
 
 ---
 

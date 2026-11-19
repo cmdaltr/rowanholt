@@ -757,6 +757,21 @@ class JobStorage:
         finally:
             session.close()
 
+    def revoke_user_tokens(self, user_id: str) -> int:
+        """Revoke every token of one user's that's still live (a reset of their access); how many."""
+        session = self.Session()
+        try:
+            now = datetime.now()
+            count = (session.query(ApiTokenModel).filter_by(user_id=user_id, revoked_at=None)
+                     .update({"revoked_at": now}))
+            session.commit()
+            return count
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
     def touch_token(self, token_id: str, when: datetime) -> None:
         """Record when a token was last used."""
         session = self.Session()

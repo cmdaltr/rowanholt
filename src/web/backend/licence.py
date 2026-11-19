@@ -40,6 +40,7 @@ import logging
 import os
 import re
 import uuid
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -199,26 +200,37 @@ def remove() -> bool:
 # ── Seats ────────────────────────────────────────────────────────────────────
 
 
-def places_held(users: dict) -> int:
-    """Accounts that can sign in. Rowanholt has no invitations to count."""
-    return sum(1 for u in users.values() if u.get("is_active", True))
+def places_held(users: dict, excluding: Iterable[str] = ()) -> int:
+    """Accounts that can sign in, and pending invitations, which would add one (auth/invitations.py):
+    as in Ostraka and Shikari, so inviting past the seats is refused when it's done rather than when
+    someone accepts. `excluding`: invitations not to count (the one being replaced or accepted)."""
+    return sum(1 for u in users.values() if u.get("is_active", True)) + _invitations_pending(set(excluding))
 
 
-def seat_refusal(users: dict, server_mode: bool, now: Optional[datetime] = None) -> Optional[str]:
-    """Why one more account can't be added, or None. Asked only when someone is added, never of
-    the people already in, and never in local mode (one analyst, no licence)."""
+def _invitations_pending(excluding: set) -> int:
+    try:
+        from auth import invitations
+    except ImportError:  # imported as a package (src.web.backend)
+        from .auth import invitations
+    return sum(1 for inv in invitations.pending() if inv["id"] not in excluding)
+
+
+def seat_refusal(users: dict, server_mode: bool, now: Optional[datetime] = None,
+                 excluding: Iterable[str] = ()) -> Optional[str]:
+    """Why one more account (or invitation) can't be added, or None. Asked only when someone is
+    added, never of the people already in, and never in local mode (one analyst, no licence)."""
     if not server_mode:
         return None
     st = current(now)
     if st.seats is None:
         return None
-    held = places_held(users)
+    held = places_held(users, excluding)
     if held < st.seats:
         return None
     edition = "the free edition" if st.edition is Edition.FREE else f"this {st.edition.value} licence"
     return (
-        f"All {st.seats} places on {edition} are taken ({held} accounts can sign in). "
-        "Disable an account to make room, or install a licence with more seats."
+        f"All {st.seats} places on {edition} are taken ({held} accounts and pending invitations). "
+        "Disable an account or withdraw an invitation to make room, or install a licence with more seats."
     )
 
 

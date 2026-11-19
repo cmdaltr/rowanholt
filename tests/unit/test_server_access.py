@@ -74,10 +74,7 @@ class BackendCase(unittest.TestCase):
         cls.client = TestClient(cls.main.app)
         cls.admin = cls.login("admin", "correct horse battery staple")
         for name in ("alice", "bob"):
-            resp = cls.client.post("/api/auth/users", headers=cls.admin, json={
-                "username": name, "email": f"{name}@example.org", "password": f"{name}-password-123"})
-            # Another class over the same store may have made them already
-            assert resp.status_code == 200 or "already taken" in resp.text, resp.text
+            cls.make_user(name, f"{name}-password-123")
         cls.alice = cls.login("alice", "alice-password-123")
         cls.bob = cls.login("bob", "bob-password-123")
 
@@ -85,6 +82,43 @@ class BackendCase(unittest.TestCase):
     def tearDownClass(cls):
         cls.allowed.stop()
         cls.settings.rowanholt_server_mode = False
+
+    @classmethod
+    def make_user(cls, name, password, role="user", email=None):
+        """An account written straight to the store, as a fixture (a server makes them by invitation,
+        which test_invitations.py tests), or the one already there: other classes share the store."""
+        from auth import users as store
+        accounts = store.load_users()
+        found = store.find_user(accounts, name)
+        if found:
+            return store.public(found)
+        record = store.new_user(name, email or f"{name}@example.org", role=role, password=password)
+        accounts[record["id"]] = record
+        store.save_users(accounts)
+        return store.public(record)
+
+    def invite(self, email, role="user", headers=None, **body):
+        return self.client.post("/api/auth/users/invitations", headers=headers or self.admin,
+                                json={"email": email, "role": role, **body})
+
+    def accept(self, link, username, password, full_name=None):
+        """Accept an invitation's link as its page does, with a code from the authenticator it gives."""
+        from auth import mfa
+        token = link.split("#", 1)[1]
+        self.client.cookies.clear()
+        started = self.client.post("/api/auth/invitations/accept/start", json={"token": token, "username": username})
+        if started.status_code != 200:
+            return started
+        code = mfa.code_at(started.json()["secret"], mfa.current_step())
+        done = self.client.post("/api/auth/invitations/accept/complete", json={
+            "token": token, "username": username, "full_name": full_name, "new_password": password, "code": code})
+        self.client.cookies.clear()
+        return done
+
+    def add_by_invitation(self, name, password, role="user"):
+        """Invite and accept, as a server makes an account: the invitation's refusal if it's refused."""
+        invited = self.invite(f"{name}@example.org", role)
+        return self.accept(invited.json()["link"], name, password) if invited.status_code == 200 else invited
 
     @classmethod
     def login(cls, username, password):
@@ -545,9 +579,7 @@ class ServerAccessTest(BackendCase):
         seats = mock.patch.object(sys.modules["auth.routes_simple"].licence, "seat_refusal", return_value=None)
         seats.start()
         self.addCleanup(seats.stop)
-        resp = self.client.post("/api/auth/users", headers=self.admin, json={
-            "username": "lockpair", "email": "lockpair@example.org", "password": "lockpair-password-1"})
-        assert resp.status_code == 200 or "already taken" in resp.text, resp.text
+        self.make_user("lockpair", "lockpair-password-1")
         names = ("lockpair", "lockpair@example.org")
         for n in range(self.settings.max_login_attempts):
             self.client.post("/api/auth/login", data={"username": names[n % 2], "password": "wrong"})

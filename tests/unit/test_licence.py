@@ -72,9 +72,9 @@ class LicenceApiTest(BackendCase):
             expires, product=product, **extra))
 
     def add(self, name):
+        """An account made as a server makes one, by invitation: the invitation's refusal if it's refused."""
         self.added.append(name)
-        return self.client.post("/api/auth/users", headers=self.admin, json={
-            "username": name, "email": f"{name}@example.org", "password": f"{name}-password-123"})
+        return self.add_by_invitation(name, f"{name}-password-123")
 
     def held(self):
         return self.licence.places_held(self.users.load_users())
@@ -188,13 +188,11 @@ class LicenceApiTest(BackendCase):
         self.client.delete("/api/licence", headers=self.admin)
         self.assertEqual(self.oidc.user_for(claims)["id"], user["id"])  # already here: signs in regardless
 
-    def test_the_users_command_checks_places_on_add_and_enable(self):
+    def test_the_users_command_checks_places_on_invite(self):
         self.fill_free_places()
-        with mock.patch.object(self.users, "hash_password", lambda p: "x"), \
-                mock.patch("getpass.getpass", return_value="a-long-enough-password"):
-            from auth import manage_users
-            with self.assertRaisesRegex(SystemExit, "All 4 places"):
-                manage_users.main(["add", "ivan", "ivan@example.org"])
+        from auth import manage_users
+        with self.assertRaisesRegex(SystemExit, "All 4 places"):
+            manage_users.main(["invite", "ivan@example.org"])
 
     def test_local_mode_is_free_with_no_licence_and_its_analyst_can_install_one(self):
         self.settings.rowanholt_server_mode = False

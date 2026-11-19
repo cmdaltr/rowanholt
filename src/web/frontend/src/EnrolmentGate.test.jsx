@@ -20,6 +20,8 @@ const visit = (path) => render(
       <Routes>
         <Route path="/account" element={<Account />} />
         <Route path="/login" element={<div>login</div>} />
+        <Route path="/reset-access" element={<div>reset access</div>} />
+        <Route path="/accept-invite" element={<div>accept invite</div>} />
         <Route path="/gandalf" element={<div>custodian</div>} />
         <Route path="/ai" element={<div>smith</div>} />
       </Routes>
@@ -37,6 +39,18 @@ test('MFA to set up: Account and sign-in still open', () => {
   mockUser = { username: 'alice', mfa_enrolment_required: true };
   visit('/login');
   expect(screen.getByText('login')).toBeInTheDocument();
+});
+
+test('MFA to set up: a reset link still opens (it sets MFA up itself)', () => {
+  mockUser = { username: 'alice', mfa_enrolment_required: true };
+  visit('/reset-access#tok');
+  expect(screen.getByText('reset access')).toBeInTheDocument();
+});
+
+test('MFA to set up: an invitation still opens', () => {
+  mockUser = { username: 'alice', mfa_enrolment_required: true };
+  visit('/accept-invite#tok');
+  expect(screen.getByText('accept invite')).toBeInTheDocument();
 });
 
 test.each([null, { username: 'alice' }, { username: 'alice', mfa_enrolment_required: false }])(

@@ -10,8 +10,11 @@ import { useAuth } from '../context/AuthContext';
 
 const detail = (error, fallback) => error.response?.data?.detail || fallback;
 
-const BackupCodeList = ({ codes, onDone }) => {
+// The codes, shown once. With `confirm` (a reset of someone's access, where there's no Account page
+// to come back to), Continue waits for the tickbox
+export const BackupCodeList = ({ codes, onDone, confirm = false }) => {
   const [copied, setCopied] = useState('');
+  const [saved, setSaved] = useState(false);
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(codes.join('\n'));
@@ -29,11 +32,23 @@ const BackupCodeList = ({ codes, onDone }) => {
       <ul style={{ columns: 2, listStyle: 'none', padding: 0, fontFamily: 'monospace', fontSize: '1rem' }}>
         {codes.map((code) => <li key={code}>{code}</li>)}
       </ul>
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-        <button type="button" className="secondary" onClick={copy}>Copy</button>
-        <button type="button" onClick={onDone}>I've saved them</button>
-        {copied && <span style={{ fontSize: '0.85rem', color: '#a09580' }}>{copied}</span>}
-      </div>
+      {confirm ? (
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <label htmlFor="codes-saved" style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', margin: 0 }}>
+            <input id="codes-saved" type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
+            I've saved these codes
+          </label>
+          <button type="button" className="secondary" onClick={copy} style={{ marginLeft: 'auto' }}>Copy codes</button>
+          <button type="button" onClick={onDone} disabled={!saved}>Continue</button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <button type="button" className="secondary" onClick={copy}>Copy</button>
+          <button type="button" onClick={onDone}>I've saved them</button>
+          {copied && <span style={{ fontSize: '0.85rem', color: '#a09580' }}>{copied}</span>}
+        </div>
+      )}
+      {confirm && copied && <p style={{ fontSize: '0.85rem', color: '#a09580', margin: '0.5rem 0 0' }}>{copied}</p>}
     </div>
   );
 };

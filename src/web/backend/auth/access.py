@@ -58,6 +58,11 @@ PUBLIC_PATHS = {
     "/api/auth/logout",
     "/api/auth/reset-password",  # a forgotten password: a backup code is its credential
     "/api/auth/forgot-password",  # refuses, saying how to reset instead
+    "/api/auth/reset-access/start",  # an admin's reset link: its token is the credential
+    "/api/auth/reset-access/complete",
+    "/api/auth/invitations/accept",  # an admin's invitation: its token is the credential
+    "/api/auth/invitations/accept/start",
+    "/api/auth/invitations/accept/complete",
     "/api/auth/oidc/login",
     "/api/auth/oidc/callback",
     "/api/auth/verify",

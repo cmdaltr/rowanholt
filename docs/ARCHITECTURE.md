@@ -725,7 +725,9 @@ Case data itself stays in case directories on disk; nothing in Postgres copies e
 │   ├── POST   /guest                 Login as guest
 │   ├── GET    /me                    Get current user info
 │   ├── POST   /forgot-password       410: no email, says how to reset
-│   └── POST   /reset-password        App code + backup code set a new password
+│   ├── POST   /reset-password        App code + backup code set a new password
+│   ├── POST   /reset-access/start|complete  An admin's link: new password, authenticator, codes
+│   └── POST   /invitations/accept[/start|/complete]  An invitation: the account made at the end
 │
 ├── /jobs                              [Job Management]
 │   ├── GET    /                      List all jobs

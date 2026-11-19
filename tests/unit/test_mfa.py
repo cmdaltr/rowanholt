@@ -48,10 +48,8 @@ class MfaTest(BackendCase):
 
     def new_user(self):
         name = f"mfa{next(_names)}x{int(self.now) % 100000}"
-        resp = self.client.post("/api/auth/users", headers=self.admin, json={
-            "username": name, "email": f"{name}@example.org", "password": PASSWORD})
-        self.assertEqual(resp.status_code, 200, resp.text)
-        return name, resp.json()["id"], self.login(name, PASSWORD)
+        user = self.make_user(name, PASSWORD)
+        return name, user["id"], self.login(name, PASSWORD)
 
     def code(self, secret):
         """The next step's code (the clock moves on 30 s first)."""
