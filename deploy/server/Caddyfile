@@ -16,9 +16,10 @@
 
 # Splunk, Kibana and the Navigator have no idea who Rowanholt's users are, so the
 # backend vouches for each request; anyone not signed in goes to the sign-in page, and
-# the Navigator's case layers follow job sharing
+# the Navigator's case layers follow job sharing. The backend is reached over rowanholt-edge
+# (backend-edge), where it believes the X-Forwarded-For Caddy sets
 (signed_in) {
-	forward_auth backend:5688 {
+	forward_auth backend-edge:5688 {
 		uri /api/auth/verify?login_redirect=1&service={args[0]}
 		copy_headers X-Rowanholt-User
 	}
@@ -44,9 +45,16 @@
 # on the host's loopback: the backend is told so, or its redirects would point at http://
 (app) {
 	header X-Frame-Options SAMEORIGIN
+	# Scripts from the app's own files only. Styles may be inline (React's style props); images
+	# and downloads may be blob: (the report logo, exports); the live case and a lab console are
+	# websockets to this same address. The journey map is a static page with its scripts inline
+	@app_pages not path /architecture/rowanholt-journey.html
+	header @app_pages Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' wss://{hostport}; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+	@journey path /architecture/rowanholt-journey.html
+	header @journey Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
 
 	handle /api/* {
-		reverse_proxy backend:5688 {
+		reverse_proxy backend-edge:5688 {
 			header_up X-Forwarded-Proto https
 			# Evidence uploads and long analyses
 			transport http {

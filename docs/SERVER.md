@@ -234,6 +234,7 @@ People can use the server from the desktop app instead of a browser tab: in setu
 
 - **Quartermaster holds the Docker socket.** It's opt-in (`rowanholt anduril enable`) and admin-only on a server, but whoever administers it administers the host's Docker.
 - **Splunk and Kibana** have their own users and indexes. Rowanholt's sign-in in front of them keeps out anyone without a Rowanholt account, and every case's data in them is the team's, as in Rowanholt itself. The Navigator's layers are for anyone signed in.
+- **The web app's Content-Security-Policy** (Caddy) allows scripts from the app's own files only, and frames, connections and forms on its own address. A browser extension or a reverse proxy in front of Caddy that injects scripts will be blocked, and the browser's console says so.
 - **Sessions are 24-hour tokens** (`access_token_expire_minutes`); disabling a user stops their next request, since every request checks the user store, and a new password (changed, set by an admin or reset) ends every session from before it. API tokens are left alone: revoke one under Account.
 - **Accounts live in the checkout, not the database.** The user store is `src/web/backend/data/users.json` (the installed licence, `licence.json`, sits beside it), on the host through the backend's bind mount and kept out of the images by `.dockerignore`, so a rebuild or a pull leaves accounts alone. It's gitignored, so `git clean -x` deletes it: `rowanholt server backup` (below) keeps it with `.env` and the database.
 
@@ -258,7 +259,7 @@ docker restart rowanholt-backend
 
 ## How sign-in lockouts work
 
-Failed password sign-ins are counted in Redis, so restarts don't reset them. Five failures from one address lock that username for 15 minutes from that address only: someone guessing at a colleague's account locks themselves out, not the colleague. Fifty failures across all addresses lock the username everywhere, to catch guessing spread over many machines. If Redis is down, the counts are held in the backend process until it's back. A wrong MFA code (at sign-in, or on the Account page) counts as a failure, and for an account with MFA a right password doesn't clear the count: only a right code does.
+Failed password sign-ins are counted in Redis, so restarts don't reset them. The address is the browser's, as Caddy reports it in `X-Forwarded-For`. The backend believes that header only from Caddy's fixed address on a network of their own (`rowanholt-edge`, `10.213.47.0/29`, Caddy at `10.213.47.2`), so nothing else on the compose network can claim a fresh address. If that range is taken on the host, set `ROWANHOLT_EDGE_SUBNET` and `ROWANHOLT_EDGE_PROXY` in `.env`. Five failures from one address lock that username for 15 minutes from that address only: someone guessing at a colleague's account locks themselves out, not the colleague. Fifty failures across all addresses lock the username everywhere, to catch guessing spread over many machines. If Redis is down, the counts are held in the backend process until it's back. A wrong MFA code (at sign-in, or on the Account page) counts as a failure, and for an account with MFA a right password doesn't clear the count: only a right code does.
 
 ## The schema
 

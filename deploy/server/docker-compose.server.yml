@@ -35,12 +35,19 @@ services:
       - backend
       - frontend
     networks:
-      - rowanholt-network
+      rowanholt-network:
+      rowanholt-edge:
+        ipv4_address: ${ROWANHOLT_EDGE_PROXY:-10.213.47.2}
 
   backend:
     ports: !reset []
-    # No --reload; the proxy's X-Forwarded-* headers are trusted (only it can reach here)
-    command: uvicorn main:app --host 0.0.0.0 --port 5688 --proxy-headers --forwarded-allow-ips=*
+    # No --reload. X-Forwarded-* is believed from the proxy's fixed address on rowanholt-edge only:
+    # anything else on the compose network could otherwise pick its own address for the lockout
+    command: uvicorn main:app --host 0.0.0.0 --port 5688 --proxy-headers --forwarded-allow-ips=${ROWANHOLT_EDGE_PROXY:-10.213.47.2}
+    networks:
+      rowanholt-edge:
+        aliases:
+          - backend-edge
     environment:
       - ROWANHOLT_SERVER_MODE=true
       - ROWANHOLT_PUBLIC_URL=${ROWANHOLT_PUBLIC_URL:-https://${ROWANHOLT_HOSTNAME:?Run rowanholt server init first}}
@@ -115,3 +122,12 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+
+networks:
+  # The proxy and the backend only, so the backend can tell the proxy's requests from the rest.
+  # ROWANHOLT_EDGE_SUBNET and ROWANHOLT_EDGE_PROXY move it if 10.213.47.0/29 is taken on the host
+  rowanholt-edge:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${ROWANHOLT_EDGE_SUBNET:-10.213.47.0/29}
