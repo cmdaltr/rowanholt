@@ -4,24 +4,26 @@
 <meta charset="utf-8">
 <title>Starting Rowanholt</title>
 <style>
-:root { color-scheme: dark; --bg: #0b1210; --text: #b9c9b4; --dim: #7d907a; --strong: #e1ecdc;
+:root { --col: min(680px, 74vw); color-scheme: dark; --bg: #0b1210; --text: #b9c9b4; --dim: #7d907a; --strong: #e1ecdc;
         --bad: #e8a07a; --gold: #c9a44c; --track: #1d2b26; --line: #1d2b26; }
 * { box-sizing: border-box; }
 body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
        background: var(--bg); color: var(--text); font: 14px/1.5 -apple-system, system-ui, sans-serif; padding: 24px; }
-.logo { width: 360px; max-width: 70vw; margin-bottom: 18px; }
-.bar { width: min(560px, 86vw); height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
+/* One column: the logo's artwork (the image less its ™, which hangs past the right) as wide as the
+   bar, the status and the log under it */
+.logo { width: calc(var(--col) * 1.14); max-height: 56vh; object-fit: contain; margin-bottom: 22px; }
+.bar { width: var(--col); height: 8px; border-radius: 3px; background: var(--track); overflow: hidden; }
 .bar div { height: 100%; width: 0; background: var(--gold); border-radius: 3px; }
-.status { margin-top: 16px; text-align: center; min-height: 64px; }
-#where { font-size: 17px; color: var(--strong); }
-#eta { margin-top: 2px; font-size: 15px; }
-#phase { margin-top: 2px; color: var(--dim); font-size: 13px; }
-.error #where { color: var(--bad); font-size: 15px; }
+.status { width: var(--col); margin-top: 20px; text-align: center; min-height: 84px; }
+#where { font-size: 22px; color: var(--strong); }
+#eta { margin-top: 4px; font-size: 18px; }
+#phase { margin-top: 4px; color: var(--dim); font-size: 15px; }
+.error #where { color: var(--bad); font-size: 18px; }
 button { margin-top: 12px; padding: 6px 18px; background: #1d3a2e; color: #d6e6d0; border: 1px solid #2f5a47;
          border-radius: 6px; font: inherit; cursor: pointer; display: none; }
 .error button { display: inline-block; }
-details { width: min(940px, 92vw); margin-top: 14px; color: var(--dim); }
-summary { cursor: pointer; font-size: 12px; }
+details { width: var(--col); margin-top: 16px; color: var(--dim); }
+summary { cursor: pointer; font-size: 13px; text-align: center; }
 pre { height: 26vh; overflow: auto; margin: 8px 0 0; padding: 12px; background: #050908; border: 1px solid var(--line);
       border-radius: 6px; font: 12px "JetBrains Mono", Menlo, monospace; color: #8fa58a; white-space: pre-wrap; }
 .plain .bar { display: none; }
