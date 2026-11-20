@@ -4,7 +4,7 @@
 # runs it, and deploy/linux/uninstall.sh undoes it.
 #
 #   rowanholt server init <hostname> [--tls internal|<acme-email>|files|tailscale] [--https-port N]
-#                                    [--service <name>|off]
+#                                    [--service <name>|off] [--admin <email>]
 #
 # <hostname> is the name people will open, e.g. rowanholt.dfir.example.org. --tls picks
 # the certificate: Caddy's own CA (internal, the default), Let's Encrypt for a public
@@ -16,10 +16,13 @@
 # --service, with --tls tailscale, also gives the server a Tailscale Service name of its own,
 # https://<name>.<tailnet>.ts.net with no port, which becomes the URL people open; the
 # host-and-port address keeps working. Kept like --https-port; --service off drops it.
+# --admin names the first admin: a server has no seeded account, and while it has no admin,
+# `rowanholt start` prints that person's one-time invitation link (24 hours; the newest works),
+# which `rowanholt server users first-admin <email>` also prints at any time.
 # Afterwards `rowanholt start` runs the server profile.
 #
-# Secrets are generated once and kept: SECRET_KEY, the first admin's password (printed
-# once), and the Postgres, Elastic and Splunk passwords for stores that don't exist yet.
+# Secrets are generated once and kept: SECRET_KEY and the Postgres, Elastic and Splunk
+# passwords for stores that don't exist yet.
 # Stores created earlier keep their passwords, since changing them would lock Rowanholt
 # out of its own data; on a server those stores aren't reachable from the network.
 set -euo pipefail
@@ -30,12 +33,14 @@ HOSTNAME_ARG=""
 TLS="internal"
 HTTPS_PORT=""
 SERVICE_ARG=""
+ADMIN_ARG=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --tls) TLS="$2"; shift ;;
         --https-port) HTTPS_PORT="$2"; shift ;;
         --service) SERVICE_ARG="$2"; shift ;;
-        -h|--help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --admin) ADMIN_ARG="$2"; shift ;;
+        -h|--help) sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*) echo "Error: unknown option: $1" >&2; exit 1 ;;
         *) HOSTNAME_ARG="$1" ;;
     esac
@@ -43,6 +48,10 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$HOSTNAME_ARG" ] || { echo "Usage: rowanholt server init <hostname> [--tls internal|<acme-email>|files|tailscale]" >&2; exit 1; }
 [[ "$HOSTNAME_ARG" =~ ^[A-Za-z0-9.-]+$ ]] || { echo "Error: '$HOSTNAME_ARG' isn't a hostname" >&2; exit 1; }
+if [ -n "$ADMIN_ARG" ]; then
+    [[ "$ADMIN_ARG" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]] \
+        || { echo "Error: --admin takes the first admin's email address" >&2; exit 1; }
+fi
 if [ -n "$HTTPS_PORT" ]; then
     [[ "$HTTPS_PORT" =~ ^[0-9]+$ ]] && [ "$HTTPS_PORT" -ge 1 ] && [ "$HTTPS_PORT" -le 65535 ] \
         || { echo "Error: --https-port takes a port number" >&2; exit 1; }
@@ -177,11 +186,18 @@ set_value ROWANHOLT_PUBLIC_URL "$PUBLIC_URL"
 key="$(current SECRET_KEY)"
 case "$key" in ""|change-this-to-a-random-secret-key|your-secret-key-change-in-production) set_value SECRET_KEY "$(secret)$(secret)" ;; esac
 
-ADMIN_PASSWORD=""
-if [ -z "$(current ROWANHOLT_ADMIN_PASSWORD)" ]; then
-    ADMIN_PASSWORD="$(secret)"
-    set_value ROWANHOLT_ADMIN_PASSWORD "$ADMIN_PASSWORD"
+# No seeded admin on a server: the first one comes from an invitation. An .env from before
+# (19 November 2026) has ROWANHOLT_ADMIN_PASSWORD, which nothing reads now; the account it made stays
+OLD_ADMIN_PASSWORD=false
+if grep -q '^ROWANHOLT_ADMIN_PASSWORD=' "$ENV_FILE"; then
+    tmp="$(mktemp)"
+    grep -v '^ROWANHOLT_ADMIN_PASSWORD=' "$ENV_FILE" > "$tmp" || true
+    cat "$tmp" > "$ENV_FILE"
+    rm -f "$tmp"
+    OLD_ADMIN_PASSWORD=true
 fi
+[ -n "$ADMIN_ARG" ] && set_value ROWANHOLT_FIRST_ADMIN "$ADMIN_ARG"
+FIRST_ADMIN="$(current ROWANHOLT_FIRST_ADMIN)"
 
 kept=()
 for pair in POSTGRES_PASSWORD:postgres_data ELASTIC_PASSWORD:elastic_data KIBANA_PASSWORD:elastic_data SPLUNK_PASSWORD:splunk_var; do
@@ -207,9 +223,16 @@ elif [ -n "$OLD_SERVICE" ]; then
     echo "  Tailscale Service svc:$OLD_SERVICE dropped: MCP clients and an SSO redirect URI move back to $PUBLIC_URL."
     echo ""
 fi
-if [ -n "$ADMIN_PASSWORD" ]; then
-    echo "  First admin:  admin / $ADMIN_PASSWORD"
-    echo "  (shown once; it's also ROWANHOLT_ADMIN_PASSWORD in .env until you change it after signing in)"
+if [ -n "$FIRST_ADMIN" ]; then
+    echo "  First admin:  $FIRST_ADMIN. While there's no admin, 'rowanholt start' prints their one-time"
+    echo "  invitation link (24 hours): a username, a password and an authenticator, then they invite the rest."
+else
+    echo "  First admin:  none named. After 'rowanholt start': rowanholt server users first-admin you@example.org"
+fi
+echo ""
+if $OLD_ADMIN_PASSWORD; then
+    echo "  Removed ROWANHOLT_ADMIN_PASSWORD from .env: a server's first admin comes from an invitation now,"
+    echo "  and nothing reads it. Accounts already made are unchanged: if 'admin' still has that password, change it."
     echo ""
 fi
 if [ ${#OPENED[@]} -gt 0 ]; then

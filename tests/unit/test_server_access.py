@@ -22,7 +22,6 @@ os.environ.update({
     "USERS_FILE": f"{TMP}/users.json",
     "OUTPUT_DIR": f"{TMP}/output",
     "SECRET_KEY": "test-secret-key-for-unit-tests-only-0123456789",
-    "ROWANHOLT_ADMIN_PASSWORD": "correct horse battery staple",
     "ROWANHOLT_PUBLIC_URL": "https://rowanholt.test",
     # No Redis here: sign-in lockouts fall back to memory (port 1 refuses at once)
     "REDIS_HOST": "127.0.0.1",
@@ -72,6 +71,8 @@ class BackendCase(unittest.TestCase):
         cls.allowed.start()
         settings.rowanholt_server_mode = True
         cls.client = TestClient(cls.main.app)
+        # A server seeds no account: its first admin would come from first-admin (test_first_admin.py)
+        cls.make_user("admin", "correct horse battery staple", role="admin")
         cls.admin = cls.login("admin", "correct horse battery staple")
         for name in ("alice", "bob"):
             cls.make_user(name, f"{name}-password-123")

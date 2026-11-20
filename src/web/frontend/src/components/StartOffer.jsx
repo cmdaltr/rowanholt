@@ -26,7 +26,7 @@ const Shot = ({ shot, onClick, label }) => (
 );
 
 // Pages where nobody's settled in yet: the offer waits until they're past them
-const NOT_YET = ['/login', '/register', '/forgot-password', '/reset-password'];
+const NOT_YET = ['/login', '/register', '/forgot-password'];
 
 /**
  * At start-up: a quote, then the guide on offer and a tip side by side, each with its own "every start" tickbox.

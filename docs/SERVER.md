@@ -10,7 +10,7 @@ A local install (an analyst's own machine, the lab) is unchanged. Everything her
 |---|---|---|
 | Network | Every service's port published | Caddy only: 443 (and 80 for redirects and ACME); Splunk, Kibana and the Navigator on 7755, 5601 and 5602 through Caddy, behind the Rowanholt sign-in |
 | TLS | None | Caddy: its own CA, Let's Encrypt, or your organisation's certificate |
-| Sign-in | Optional; guest access; open sign-up | Required for every API route; no guests; admins create accounts; single sign-on (OIDC) optional |
+| Sign-in | Optional; guest access and open sign-up while published on loopback (`ROWANHOLT_BIND`) | Required for every API route; no guests; accounts by invitation; single sign-on (OIDC) optional |
 | Jobs | Everyone sees everything | Every analyst sees every case; managing a job (cancel, delete, a fresh restart) is its owner's or an admin's |
 | Disk and memory images | Wherever they are | An analyst's own folder (`/srv/evidence/<username>/`) is theirs: others see only the case output in it |
 | Smith | Every case | The cases behind jobs you can see |
@@ -27,11 +27,11 @@ Requirements: a Linux host with Docker Engine and Compose 2.24 or later, and a D
 ```bash
 git clone https://github.com/cmdaltr/rowanholt.git && cd rowanholt
 ./rowanholt install
-rowanholt server init rowanholt.dfir.example.org
-rowanholt start
+rowanholt server init rowanholt.dfir.example.org --admin you@example.org
+rowanholt start                                  # prints your one-time link as the first admin
 ```
 
-`server init` is `deploy/linux/install.sh`, at the same path as Shikari's and Ostraka's team-server installers (the Compose overrides it starts sit beside it in `deploy/server/`). It writes the server settings into `.env` (mode 600): the hostname, the certificate choice, a random `SECRET_KEY`, the first admin's password (printed once), and random Postgres, Elastic and Splunk passwords for stores that don't exist yet. It also writes `ROWANHOLT_SYMBOL_DOWNLOADS=off`: the worker doesn't fetch Volatility symbol tables or Windows PDBs for memory images. A job that needs one names the `rowanholt symbols fetch` command an administrator runs, or set it `on` (`symbols/README.md`). Run it again to change the hostname or certificate; secrets already set are kept. From then on, `rowanholt start`, `stop` and `status` use the server profile without being asked (`--server` forces it).
+`server init` is `deploy/linux/install.sh`, at the same path as Shikari's and Ostraka's team-server installers (the Compose overrides it starts sit beside it in `deploy/server/`). It writes the server settings into `.env` (mode 600): the hostname, the certificate choice, a random `SECRET_KEY`, the first admin's email (`--admin`), and random Postgres, Elastic and Splunk passwords for stores that don't exist yet. It also writes `ROWANHOLT_SYMBOL_DOWNLOADS=off`: the worker doesn't fetch Volatility symbol tables or Windows PDBs for memory images. A job that needs one names the `rowanholt symbols fetch` command an administrator runs, or set it `on` (`symbols/README.md`). Run it again to change the hostname or certificate; secrets already set are kept. From then on, `rowanholt start`, `stop` and `status` use the server profile without being asked (`--server` forces it).
 
 With Splunk, Elastic and the Navigator:
 
@@ -39,7 +39,7 @@ With Splunk, Elastic and the Navigator:
 COMPOSE_PROFILES=siem rowanholt start
 ```
 
-Sign in at `https://rowanholt.dfir.example.org` as `admin` with the printed password, and change it under Account.
+Open the printed link (`https://rowanholt.dfir.example.org/accept-invite#…`): choose your username and password, set up an authenticator and save the backup codes, and you're signed in as the first admin ([The first admin](#the-first-admin)). Then invite everyone else.
 
 ### Removing a server
 
@@ -108,7 +108,7 @@ git clone https://github.com/cmdaltr/rowanholt.git; cd rowanholt
     -CertificateThumbprint 3F2A... -EvidencePath D:\Evidence -WslPath E:\Rowanholt\wsl
 ```
 
-Windows Server 2022 needs its cumulative updates first: WSL comes from Microsoft's MSI, which refuses the release build (20348.587, `WSL_E_OS_NOT_SUPPORTED`). It turns WSL 2 on (the first run may stop and ask for a reboot: run it again afterwards), imports Ubuntu 24.04's WSL image (SHA-256 checked) as a distribution named `Rowanholt` with its disk under `-WslPath`, installs Docker Engine from Docker's repository under systemd, clones Rowanholt into `/opt/rowanholt` inside it, and runs the same `rowanholt server init` as on Linux. The first admin's password is printed then, as on Linux.
+Windows Server 2022 needs its cumulative updates first: WSL comes from Microsoft's MSI, which refuses the release build (20348.587, `WSL_E_OS_NOT_SUPPORTED`). It turns WSL 2 on (the first run may stop and ask for a reboot: run it again afterwards), imports Ubuntu 24.04's WSL image (SHA-256 checked) as a distribution named `Rowanholt` with its disk under `-WslPath`, installs Docker Engine from Docker's repository under systemd, clones Rowanholt into `/opt/rowanholt` inside it, and runs the same `rowanholt server init` as on Linux. `-AdminEmail` names the first admin (`--admin`); once it's up, `wsl -d Rowanholt -u root -- /opt/rowanholt/rowanholt server users first-admin <email>` prints their link.
 
 | Parameter | |
 |---|---|
@@ -162,24 +162,45 @@ rowanholt server users invite bob@example.org --role admin --name "Bob Smith"
 rowanholt server users invitations                             # pending ones
 rowanholt server users revoke-invitation <id>
 rowanholt server users role alice admin
-rowanholt server users disable bob
+rowanholt server users disable bob                             # his sessions end and his API tokens are revoked
 rowanholt server users mfa-reset alice                         # lost her phone and backup codes
 rowanholt server users reset-access alice                      # a link to a new password and authenticator (a locked-out admin too)
 ```
 
-These work inside the backend container, so they work when nobody can sign in. Admins can do the same through the API (`/api/auth/users`). Passwords on a server need at least 12 characters, and repeated failures lock the username (`max_login_attempts`, `lockout_duration_minutes`; see below).
+These work inside the backend container, so they work when nobody can sign in. Admins can do the same through the API (`/api/auth/users`). The commands and the API take the same lock on `users.json` and `invitations.json` while they read and write them. Every link they print points at `ROWANHOLT_PUBLIC_URL` (`server init` sets it); without it the CLI prints this machine's address and a warning, and the API uses the address the request came to. Passwords on a server need at least 12 characters, and repeated failures lock the username (`max_login_attempts`, `lockout_duration_minutes`; see below).
 
 ### Inviting people
 
-Accounts on a server are made by invitation, so nobody chooses another person's password: `users add` and `POST /api/auth/users` are refused there, and so are `users password` and a `password` in `PATCH /api/auth/users/{id}` (give a [reset link](#resetting-someones-access) instead). A local stack, with its one analyst, keeps `add` and `password`. `invite` (or `POST /api/auth/users/invitations` from an admin) prints a one-time link, `<ROWANHOLT_PUBLIC_URL>/accept-invite#<token>`, for an email and a role (`user` unless `--role admin`). Pass it on by a channel you trust; it works once, for 24 hours, and a newer invitation for the same email replaces an older one. Opening it, they choose a username (the email's first part is suggested), their name and a password, set up an authenticator, which is required whatever `ROWANHOLT_REQUIRE_MFA` says, and only once a code from it is right is the account made, with the role it was invited as. They see ten backup codes, once, and are signed in. An email that already has an account is refused: give that person a [reset link](#resetting-someones-access) instead. Each pending invitation holds one of the licence's places, so inviting past the seats is refused at once, and the places are checked again when it's accepted. Pending invitations are kept in `invitations.json` beside `users.json`; `invitations` lists them and `revoke-invitation` withdraws one. Making, withdrawing and accepting are in the audit log (`invitation_created`, `invitation_revoked`, `account_created`).
+Accounts on a server are made by invitation, so nobody chooses another person's password: `POST /api/auth/users` and a `password` in `PATCH /api/auth/users/{id}` are refused, on a server and a local stack alike (give a [reset link](#resetting-someones-access) instead), and the `add` and `password` commands are gone. `invite` (or `POST /api/auth/users/invitations` from an admin) prints a one-time link, `<ROWANHOLT_PUBLIC_URL>/accept-invite#<token>`, for an email and a role (`user` unless `--role admin`). Pass it on by a channel you trust; it works once, for 24 hours, and a newer invitation for the same email replaces an older one. Opening it, they choose a username (the email's first part is suggested), their name and a password, set up an authenticator, which is required whatever `ROWANHOLT_REQUIRE_MFA` says, and only once a code from it is right is the account made, with the role it was invited as. They see ten backup codes, once, and are signed in. Opening the link again shows the same authenticator. Each wrong code is audited (`invitation_wrong_code`), and the fifth closes the invitation (`invitation_closed`): issue a new one. An invitation is refused at the end if the admin who made it has since been disabled or is no longer an admin; those from the CLI have no inviter to check. An email that already has an account is refused: give that person a [reset link](#resetting-someones-access) instead. Each pending invitation holds one of the licence's places, so inviting past the seats is refused at once, and the places are checked again when it's accepted. Pending invitations are kept in `invitations.json` beside `users.json`; `invitations` lists them and `revoke-invitation` withdraws one. Making, withdrawing (or replacing) and accepting are in the audit log (`invitation_created`, `invitation_revoked`, `account_created`).
 
-The first admin is still `admin`, with `ROWANHOLT_ADMIN_PASSWORD` from `.env` (`server init` makes one and shows it once). To have your own account with MFA instead, sign in as `admin`, invite yourself with `--role admin`, accept it, and then `rowanholt server users disable admin`.
+### The first admin
+
+A server has no seeded account and no default password. Its first admin comes from a one-time invitation, as in Ostraka and Shikari: `rowanholt server users first-admin <email>` prints an admin's link (24 hours), where they choose a username and password and set up an authenticator, and the account exists only once a code from it is right. Only the newest such link works, and it needs no free licence place while no admin can sign in, so there is always a way back in. Once an active admin exists it's refused (exit 5) unless `--force`; from then on admins invite everyone else. `server init --admin <email>` records the person (`ROWANHOLT_FIRST_ADMIN` in `.env`), and while there's no admin, `rowanholt start` prints their link (each start makes a new one). The link is printed, never logged: it's the way in. `rowanholt server users has-admin` says whether there is one. Without `ROWANHOLT_PUBLIC_URL` the link is this machine's, and the command and `rowanholt start` warn on stderr.
+
+Servers set up before 19 November 2026 have `ROWANHOLT_ADMIN_PASSWORD` in `.env`, which made `admin` on the first sign-in. Nothing reads it now: `rowanholt start` says so, and `server init` again removes it. An existing `admin` account is unchanged, so if it still has that password, change it, or invite yourself with `--role admin` and disable `admin`.
 
 ### Resetting someone's access
 
-When someone has lost their password, their authenticator or their backup codes, `reset-access` (or `POST /api/auth/users/{id}/reset-access` from an admin) prints a one-time link, `<ROWANHOLT_PUBLIC_URL>/reset-access#<token>`. It ends their sessions and revokes their API tokens at once, and a new link replaces an earlier one. Pass it on by a channel you trust; it works once, for 24 hours. Opening it, they choose a new password and set up a new authenticator, which is required whatever `ROWANHOLT_REQUIRE_MFA` says, then see ten new backup codes, once, and are signed in. The old backup codes stop working. Until they finish, their old password and authenticator still work. Single sign-on accounts have no password here to reset: their identity provider handles recovery. Issuing and finishing are in the audit log (`access_reset_issued`, `access_reset_completed`).
+When someone has lost their password, their authenticator or their backup codes, `reset-access` (or `POST /api/auth/users/{id}/reset-access` from an admin) prints a one-time link, `<ROWANHOLT_PUBLIC_URL>/reset-access#<token>`. It ends their sessions and revokes their API tokens at once, and a new link replaces an earlier one. Pass it on by a channel you trust; it works once, for 24 hours, and says it has expired for a day after that. Opening it, they choose a new password and set up a new authenticator (opening it again shows the same one), which is required whatever `ROWANHOLT_REQUIRE_MFA` says, then see ten new backup codes, once, and are signed in; their sessions end and API tokens are revoked again. The old backup codes stop working. Until they finish, their old password and authenticator still work. Wrong codes count towards the account's sign-in lockout, at the link and at sign-in alike. Single sign-on accounts have no password here to reset: their identity provider handles recovery. Issuing, wrong codes and finishing are in the audit log (`access_reset_issued` with `via`, `access_reset_failed`, `access_reset_completed`). It works the same on a local stack.
 
-`password` and `mfa-reset` are still there for a password alone or MFA alone, done for them rather than by them.
+With [email](#email) set up, people ask for the link themselves from Forgot password on the sign-in page: the same link and page, emailed to the account's address (`via: self-service`). Asking ends nothing, since anyone can ask; finishing does. It never replaces an admin's link that's still open.
+
+`mfa-reset` is still there for MFA alone, done for them rather than by them. Nobody sets another person's password.
+
+### Email
+
+Rowanholt sends one email: the reset link someone asks for from Forgot password. Set these in `.env` and `rowanholt start` again:
+
+```
+ROWANHOLT_SMTP_HOST=smtp.example.org
+ROWANHOLT_SMTP_PORT=587
+ROWANHOLT_SMTP_USERNAME=rowanholt
+ROWANHOLT_SMTP_PASSWORD=…
+ROWANHOLT_SMTP_FROM=rowanholt@example.org
+ROWANHOLT_SMTP_STARTTLS=true
+```
+
+Nothing is sent without `ROWANHOLT_SMTP_HOST`, `ROWANHOLT_SMTP_FROM` and `ROWANHOLT_PUBLIC_URL`, and Forgot password then says to ask an administrator. The emailed link is always at the public URL, never the address a request came to: whoever asks chooses that, and could otherwise have the victim emailed a real token pointing at them. STARTTLS is on unless set to `false`; port 465 is TLS from the start. The username and password are optional (a relay that takes the server's address). The answer to a request is the same whether or not an account matched, the email goes after it, and requests are limited to 3 an hour for one address and 10 an hour from one client address. A send that fails is in the backend's log. The same settings work on a local stack, with `ROWANHOLT_PUBLIC_URL` set to its address.
 
 ### Multi-factor authentication
 
@@ -273,7 +294,7 @@ docker restart rowanholt-backend
 
 ## How sign-in lockouts work
 
-Failed password sign-ins are counted in Redis, so restarts don't reset them. The address is the browser's, as Caddy reports it in `X-Forwarded-For`. The backend believes that header only from Caddy's fixed address on a network of their own (`rowanholt-edge`, `10.213.47.0/29`, Caddy at `10.213.47.2`, everything else from `10.213.47.4/30`), so nothing else on the compose network can claim a fresh address. Through a Tailscale Service name, requests reach Caddy from Docker's gateway on that network, carrying the browser's tailnet address in an `X-Forwarded-For` that Tailscale Serve sets (replacing any the browser sent); Caddy believes it on the Service's listener only, from `rowanholt-edge`, so each browser keeps a count of its own there too. If that range is taken on the host, set `ROWANHOLT_EDGE_SUBNET`, `ROWANHOLT_EDGE_RANGE` and `ROWANHOLT_EDGE_PROXY` in `.env`. Five failures from one address lock that username for 15 minutes from that address only: someone guessing at a colleague's account locks themselves out, not the colleague. Fifty failures across all addresses lock the username everywhere, to catch guessing spread over many machines. If Redis is down, the counts are held in the backend process until it's back. A wrong MFA code (at sign-in, or on the Account page) counts as a failure, and for an account with MFA a right password doesn't clear the count: only a right code does.
+Failed password sign-ins are counted in Redis, so restarts don't reset them. The address is the browser's, as Caddy reports it in `X-Forwarded-For`. The backend believes that header only from Caddy's fixed address on a network of their own (`rowanholt-edge`, `10.213.47.0/29`, Caddy at `10.213.47.2`, everything else from `10.213.47.4/30`), so nothing else on the compose network can claim a fresh address. Through a Tailscale Service name, requests reach Caddy from Docker's gateway on that network, carrying the browser's tailnet address in an `X-Forwarded-For` that Tailscale Serve sets (replacing any the browser sent); Caddy believes it on the Service's listener only, from `rowanholt-edge`, so each browser keeps a count of its own there too. If that range is taken on the host, set `ROWANHOLT_EDGE_SUBNET`, `ROWANHOLT_EDGE_RANGE` and `ROWANHOLT_EDGE_PROXY` in `.env`. Five failures from one address lock that username for 15 minutes from that address only: someone guessing at a colleague's account locks themselves out, not the colleague. Fifty failures across all addresses lock the username everywhere, to catch guessing spread over many machines. If Redis is down, the counts are held in the backend process until it's back. A wrong MFA code (at sign-in, on the Account page, or at a reset link) counts as a failure, and for an account with MFA a right password doesn't clear the count: only a right code does. The failure that locks a username is in the audit log (`account_locked`, with where it happened). Wrong codes on an invitation don't count here: five close the invitation instead.
 
 ## The schema
 

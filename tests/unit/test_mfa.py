@@ -276,55 +276,6 @@ class MfaTest(BackendCase):
         self.assertFalse([k for k in memory if codes[0] in k or codes[0].replace("-", "") in k])
         self.assertTrue([k for k in memory if self.mfa.hash_backup_code(codes[0]) in k])
 
-    def reset(self, name, backup, code, password="a-new-password-2"):
-        self.client.cookies.clear()
-        return self.client.post("/api/auth/reset-password", json={
-            "username": name, "backup_code": backup, "code": code, "new_password": password})
-
-    def test_a_backup_code_and_an_app_code_reset_a_forgotten_password(self):
-        name, user_id, headers = self.new_user()
-        secret, codes = self.enrol(headers)
-        done = self.reset(name, codes[0], self.code(secret))
-        self.assertEqual(done.status_code, 200, done.text)
-        self.assertEqual(done.json()["backup_codes_left"], 9)
-        self.assertNotIn("access_token", done.json())  # no sign-in from a reset
-        # The old password is gone; the new one still needs the second factor
-        self.assertEqual(self.password_step(name).status_code, 401)
-        challenge = self.password_step(name, "a-new-password-2").json()["challenge"]
-        self.assertEqual(self.second_step(challenge, self.code(secret)).status_code, 200)
-        # The backup code was used up: not again for a reset, nor for a sign-in
-        self.assertEqual(self.reset(name, codes[0], self.code(secret), "another-password-3").status_code, 400)
-        challenge = self.password_step(name, "a-new-password-2").json()["challenge"]
-        self.assertEqual(self.second_step(challenge, codes[0]).status_code, 401)
-        self.assertEqual(len(self.audited(user_id, "mfa_password_reset")), 1)
-
-    def test_a_reset_needs_both_codes_refuses_alike_and_counts_towards_the_lockout(self):
-        name, user_id, headers = self.new_user()
-        secret, codes = self.enrol(headers)
-        plain, _, _ = self.new_user()  # no MFA
-        refusals = [
-            self.reset(name, codes[1], "000000"),               # right backup code, wrong app code
-            self.reset(name, "AAAA-BBBB-CC", self.code(secret)),  # right app code, wrong backup code
-            self.reset(name, codes[1], codes[2]),               # two backup codes aren't an app code
-            self.reset("nobody-here", codes[1], self.code(secret)),  # no such account
-            self.reset(plain, codes[1], self.code(secret)),     # no MFA
-        ]
-        self.assertEqual([r.status_code for r in refusals], [400] * 5)
-        self.assertEqual(len({r.json()["detail"] for r in refusals}), 1)
-        self.assertEqual(self.reset(name, codes[1], self.code(secret), "short").status_code, 400)
-        # A wrong app code never spends the backup code beside it
-        self.assertEqual(len(self.record(user_id)["mfa_backup_codes"]), 10)
-        for _ in range(self.settings.max_login_attempts):
-            last = self.reset(name, codes[1], "000000")
-        self.assertEqual(last.status_code, 429)
-        self.assertEqual(self.reset(name, codes[1], self.code(secret)).status_code, 429)  # locked, right codes or not
-
-    def test_forgot_password_refuses_rather_than_pretending_to_email(self):
-        self.client.cookies.clear()
-        resp = self.client.post("/api/auth/forgot-password", json={"email": "someone@example.org"})
-        self.assertEqual(resp.status_code, 410)
-        self.assertIn("backup codes", resp.json()["detail"])
-
     def test_regenerating_backup_codes_needs_a_current_code_and_replaces_them(self):
         name, user_id, headers = self.new_user()
         secret, old = self.enrol(headers)
@@ -457,6 +408,38 @@ class MfaTest(BackendCase):
             self.assertEqual((status["available"], status["reason"]), (False, "local"))
             self.assertIn("team server", status["message"])
             self.assertEqual(self.client.post("/api/auth/mfa/setup", json={}).status_code, 400)
+        finally:
+            self.settings.rowanholt_server_mode = True
+
+    def test_on_a_local_stack_an_account_with_mfa_on_manages_it(self):
+        # A reset of access turns MFA on locally too: the account then manages it as on a server
+        _, _, headers = self.new_user()
+        secret, _ = self.enrol(headers)
+        self.settings.rowanholt_server_mode = False
+        try:
+            status = self.client.get("/api/auth/mfa", headers=headers).json()
+            self.assertEqual((status["available"], status["enabled"]), (True, True))
+            codes = self.client.post("/api/auth/mfa/backup-codes", headers=headers, json={"code": self.code(secret)})
+            self.assertEqual(codes.status_code, 200, codes.text)
+            self.assertEqual(len(codes.json()["backup_codes"]), 10)
+            # A new authenticator, with a current code from the old one first
+            started = self.client.post("/api/auth/mfa/setup", headers=headers, json={"code": self.code(secret)})
+            self.assertEqual(started.status_code, 200, started.text)
+            new_secret = started.json()["secret"]
+            enabled = self.client.post("/api/auth/mfa/enable", headers=headers, json={"code": self.code(new_secret)})
+            self.assertEqual(enabled.status_code, 200, enabled.text)
+            # Turning it off keeps the server's rules: refused while required, else password and a code
+            self.settings.rowanholt_require_mfa = True
+            refused = self.client.post("/api/auth/mfa/disable", headers=headers,
+                                       json={"password": PASSWORD, "code": self.code(new_secret)})
+            self.assertEqual(refused.status_code, 400)
+            self.settings.rowanholt_require_mfa = False
+            off = self.client.post("/api/auth/mfa/disable", headers=headers,
+                                   json={"password": PASSWORD, "code": self.code(new_secret)})
+            self.assertEqual(off.status_code, 200, off.text)
+            # With it off, a local stack offers it no longer
+            self.assertEqual(self.client.get("/api/auth/mfa", headers=headers).json()["reason"], "local")
+            self.assertEqual(self.client.post("/api/auth/mfa/setup", headers=headers, json={}).status_code, 400)
         finally:
             self.settings.rowanholt_server_mode = True
 

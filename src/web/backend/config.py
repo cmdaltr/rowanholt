@@ -74,7 +74,8 @@ class Settings(BaseSettings):
 
     # Default Admin
     default_admin_email: str = "admin@rowanholt.app"
-    default_admin_password: str = "IWasThere3000YearsAgo!"
+    # Seeded only on a local stack bound to loopback (auth/users.init_default_admin); a server seeds none
+    default_admin_password: str = "3000YearsAgo"
 
     # Guest Mode
     guest_session_timeout: int = 3600  # 1 hour
@@ -86,10 +87,14 @@ class Settings(BaseSettings):
     # Server mode (ROWANHOLT_SERVER_MODE, set by deploy/server): one Rowanholt shared by a
     # team. Every API route outside sign-in needs a user, each job is visible to its owner,
     # the people it's shared with and admins, sign-up and guest access are off, and the
-    # first admin's password comes from ROWANHOLT_ADMIN_PASSWORD. Off (the default), the
-    # API stays open to whoever reaches it, as on an analyst's own machine.
+    # first admin comes from a one-time invitation (rowanholt server users first-admin). Off
+    # (the default), the API stays open to whoever reaches it, as on an analyst's own machine.
     rowanholt_server_mode: bool = False
+    # Read only to say it's ignored: servers seeded an admin from it until 19 November 2026
     rowanholt_admin_password: str = ""
+    # Where a local stack publishes its ports (docker-compose.yml): loopback unless changed, and the
+    # default admin is seeded only then
+    rowanholt_bind: str = "127.0.0.1"
     # The URL people open, e.g. https://rowanholt.example.org (CORS, cookies, OIDC redirects)
     rowanholt_public_url: str = ""
     # Other addresses the same server answers on, separated by commas: allowed origins too
@@ -101,6 +106,15 @@ class Settings(BaseSettings):
     # More places evidence may be read from and written to, separated by commas, as the
     # containers see them (a server's evidence share mounted at /srv/evidence, say)
     rowanholt_evidence_paths: str = ""
+
+    # Email, for the reset-access link someone asks for from Forgot password (mailer.py): sent only
+    # when a host and a From address are set. STARTTLS unless turned off; port 465 is TLS from the start
+    rowanholt_smtp_host: str = ""
+    rowanholt_smtp_port: int = 587
+    rowanholt_smtp_username: str = ""
+    rowanholt_smtp_password: str = ""
+    rowanholt_smtp_from: str = ""
+    rowanholt_smtp_starttls: bool = True
 
     # Password sign-in alongside single sign-on; turn off to make the IdP the only way in
     rowanholt_local_login: bool = True

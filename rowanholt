@@ -172,6 +172,7 @@ print_urls() {
         echo ""
         echo "  Users: 'rowanholt server users list'. Nothing else is published."
         echo ""
+        offer_first_admin
         return
     fi
     if $TESTING; then
@@ -188,7 +189,50 @@ print_urls() {
         echo "  Navigator:     http://localhost:5602"
     fi
     echo ""
-    echo "  Sign in:       admin, with DEFAULT_ADMIN_PASSWORD from .env (else default_admin_password in src/web/backend/config.py)"
+    echo "  Sign in:       optional on your own machine; the account is admin / 3000YearsAgo (change it under"
+    echo "                 Account). Made only while the stack is this machine's alone (ROWANHOLT_BIND)"
+    echo ""
+}
+
+# A server has no seeded account: while it has no admin, the first admin's one-time invitation
+# link (rowanholt server users first-admin; server init --admin names them), printed here rather
+# than logged, since the link is the way in. Each start makes a new one, and only the newest works
+offer_first_admin() {
+    local email link status tries
+    if grep -q '^ROWANHOLT_ADMIN_PASSWORD=' "$ROOT/.env" 2>/dev/null; then
+        echo "  ROWANHOLT_ADMIN_PASSWORD in .env is ignored: a server's first admin comes from an invitation."
+        echo "  'rowanholt server init' again removes it; accounts already made are unchanged."
+        echo ""
+    fi
+    email="$(sed -n 's/^ROWANHOLT_FIRST_ADMIN=//p' "$ROOT/.env" | tail -1)"
+    # The backend takes a moment to start answering exec; first-admin exits 5 when there's an admin
+    for tries in $(seq 1 30); do
+        if [ -n "$email" ]; then
+            link="$(compose_cmd exec -T backend python -m auth.manage_users first-admin --link-only "$email" 2>/dev/null)"
+        else
+            link="$(compose_cmd exec -T backend python -m auth.manage_users has-admin 2>/dev/null)"
+        fi
+        status=$?
+        [ "$status" -eq 0 ] || [ "$status" -eq 5 ] && break
+        sleep 2
+    done
+    if [ "$status" -eq 5 ] || [ "$link" = true ]; then
+        return 0
+    elif [ "$status" -ne 0 ]; then
+        echo "  No admin yet. Once the backend is up: rowanholt server users first-admin ${email:-you@example.org}"
+    elif [ -z "$email" ]; then
+        echo "  No admin yet: rowanholt server users first-admin you@example.org prints the first admin's link."
+    else
+        echo "  First admin ($email): open within 24 hours to make the account (only the newest link works):"
+        echo ""
+        echo "    $link"
+        # The backend falls back to this machine's address when it has no public URL
+        case "$link" in
+            http://localhost*|https://localhost*)
+                echo "  Warning: ROWANHOLT_PUBLIC_URL isn't set, so this link is for this machine: set it in .env" \
+                    "to the address people open (rowanholt server init does)." >&2 ;;
+        esac
+    fi
     echo ""
 }
 

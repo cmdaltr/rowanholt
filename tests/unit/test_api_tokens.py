@@ -8,6 +8,7 @@ Run from tests/unit: python3 -m unittest test_api_tokens.py
 import sys
 import unittest
 from datetime import datetime, timedelta
+from unittest import mock
 
 from test_server_access import BackendCase, TestClient
 
@@ -78,6 +79,32 @@ class ApiTokenTest(BackendCase):
             self.assertEqual(self.client.get("/api/auth/me", headers=bearer(made["token"])).status_code, 401)
         finally:
             self.client.patch(f"/api/auth/users/{carol_id}", headers=self.admin, json={"is_active": True})
+
+    def test_deactivating_ends_sessions_and_revokes_tokens_for_good(self):
+        # Re-enabling the account mustn't bring back what the deactivation stopped
+        seats = mock.patch.object(sys.modules["licence"], "seat_refusal", return_value=None)
+        seats.start()
+        self.addCleanup(seats.stop)
+        self.make_user("deactivated-dee", "deactivated-dee-pw1")
+        dee = self.login("deactivated-dee", "deactivated-dee-pw1")
+        made = self.make(dee)
+        dee_id = self.client.get("/api/auth/me", headers=dee).json()["id"]
+        self.assertEqual(self.client.patch(f"/api/auth/users/{dee_id}", headers=self.admin,
+                                           json={"is_active": False}).status_code, 200)
+        self.assertEqual(self.client.patch(f"/api/auth/users/{dee_id}", headers=self.admin,
+                                           json={"is_active": True}).status_code, 200)
+        self.assertEqual(self.client.get("/api/auth/me", headers=bearer(made["token"])).status_code, 401)
+        self.assertEqual(self.client.get("/api/auth/me", headers=dee).status_code, 401)
+        storage = sys.modules["auth.access"]._storage
+        [row] = [r for r in storage.audit_records(resource_id=dee_id) if r["action"] == "account_deactivated"]
+        self.assertEqual((row["username"], row["details"]["tokens_revoked"]), ("admin", 1))
+        # The CLI's disable does the same
+        again = self.make(self.login("deactivated-dee", "deactivated-dee-pw1"))
+        from auth import manage_users
+        with mock.patch.object(manage_users, "_audit_storage", lambda: storage), mock.patch("builtins.print"):
+            self.assertEqual(manage_users.main(["disable", "deactivated-dee"]), 0)
+            self.assertEqual(manage_users.main(["enable", "deactivated-dee"]), 0)
+        self.assertEqual(self.client.get("/api/auth/me", headers=bearer(again["token"])).status_code, 401)
 
     def test_tokens_are_managed_from_a_sign_in(self):
         token = bearer(self.make(self.alice)["token"])

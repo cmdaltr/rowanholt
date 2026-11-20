@@ -19,11 +19,11 @@ from jose import JWTError, jwt
 
 try:
     from ..config import settings
-    from .users import load_users, new_user, save_users
+    from .users import load_users, locked, new_user, save_users
     from .. import licence
 except ImportError:
     from config import settings
-    from auth.users import load_users, new_user, save_users
+    from auth.users import load_users, locked, new_user, save_users
     import licence
 
 CACHE_SECONDS = 3600
@@ -162,6 +162,11 @@ def user_for(claims: dict) -> dict:
             and settings.oidc_admin_group not in groups:
         raise SignInRefused("Your account isn't in the group allowed to use Rowanholt")
     subject = f"{claims['iss']}|{claims['sub']}"
+    with locked():
+        return _sign_in(claims, groups, subject)
+
+
+def _sign_in(claims: dict, groups: list, subject: str) -> dict:
     users = load_users()
     user = next((u for u in users.values() if u.get("oidc_subject") == subject), None)
     if user is None:

@@ -3,15 +3,30 @@ User Store
 
 Users live in a JSON file (USERS_FILE) beside the backend's data, keyed by user ID.
 Password users carry a bcrypt hash; single sign-on users carry their IdP subject instead.
+
+The API and `rowanholt server users` (another process, in the same container) both write the users
+and the invitations beside them, so anything that reads one of those files, decides, and writes it
+back does so inside `locked()`: two completions of one link can't both pass the check.
 """
 
+import ipaddress
 import json
+import logging
 import os
 import re
+import threading
 import time
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Optional
+
+try:
+    import fcntl
+except ImportError:  # Windows: the backend runs in Linux containers, but the CLI's tests may not
+    fcntl = None
+    import msvcrt
 
 try:
     from ..config import settings
@@ -20,12 +35,14 @@ except ImportError:
     from config import settings
     from auth.security import hash_password
 
+logger = logging.getLogger(__name__)
+
 USERS_FILE = os.environ.get("USERS_FILE", "/app/data/users.json")
 USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9._@-]{2,64}$")
+DEFAULT_ADMIN = "admin"
 
-
-class AdminPasswordMissing(RuntimeError):
-    """Server mode with no users yet and no ROWANHOLT_ADMIN_PASSWORD to create the first admin."""
+NO_ACCOUNTS = ("This server has no accounts yet: make the first admin with "
+               "rowanholt server users first-admin <email>, which prints a one-time link")
 
 
 def ensure_data_dir() -> None:
@@ -33,6 +50,58 @@ def ensure_data_dir() -> None:
     data_dir = os.path.dirname(USERS_FILE)
     if data_dir and not os.path.exists(data_dir):
         os.makedirs(data_dir, exist_ok=True)
+
+
+_held = threading.local()
+_in_process = threading.RLock()
+
+
+@contextmanager
+def locked() -> Iterator[None]:
+    """An exclusive lock on the user store and the invitations beside it, shared by every process that
+    writes them (a lock file beside USERS_FILE). Re-entrant in one thread, so a caller already holding it
+    can call code that takes it again."""
+    if getattr(_held, "depth", 0):
+        _held.depth += 1
+        try:
+            yield
+        finally:
+            _held.depth -= 1
+        return
+    with _in_process:
+        ensure_data_dir()
+        fd = os.open(f"{USERS_FILE}.lock", os.O_RDWR | os.O_CREAT, 0o600)
+        try:
+            _lock(fd)
+            _held.depth = 1
+            try:
+                yield
+            finally:
+                _held.depth = 0
+                _unlock(fd)
+        finally:
+            os.close(fd)
+
+
+def _lock(fd: int) -> None:
+    if fcntl is not None:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        return
+    os.lseek(fd, 0, os.SEEK_SET)
+    while True:  # msvcrt gives up after ten seconds; keep waiting, as flock does
+        try:
+            msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+            return
+        except OSError:
+            continue
+
+
+def _unlock(fd: int) -> None:
+    if fcntl is not None:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+    else:
+        os.lseek(fd, 0, os.SEEK_SET)
+        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
 
 
 def load_users() -> dict:
@@ -61,7 +130,26 @@ def set_password(record: dict, password: str) -> None:
     """A new password, and an end to every session signed in before it: whoever had the old one
     (the reason for a reset, often) is signed out too. auth.access refuses tokens issued earlier."""
     record["hashed_password"] = hash_password(password)
+    end_sessions(record)
+
+
+def end_sessions(record: dict) -> None:
+    """Every session signed in until now ends: auth.access refuses tokens issued before sessions_after."""
     record["sessions_after"] = round(time.time(), 3)
+
+
+def deactivate(record: dict, actor: dict | None, ip: str | None = None, storage=None, **details) -> None:
+    """Disable an account: its sessions end and its API tokens are revoked, so re-enabling it later
+    doesn't bring either back. Audited. The caller saves the users."""
+    try:
+        from . import access, mfa
+    except ImportError:
+        from auth import access, mfa
+    storage = storage if storage is not None else access._storage
+    record["is_active"] = False
+    end_sessions(record)
+    revoked = storage.revoke_user_tokens(record["id"]) if storage is not None else None
+    mfa.audit("account_deactivated", actor, record, ip, storage=storage, tokens_revoked=revoked, **details)
 
 
 def new_user(username: str, email: str, role: str = "user", password: Optional[str] = None,
@@ -85,26 +173,63 @@ def new_user(username: str, email: str, role: str = "user", password: Optional[s
     }
 
 
-def init_default_admin() -> dict:
-    """Create the first admin if there are no users, and return the users.
+def loopback_only(bind: str) -> bool:
+    """Whether the stack's ports are published on this machine only (ROWANHOLT_BIND)."""
+    host = (bind or "").strip().strip("[]")
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
 
-    Locally that admin has the built-in password. A server takes it from
-    ROWANHOLT_ADMIN_PASSWORD and refuses to create one without it, since the
-    built-in password is public.
+
+def init_default_admin() -> dict:
+    """The users, after making the default admin on a local stack whose store is empty.
+
+    A local stack (an analyst's own machine, or the desktop app) seeds `admin` with the published
+    password (settings.default_admin_password), and only while its ports are this machine's alone
+    (ROWANHOLT_BIND on loopback): a known password mustn't be reachable from the network. A team
+    server seeds nothing: its first admin comes from an invitation (`rowanholt server users
+    first-admin <email>`, auth/invitations.py), and an old .env's ROWANHOLT_ADMIN_PASSWORD is ignored.
     """
     users = load_users()
     if users:
         return users
+    with locked():
+        return _seed_default_admin()
+
+
+def _seed_default_admin() -> dict:
+    users = load_users()  # again, under the lock: another process may have seeded it meanwhile
+    if users:
+        return users
     if settings.rowanholt_server_mode:
-        if not settings.rowanholt_admin_password:
-            raise AdminPasswordMissing("Set ROWANHOLT_ADMIN_PASSWORD (rowanholt server init does) to create the first admin")
-        password = settings.rowanholt_admin_password
-    else:
-        password = settings.default_admin_password
-    admin = new_user("admin", settings.default_admin_email, role="admin", password=password, full_name="Administrator")
+        if settings.rowanholt_admin_password:
+            logger.warning("ROWANHOLT_ADMIN_PASSWORD is set but ignored: a server's first admin comes from "
+                           "rowanholt server users first-admin <email>. Remove it from .env")
+        return users
+    if not loopback_only(settings.rowanholt_bind):
+        logger.warning("No default admin made: Rowanholt is published beyond this machine (ROWANHOLT_BIND=%s), "
+                       "where a known password would be anyone's. Run it as a team server (rowanholt server "
+                       "init), whose first admin comes from rowanholt server users first-admin <email>",
+                       settings.rowanholt_bind)
+        return users
+    admin = new_user(DEFAULT_ADMIN, settings.default_admin_email, role="admin",
+                     password=settings.default_admin_password, full_name="Administrator")
     users[admin["id"]] = admin
     save_users(users)
+    try:
+        from . import mfa
+    except ImportError:
+        from auth import mfa
+    mfa.audit("default_admin_seeded", None, admin, role="admin", bind=settings.rowanholt_bind)
     return users
+
+
+def active_admin(users: dict) -> bool:
+    """Whether any admin can sign in."""
+    return any(u.get("role") == "admin" and u.get("is_active", True) for u in users.values())
 
 
 def find_user(users: dict, name: str) -> Optional[dict]:

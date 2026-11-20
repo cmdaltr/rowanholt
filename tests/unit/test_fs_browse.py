@@ -2,20 +2,15 @@
 as job paths do: a string prefix let /tmp/rowanholtX through as inside /tmp/rowanholt.
 
 Driven through the real app in server mode (test_server_access.BackendCase, whose allowed folder is
-its `evidence`). Also auth/security_utils.sanitize_path, the other prefix comparison.
+its `evidence`).
 
 Run: python3 -m unittest tests/unit/test_fs_browse.py
 """
 
-import importlib
-import sys
 import unittest
-from pathlib import Path
 from unittest import mock
 
 from test_server_access import BackendCase, TestClient
-
-WEB = Path(__file__).resolve().parents[2] / "src" / "web"
 
 
 @unittest.skipIf(TestClient is None, "backend requirements (fastapi) not installed")
@@ -75,26 +70,6 @@ class BrowseTest(BackendCase):
         self.assertEqual(self.browse("/").status_code, 403)
         self.assertEqual(self.browse(self.outside).status_code, 403)
 
-
-class SanitizePathTest(unittest.TestCase):
-    """auth/security_utils.sanitize_path (nothing mounted calls it) compared by string prefix too."""
-
-    @classmethod
-    def setUpClass(cls):
-        try:
-            sys.path.insert(0, str(WEB))
-            cls.utils = importlib.import_module("backend.auth.security_utils")
-        except ImportError as exc:  # bleach, pyotp or cryptography missing
-            raise unittest.SkipTest(f"backend.auth.security_utils not importable: {exc}")
-        finally:
-            sys.path.remove(str(WEB))
-
-    def test_whole_folder_names_only(self):
-        sanitize = self.utils.sanitize_path
-        self.assertIsNone(sanitize("/tmp/rowanholtX/disk.E01", ["/tmp/rowanholt"]))
-        self.assertIsNone(sanitize("/tmp/rowanholt/../rowanholtX", ["/tmp/rowanholt"]))
-        self.assertEqual(sanitize("/tmp/rowanholt/case/disk.E01", ["/tmp/rowanholt"]), "/tmp/rowanholt/case/disk.E01")
-        self.assertEqual(sanitize("/tmp/rowanholt", ["/tmp/rowanholt/"]), "/tmp/rowanholt")
 
 
 if __name__ == "__main__":

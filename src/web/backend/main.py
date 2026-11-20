@@ -57,7 +57,7 @@ from models.job import (
 from storage import JobStorage
 from tasks_docker import start_analysis
 
-# Temporary replacement for security_utils (paths: output_removal.contained)
+# Paths are checked by output_removal.contained
 def sanitize_case_number(case_number: str) -> str:
     """Basic sanitization of case number."""
     return case_number.replace("/", "_").replace("\\", "_").replace("..", "")

@@ -8,6 +8,10 @@ every address catches guessing spread over many machines; reaching it locks the 
 everywhere, which costs an attacker ten times the attempts that used to lock it.
 
 Without Redis (it's down, or host-side tools) the counts are kept in this process.
+
+`failed` says when a failure is the one that locks, so the caller can audit it (account_locked): the
+throttle knows usernames and addresses, not the accounts and the audit log. `allow` is a plain rate
+limit on the same storage (Forgot password's, per address and per IP).
 """
 
 import logging
@@ -75,9 +79,9 @@ class SignInThrottle:
             return (count, left) if left > 0 else (0, 0)
         return self._call(redis_op, memory_op)
 
-    def _add(self, key: str, window: int, cap: int) -> None:
-        """One more failure. The count is forgotten `window` seconds after the first, and
-        reaching `cap` restarts the window, so a lockout always lasts the full window."""
+    def _add(self, key: str, window: int, cap: int) -> int:
+        """One more failure, and the count now. The count is forgotten `window` seconds after the
+        first, and reaching `cap` restarts the window, so a lockout always lasts the full window."""
         def redis_op(client):
             pipe = client.pipeline()
             pipe.incr(PREFIX + key)
@@ -85,12 +89,14 @@ class SignInThrottle:
             count = pipe.execute()[0]
             if count == cap:
                 client.expire(PREFIX + key, window)
+            return int(count)
 
         def memory_op():
             count, left = self._count(key)
             count += 1
             self._memory[key] = (count, time.time() + (window if count == cap or not left else left))
-        self._call(redis_op, memory_op)
+            return count
+        return self._call(redis_op, memory_op)
 
     def _clear(self, key: str) -> None:
         self._call(lambda client: client.delete(PREFIX + key), lambda: self._memory.pop(key, None))
@@ -126,13 +132,23 @@ class SignInThrottle:
                  for count, left in [self._count(key)] if count >= cap]
         return max(waits, default=0)
 
-    def failed(self, username: str, address: str) -> None:
-        """Count a failed sign-in; the lockout window starts at the first failure."""
+    def failed(self, username: str, address: str) -> bool:
+        """Count a failed sign-in; the lockout window starts at the first failure. True when this one
+        locks the username (from this address, or everywhere)."""
         window = settings.lockout_duration_minutes * 60
         limit = settings.max_login_attempts
         here, everywhere = self._keys(username, address)
-        self._add(here, window, limit)
-        self._add(everywhere, window, limit * EVERYWHERE)
+        locked_here = self._add(here, window, limit) == limit
+        locked_everywhere = self._add(everywhere, window, limit * EVERYWHERE) == limit * EVERYWHERE
+        return locked_here or locked_everywhere
+
+    def allow(self, key: str, limit: int, window: int) -> bool:
+        """Whether one more `key` is allowed: at most `limit` in `window` seconds (from the first)."""
+        rate = f"rate:{key.strip().lower()}"
+        if self._count(rate)[0] >= limit:
+            return False
+        self._add(rate, window, limit)
+        return True
 
     def succeeded(self, username: str, address: str) -> None:
         """Forget this address's failures (the username-wide count runs its course)."""

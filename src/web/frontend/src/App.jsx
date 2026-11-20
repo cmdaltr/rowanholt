@@ -156,7 +156,6 @@ function AppContent() {
               <Route path="/login/sso" element={<SsoCallback />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/reset-password" element={<Navigate to="/forgot-password" replace />} />
               <Route path="/reset-access" element={<ResetAccessPage />} />
               <Route path="/accept-invite" element={<ResetAccessPage mode="invite" />} />
               <Route path="/help" element={<HelpPage />} />

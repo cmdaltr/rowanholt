@@ -17,6 +17,11 @@ backend's user only), not in users.json: everything that reads the users (licenc
 directory, sign-in, single sign-on's matching, evidence folders named after accounts) would otherwise
 have to learn to skip them. A new invitation for an email replaces an earlier one, and expired ones
 are dropped when the file is written a day after they expired.
+
+Opening the link again shows the same authenticator. Five wrong codes close the invitation (each is
+audited), and the admin issues a new one. An invitation an admin made is refused at completion if that
+admin has since been disabled or is no longer an admin; the server's own (the CLI, first-admin) have
+no inviter to check. Callers hold users.locked() from loading the files to saving them.
 """
 
 import hmac
@@ -41,19 +46,25 @@ except ImportError:
 PATH = "/accept-invite"
 ROLES = ("admin", "user")
 EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-KEEP_EXPIRED_SECONDS = 24 * 3600
+KEEP_EXPIRED_SECONDS = reset_access.KEEP_EXPIRED_SECONDS
+MAX_WRONG_CODES = 5
 
 INVALID = "This invitation isn't valid or has been used: ask an administrator for a new one"
 EXPIRED = "This invitation has expired: ask an administrator for a new one"
 LOCAL = "Invitations are for a team server: on your own machine, Rowanholt has one analyst"
 _INVITE = "Accounts on a team server are made by invitation, so nobody else sets their password: "
 INVITE_INSTEAD = _INVITE + "rowanholt server users invite <email> (or POST /api/auth/users/invitations)"
-INVITE_INSTEAD_CLI = _INVITE + "rowanholt server users invite <email>"
+CLOSED = (f"That's {MAX_WRONG_CODES} wrong codes, so this invitation is closed: ask an administrator "
+          "for a new one")
+INVITER_GONE = ("Whoever invited you can no longer invite people to this server: ask an administrator "
+                "for a new invitation")
+ADMIN_EXISTS = ("This server already has an active admin, who invites everyone else "
+                "(rowanholt server users invite). --force makes another admin's invitation anyway")
 
 
 class InvitationRefused(ValueError):
     """An invitation that can't be made or used; the message says why, and `status` is the API's answer
-    (402 no free place, 409 an account already, 410 expired)."""
+    (402 no free place, 403 the inviter can no longer invite, 409 an account already, 410 expired)."""
 
     def __init__(self, message: str, status: int = 400):
         super().__init__(message)
@@ -114,10 +125,23 @@ def audit(action: str, actor: dict | None, invitation: dict, ip: str | None, sto
 # ── inviting ──────────────────────────────────────────────────────────────────
 
 def create(users: dict, email: str, role: str = "user", full_name: str | None = None,
-           actor: dict | None = None, ip: str | None = None, storage=None, **details) -> tuple[dict, str]:
+           actor: dict | None = None, ip: str | None = None, storage=None, first_admin: bool = False,
+           origin: str | None = None, **details) -> tuple[dict, str]:
     """Invite `email` as `role`: (the invitation, as the API lists it; the link, to pass on once).
     Refused for an email that already has an account, and when the licence has no free place (pending
-    invitations hold one each, licence.places_held)."""
+    invitations hold one each, licence.places_held).
+
+    `first_admin` is a server's first admin (`rowanholt server users first-admin`), with nobody yet to
+    invite anyone: an admin's invitation that needs no free place while no admin can sign in (there
+    must always be a way back in), and only the newest such invitation works. The caller refuses it
+    when an active admin exists, unless forced. `origin` is where the link points without
+    ROWANHOLT_PUBLIC_URL (reset_access.link)."""
+    with user_store.locked():
+        return _create(users, email, role, full_name, actor, ip, storage, first_admin, origin, **details)
+
+
+def _create(users: dict, email: str, role: str, full_name: str | None, actor: dict | None, ip: str | None,
+            storage, first_admin: bool, origin: str | None, **details) -> tuple[dict, str]:
     if not settings.rowanholt_server_mode:
         raise InvitationRefused(LOCAL)
     email = (email or "").strip().lower()
@@ -131,8 +155,12 @@ def create(users: dict, email: str, role: str = "user", full_name: str | None = 
         raise InvitationRefused(f"{email} already has an account ({existing['username']}): if they can't sign in, "
                                 f"give them a reset link (rowanholt server users reset-access {existing['username']})",
                                 409)
-    earlier = {key for key, inv in load().items() if inv["email"] == email}  # replaced, so not counted
-    refusal = licence.seat_refusal(users, settings.rowanholt_server_mode, excluding=earlier)
+    if first_admin:
+        role = "admin"
+    # Replaced, so not counted: an earlier one for this email, and for a first admin any earlier first admin's
+    earlier = {key for key, inv in load().items() if inv["email"] == email or (first_admin and inv.get("first_admin"))}
+    refusal = None if first_admin and not user_store.active_admin(users) else licence.seat_refusal(
+        users, settings.rowanholt_server_mode, excluding=earlier)
     if refusal:
         raise InvitationRefused(refusal, 402)
     token, expires = reset_access.new_token()
@@ -142,25 +170,33 @@ def create(users: dict, email: str, role: str = "user", full_name: str | None = 
         "role": role,
         "full_name": (full_name or "").strip() or None,
         "invited_by": (actor or {}).get("username") or "server",
+        # An admin's account, checked again at completion (the CLI's actor has none: the server's own)
+        **({"invited_by_id": actor["id"]} if (actor or {}).get("id") else {}),
         "created_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         "expires": expires,
         "token_hash": reset_access.token_hash(token),
+        **({"first_admin": True} if first_admin else {}),
     }
-    invitations = {key: inv for key, inv in load().items() if inv["email"] != email}  # replaces an earlier one
+    current = load()
+    invitations = {key: inv for key, inv in current.items() if key not in earlier}  # replaces earlier ones
     invitations[invitation["id"]] = invitation
     save(invitations)
-    audit("invitation_created", actor, invitation, ip, storage, **details)
-    return public(invitation), reset_access.link(PATH, token)
+    for key in earlier & current.keys():
+        audit("invitation_revoked", actor, current[key], ip, storage, reason="replaced", replaced_by=invitation["id"])
+    audit("invitation_created", actor, invitation, ip, storage, **({"first_admin": True} if first_admin else {}),
+          **details)
+    return public(invitation), reset_access.link(PATH, token, origin)
 
 
 def revoke(invitation_id: str, actor: dict | None = None, ip: str | None = None, storage=None,
            **details) -> dict | None:
     """Withdraw a pending invitation; None if there's no such invitation (or it's been used)."""
-    invitations = load()
-    invitation = invitations.pop(invitation_id, None)
-    if invitation is None:
-        return None
-    save(invitations)
+    with user_store.locked():
+        invitations = load()
+        invitation = invitations.pop(invitation_id, None)
+        if invitation is None:
+            return None
+        save(invitations)
     audit("invitation_revoked", actor, invitation, ip, storage, **details)
     return public(invitation)
 
@@ -175,7 +211,9 @@ def pending() -> list:
 # ── accepting ─────────────────────────────────────────────────────────────────
 
 def find(token: str) -> tuple[dict, dict]:
-    """(the invitations, the one a token is for); InvitationRefused if it's unknown, used or expired."""
+    """(the invitations, the one a token is for); InvitationRefused if it's unknown, used or expired
+    (410, until it's dropped a day later). An expired one loses its pending authenticator, saved here:
+    the caller holds users.locked()."""
     if not settings.rowanholt_server_mode:
         raise InvitationRefused(LOCAL)
     invitations = load()
@@ -185,6 +223,10 @@ def find(token: str) -> tuple[dict, dict]:
     if not token or invitation is None:
         raise InvitationRefused(INVALID)
     if float(invitation.get("expires") or 0) < mfa._now():
+        if float(invitation["expires"]) < mfa._now() - KEEP_EXPIRED_SECONDS:
+            raise InvitationRefused(INVALID)  # save() drops it
+        if invitation.pop("pending_secret", None) is not None:
+            save(invitations)
         raise InvitationRefused(EXPIRED, 410)
     return invitations, invitation
 
@@ -224,9 +266,11 @@ def check_username(users: dict, invitations: dict, invitation: dict, username: s
 
 def start(users: dict, invitations: dict, invitation: dict, username: str) -> dict:
     """The authenticator to set up, labelled with the chosen username; its secret is kept on the
-    invitation (encrypted) until `complete`. Starting again makes another. The caller saves."""
+    invitation (encrypted) until `complete`. Starting again (a reload, a second tab, another username)
+    shows the same one, so a phone that has already scanned it still works. The caller saves."""
     username = check_username(users, invitations, invitation, username)
-    secret = mfa.new_secret()
+    stored = invitation.get("pending_secret")
+    secret = (mfa.decrypt_secret(stored) if stored else None) or mfa.new_secret()
     invitation["pending_secret"] = mfa.encrypt_secret(secret)
     invitations[invitation["id"]] = invitation
     return {"username": username, **reset_access.enrolment(secret, username)}
@@ -241,16 +285,50 @@ def pending_step(invitation: dict, code: str) -> int | None:
     return mfa.matching_step(secret, code)
 
 
+def wrong_code(invitations: dict, invitation: dict, ip: str | None = None, storage=None) -> bool:
+    """A wrong code on the invitation's new authenticator, audited; at the fifth the invitation is
+    closed (removed, its authenticator with it) and that's audited too. Whether it's closed. The caller
+    saves the invitations."""
+    invitation["wrong_codes"] = int(invitation.get("wrong_codes") or 0) + 1
+    audit("invitation_wrong_code", None, invitation, ip, storage, attempt=invitation["wrong_codes"])
+    if invitation["wrong_codes"] < MAX_WRONG_CODES:
+        invitations[invitation["id"]] = invitation
+        return False
+    invitations.pop(invitation["id"], None)
+    audit("invitation_closed", None, invitation, ip, storage, reason="wrong codes", wrong_codes=invitation["wrong_codes"])
+    return True
+
+
+def inviter_refusal(users: dict, invitation: dict) -> str | None:
+    """Why an admin's invitation can't be completed: they've been disabled, removed or are no longer an
+    admin (only admins invite). None for the server's own invitations and an inviter who still can."""
+    inviter_id = invitation.get("invited_by_id")
+    if inviter_id:
+        inviter = users.get(inviter_id)
+    elif invitation.get("invited_by") in (None, "server", "server-cli") or invitation.get("first_admin"):
+        return None
+    else:  # made before invited_by_id was kept
+        inviter = user_store.find_user(users, invitation["invited_by"])
+    if not inviter or not inviter.get("is_active", True) or inviter.get("role") != "admin":
+        return INVITER_GONE
+    return None
+
+
 def complete(users: dict, invitations: dict, invitation: dict, username: str, full_name: str | None,
              password: str, step: int, ip: str | None = None, storage=None) -> tuple[dict, list]:
     """Make the account, once `pending_step` has accepted a code: (the new user record; its ten
     backup codes, to be shown once). The username, the email and a place are checked again, since
     any may have gone since the invitation was made. Saves both files: the invitation is used up."""
+    refusal = inviter_refusal(users, invitation)
+    if refusal:
+        raise InvitationRefused(refusal, 403)
     username = check_username(users, invitations, invitation, username)
     if any(invitation["email"] in ((u.get("email") or "").lower(), (u.get("username") or "").lower())
            for u in users.values()):
         raise InvitationRefused(f"{invitation['email']} already has an account: sign in instead", 409)
-    refusal = licence.seat_refusal(users, settings.rowanholt_server_mode, excluding={invitation["id"]})
+    # A first admin's needs no place while nobody can administer the server (see create)
+    refusal = None if invitation.get("first_admin") and not user_store.active_admin(users) else licence.seat_refusal(
+        users, settings.rowanholt_server_mode, excluding={invitation["id"]})
     if refusal:
         raise InvitationRefused(refusal, 402)
     record = user_store.new_user(username, invitation["email"], role=invitation["role"], password=password,

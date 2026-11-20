@@ -30,6 +30,9 @@ param(
     # A certificate in Cert:\LocalMachine\My, with an exportable private key: served as --tls files
     [string]$CertificateThumbprint,
     [ValidateRange(1, 65535)][int]$HttpsPort = 443,
+    # The first admin's email (server init --admin): a server has no seeded account, and its first
+    # admin comes from a one-time invitation, printed by `rowanholt server users first-admin`
+    [ValidatePattern('^[^@\s]+@[^@\s]+\.[^@\s]+$')][string]$AdminEmail,
     [string[]]$EvidencePath = @(),
     # Where the distribution's virtual disk lives: cases are written inside it, so a data drive
     [string]$WslPath = (Join-Path $env:ProgramData 'Rowanholt\wsl'),
@@ -205,6 +208,7 @@ if [ -d $Root/.git ]; then git -C $Root pull --ff-only -q; else git clone -q --b
 "@
 $initArgs = @((Quote-Bash $Hostname))
 if ($HttpsPort -ne 443) { $initArgs += "--https-port $HttpsPort" }
+if ($AdminEmail) { $initArgs += "--admin $(Quote-Bash $AdminEmail)" }
 if ($CertificateThumbprint) {
     # Exported once with a throwaway password, converted inside WSL and deleted
     $pfx = Join-Path $State 'rowanholt.pfx'
@@ -275,3 +279,6 @@ Write-Host ''
 Write-Host "Rowanholt runs at boot as $($Credential.UserName), forwarding $($ports -join ', ') into WSL."
 Write-Host "Follow the first start with: wsl -d $Distro -u root -- $Root/rowanholt status"
 Write-Host "The rowanholt command inside: wsl -d $Distro -u root -- $Root/rowanholt <command>"
+$firstAdmin = if ($AdminEmail) { $AdminEmail } else { 'you@example.org' }
+Write-Host "Once it's up, the first admin's one-time link (24 hours):"
+Write-Host "  wsl -d $Distro -u root -- $Root/rowanholt server users first-admin $firstAdmin"

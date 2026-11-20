@@ -2,9 +2,11 @@
 and `server users invite|invitations|revoke-invitation`): how a team server's accounts are made. An
 admin invites an email with a role; the link makes the account only once a code from a new
 authenticator is confirmed, with the role, MFA on and ten backup codes, signed in, once, within 24
-hours. Refused for an email with an account, past the licence's places, and on a local stack; a newer
-invitation replaces an older one; admins list and withdraw them; admins no longer set a new
-account's password on a server, and a local stack keeps its own sign-up.
+hours. Opening it again shows the same authenticator; five wrong codes close it; it's refused if the
+admin who made it can no longer invite. Refused for an email with an account, past the licence's
+places, and on a local stack; a newer invitation replaces an older one; admins list and withdraw
+them; nobody sets another person's password, on a server or locally; a local stack keeps its own
+sign-up only while it's published on loopback.
 
 Run from tests/unit: python3 -m unittest test_invitations.py
 """
@@ -51,8 +53,8 @@ class InvitationTest(BackendCase):
     def email(self):
         return f"inv{next(_names)}x{int(self.now) % 100000}@example.org"
 
-    def issue(self, email, role="user", **body):
-        resp = self.invite(email, role, **body)
+    def issue(self, email, role="user", headers=None, **body):
+        resp = self.invite(email, role, headers=headers, **body)
         self.assertEqual(resp.status_code, 200, resp.text)
         self.assertTrue(resp.json()["link"].startswith("https://rowanholt.test/accept-invite#"))
         return resp.json(), resp.json()["link"].split("#", 1)[1]
@@ -220,6 +222,8 @@ class InvitationTest(BackendCase):
         ids = [inv["id"] for inv in self.client.get("/api/auth/users/invitations", headers=self.admin).json()]
         self.assertIn(second["id"], ids)
         self.assertNotIn(first["id"], ids)
+        [revoked] = self.audited(first["id"], "invitation_revoked")
+        self.assertEqual((revoked["details"]["reason"], revoked["details"]["replaced_by"]), ("replaced", second["id"]))
 
     def test_refusals(self):
         refused = self.invite("alice@example.org")
@@ -233,18 +237,77 @@ class InvitationTest(BackendCase):
         self.assertEqual(self.complete(token, "x" * 5, "123456").status_code, 400)  # no authenticator yet
         self.assertEqual(self.complete(token, "x" * 5, "123456", password="short").status_code, 400)
 
-    def test_wrong_codes_count_towards_the_lockout(self):
+    def test_five_wrong_codes_close_the_invitation(self):
         email = self.email()
         _, token = self.issue(email)
         username = email.split("@")[0]
         secret = self.start(token, username).json()["secret"]
         invitation_id = next(inv["id"] for inv in self.invitations.load().values() if inv["email"] == email)
-        for _ in range(self.settings.max_login_attempts):
-            self.assertEqual(self.complete(token, username, "000000").status_code, 400)
-        self.assertEqual(self.complete(token, username, self.code(secret)).status_code, 429)
-        failed = self.audited(invitation_id, "mfa_failed")
-        self.assertEqual(len(failed), self.settings.max_login_attempts)
-        self.assertEqual(failed[0]["details"]["stage"], "invitation")
+        for _ in range(self.invitations.MAX_WRONG_CODES - 1):
+            wrong = self.complete(token, username, "000000")
+            self.assertEqual(wrong.status_code, 400)
+            self.assertIn("Incorrect code", wrong.json()["detail"])
+        closed = self.complete(token, username, "000000")
+        self.assertEqual(closed.status_code, 400)
+        self.assertEqual(closed.json()["detail"], self.invitations.CLOSED)
+        self.assertNotIn(invitation_id, self.invitations.load())  # its authenticator gone with it
+        # The right code is too late: the admin issues a new invitation
+        self.assertEqual(self.complete(token, username, self.code(secret)).status_code, 400)
+        self.assertIsNone(self.find(username))
+        failed = self.audited(invitation_id, "invitation_wrong_code")
+        self.assertEqual([row["details"]["attempt"] for row in failed], [1, 2, 3, 4, 5])
+        self.assertEqual(len(self.audited(invitation_id, "invitation_closed")), 1)
+        # Not a sign-in lockout against the invited email: a new invitation works at once
+        _, again = self.issue(email)
+        done = self.complete(again, username, self.code(self.start(again, username).json()["secret"]))
+        self.assertEqual(done.status_code, 200, done.text)
+
+    def test_opening_it_again_shows_the_same_authenticator(self):
+        email = self.email()
+        _, token = self.issue(email)
+        username = email.split("@")[0]
+        first = self.start(token, username).json()["secret"]
+        self.assertEqual(self.start(token, username).json()["secret"], first)
+        self.assertEqual(self.start(token, username + "x").json()["secret"], first)  # another username, too
+        self.assertEqual(self.complete(token, username, self.code(first)).status_code, 200)
+
+    def test_an_expired_invitation_drops_its_authenticator(self):
+        email = self.email()
+        invitation, token = self.issue(email)
+        self.start(token, email.split("@")[0])
+        self.assertIn("pending_secret", self.invitations.load()[invitation["id"]])
+        self.now += self.reset.RESET_HOURS * 3600 + 1
+        self.assertEqual(self.preview(token).status_code, 410)
+        self.assertNotIn("pending_secret", self.invitations.load()[invitation["id"]])
+
+    def test_the_inviter_must_still_be_able_to_invite(self):
+        # An admin who invites someone and is then disabled or made a user can't have the invitation honoured
+        boss = f"boss{next(_names)}"
+        self.make_user(boss, "boss-password-1234", role="admin")
+        boss_headers = self.login(boss, "boss-password-1234")
+        for change in ({"role": "user"}, {"is_active": False}):
+            email = self.email()
+            _, token = self.issue(email, headers=boss_headers)
+            username = email.split("@")[0]
+            secret = self.start(token, username).json()["secret"]
+            self.assertEqual(self.client.patch(f"/api/auth/users/{self.find(boss)['id']}", headers=self.admin,
+                                               json=change).status_code, 200)
+            refused = self.complete(token, username, self.code(secret))
+            self.assertEqual(refused.status_code, 403, change)
+            self.assertEqual(refused.json()["detail"], self.invitations.INVITER_GONE)
+            self.assertIsNone(self.find(username))
+            self.client.patch(f"/api/auth/users/{self.find(boss)['id']}", headers=self.admin,
+                              json={"role": "admin", "is_active": True})
+            boss_headers = self.login(boss, "boss-password-1234")
+        self.disable(boss)
+        # The server's own (the CLI's) have no inviter to check
+        invitation = {"id": "x", "email": "e@example.org", "invited_by": "server-cli"}
+        self.assertIsNone(self.invitations.inviter_refusal(self.users_module.load_users(), invitation))
+
+    def test_without_a_public_url_the_link_is_the_requests_own_address(self):
+        with mock.patch.object(self.settings, "rowanholt_public_url", ""):
+            resp = self.invite(self.email(), headers={**self.admin, "Origin": "https://rh.internal:8443"})
+        self.assertTrue(resp.json()["link"].startswith("https://rh.internal:8443/accept-invite#"), resp.text)
 
     def test_only_admins_invite_list_and_revoke_and_never_with_a_token(self):
         for who in (self.alice, self.bob):
@@ -301,36 +364,57 @@ class InvitationTest(BackendCase):
             self.assertIn("invitation", refused.json()["detail"])
         self.assertIsNone(self.find("pwmade"))
         from auth import manage_users
-        with self.assertRaisesRegex(SystemExit, "invite <email>$"):
+        with self.assertRaises(SystemExit), mock.patch("sys.stderr"):  # no add command any more
             manage_users.main(["add", "pwmade", "pwmade@example.org"])
 
-    def test_a_server_refuses_an_admin_setting_someones_password(self):
+    def test_nobody_sets_someone_elses_password_on_a_server_or_locally(self):
         alice = self.find("alice")
         before = alice["hashed_password"]
-        refused = self.client.patch(f"/api/auth/users/{alice['id']}", headers=self.admin,
-                                    json={"password": "chosen-by-admin-2", "full_name": "Alice"})
-        self.assertEqual(refused.status_code, 400, refused.text)
-        self.assertIn("reset-access", refused.json()["detail"])
+        from auth import manage_users
+        for server in (True, False):
+            self.settings.rowanholt_server_mode = server
+            try:
+                refused = self.client.patch(f"/api/auth/users/{alice['id']}", headers=self.admin,
+                                            json={"password": "chosen-by-admin-2", "full_name": "Alice"})
+                self.assertEqual(refused.status_code, 400, refused.text)
+                self.assertIn("reset-access", refused.json()["detail"])
+                made = self.client.post("/api/auth/users", headers=self.admin, json={
+                    "username": "pwmade2", "email": "pwmade2@example.org", "password": "chosen-by-admin-3"})
+                self.assertEqual(made.status_code, 400, made.text)
+                with self.assertRaises(SystemExit), mock.patch("sys.stderr"):  # no password command any more
+                    manage_users.main(["password", "alice"])
+            finally:
+                self.settings.rowanholt_server_mode = True
         self.assertEqual(self.find("alice")["hashed_password"], before)
         self.assertNotEqual(self.find("alice").get("full_name"), "Alice")  # nothing else changed either
-        from auth import manage_users
-        with self.assertRaisesRegex(SystemExit, "reset-access <user>$"):
-            manage_users.main(["password", "alice"])
-        self.assertEqual(self.find("alice")["hashed_password"], before)
+        self.assertIsNone(self.find("pwmade2"))
 
-    def test_a_local_stack_keeps_its_own_sign_up_and_has_no_invitations(self):
+    def test_a_local_stack_keeps_its_own_sign_up_on_loopback_only_and_has_no_invitations(self):
         self.settings.rowanholt_server_mode = False
         try:
+            username = f"local{next(_names)}"
             made = self.client.post("/api/auth/register", json={
-                "username": f"local{next(_names)}", "email": f"local{next(_names)}@example.org",
-                "password": "a-local-password"})
+                "username": username, "email": f"{username}@example.org", "password": "a-local-password"})
             self.assertEqual(made.status_code, 200, made.text)
+            [created] = self.audited(made.json()["id"], "account_created")
+            self.assertEqual(created["details"]["via"], "register")
             self.assertEqual(self.invite(self.email()).status_code, 400)
-            from auth import manage_users
-            with mock.patch("getpass.getpass", return_value="a-local-password-2"):
-                self.assertEqual(manage_users.main(["add", f"local{next(_names)}", "l@example.org"]), 0)
+            config = self.client.get("/api/auth/config").json()
+            self.assertTrue(config["register"] and config["guest"])
+            self.assertEqual(self.client.post("/api/auth/guest").status_code, 200)
+            self.client.cookies.clear()
+            # Published beyond this machine: no sign-up and no guests, as no default admin
+            with mock.patch.object(self.settings, "rowanholt_bind", "0.0.0.0"):
+                config = self.client.get("/api/auth/config").json()
+                self.assertFalse(config["register"] or config["guest"])
+                refused = self.client.post("/api/auth/register", json={
+                    "username": f"wide{next(_names)}", "email": "wide@example.org", "password": "a-local-password"})
+                self.assertEqual(refused.status_code, 403)
+                self.assertIn("ROWANHOLT_BIND", refused.json()["detail"])
+                self.assertEqual(self.client.post("/api/auth/guest").status_code, 403)
         finally:
             self.settings.rowanholt_server_mode = True
+            self.client.cookies.clear()
 
     # ── the server's CLI ─────────────────────────────────────────────────────
 

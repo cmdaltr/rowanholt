@@ -3,7 +3,7 @@ an admin's reset, the ROWANHOLT_REQUIRE_MFA policy, and single sign-on accounts'
 identity provider.
 
 Until 12 November 2026 Rowanholt had no MFA, and the docs said so (commit 4a8e8fa); before that they
-described routes in auth/routes.py that the backend never mounted. This keeps both of the old
+described routes in an auth/routes.py the backend never mounted (deleted 20 November 2026). This keeps both of the old
 claims out: that there's no MFA, and the unmounted design's endpoints.
 
 Run: python3 -m pytest tests/unit/test_docs_mfa.py
@@ -26,7 +26,7 @@ NONE_CLAIMS = (
     "no built-in multi-factor",
     "MFA panel doesn't work",
 )
-# The unmounted design's endpoints (auth/routes.py), which the built-in MFA doesn't have
+# The unmounted design's endpoints, which the built-in MFA doesn't have
 OLD_ENDPOINTS = ("/api/auth/mfa/verify", "/auth/mfa/verify")
 
 
