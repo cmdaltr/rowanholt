@@ -1,6 +1,6 @@
 # Rowanholt Web API Reference
 
-**Version:** 2.1.0
+**Version:** 2.1.1
 **Base URL:** `http://127.0.0.1:5688/api` on a local stack; `https://<server>/api` on a team server, through its proxy
 **Protocol:** REST, and two WebSockets (the case browser's live feed and the lab's VM consoles)
 **Authentication:** none on a local stack; on a team server a session cookie, a sign-in's JWT, or an API token (see [Authentication Status](#authentication-status))
@@ -1440,6 +1440,6 @@ Job progress has no socket of its own: poll `GET /api/jobs/{job_id}`.
 
 ---
 
-**Version:** 2.1.0
+**Version:** 2.1.1
 **Last Updated:** 2026-11-12
 **License:** See LICENSE file

@@ -6,7 +6,7 @@ FROM ubuntu:22.04 AS base
 
 LABEL maintainer="Elrond Team"
 LABEL description="Elrond Digital Forensics Automation Tool - Complete Forensics Workstation"
-LABEL version="2.1.0"
+LABEL version="2.1.1"
 
 # Prevent interactive prompts during build
 ENV DEBIAN_FRONTEND=noninteractive
@@ -291,7 +291,7 @@ set -e\n\
 \n\
 # Banner\n\
 echo "================================================"\n\
-echo "  Elrond Forensics Engine v2.1.0"\n\
+echo "  Elrond Forensics Engine v2.1.1"\n\
 echo "  Digital Forensics Automation Tool"\n\
 echo "================================================"\n\
 echo ""\n\
