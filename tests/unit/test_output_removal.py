@@ -789,10 +789,10 @@ class ComposeTest(unittest.TestCase):
 
     def test_local_stack_publishes_the_api_redis_and_postgres_on_loopback(self):
         services = self.load(REPO / "docker-compose.yml")["services"]
-        self.assertEqual(services["backend"]["ports"], ["127.0.0.1:5688:5688"])
+        self.assertEqual([self.unset(p) for p in services["backend"]["ports"]], ["127.0.0.1:5688:5688"])
         for name in ("backend", "postgres", "redis"):
             for port in services[name]["ports"]:
-                self.assertTrue(str(port).startswith("127.0.0.1:"), f"{name}: {port}")
+                self.assertTrue(self.unset(port).startswith("127.0.0.1:"), f"{name}: {port}")
         legacy = self.load(REPO / "src" / "web" / "docker-compose.yml")["services"]
         backend = next(s for s in legacy.values() if "5688" in str(s.get("ports")))
         self.assertTrue(all(str(p).startswith("127.0.0.1:") for p in backend["ports"]))
@@ -802,11 +802,16 @@ class ComposeTest(unittest.TestCase):
         self.assertEqual(services["backend"]["ports"], [])
 
     @staticmethod
-    def host_ip(port):
+    def unset(port):
+        """A `ports` entry as compose expands it with ROWANHOLT_BIND unset: its default, loopback."""
+        return str(port).replace("${ROWANHOLT_BIND:-127.0.0.1}", "127.0.0.1")
+
+    @classmethod
+    def host_ip(cls, port):
         """The address a `ports` entry is published on; "" for every interface."""
         if isinstance(port, dict):
             return port.get("host_ip", "")
-        parts = str(port).rsplit(":", 2)
+        parts = cls.unset(port).rsplit(":", 2)
         return parts[0] if len(parts) == 3 else ""
 
     def test_no_local_port_is_published_on_every_interface(self):

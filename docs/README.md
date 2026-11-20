@@ -106,9 +106,9 @@ docs/
 # Access web interface
 http://localhost:5687
 
-# Default login
-Email: admin@rowanholt.app
-Password: IWasThere3000YearsAgo!
+# Default login (your own machine only; a team server makes its first admin by invitation)
+Username: admin
+Password: 3000YearsAgo
 ```
 
 ### Creating an Analysis Job

@@ -5,6 +5,10 @@ Lightweight authentication without database dependencies: users live in a JSON f
 (auth/users.py). Password sign-in with an optional second factor (auth/mfa.py), single
 sign-on (auth/oidc.py) when configured, and, in server mode, user administration for
 admins in place of open sign-up.
+
+Every route that reads the users (or the invitations), decides and writes them back does so inside
+users.locked(), which `rowanholt server users` takes too: a link can't be completed twice at once,
+and one write doesn't undo another's.
 """
 
 import logging
@@ -12,7 +16,15 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import quote, urlsplit
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Request,
+    Response,
+    status,
+)
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
@@ -20,24 +32,29 @@ from pydantic import BaseModel
 try:
     from ..config import settings
     from .security import verify_password, create_access_token
-    from .users import (AdminPasswordMissing, find_user, init_default_admin, load_users,  # noqa: F401
-                        new_user, public, save_users, set_password)
+    from .users import (NO_ACCOUNTS, deactivate, find_user, init_default_admin, load_users,  # noqa: F401
+                        locked, loopback_only, new_user, public, save_users, set_password)
     from . import access, invitations, mfa, oidc, reset_access, tokens
     from .throttle import throttle
-    from .. import licence
+    from .. import licence, mailer
 except ImportError:
     from config import settings
     from auth.security import verify_password, create_access_token
-    from auth.users import (AdminPasswordMissing, find_user, init_default_admin, load_users,  # noqa: F401
-                            new_user, public, save_users, set_password)
+    from auth.users import (NO_ACCOUNTS, deactivate, find_user, init_default_admin, load_users,  # noqa: F401
+                            locked, loopback_only, new_user, public, save_users, set_password)
     from auth import access, invitations, mfa, oidc, reset_access, tokens
     from auth.throttle import throttle
     import licence
+    import mailer
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 logger = logging.getLogger(__name__)
 
 MIN_PASSWORD = 12
+# Forgot password: requests per address and per client address, an hour
+FORGOT_PER_ADDRESS = 3
+FORGOT_PER_IP = 10
+FORGOT_WINDOW = 3600
 
 
 # Request/Response Models
@@ -51,7 +68,7 @@ class RegisterRequest(BaseModel):
     username: str
     password: str
     full_name: Optional[str] = None
-    role: str = "user"  # honoured for admins creating users in server mode
+    role: str = "user"  # ignored: a sign-up is always a user (only a local stack signs up)
 
 
 class LoginResponse(BaseModel):
@@ -71,7 +88,7 @@ class UserResponse(BaseModel):
 class UserUpdate(BaseModel):
     role: Optional[str] = None
     is_active: Optional[bool] = None
-    password: Optional[str] = None
+    password: Optional[str] = None  # refused: nobody sets another person's password
     full_name: Optional[str] = None
 
 
@@ -104,6 +121,33 @@ def _address(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+def _failed(name: str, address: str, record: dict | None, stage: str) -> None:
+    """Count a failed sign-in (or a wrong code that counts as one); the failure that locks the account
+    is audited as account_locked, with where it happened."""
+    if throttle.failed(name, address):
+        target = record or {"id": None, "username": name}
+        mfa.audit("account_locked", None, target, address, stage=stage,
+                  minutes=settings.lockout_duration_minutes)
+
+
+def _local_open() -> bool:
+    """Whether this is a local stack published on this machine only (ROWANHOLT_BIND on loopback): the
+    only place with open sign-up and guests, as the default admin is seeded only there."""
+    return not settings.rowanholt_server_mode and loopback_only(settings.rowanholt_bind)
+
+
+def _forgot_password_offered() -> bool:
+    """Forgot password emails a link, so it needs email and ROWANHOLT_PUBLIC_URL: an emailed link is
+    never built from the request (its Origin or Host is the asker's to choose, and the token would go
+    to their address)."""
+    return mailer.configured() and bool(settings.rowanholt_public_url)
+
+
+def _link_origin(request: Request) -> str | None:
+    """Where links point without ROWANHOLT_PUBLIC_URL: the request's own address."""
+    return None if settings.rowanholt_public_url else reset_access.request_origin(request)
+
+
 def _refuse_if_locked(name: str, address: str) -> None:
     wait = throttle.locked_for(name, address)
     if wait:
@@ -126,10 +170,16 @@ def _room_for_one_more(users: dict) -> None:
 
 
 def _users_or_503() -> dict:
-    try:
-        return init_default_admin()
-    except AdminPasswordMissing as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
+    """The users, after seeding a local stack's default admin (auth/users.init_default_admin)."""
+    return init_default_admin()
+
+
+def _users_to_sign_in() -> dict:
+    """The users for a sign-in: 503 on a server with none yet, saying how its first admin is made."""
+    users = init_default_admin()
+    if not users and settings.rowanholt_server_mode:
+        raise HTTPException(status_code=503, detail=NO_ACCOUNTS)
+    return users
 
 
 # Routes
@@ -140,8 +190,10 @@ async def auth_config():
     return {
         "server_mode": server,
         "local_login": settings.rowanholt_local_login or not settings.oidc_enabled,
-        "guest": not server,
-        "register": not server,
+        "guest": _local_open(),
+        "register": _local_open(),
+        # Forgot password emails a reset link: only with email to send it by (mailer.py)
+        "forgot_password": _forgot_password_offered(),
         "sso": {"enabled": settings.oidc_enabled, "name": settings.oidc_display_name},
     }
 
@@ -154,7 +206,7 @@ async def login(
 ):
     """Login with username/email and password (OAuth2 form data). With MFA on, the answer is a
     challenge for the second step (POST /login/mfa), not a session."""
-    users = _users_or_503()
+    users = _users_to_sign_in()
     known = find_user(users, form_data.username)
     # One account, one count: its username and its email share a lockout
     name = known["username"] if known else form_data.username
@@ -163,7 +215,7 @@ async def login(
 
     user = known
     if not user or not user.get("hashed_password") or not verify_password(form_data.password, user["hashed_password"]):
-        throttle.failed(name, address)
+        _failed(name, address, known, "sign-in")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -184,8 +236,11 @@ async def login(
         return {"mfa_required": True, "challenge": mfa.new_challenge(user),
                 "expires_in": mfa.CHALLENGE_SECONDS, "methods": ["totp", "backup_code"]}
     throttle.succeeded(name, address)
-    user["last_login"] = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
-    save_users(users)
+    with locked():  # read again: the password check took a while, and another write may have landed
+        users = load_users()
+        user = users.get(user["id"]) or user
+        user["last_login"] = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+        save_users(users)
     return _session(response, user)
 
 
@@ -199,24 +254,25 @@ async def login_second_factor(body: SecondFactor, request: Request, response: Re
     """The sign-in's second step: the challenge from /login and a TOTP or backup code. Signs in as
     /login does without MFA. A wrong code counts towards the sign-in lockout; the challenge lasts
     five minutes and signs in once."""
-    users = _users_or_503()
     address = _address(request)
-    try:
-        record, nonce = mfa.read_challenge(body.challenge, users)
-    except mfa.MfaError as exc:
-        raise HTTPException(status_code=401, detail=str(exc))
-    name = record["username"]
-    _refuse_if_locked(name, address)
-    accepted, how = mfa.check_code(record, body.code)
-    if not accepted:
-        throttle.failed(name, address)
-        mfa.audit("mfa_failed", record, record, address, stage="sign-in")
-        raise HTTPException(status_code=401, detail="Incorrect code")
-    if not mfa.spend_challenge(nonce):
-        raise HTTPException(status_code=401, detail="That sign-in has been used; start again")
-    throttle.succeeded(name, address)
-    record["last_login"] = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
-    save_users(users)
+    with locked():  # a backup code is used up once
+        users = _users_or_503()
+        try:
+            record, nonce = mfa.read_challenge(body.challenge, users)
+        except mfa.MfaError as exc:
+            raise HTTPException(status_code=401, detail=str(exc))
+        name = record["username"]
+        _refuse_if_locked(name, address)
+        accepted, how = mfa.check_code(record, body.code)
+        if not accepted:
+            _failed(name, address, record, "sign-in")
+            mfa.audit("mfa_failed", record, record, address, stage="sign-in")
+            raise HTTPException(status_code=401, detail="Incorrect code")
+        if not mfa.spend_challenge(nonce):
+            raise HTTPException(status_code=401, detail="That sign-in has been used; start again")
+        throttle.succeeded(name, address)
+        record["last_login"] = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+        save_users(users)
     if how == "backup_code":
         mfa.audit("mfa_backup_code_used", record, record, address, stage="sign-in",
                   left=len(record.get("mfa_backup_codes") or []))
@@ -225,9 +281,11 @@ async def login_second_factor(body: SecondFactor, request: Request, response: Re
 
 @router.post("/guest", response_model=LoginResponse)
 async def login_as_guest(response: Response):
-    """Login as guest user (limited access). Not on a server."""
+    """Login as guest user (limited access): only on a local stack published on this machine alone."""
     if settings.rowanholt_server_mode:
         raise HTTPException(status_code=403, detail="Guest access is off on this server")
+    if not _local_open():
+        raise HTTPException(status_code=403, detail=CLOSED_BEYOND_LOOPBACK)
     access_token = create_access_token(
         data={"sub": "guest", "role": "guest"},
         expires_delta=timedelta(seconds=settings.guest_session_timeout)
@@ -255,14 +313,27 @@ async def login_as_guest(response: Response):
     }
 
 
+CLOSED_BEYOND_LOOPBACK = ("Sign-up and guests are only for a Rowanholt on this machine alone: this one is published "
+                          "beyond it (ROWANHOLT_BIND). For a team, run a server (rowanholt server init), whose "
+                          "accounts come by invitation")
+
+
 @router.post("/register", response_model=UserResponse)
 async def register(request: RegisterRequest, http_request: Request):
-    """Register a new user account: a local stack's own sign-up. A server's accounts come by invitation."""
+    """Register a new user account: the sign-up of a local stack published on this machine alone
+    (ROWANHOLT_BIND on loopback, as for the default admin). A server's accounts come by invitation."""
     role = "user"
     if settings.rowanholt_server_mode:
         access.require_admin(http_request)
         raise HTTPException(status_code=400, detail=invitations.INVITE_INSTEAD)
+    if not _local_open():
+        raise HTTPException(status_code=403, detail=CLOSED_BEYOND_LOOPBACK)
     _check_password_strength(request.password)
+    with locked():
+        return _register(request, role, _address(http_request))
+
+
+def _register(request: RegisterRequest, role: str, address: str) -> dict:
     users = _users_or_503()
 
     # Check if email already exists
@@ -286,6 +357,7 @@ async def register(request: RegisterRequest, http_request: Request):
         raise HTTPException(status_code=400, detail=str(exc))
     users[user["id"]] = user
     save_users(users)
+    mfa.audit("account_created", user, user, address, role=user["role"], via="register")
     return public(user)
 
 
@@ -296,61 +368,46 @@ async def logout(response: Response):
     return {"message": "Logged out successfully"}
 
 
-NO_EMAIL = ("Rowanholt doesn't send email. Reset your password with one of your backup codes, or ask an "
-            "administrator for a reset link: rowanholt server users reset-access <username>")
+NO_EMAIL = ("This Rowanholt doesn't send email, so it can't send you a link: ask an administrator for a "
+            "reset link (rowanholt server users reset-access <username>)")
+LINK_ON_ITS_WAY = "If that address has an account, a link is on its way"
+TOO_MANY_REQUESTS = "Too many requests for a link: try again in an hour"
+
+
+class ForgotPassword(BaseModel):
+    email: str  # or the username: sign-in takes either
 
 
 @router.post("/forgot-password")
-async def forgot_password():
-    """There's no email to send a link to: say how a password is reset instead of pretending."""
-    raise HTTPException(status_code=status.HTTP_410_GONE, detail=NO_EMAIL)
-
-
-class BackupCodeReset(BaseModel):
-    username: str
-    backup_code: str
-    code: str
-    new_password: str
-
-
-RESET_REFUSED = "That username and those codes don't match"
-
-
-@router.post("/reset-password")
-async def reset_password_with_backup_code(body: BackupCodeReset, request: Request):
-    """A forgotten password, for an account with MFA: its username (or email), a current code from
-    its authenticator app and one of its backup codes set a new one, so neither the phone nor the
-    printed codes is enough alone. The app code is checked first and a backup code is used up only
-    once it's right; a wrong one counts towards the sign-in lockout, and every refusal reads the
-    same, so it doesn't say which accounts exist or have MFA. It doesn't sign in: that still takes
-    the new password and a second factor."""
-    _check_password_strength(body.new_password)
-    if len(body.new_password) < MIN_PASSWORD:
-        raise HTTPException(status_code=400, detail=f"Passwords need at least {MIN_PASSWORD} characters")
-    users = _users_or_503()
-    record = find_user(users, body.username)
-    name = record["username"] if record else body.username
+async def forgot_password(body: ForgotPassword, request: Request, background: BackgroundTasks):
+    """Forgot password: an active password account matching the email (or username) is emailed a
+    reset-access link, the same link and page as an admin's reset. The answer is the same whether or
+    not one matched, and the email goes after it (a background task), so its timing doesn't say either.
+    Rate-limited per address and per client address. The account's sessions and tokens are left alone,
+    since anyone can ask; completing the reset ends them. An admin's link that's still open isn't
+    replaced. Without email (ROWANHOLT_SMTP_*) or ROWANHOLT_PUBLIC_URL, 503 saying to ask an
+    administrator: the emailed link is always the public URL's, never the request's address."""
+    if not _forgot_password_offered():
+        raise HTTPException(status_code=503, detail=NO_EMAIL)
+    name = (body.email or "").strip()
     address = _address(request)
-    _refuse_if_locked(name, address)
-    usable = (record and record.get("is_active", True) and record.get("hashed_password")
-              and mfa.offered_to(record) and mfa.is_enabled(record)
-              and mfa.looks_like_backup_code(body.backup_code))
-    accepted = False
-    if usable and mfa.check_code(record, body.code, allow_backup=False)[0]:
-        accepted, how = mfa.check_code(record, body.backup_code)
-        accepted = accepted and how == "backup_code"
-    if not accepted:
-        throttle.failed(name, address)
-        if record:
-            mfa.audit("mfa_failed", record, record, address, stage="password reset")
-        raise HTTPException(status_code=400, detail=RESET_REFUSED)
-    set_password(record, body.new_password)
-    save_users(users)
-    # The lockout's count stands: the sign-in that follows, password and code, is what clears it
-    mfa.audit("mfa_password_reset", record, record, address,
-              left=len(record.get("mfa_backup_codes") or []))
-    return {"message": "Password changed: sign in with it and your authenticator",
-            "backup_codes_left": len(record.get("mfa_backup_codes") or [])}
+    if not throttle.allow(f"forgot|ip|{address}", FORGOT_PER_IP, FORGOT_WINDOW) or \
+            not throttle.allow(f"forgot|{name}", FORGOT_PER_ADDRESS, FORGOT_WINDOW):
+        raise HTTPException(status_code=429, detail=TOO_MANY_REQUESTS)
+    with locked():
+        users = _users_or_503()
+        record = find_user(users, name) if name else None
+        if record is None and name:
+            record = next((u for u in users.values() if (u.get("email") or "").lower() == name.lower()), None)
+        link = None
+        if record and record.get("email"):
+            link = reset_access.issue_self_service(record, address, storage=access._storage)
+            if link:
+                save_users(users)
+    if link:
+        background.add_task(mailer.send_reset_link, record["email"], record["username"], link,
+                            reset_access.RESET_HOURS)
+    return {"message": LINK_ON_ITS_WAY}
 
 
 @router.get("/me")
@@ -405,15 +462,16 @@ async def verify(request: Request, response: Response, login_redirect: bool = Fa
 async def change_password(body: PasswordChange, response: Response, user: dict = Depends(access.current_user)):
     """Change the caller's own password. Every other session ends; this one carries on with a new
     token (a browser's cookie is replaced, a bearer caller takes it from the answer)."""
-    users = load_users()
-    record = users.get(user["id"])
-    if not record or not record.get("hashed_password"):
-        raise HTTPException(status_code=400, detail="This account signs in with single sign-on")
-    if not verify_password(body.current_password, record["hashed_password"]):
-        raise HTTPException(status_code=400, detail="Current password is incorrect")
     _check_password_strength(body.new_password)
-    set_password(record, body.new_password)
-    save_users(users)
+    with locked():
+        users = load_users()
+        record = users.get(user["id"])
+        if not record or not record.get("hashed_password"):
+            raise HTTPException(status_code=400, detail="This account signs in with single sign-on")
+        if not verify_password(body.current_password, record["hashed_password"]):
+            raise HTTPException(status_code=400, detail="Current password is incorrect")
+        set_password(record, body.new_password)
+        save_users(users)
     return {"message": "Password changed", **_session(response, record)}
 
 
@@ -433,9 +491,16 @@ class MfaDisable(BaseModel):
     code: str
 
 
+def _local_mfa(record: dict | None) -> bool:
+    """On a local stack, MFA is managed only by an account that already has it on (a reset of its
+    access turns it on): it can change its authenticator, make new backup codes or turn it off, as on a
+    server. Others aren't offered it: a local stack has no sign-in for it to protect."""
+    return bool(record and mfa.offered_to(record) and mfa.is_enabled(record))
+
+
 def _mfa_account(user: dict) -> tuple:
     """(users, the caller's record) for managing their own MFA, or the reason they can't."""
-    if not settings.rowanholt_server_mode:
+    if not settings.rowanholt_server_mode and not _local_mfa(load_users().get(user["id"])):
         raise HTTPException(status_code=400, detail=LOCAL_MFA)
     if user.get("token"):
         # A token already skips the second factor; it mustn't also be able to replace it
@@ -455,7 +520,7 @@ def _second_factor(record: dict, code: str, request: Request, purpose: str, allo
     _refuse_if_locked(record["username"], address)
     accepted, how = mfa.check_code(record, code, allow_backup=allow_backup)
     if not accepted:
-        throttle.failed(record["username"], address)
+        _failed(record["username"], address, record, purpose)
         mfa.audit("mfa_failed", record, record, address, stage=purpose)
         raise HTTPException(status_code=400, detail="Incorrect code")
     if how == "backup_code":
@@ -467,9 +532,9 @@ def _second_factor(record: dict, code: str, request: Request, purpose: str, allo
 @router.get("/mfa")
 async def mfa_status(user: dict = Depends(access.current_user)):
     """The caller's MFA: whether it's on, backup codes left, and whether this server requires it."""
-    if not settings.rowanholt_server_mode:
-        return {"available": False, "reason": "local", "message": LOCAL_MFA}
     record = load_users().get(user["id"])
+    if not settings.rowanholt_server_mode and not _local_mfa(record):
+        return {"available": False, "reason": "local", "message": LOCAL_MFA}
     if not record:
         return {"available": False, "reason": "none", "message": "This account has no MFA to manage"}
     if not mfa.offered_to(record):
@@ -483,90 +548,95 @@ async def mfa_setup(body: MfaCode, request: Request, user: dict = Depends(access
     """Start enrolment: a new secret, as an otpauth:// URI, a QR code and text to type in. Nothing
     changes until /mfa/enable confirms a code from it. With MFA already on (a new phone), it needs a
     current code first, so a session left open can't move the account to someone else's app."""
-    users, record = _mfa_account(user)
-    if mfa.is_enabled(record):
-        if not body.code:
-            raise HTTPException(status_code=400, detail="Enter a current code to set up a new authenticator")
-        _second_factor(record, body.code, request, "re-enrolment")
-    secret = mfa.new_secret()
-    record["mfa_pending_secret"] = mfa.encrypt_secret(secret)
-    record["mfa_pending_at"] = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
-    save_users(users)
-    uri = mfa.provisioning_uri(secret, record["username"])
-    return {"secret": secret, "otpauth_uri": uri, "qr_svg": mfa.qr_svg_data_uri(uri)}
+    with locked():
+        users, record = _mfa_account(user)
+        if mfa.is_enabled(record):
+            if not body.code:
+                raise HTTPException(status_code=400, detail="Enter a current code to set up a new authenticator")
+            _second_factor(record, body.code, request, "re-enrolment")
+        secret = mfa.new_secret()
+        record["mfa_pending_secret"] = mfa.encrypt_secret(secret)
+        record["mfa_pending_at"] = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+        save_users(users)
+        uri = mfa.provisioning_uri(secret, record["username"])
+        return {"secret": secret, "otpauth_uri": uri, "qr_svg": mfa.qr_svg_data_uri(uri)}
 
 
 @router.post("/mfa/enable")
 async def mfa_enable(body: MfaCode, request: Request, user: dict = Depends(access.current_user)):
     """Confirm enrolment with a code from the new secret: MFA goes on (or the new secret replaces the
     old). The first time, ten backup codes come back, shown this once."""
-    users, record = _mfa_account(user)
-    secret = mfa.decrypt_secret(record.get("mfa_pending_secret") or "") if record.get("mfa_pending_secret") else None
-    if not secret:
-        raise HTTPException(status_code=400, detail="Start setting MFA up first")
-    address = _address(request)
-    _refuse_if_locked(record["username"], address)
-    # The new secret's own codes: none has been used, whatever step the old secret last took
-    step = mfa.matching_step(secret, body.code)
-    if step is None:
-        throttle.failed(record["username"], address)
-        mfa.audit("mfa_failed", record, record, address, stage="enrolment")
-        raise HTTPException(status_code=400, detail="Incorrect code: check the app's clock and try the next one")
-    again = mfa.is_enabled(record)
-    codes = mfa.enable(record, secret, step)
-    save_users(users)
-    mfa.audit("mfa_reenrolled" if again else "mfa_enabled", record, record, address)
-    return {**mfa.status(record), "backup_codes": codes}
+    with locked():
+        users, record = _mfa_account(user)
+        secret = mfa.decrypt_secret(record.get("mfa_pending_secret") or "") if record.get("mfa_pending_secret") else None
+        if not secret:
+            raise HTTPException(status_code=400, detail="Start setting MFA up first")
+        address = _address(request)
+        _refuse_if_locked(record["username"], address)
+        # The new secret's own codes: none has been used, whatever step the old secret last took
+        step = mfa.matching_step(secret, body.code)
+        if step is None:
+            _failed(record["username"], address, record, "enrolment")
+            mfa.audit("mfa_failed", record, record, address, stage="enrolment")
+            raise HTTPException(status_code=400, detail="Incorrect code: check the app's clock and try the next one")
+        again = mfa.is_enabled(record)
+        codes = mfa.enable(record, secret, step)
+        save_users(users)
+        mfa.audit("mfa_reenrolled" if again else "mfa_enabled", record, record, address)
+        return {**mfa.status(record), "backup_codes": codes}
 
 
 @router.post("/mfa/disable")
 async def mfa_disable(body: MfaDisable, request: Request, user: dict = Depends(access.current_user)):
     """Turn the caller's MFA off: their password and a current code (or a backup code)."""
-    users, record = _mfa_account(user)
-    if not mfa.is_enabled(record):
-        raise HTTPException(status_code=400, detail="MFA isn't on")
-    if settings.rowanholt_require_mfa:
-        raise HTTPException(status_code=400, detail="This server requires MFA: set up a new authenticator instead")
-    address = _address(request)
-    _refuse_if_locked(record["username"], address)
-    if not verify_password(body.password, record.get("hashed_password") or ""):
-        throttle.failed(record["username"], address)
-        raise HTTPException(status_code=400, detail="Password is incorrect")
-    _second_factor(record, body.code, request, "disable")
-    mfa.disable(record)
-    save_users(users)
-    mfa.audit("mfa_disabled", record, record, address)
-    return mfa.status(record)
+    with locked():
+        users, record = _mfa_account(user)
+        if not mfa.is_enabled(record):
+            raise HTTPException(status_code=400, detail="MFA isn't on")
+        if settings.rowanholt_require_mfa:
+            raise HTTPException(status_code=400, detail="This server requires MFA: set up a new authenticator instead")
+        address = _address(request)
+        _refuse_if_locked(record["username"], address)
+        if not verify_password(body.password, record.get("hashed_password") or ""):
+            _failed(record["username"], address, record, "disable")
+            raise HTTPException(status_code=400, detail="Password is incorrect")
+        _second_factor(record, body.code, request, "disable")
+        mfa.disable(record)
+        save_users(users)
+        mfa.audit("mfa_disabled", record, record, address)
+        return mfa.status(record)
 
 
 @router.post("/mfa/backup-codes")
 async def mfa_backup_codes(body: MfaCode, request: Request, user: dict = Depends(access.current_user)):
     """Ten new backup codes in place of the old ones, for a current authenticator code (not a backup
     code: losing the codes is why someone makes new ones). Shown this once."""
-    users, record = _mfa_account(user)
-    if not mfa.is_enabled(record):
-        raise HTTPException(status_code=400, detail="Turn MFA on first")
-    _second_factor(record, body.code, request, "backup codes", allow_backup=False)
-    codes = mfa.replace_backup_codes(record)
-    save_users(users)
-    mfa.audit("mfa_backup_codes_regenerated", record, record, _address(request))
-    return {**mfa.status(record), "backup_codes": codes}
+    with locked():
+        users, record = _mfa_account(user)
+        if not mfa.is_enabled(record):
+            raise HTTPException(status_code=400, detail="Turn MFA on first")
+        _second_factor(record, body.code, request, "backup codes", allow_backup=False)
+        codes = mfa.replace_backup_codes(record)
+        save_users(users)
+        mfa.audit("mfa_backup_codes_regenerated", record, record, _address(request))
+        return {**mfa.status(record), "backup_codes": codes}
 
 
 @router.delete("/users/{user_id}/mfa")
 async def mfa_admin_reset(user_id: str, request: Request, admin: dict = Depends(access.require_admin)):
     """Turn MFA off for someone who's lost their authenticator and backup codes (admins). They sign
     in with their password next, and set it up again (ROWANHOLT_REQUIRE_MFA holds them to it)."""
-    users = load_users()
-    record = users.get(user_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="User not found")
-    if not mfa.is_enabled(record) and not record.get("mfa_pending_secret"):
-        raise HTTPException(status_code=400, detail=f"MFA isn't on for {record['username']}")
-    mfa.disable(record)
-    save_users(users)
-    mfa.audit("mfa_admin_reset", admin, record, _address(request))
-    return public(record)
+    with locked():
+        users = load_users()
+        record = users.get(user_id)
+        if not record:
+            raise HTTPException(status_code=404, detail="User not found")
+        if not mfa.is_enabled(record) and not record.get("mfa_pending_secret"):
+            raise HTTPException(status_code=400, detail=f"MFA isn't on for {record['username']}")
+        mfa.disable(record)
+        save_users(users)
+        mfa.audit("mfa_admin_reset", admin, record, _address(request))
+        return public(record)
 
 
 # ── Reset access (auth/reset_access.py) ──────────────────────────────────────
@@ -576,15 +646,17 @@ async def reset_access_link(user_id: str, request: Request, admin: dict = Depend
     """A one-time link for someone who's lost their password, authenticator or backup codes (admins):
     they choose a new password and set up a new authenticator. Their sessions end and their API
     tokens are revoked now, and any earlier link stops working. Pass the link on: it's shown once."""
-    users = load_users()
-    record = users.get(user_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="User not found")
-    try:
-        link, expires = reset_access.issue(record, admin, _address(request), storage=access._storage)
-    except reset_access.ResetRefused as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    save_users(users)
+    with locked():
+        users = load_users()
+        record = users.get(user_id)
+        if not record:
+            raise HTTPException(status_code=404, detail="User not found")
+        try:
+            link, expires = reset_access.issue(record, admin, _address(request), storage=access._storage,
+                                               origin=_link_origin(request))
+        except reset_access.ResetRefused as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        save_users(users)
     return {"link": link, "expires_at": datetime.fromtimestamp(expires, timezone.utc).replace(tzinfo=None).isoformat(),
             "user": public(record)}
 
@@ -601,46 +673,53 @@ class ResetComplete(BaseModel):
 
 def _reset_record(token: str) -> tuple:
     """(users, the record a reset link is for); 400 for a link that's unknown or used, 410 expired.
-    Never 401, which the web app reads as a session that's ended."""
+    Never 401, which the web app reads as a session that's ended. The caller holds users.locked()."""
     users = _users_or_503()
     try:
         return users, reset_access.find(users, token)
     except reset_access.ResetRefused as exc:
-        raise HTTPException(status_code=410 if str(exc) == reset_access.EXPIRED else 400, detail=str(exc))
+        if exc.changed:  # an expired link's authenticator dropped
+            save_users(users)
+        raise HTTPException(status_code=exc.status, detail=str(exc))
 
 
 @router.post("/reset-access/start")
-async def reset_access_start(body: ResetStart):
+async def reset_access_start(body: ResetStart, request: Request):
     """Opening a reset link: the account's username and a new authenticator to set up (a secret, as
-    text and a QR code). Nothing changes until /reset-access/complete; opening it again shows the same one."""
-    users, record = _reset_record(body.token)
-    enrolment = reset_access.start(record)
-    save_users(users)
+    text and a QR code). Nothing changes until /reset-access/complete; opening it again shows the same
+    one. 429 while the account is locked out."""
+    with locked():
+        users, record = _reset_record(body.token)
+        _refuse_if_locked(record["username"], _address(request))
+        enrolment = reset_access.start(record)
+        save_users(users)
     return {**enrolment, "expires_in": int(float(record["access_reset_expires"]) - mfa._now())}
 
 
 @router.post("/reset-access/complete")
 async def reset_access_complete(body: ResetComplete, request: Request, response: Response):
     """Finishing a reset: the new password and a code from the new authenticator. Signs the person in,
-    with MFA on and ten new backup codes, returned this once; the link is used up. A wrong code counts
-    towards the sign-in lockout."""
+    with MFA on and ten new backup codes, returned this once; the link is used up, every other session
+    ends and the account's API tokens are revoked. A wrong code is audited and counts towards the
+    account's sign-in lockout (429 once it's locked, here and at sign-in)."""
     if len(body.new_password) < MIN_PASSWORD:
         raise HTTPException(status_code=400, detail=f"Passwords need at least {MIN_PASSWORD} characters")
-    users, record = _reset_record(body.token)
-    name, address = record["username"], _address(request)
-    _refuse_if_locked(name, address)
-    try:
-        step = reset_access.pending_step(record, body.code)
-    except reset_access.ResetRefused as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    if step is None:
-        throttle.failed(name, address)
-        mfa.audit("mfa_failed", record, record, address, stage="reset access")
-        raise HTTPException(status_code=400, detail="Incorrect code: check the app's clock and try the next one")
-    codes = reset_access.complete(record, body.new_password, step, address, storage=access._storage)
-    throttle.succeeded(name, address)
-    record["last_login"] = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
-    save_users(users)
+    with locked():  # the link is claimed once: a second completion finds it gone
+        users, record = _reset_record(body.token)
+        name, address = record["username"], _address(request)
+        _refuse_if_locked(name, address)
+        try:
+            step = reset_access.pending_step(record, body.code)
+        except reset_access.ResetRefused as exc:
+            raise HTTPException(status_code=exc.status, detail=str(exc))
+        if step is None:
+            _failed(name, address, record, "reset access")
+            mfa.audit("access_reset_failed", record, record, address, reason="wrong code")
+            raise HTTPException(status_code=400, detail="Incorrect code: check the app's clock and try the next one")
+        codes = reset_access.complete(record, body.new_password, step, address, storage=access._storage)
+        throttle.succeeded(name, address)
+        record["last_login"] = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+        save_users(users)
     return {**_session(response, record), "backup_codes": codes}
 
 
@@ -719,8 +798,10 @@ async def create_invitation(body: InvitationRequest, request: Request, admin: di
     authenticator. Returns the invitation and `link`, shown this once. A newer invitation for the
     same email replaces an older one. 409 for an email with an account, 402 with no free place."""
     try:
-        invitation, link = invitations.create(_users_or_503(), body.email, body.role, body.full_name, admin,
-                                              _address(request), storage=access._storage)
+        with locked():
+            invitation, link = invitations.create(_users_or_503(), body.email, body.role, body.full_name, admin,
+                                                  _address(request), storage=access._storage,
+                                                  origin=_link_origin(request))
     except invitations.InvitationRefused as exc:
         raise HTTPException(status_code=exc.status, detail=str(exc))
     return {**invitation, "link": link}
@@ -758,7 +839,8 @@ class InvitationAccept(InvitationStart):
 
 
 def _open_invitation(token: str) -> tuple:
-    """(invitations, the one a link is for); 400 unknown or used, 410 expired (never 401: see _reset_record)."""
+    """(invitations, the one a link is for); 400 unknown or used, 410 expired (never 401: see
+    _reset_record). The caller holds users.locked()."""
     try:
         return invitations.find(token)
     except invitations.InvitationRefused as exc:
@@ -768,45 +850,47 @@ def _open_invitation(token: str) -> tuple:
 @router.post("/invitations/accept")
 async def invitation_preview(body: InvitationToken):
     """Opening an invitation: the email, role and name it's for, and a username to suggest."""
-    _, invitation = _open_invitation(body.token)
-    return invitations.preview(_users_or_503(), invitation)
+    with locked():
+        _, invitation = _open_invitation(body.token)
+        return invitations.preview(_users_or_503(), invitation)
 
 
 @router.post("/invitations/accept/start")
 async def invitation_start(body: InvitationStart):
     """The username chosen (checked: well formed and free), the authenticator to set up. Nothing is
-    made until /invitations/accept/complete; starting again makes another."""
-    pending, invitation = _open_invitation(body.token)
-    try:
-        enrolment = invitations.start(_users_or_503(), pending, invitation, body.username)
-    except invitations.InvitationRefused as exc:
-        raise HTTPException(status_code=exc.status, detail=str(exc))
-    invitations.save(pending)
+    made until /invitations/accept/complete; starting again shows the same authenticator."""
+    with locked():
+        pending, invitation = _open_invitation(body.token)
+        try:
+            enrolment = invitations.start(_users_or_503(), pending, invitation, body.username)
+        except invitations.InvitationRefused as exc:
+            raise HTTPException(status_code=exc.status, detail=str(exc))
+        invitations.save(pending)
     return enrolment
 
 
 @router.post("/invitations/accept/complete")
 async def invitation_complete(body: InvitationAccept, request: Request, response: Response):
     """The account made, once a code from the new authenticator is confirmed: the invited role, MFA
-    on, ten backup codes (returned this once), signed in. The invitation is used up. A wrong code
-    counts towards the lockout, against the invitation's email."""
+    on, ten backup codes (returned this once), signed in. The invitation is used up. Each wrong code is
+    audited, and the fifth closes the invitation: the admin issues a new one."""
     if len(body.new_password) < MIN_PASSWORD:
         raise HTTPException(status_code=400, detail=f"Passwords need at least {MIN_PASSWORD} characters")
-    pending, invitation = _open_invitation(body.token)
-    name, address = invitation["email"], _address(request)
-    _refuse_if_locked(name, address)
-    users = _users_or_503()
-    try:
-        step = invitations.pending_step(invitation, body.code)
-        if step is None:
-            throttle.failed(name, address)
-            invitations.audit("mfa_failed", None, invitation, address, stage="invitation")
-            raise HTTPException(status_code=400, detail="Incorrect code: check the app's clock and try the next one")
-        record, codes = invitations.complete(users, pending, invitation, body.username, body.full_name,
-                                             body.new_password, step, address, storage=access._storage)
-    except invitations.InvitationRefused as exc:
-        raise HTTPException(status_code=exc.status, detail=str(exc))
-    throttle.succeeded(name, address)
+    address = _address(request)
+    with locked():  # the invitation is claimed once: a second completion finds it gone
+        pending, invitation = _open_invitation(body.token)
+        users = _users_or_503()
+        try:
+            step = invitations.pending_step(invitation, body.code)
+            if step is None:
+                closed = invitations.wrong_code(pending, invitation, address, storage=access._storage)
+                invitations.save(pending)
+                raise HTTPException(status_code=400, detail=invitations.CLOSED if closed else
+                                    "Incorrect code: check the app's clock and try the next one")
+            record, codes = invitations.complete(users, pending, invitation, body.username, body.full_name,
+                                                 body.new_password, step, address, storage=access._storage)
+        except invitations.InvitationRefused as exc:
+            raise HTTPException(status_code=exc.status, detail=str(exc))
     return {**_session(response, record), "backup_codes": codes}
 
 
@@ -816,57 +900,47 @@ async def list_users(admin: dict = Depends(access.require_admin)):
     return [public(u) for u in load_users().values()]
 
 
-@router.post("/users", response_model=UserResponse)
-async def create_user(request: RegisterRequest, http_request: Request):
-    """Create a user with a password (admins). Local mode only: a team server's accounts come by
-    invitation (POST /users/invitations), so nobody chooses another person's password."""
+@router.post("/users")
+async def create_user(http_request: Request):
+    """Gone: nobody makes an account with a password for someone else. A team server's accounts come
+    by invitation (POST /users/invitations); a local stack's by its own sign-up (/register)."""
     access.require_admin(http_request)
-    if settings.rowanholt_server_mode:
-        raise HTTPException(status_code=400, detail=invitations.INVITE_INSTEAD)
-    _check_password_strength(request.password)
-    users = _users_or_503()
-    if find_user(users, request.username) or find_user(users, request.email):
-        raise HTTPException(status_code=400, detail="Username or email already taken")
-    _room_for_one_more(users)
-    try:
-        user = new_user(request.username, request.email, role=request.role, password=request.password,
-                        full_name=request.full_name)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    users[user["id"]] = user
-    save_users(users)
-    return public(user)
+    raise HTTPException(status_code=400, detail=invitations.INVITE_INSTEAD if settings.rowanholt_server_mode
+                        else "Nobody makes an account with a password for someone else: on a local stack, "
+                             "people sign up for themselves (Register)")
 
 
 @router.patch("/users/{user_id}")
-async def update_user(user_id: str, update: UserUpdate, admin: dict = Depends(access.require_admin)):
-    """Change a user's role, status, password or name (admins). The last active admin stays one. A team
-    server doesn't let an admin choose someone's password: a reset link lets them choose it."""
-    if update.password and settings.rowanholt_server_mode:
-        raise HTTPException(status_code=400, detail=reset_access.RESET_INSTEAD)
-    users = load_users()
-    user = users.get(user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    demoting = (update.role is not None and update.role != "admin") or update.is_active is False
-    if user["role"] == "admin" and demoting:
-        admins = [u for u in users.values() if u["role"] == "admin" and u.get("is_active", True)]
-        if len(admins) <= 1:
-            raise HTTPException(status_code=400, detail="That's the last active admin")
-    if update.role is not None:
-        if update.role not in ("admin", "user"):
-            raise HTTPException(status_code=400, detail="Role must be admin or user")
-        user["role"] = update.role
-    if update.is_active is not None:
-        if update.is_active and not user.get("is_active", True):
-            _room_for_one_more(users)
-        user["is_active"] = update.is_active
+async def update_user(user_id: str, update: UserUpdate, request: Request,
+                      admin: dict = Depends(access.require_admin)):
+    """Change a user's role, status or name (admins). The last active admin stays one. Disabling an
+    account ends its sessions and revokes its API tokens. Nobody sets another person's password, on a
+    server or locally: a reset link lets them choose it (POST /users/{id}/reset-access)."""
     if update.password:
-        _check_password_strength(update.password)
-        set_password(user, update.password)
-    if update.full_name is not None:
-        user["full_name"] = update.full_name
-    save_users(users)
+        raise HTTPException(status_code=400, detail=reset_access.RESET_INSTEAD)
+    with locked():
+        users = load_users()
+        user = users.get(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        demoting = (update.role is not None and update.role != "admin") or update.is_active is False
+        if user["role"] == "admin" and demoting:
+            admins = [u for u in users.values() if u["role"] == "admin" and u.get("is_active", True)]
+            if len(admins) <= 1:
+                raise HTTPException(status_code=400, detail="That's the last active admin")
+        if update.role is not None:
+            if update.role not in ("admin", "user"):
+                raise HTTPException(status_code=400, detail="Role must be admin or user")
+            user["role"] = update.role
+        if update.is_active is not None:
+            if update.is_active and not user.get("is_active", True):
+                _room_for_one_more(users)
+                user["is_active"] = True
+            elif not update.is_active and user.get("is_active", True):
+                deactivate(user, admin, _address(request), storage=access._storage)
+        if update.full_name is not None:
+            user["full_name"] = update.full_name
+        save_users(users)
     return public(user)
 
 

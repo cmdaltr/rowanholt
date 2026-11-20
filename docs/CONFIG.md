@@ -27,7 +27,7 @@ Rowanholt works out-of-the-box with sensible defaults:
 - **Frontend**: http://localhost:5687
 - **Database**: PostgreSQL (localhost:5432)
 - **Redis**: localhost:6379
-- **Default Admin**: admin@rowanholt.app / IWasThere3000YearsAgo!
+- **Default Admin** (a local stack only, made while it's published on loopback): admin@rowanholt.app (or `admin`) / 3000YearsAgo. A team server has none: [SERVER.md](SERVER.md#the-first-admin)
 
 ### Environment Variables
 
@@ -49,6 +49,16 @@ REDIS_PORT=6379
 SECRET_KEY=your-secret-key-change-in-production  # also keys MFA's stored secrets: changing it means MFA resets
 ENABLE_HTTPS_ONLY=false  # Set true in production
 ROWANHOLT_REQUIRE_MFA=false  # team server: password accounts must set up MFA before anything else
+ROWANHOLT_FIRST_ADMIN=       # team server (server init --admin): rowanholt start prints this person's first-admin link while there's no admin
+ROWANHOLT_BIND=127.0.0.1     # local stack: where the API (5688) and web app (5687) are published; no default admin, sign-up or guests off loopback
+
+# Email for Forgot password's reset link (SERVER.md#email): nothing is sent without HOST and FROM
+ROWANHOLT_SMTP_HOST=
+ROWANHOLT_SMTP_PORT=587          # 465: TLS from the start
+ROWANHOLT_SMTP_USERNAME=
+ROWANHOLT_SMTP_PASSWORD=
+ROWANHOLT_SMTP_FROM=
+ROWANHOLT_SMTP_STARTTLS=true
 
 # File Paths
 UPLOAD_DIR=/tmp/elrond/uploads
@@ -217,7 +227,7 @@ redis:
 
 - [ ] **Change SECRET_KEY**: Generate with `python -c "import secrets; print(secrets.token_urlsafe(32))"`
 - [ ] **Enable HTTPS**: Set `ENABLE_HTTPS_ONLY=true`
-- [ ] **Change default admin password**: First thing after deployment
+- [ ] **First admin**: a team server has no default account; make it with `rowanholt server users first-admin <email>` ([SERVER.md](SERVER.md#the-first-admin)). `ROWANHOLT_ADMIN_PASSWORD` is no longer read
 - [ ] **Secure database password**: Use strong, random passwords
 - [ ] **Restrict CORS origins**: Update `cors_origins` list
 

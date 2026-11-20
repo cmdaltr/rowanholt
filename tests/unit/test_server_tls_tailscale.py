@@ -91,7 +91,9 @@ def test_https_port_moves_rowanholt_off_443_and_is_kept(tmp_path):
     assert done.returncode == 0, done.stderr
     assert (setting(root, "ROWANHOLT_HTTPS_PORT"), setting(root, "ROWANHOLT_HTTP_PUBLISH"),
             setting(root, "ROWANHOLT_PUBLIC_URL")) == ("8443", "127.0.0.1:8080", f"https://{NAME}:8443")
-    assert setting(root, "SECRET_KEY") == secret_key and "First admin" not in done.stdout
+    # No admin password is made or shown: a server's first admin comes from an invitation
+    assert setting(root, "SECRET_KEY") == secret_key and "admin / " not in done.stdout
+    assert setting(root, "ROWANHOLT_ADMIN_PASSWORD") == ""
 
     # init again without the option keeps the port
     assert run(root, env, "init", NAME, "--tls", "tailscale").returncode == 0

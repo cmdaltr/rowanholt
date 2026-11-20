@@ -301,16 +301,9 @@ export const getCurrentUser = async () => {
   return response.data;
 };
 
-// A forgotten password on an account with MFA: its username, a code from its app and a backup code
-export const resetPasswordWithBackupCode = async (username, code, backupCode, newPassword) => {
-  const response = await api.post('/api/auth/reset-password', {
-    username,
-    code,
-    backup_code: backupCode,
-    new_password: newPassword,
-  });
-  return response.data;
-};
+// Forgot password: a reset-access link emailed to the account the address (or username) belongs to.
+// The answer is the same whether or not one matched; 503 when this Rowanholt sends no email
+export const requestResetLink = async (email) => (await api.post('/api/auth/forgot-password', { email })).data;
 
 // An admin's reset link (/reset-access#<token>, auth/reset_access.py): start gives the new authenticator
 // to set up; complete, with the new password and a code from it, signs in and returns new backup codes

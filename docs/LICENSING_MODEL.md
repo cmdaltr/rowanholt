@@ -120,6 +120,8 @@ product's `PUBLIC_KEYS` entry.
   around it.
 - **Seats** count accounts that can sign in plus open invitations that would add one, and are
   checked only when someone is added (invited, re-enabled, given access). Never retroactively.
+  A first admin's link needs no seat while no active admin exists, so a server can always be
+  got back into; with `--force` past an existing admin, it needs one.
 - **Validity:** from the start of `not_before` (if any) to the end of `expires`. Before
   `not_before`: Free, shown as pending. After `expires`: the edition carries on for **30 days'
   grace** with a warning to admins, then the installation is Free again.
@@ -220,8 +222,6 @@ Single sign-on stays free because gating it would sign people out, which the sha
   either mode.
 - **Audit.** Licence installs and removals, brand changes and webhook changes go in the `audit_logs`
   table (`storage.AuditLogModel`, migration `d5a2e8f1c693`), the licence's with the terms version.
-  `models/database.py`'s AuditLog is the dormant schema's (its foreign key points at a users table
-  Rowanholt doesn't use), so it isn't the one written.
 - **Tooling and tests.** `scripts/admin/sign_licence.py` (it signs `samarkand.licence.head_of`'s
   text and joins the line with `line_of`; samarkand itself never signs) and `issue-licence.sh` (key in
   `ROWANHOLT_LICENCE_KEY`, ledger with `LICENCE_LEDGER_DIR`); `tests/unit/test_licence_units.py`,

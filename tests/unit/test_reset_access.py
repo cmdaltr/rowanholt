@@ -2,12 +2,16 @@
 auth/routes_simple.py and `server users reset-access`): issuing ends the account's sessions, revokes
 its API tokens and replaces an earlier link, and is audited; a link sets a new password and a new
 authenticator only once a code from it is confirmed, with fresh backup codes, signs in once, and
-expires; disabled and single sign-on accounts are refused; only admins issue one.
+expires (saying so for a day); wrong codes are audited and lock the account, at the link and at
+sign-in; disabled and single sign-on accounts are refused; only admins issue one; completions are
+claimed under the store's lock; a local stack has it too, with links from the request's address.
 
 Run from tests/unit: python3 -m unittest test_reset_access.py
 """
 
+import subprocess
 import sys
+import threading
 import time
 import unittest
 from itertools import count
@@ -217,6 +221,25 @@ class ResetAccessTest(BackendCase):
         self.assertEqual(self.complete(token, self.code(secret)).status_code, 410)
         self.assertFalse(self.mfa.is_enabled(self.record(user_id)))
 
+    def test_an_expired_link_says_so_for_a_day_and_drops_its_authenticator(self):
+        _, user_id, _ = self.new_user()
+        token = self.issue(user_id)
+        self.start(token)
+        self.assertIn("access_reset_pending_secret", self.record(user_id))
+        self.now += self.reset.RESET_HOURS * 3600 + 1
+        expired = self.start(token)
+        self.assertEqual(expired.status_code, 410)
+        self.assertEqual(expired.json()["detail"], self.reset.EXPIRED)
+        self.assertNotIn("access_reset_pending_secret", self.record(user_id))
+        # Still "expired" most of a day on; then it reads as never valid, and the link is gone
+        self.now += self.reset.KEEP_EXPIRED_SECONDS - 60
+        self.assertEqual(self.start(token).status_code, 410)
+        self.now += 120
+        gone = self.start(token)
+        self.assertEqual(gone.status_code, 400)
+        self.assertEqual(gone.json()["detail"], self.reset.INVALID)
+        self.assertNotIn("access_reset_hash", self.record(user_id))
+
     def test_refusals_before_anything_changes(self):
         name, user_id, _ = self.new_user()
         token = self.issue(user_id)
@@ -233,12 +256,73 @@ class ResetAccessTest(BackendCase):
         self.assertEqual(self.password_step(name, PASSWORD).status_code, 200)
 
     def test_wrong_codes_count_towards_the_lockout(self):
-        _, user_id, _ = self.new_user()
+        name, user_id, _ = self.new_user()
         token = self.issue(user_id)
         secret = self.start(token).json()["secret"]
         for _ in range(self.settings.max_login_attempts):
             self.assertEqual(self.complete(token, "000000").status_code, 400)
         self.assertEqual(self.complete(token, self.code(secret)).status_code, 429)
+        # Locked at the link's page and at sign-in alike, the right password or not
+        self.assertEqual(self.start(token).status_code, 429)
+        self.assertEqual(self.password_step(name, PASSWORD).status_code, 429)
+        failed = self.audited(user_id, "access_reset_failed")
+        self.assertEqual(len(failed), self.settings.max_login_attempts)
+        storage = sys.modules["auth.access"]._storage
+        [locked] = [row for row in storage.audit_records(resource_id=user_id) if row["action"] == "account_locked"]
+        self.assertEqual(locked["details"]["stage"], "reset access")
+
+    def test_a_locked_sign_in_is_audited_once(self):
+        name, user_id, _ = self.new_user()
+        for _ in range(self.settings.max_login_attempts + 2):
+            self.password_step(name, "not-the-password")
+        self.assertEqual(self.password_step(name, PASSWORD).status_code, 429)
+        storage = sys.modules["auth.access"]._storage
+        locks = [row for row in storage.audit_records(resource_id=user_id) if row["action"] == "account_locked"]
+        self.assertEqual(len(locks), 1)
+        self.assertEqual(locks[0]["details"]["stage"], "sign-in")
+
+    # ── claimed once ─────────────────────────────────────────────────────────
+
+    def test_a_completion_waits_for_the_lock_and_reads_the_store_again(self):
+        # Another process (the CLI, a second backend worker) holds the lock and uses the link up meanwhile:
+        # the completion that was waiting finds it gone rather than claiming it a second time
+        _, user_id, _ = self.new_user()
+        token = self.issue(user_id)
+        secret = self.start(token).json()["secret"]
+        code = self.code(secret)
+        held, release = threading.Event(), threading.Event()
+
+        def other_writer():
+            with self.users_module.locked():
+                held.set()
+                release.wait(10)
+                accounts = self.users_module.load_users()
+                self.reset._clear(accounts[user_id])
+                self.users_module.save_users(accounts)
+
+        writer = threading.Thread(target=other_writer)
+        writer.start()
+        held.wait(10)
+        answers = []
+        completer = threading.Thread(target=lambda: answers.append(self.complete(token, code)))
+        completer.start()
+        completer.join(0.5)
+        self.assertTrue(completer.is_alive(), "the completion didn't wait for the lock")
+        release.set()
+        writer.join(10)
+        completer.join(10)
+        self.assertEqual(answers[0].status_code, 400)
+        self.assertFalse(self.mfa.is_enabled(self.record(user_id)))
+
+    def test_the_lock_is_held_against_other_processes(self):
+        lock_file = f"{self.users_module.USERS_FILE}.lock"
+        probe = ("import fcntl, os, sys\n"
+                 "fd = os.open(sys.argv[1], os.O_RDWR)\n"
+                 "try:\n    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)\nexcept BlockingIOError:\n    sys.exit(3)\n")
+        with self.users_module.locked(), self.users_module.locked():  # re-entrant in one thread
+            taken = subprocess.run([sys.executable, "-c", probe, lock_file], check=False)
+        self.assertEqual(taken.returncode, 3)
+        self.assertEqual(subprocess.run([sys.executable, "-c", probe, lock_file], check=False).returncode, 0)
 
     def test_tokens_made_before_the_reset_completes_are_revoked(self):
         name, user_id, _ = self.new_user()
@@ -271,12 +355,39 @@ class ResetAccessTest(BackendCase):
         with self.assertRaises(SystemExit):
             manage_users.main(["reset-access", "nobody-here"])
 
-    def test_not_on_a_local_stack(self):
+    def test_the_cli_warns_when_there_is_no_public_url(self):
+        name, _, _ = self.new_user()
+        from auth import manage_users
+        with mock.patch.object(self.settings, "rowanholt_public_url", ""), \
+                mock.patch.object(manage_users, "_audit_storage", lambda: sys.modules["auth.access"]._storage), \
+                mock.patch("builtins.print") as printed:
+            self.assertEqual(manage_users.main(["reset-access", name]), 0)
+        out = [(" ".join(map(str, call.args)), call.kwargs.get("file")) for call in printed.call_args_list]
+        self.assertTrue(any("https://localhost/reset-access#" in text for text, _ in out), out)
+        self.assertTrue(any("ROWANHOLT_PUBLIC_URL isn't set" in text and where is sys.stderr for text, where in out))
+
+    def test_without_a_public_url_the_api_links_to_the_requests_own_address(self):
         _, user_id, _ = self.new_user()
-        record = self.record(user_id)
-        with mock.patch.object(self.settings, "rowanholt_server_mode", False), \
-                self.assertRaises(self.reset.ResetRefused):
-            self.reset.issue(record, None)
+        with mock.patch.object(self.settings, "rowanholt_public_url", ""):
+            via_proxy = self.client.post(f"/api/auth/users/{user_id}/reset-access", headers={
+                **self.admin, "X-Forwarded-Host": "rh.example.org:8443", "X-Forwarded-Proto": "https"})
+            from_browser = self.client.post(f"/api/auth/users/{user_id}/reset-access",
+                                            headers={**self.admin, "Origin": "http://localhost:5687"})
+        self.assertTrue(via_proxy.json()["link"].startswith("https://rh.example.org:8443/reset-access#"))
+        self.assertTrue(from_browser.json()["link"].startswith("http://localhost:5687/reset-access#"))
+
+    def test_a_local_stack_resets_access_too(self):
+        # Nobody sets another person's password locally either: an admin's reset link instead
+        name, user_id, _ = self.new_user()
+        self.settings.rowanholt_server_mode = False
+        try:
+            token = self.issue(user_id)
+            secret = self.start(token).json()["secret"]
+            done = self.complete(token, self.code(secret))
+            self.assertEqual(done.status_code, 200, done.text)
+        finally:
+            self.settings.rowanholt_server_mode = True
+        self.assertEqual(self.password_step(name, NEW_PASSWORD).json()["mfa_required"], True)
 
 
 if __name__ == "__main__":

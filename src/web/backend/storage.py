@@ -179,8 +179,7 @@ class CaseActivityModel(Base):
 
 class AuditLogModel(Base):
     """Security events outside a case, append-only: licence installs and removals (licence.py).
-    The shape of models/database.py's AuditLog, but with no foreign key: Rowanholt's accounts live
-    in users.json, not in the database, so user_id is the users.json id and username is kept too."""
+    No foreign key: Rowanholt's accounts live in users.json, not in the database, so user_id is the users.json id and username is kept too."""
     __tablename__ = "audit_logs"
 
     id = Column(String(36), primary_key=True)

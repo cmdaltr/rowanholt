@@ -83,7 +83,7 @@ The old Docker volumes are left as they were; the script prints the command to r
 
 - **Web Interface:** http://localhost:5687
 - **Backend API:** http://localhost:5688
-- **For a team:** one Rowanholt on a central server, behind HTTPS and sign-in (optionally SSO), with every case shared by the team and each analyst's disk and memory images kept to them: `rowanholt server init <hostname>`, then [docs/SERVER.md](docs/SERVER.md)
+- **For a team:** one Rowanholt on a central server, behind HTTPS and sign-in (optionally SSO), with every case shared by the team and each analyst's disk and memory images kept to them: `rowanholt server init <hostname> --admin <email>`, whose first admin comes from a one-time invitation link (no default account), then [docs/SERVER.md](docs/SERVER.md)
 
 ### Quick Commands
 

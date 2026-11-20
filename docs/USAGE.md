@@ -20,11 +20,11 @@
 
 Open your browser to: **http://localhost:5687**
 
-**Default Login:**
-- **Email**: admin@rowanholt.app
-- **Password**: IWasThere3000YearsAgo!
+**Default Login** (your own machine; signing in is optional there):
+- **Username**: admin (or admin@rowanholt.app)
+- **Password**: 3000YearsAgo
 
-⚠️ **Change this password immediately in production!**
+It's made only while the stack is published on this machine alone (`ROWANHOLT_BIND`, loopback by default). A team server has no default account: its first admin comes from a one-time invitation ([SERVER.md](SERVER.md#the-first-admin)).
 
 ### 2. Create a Forensic Analysis Job
 
@@ -127,7 +127,7 @@ rowanholt server users invite analyst@company.com                 # or --role ad
 
 It prints a link to pass on, which works once, for 24 hours: the person opens it, chooses a username and password, sets up an authenticator app, saves their backup codes, and is signed in ([SERVER.md](SERVER.md#inviting-people)). The API is `POST /api/auth/users/invitations` ([API.md](API.md#invitations)).
 
-**On your own machine**, the sign-up page makes an account, or the API:
+**On your own machine** (published on loopback, the default `ROWANHOLT_BIND`), the sign-up page makes an account, or the API. Nobody sets another person's password; someone locked out gets a reset link (`docker exec rowanholt-backend python -m auth.manage_users reset-access <username>`), or asks for one from Forgot password when email is set up ([SERVER.md](SERVER.md#email)):
 ```bash
 curl -X POST http://localhost:5688/api/auth/register \
   -H "Content-Type: application/json" \
@@ -139,8 +139,6 @@ curl -X POST http://localhost:5688/api/auth/register \
   }'
 ```
 
-> The password reset and admin user screens below depend on `auth/routes.py`, which the backend does not mount in the current build (it uses the simple file-based router). See [API.md](API.md#authentication-status).
-
 ### Multi-Factor Authentication
 
 On a team server, a password account can add a code from an authenticator app (Microsoft Authenticator, Google Authenticator, 1Password, Authy: any TOTP app) to its sign-in. Under **Account → Security**:
@@ -151,29 +149,19 @@ On a team server, a password account can add a code from an authenticator app (M
 
 From then on, signing in asks for the app's code (or a backup code) after the password. The Backup Codes panel shows how many are left, and **Generate** makes ten new ones in place of the rest, for a code from the app. **New authenticator** moves MFA to another phone (a current code first, then the new QR code), and **Disable MFA** needs your password and a code.
 
-If you've lost the phone and the backup codes (or your password as well), an admin gives you a reset link (`rowanholt server users reset-access <username>`): open it, choose a new password, set up your authenticator again and save the new backup codes, and you're signed in. Or they turn MFA off for you (`rowanholt server users mfa-reset <username>`, or `DELETE /api/auth/users/{id}/mfa`) and you set it up again. A server with `ROWANHOLT_REQUIRE_MFA=true` lets a password account without MFA in only to set it up, and doesn't offer turning it off.
+If you've forgotten your password, or lost the phone and the backup codes, you need a reset link: **Forgot password?** emails one when email is set up, or an admin gives you one (`rowanholt server users reset-access <username>`). Open it, choose a new password, set up your authenticator again and save the new backup codes, and you're signed in. Or they turn MFA off for you (`rowanholt server users mfa-reset <username>`, or `DELETE /api/auth/users/{id}/mfa`) and you set it up again. A server with `ROWANHOLT_REQUIRE_MFA=true` lets a password account without MFA in only to set it up, and doesn't offer turning it off.
 
-Accounts that sign in with single sign-on get MFA from the identity provider (require it there: Entra ID Conditional Access, Okta's sign-on policies, Keycloak's OTP), and the panel says so; with `ROWANHOLT_LOCAL_LOGIN=false` only admins keep a password, for break-glass use. API tokens need no second factor. On your own machine there's no sign-in for MFA to protect: the panels say it applies to a team server's sign-in. See [SECURITY.md](SECURITY.md#multi-factor-authentication).
+Accounts that sign in with single sign-on get MFA from the identity provider (require it there: Entra ID Conditional Access, Okta's sign-on policies, Keycloak's OTP), and the panel says so; with `ROWANHOLT_LOCAL_LOGIN=false` only admins keep a password, for break-glass use. API tokens need no second factor. On your own machine there's no sign-in for MFA to protect, and the panels say it applies to a team server's sign-in, except for an account that already has MFA on (a reset link turns it on there too): it manages it as on a server. See [SECURITY.md](SECURITY.md#multi-factor-authentication).
 
-### Reset User Password (Admin)
+### Reset Someone's Access (Admin)
 
-**Via Web Interface:**
-1. Navigate to Admin → Users
-2. Select user
-3. Click "Reset Password"
-4. Enter new password
-5. Click "Confirm"
+Nobody sets another person's password. An admin gives them a one-time reset link instead, which works once, for 24 hours: they choose a new password, set up their authenticator again and save new backup codes. Issuing it ends their sessions and revokes their API tokens.
 
-**Via API:**
 ```bash
-curl -X POST http://localhost:5688/api/auth/admin/reset-user-password \
-  -H "Authorization: Bearer ADMIN_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": "user-uuid-here",
-    "new_password": "NewSecurePass123!"
-  }'
+rowanholt server users reset-access <username|email>
 ```
+
+The API is `POST /api/auth/users/{id}/reset-access` ([API.md](API.md#reset-access)). With email set up, people can also ask for their own link from **Forgot password?** on the sign-in page ([SERVER.md](SERVER.md#email)).
 
 ---
 
@@ -357,7 +345,7 @@ The Navigator layer is written by Ledger (`<case>_navigator.json`) or downloaded
 ```bash
 # Login
 TOKEN=$(curl -s -X POST http://localhost:5688/api/auth/login \
-  -d "username=admin@rowanholt.app" --data-urlencode "password=IWasThere3000YearsAgo!" \
+  -d "username=admin@rowanholt.app" --data-urlencode "password=3000YearsAgo" \
   | jq -r '.access_token')
 
 # Use token in requests
@@ -435,7 +423,7 @@ ls -la /tmp/rowanholt
 
 ### Can't Login
 
-Users are stored in the JSON file named by `USERS_FILE` (default `/app/data/users.json` in the backend container). When the file has no users, the next login creates the default admin from `default_admin_email` and `default_admin_password` in `config.py`. Moving the file aside resets it (`/app/data` is `src/web/backend/data` on the host); other accounts are kept in the `.bak` copy:
+Users are stored in the JSON file named by `USERS_FILE` (default `/app/data/users.json` in the backend container). When the file has no users, the next login on a local stack creates the default admin from `default_admin_email` and `default_admin_password` in `config.py` (`admin` / `3000YearsAgo`), if it's published on loopback; a team server makes none (`rowanholt server users first-admin <email>`). Moving the file aside resets it (`/app/data` is `src/web/backend/data` on the host); other accounts are kept in the `.bak` copy:
 
 ```bash
 docker exec rowanholt-backend mv /app/data/users.json /app/data/users.json.bak

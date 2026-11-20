@@ -516,6 +516,7 @@ PROCESSING STAGES:
        │  ✗ Cannot save data
        │  ✗ Cannot export/import
        │  ⏰ Auto-expire (1 hour)
+       │  ⌂ Local stack on loopback only
        │
        ▼
 ┌─────────────┐
@@ -693,7 +694,7 @@ audit_logs:     user_id, timestamp, action
 
 ### 6.2 Tables in Postgres today
 
-The diagram above is the original design. What Postgres holds now, created by the Alembic migrations in `src/web/backend/alembic/versions/` (users live in a file store, `auth/users.py`, not in Postgres):
+The diagram above is the original design. What Postgres holds now, created by the Alembic migrations in `src/web/backend/alembic/versions/` (accounts and pending invitations live in files, `users.json` and `invitations.json` through `auth/users.py` and `auth/invitations.py`, not in Postgres; `docs/diagrams/database_erd.dot` draws both):
 
 | Table | Holds | Migration |
 |---|---|---|
@@ -721,14 +722,13 @@ Case data itself stays in case directories on disk; nothing in Postgres copies e
 /api
 │
 ├── /auth                              [Authentication]
-│   ├── POST   /register              Register new user
+│   ├── POST   /register              Sign up (local stack on loopback only)
 │   ├── POST   /login                 Login with credentials
 │   ├── POST   /logout                Logout current session
-│   ├── POST   /guest                 Login as guest
+│   ├── POST   /guest                 Login as guest (local stack on loopback only)
 │   ├── GET    /me                    Get current user info
-│   ├── POST   /forgot-password       410: no email, says how to reset
-│   ├── POST   /reset-password        App code + backup code set a new password
-│   ├── POST   /reset-access/start|complete  An admin's link: new password, authenticator, codes
+│   ├── POST   /forgot-password       Emails a reset-access link (needs SMTP and the public URL)
+│   ├── POST   /reset-access/start|complete  A reset link (an admin's or emailed): new password, authenticator, codes
 │   └── POST   /invitations/accept[/start|/complete]  An invitation: the account made at the end
 │
 ├── /jobs                              [Job Management]

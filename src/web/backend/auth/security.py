@@ -85,8 +85,3 @@ def verify_token(token: str) -> Optional[dict]:
         return payload
     except JWTError:
         return None
-
-
-def generate_password_reset_token() -> str:
-    """Generate a secure password reset token."""
-    return str(uuid.uuid4())

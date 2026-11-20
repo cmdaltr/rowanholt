@@ -14,8 +14,8 @@ const LoginPage = () => {
   const [figure] = useState(() => JOURNEYS[Math.floor(Math.random() * JOURNEYS.length)]);
   // Straight from Register: say the account was made and fill its username in
   // ... or from Forgot Password, with a new password set by a backup code
-  const { registered, reset } = useLocation().state || {};
-  const [username, setUsername] = useState(registered || reset || '');
+  const { registered } = useLocation().state || {};
+  const [username, setUsername] = useState(registered || '');
   const [password, setPassword] = useState('');
   const [searchParams] = useSearchParams();
   const [error, setError] = useState(searchParams.get('sso_error') || '');
@@ -144,12 +144,6 @@ const LoginPage = () => {
           </div>
         )}
 
-        {reset && !error && !challenge && (
-          <div className="alert-success" data-testid="reset">
-            Password changed. Please sign in.
-          </div>
-        )}
-
         {challenge && (
           <form onSubmit={handleSecondFactor} data-testid="mfa-step">
             <p style={{ marginBottom: '1rem' }}>
@@ -220,7 +214,7 @@ const LoginPage = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter password"
-              autoFocus={Boolean(registered || reset)}
+              autoFocus={Boolean(registered)}
               required
               disabled={loading}
             />

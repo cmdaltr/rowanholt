@@ -56,9 +56,12 @@ services:
     ports:
       # This machine only. Outside server mode the API answers anyone who reaches it, as the local
       # analyst (an admin): it isn't published to the network. A team server publishes nothing but
-      # its proxy (deploy/server/docker-compose.server.yml resets these)
-      - "127.0.0.1:5688:5688"
+      # its proxy (deploy/server/docker-compose.server.yml resets these). ROWANHOLT_BIND moves it, and
+      # the backend then seeds no default admin (auth/users.init_default_admin): run a server instead
+      - "${ROWANHOLT_BIND:-127.0.0.1}:5688:5688"
     environment:
+      # Where the API and web app are published: the default admin is seeded only on loopback
+      - ROWANHOLT_BIND=${ROWANHOLT_BIND:-127.0.0.1}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - CELERY_BROKER_URL=redis://redis:6379/0
@@ -81,6 +84,13 @@ services:
       # Online lookups (.env.example): Pippin's VirusTotal button needs "virustotal" and the key
       - ROWANHOLT_ONLINE_LOOKUPS=${ROWANHOLT_ONLINE_LOOKUPS:-}
       - VIRUSTOTAL_API_KEY=${VIRUSTOTAL_API_KEY:-}
+      # Email for Forgot password's reset link (mailer.py, .env.example): nothing is sent without a host
+      - ROWANHOLT_SMTP_HOST=${ROWANHOLT_SMTP_HOST:-}
+      - ROWANHOLT_SMTP_PORT=${ROWANHOLT_SMTP_PORT:-587}
+      - ROWANHOLT_SMTP_USERNAME=${ROWANHOLT_SMTP_USERNAME:-}
+      - ROWANHOLT_SMTP_PASSWORD=${ROWANHOLT_SMTP_PASSWORD:-}
+      - ROWANHOLT_SMTP_FROM=${ROWANHOLT_SMTP_FROM:-}
+      - ROWANHOLT_SMTP_STARTTLS=${ROWANHOLT_SMTP_STARTTLS:-true}
     volumes:
       - ./src/web/backend:/app
       - ./src/mordor:/opt/rowanholt/src/mordor # Mordor: recorded attack telemetry (/api/mordor/telemetry)
@@ -252,7 +262,7 @@ services:
     container_name: rowanholt-frontend
     ports:
       # This machine only, like the API: the dev server is the local analyst's web app
-      - "127.0.0.1:5687:3000"
+      - "${ROWANHOLT_BIND:-127.0.0.1}:5687:3000"
     environment:
       - REACT_APP_API_URL=http://localhost:5688
     volumes:

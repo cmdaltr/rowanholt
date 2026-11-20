@@ -358,9 +358,9 @@ export const GUIDE_PAGES = [
       {
         id: 'account.settings',
         title: 'Account settings',
-        what: 'Profile, API tokens for scripting against Rowanholt, password, the AI service and SIEM connections. Security has multi-factor authentication for a team server\'s password accounts: a code from an authenticator app after your password, and ten single-use backup codes for a lost phone. Single sign-on accounts get MFA from the identity provider instead, and on your own machine there is no sign-in for it to protect.',
+        what: 'Profile, API tokens for scripting against Rowanholt, password, the AI service and SIEM connections. Security has multi-factor authentication for a team server\'s password accounts: a code from an authenticator app after your password, and ten single-use backup codes for a lost phone. Single sign-on accounts get MFA from the identity provider instead. On your own machine there is no sign-in for it to protect, unless a reset link has turned it on for your account. Lost your password? Forgot password on the sign-in page emails you a reset link when this Rowanholt sends email; otherwise an admin gives you one.',
         who: 'Every user; API tokens for those automating Rowanholt.',
-        when: 'Changing the first password you were given (do this first), or wiring Rowanholt into your own scripts.',
+        when: 'Changing the default admin password on your own machine (do this first), or wiring Rowanholt into your own scripts.',
       },
     ],
   },

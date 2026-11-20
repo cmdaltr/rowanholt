@@ -121,7 +121,7 @@ digraph SystemArchitecture {
     // Connections - Data Layer
     business_logic -> postgresql [label="CRUD\nOperations"];
     business_logic -> redis [label="Queue/\nLockout"];
-    business_logic -> user_files [label="Accounts"];
+    business_logic -> user_files [label="Accounts\n(file lock)"];
     forensic_engine -> filesystem [label="Read/Write\nEvidence"];
     celery_workers -> redis [label="Task\nQueue"];
     smith_routes -> filesystem [label="Case Files\n(read-only)"];

@@ -56,8 +56,7 @@ PUBLIC_PATHS = {
     "/api/auth/login",
     "/api/auth/login/mfa",  # the second step: the challenge from the first is its credential
     "/api/auth/logout",
-    "/api/auth/reset-password",  # a forgotten password: a backup code is its credential
-    "/api/auth/forgot-password",  # refuses, saying how to reset instead
+    "/api/auth/forgot-password",  # emails a reset link (or says to ask an admin): the same answer for anyone
     "/api/auth/reset-access/start",  # an admin's reset link: its token is the credential
     "/api/auth/reset-access/complete",
     "/api/auth/invitations/accept",  # an admin's invitation: its token is the credential

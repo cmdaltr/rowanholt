@@ -32,7 +32,7 @@ digraph DatabaseERD {
     threat_intel_validity [label="<f0> THREAT_INTEL_VALIDITY|<f1> PK: indicator_id → threat_intel_indicators.id|valid_until|confidence|first_seen", fillcolor="#20c997"];
 
     // Files beside the database (src/web/backend/data)
-    users_json [shape=note, fillcolor="#51cf66", label="users.json (not a table):\n• accounts: username, email, role, password hash\n• MFA secret, backup codes\n• reset-access link (its hash) and pending secret\n• sessions_after (sessions before it refused)\n\ninvitations.json (not a table):\n• pending invitations: email, role, token hash"];
+    users_json [shape=note, fillcolor="#51cf66", label="users.json (not a table):\n• accounts: username, email, role, password hash\n• MFA secret, backup codes\n• reset-access link (its hash, 24 hours) and pending secret\n• sessions_after (sessions before it refused)\n\ninvitations.json (not a table):\n• pending invitations: email, role, token hash,\n  pending secret, wrong codes (closes at 5)\n\nBoth written under one lock (users.json.lock)\nby the API and the CLI alike"];
 
     // Relationships
     jobs:f1 -> job_access:f1 [label="1:1", color="#ffa94d"];
