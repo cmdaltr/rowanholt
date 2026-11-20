@@ -193,8 +193,8 @@ class InvitationTest(BackendCase):
         username = email.split("@")[0]
         secret = self.start(token, username).json()["secret"]
         self.assertEqual(self.complete(token, username, self.code(secret)).status_code, 200)
-        self.assertEqual(self.preview(token).status_code, 400)
-        self.assertEqual(self.complete(token, username + "2", self.code(secret)).status_code, 400)
+        self.assertEqual(self.preview(token).status_code, 404)
+        self.assertEqual(self.complete(token, username + "2", self.code(secret)).status_code, 404)
 
     def test_an_invitation_expires_after_24_hours(self):
         email = self.email()
@@ -211,13 +211,13 @@ class InvitationTest(BackendCase):
         # A day later it's dropped
         self.now += self.invitations.KEEP_EXPIRED_SECONDS
         self.issue(self.email())
-        self.assertEqual(self.preview(token).status_code, 400)
+        self.assertEqual(self.preview(token).status_code, 404)
 
     def test_a_newer_invitation_replaces_an_older_one(self):
         email = self.email()
         first, old = self.issue(email)
         second, new = self.issue(email, "admin")
-        self.assertEqual(self.preview(old).status_code, 400)
+        self.assertEqual(self.preview(old).status_code, 404)
         self.assertEqual(self.preview(new).json()["role"], "admin")
         ids = [inv["id"] for inv in self.client.get("/api/auth/users/invitations", headers=self.admin).json()]
         self.assertIn(second["id"], ids)
@@ -231,8 +231,8 @@ class InvitationTest(BackendCase):
         self.assertIn("reset-access", refused.json()["detail"])
         self.assertEqual(self.invite("not-an-email").status_code, 400)
         self.assertEqual(self.invite(self.email(), "superuser").status_code, 400)
-        self.assertEqual(self.start("not-a-token", "someone").status_code, 400)
-        self.assertEqual(self.preview("").status_code, 400)
+        self.assertEqual(self.start("not-a-token", "someone").status_code, 404)
+        self.assertEqual(self.preview("").status_code, 404)
         _, token = self.issue(self.email())
         self.assertEqual(self.complete(token, "x" * 5, "123456").status_code, 400)  # no authenticator yet
         self.assertEqual(self.complete(token, "x" * 5, "123456", password="short").status_code, 400)
@@ -252,7 +252,7 @@ class InvitationTest(BackendCase):
         self.assertEqual(closed.json()["detail"], self.invitations.CLOSED)
         self.assertNotIn(invitation_id, self.invitations.load())  # its authenticator gone with it
         # The right code is too late: the admin issues a new invitation
-        self.assertEqual(self.complete(token, username, self.code(secret)).status_code, 400)
+        self.assertEqual(self.complete(token, username, self.code(secret)).status_code, 404)
         self.assertIsNone(self.find(username))
         failed = self.audited(invitation_id, "invitation_wrong_code")
         self.assertEqual([row["details"]["attempt"] for row in failed], [1, 2, 3, 4, 5])
@@ -325,7 +325,7 @@ class InvitationTest(BackendCase):
         self.assertNotIn("token_hash", mine)
         withdrawn = self.client.delete(f"/api/auth/users/invitations/{invitation['id']}", headers=self.admin)
         self.assertEqual(withdrawn.status_code, 200, withdrawn.text)
-        self.assertEqual(self.preview(token).status_code, 400)
+        self.assertEqual(self.preview(token).status_code, 404)
         self.assertEqual(self.client.delete(f"/api/auth/users/invitations/{invitation['id']}",
                                             headers=self.admin).status_code, 404)
         self.assertEqual(len(self.audited(invitation["id"], "invitation_revoked")), 1)
@@ -441,7 +441,7 @@ class InvitationTest(BackendCase):
                 manage_users.main(["revoke-invitation", invitation["id"]])
             with self.assertRaisesRegex(SystemExit, "already has an account"):
                 manage_users.main(["invite", "alice@example.org"])
-        self.assertEqual(self.preview(token).status_code, 400)
+        self.assertEqual(self.preview(token).status_code, 404)
 
 
 if __name__ == "__main__":

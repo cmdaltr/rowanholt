@@ -312,7 +312,8 @@ curl -X POST https://rowanholt.example/api/auth/reset-access/complete \
 ```
 
 **Errors:**
-- `400 Bad Request`: the link isn't valid, has been used or replaced, the code is wrong, `start` wasn't called, or a new password under 12 characters
+- `400 Bad Request`: the code is wrong, `start` wasn't called, or a new password under 12 characters
+- `404 Not Found`: the link isn't valid, has been used or replaced (as in Ostraka and Shikari)
 - `410 Gone`: the link has expired (24 hours after it was issued), for a day after that; then it reads as not valid. Ask an admin for a new one, or Forgot Password
 - `429 Too Many Requests`: the account is locked after failed sign-ins or wrong codes here, at `start` and `complete` as at sign-in; wait and try again
 
@@ -395,7 +396,8 @@ The same can be done from the host with `rowanholt server users` ([SERVER.md](SE
 **Description:** The page behind an invitation (`/accept-invite#<token>`, `auth/invitations.py`). `accept` takes `{"token"}` and returns `email`, `role`, `full_name`, a suggested `username` (the email's first part, made free) and `expires_in` (seconds). `start` takes `{"token", "username"}`, checks the username is well formed and free, and returns an authenticator to set up (`username`, `secret`, `otpauth_uri`, `qr_svg`), kept encrypted with the invitation; calling it again (a reload, a second tab) shows the same one. `complete` takes `{"token", "username", "full_name", "new_password", "code"}` with a code from that authenticator, and only then is the account made, with the invited role and MFA on whether or not the server requires it. The answer is the [Login](#login) answer plus `backup_codes`, shown this once; the invitation is used up. Audited as `account_created`. Each wrong code is audited (`invitation_wrong_code`), and the fifth closes the invitation (`invitation_closed`): the admin issues a new one. An invitation an admin made is refused if that admin has since been disabled or is no longer an admin; the server's own (the CLI, `first-admin`) have no inviter to check.
 
 **Errors:**
-- `400 Bad Request`: the invitation isn't valid or has been used, the username is taken or malformed, the code is wrong (the fifth says the invitation is now closed), `start` wasn't called, or a password under 12 characters
+- `400 Bad Request`: the username is taken or malformed, the code is wrong (the fifth says the invitation is now closed), `start` wasn't called, or a password under 12 characters
+- `404 Not Found`: the invitation isn't valid, has been used, replaced or closed (as in Ostraka and Shikari)
 - `402 Payment Required`: the licence's places filled since the invitation was made
 - `403 Forbidden`: whoever invited them can no longer invite
 - `409 Conflict`: the email has an account now
