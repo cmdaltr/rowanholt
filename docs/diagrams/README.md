@@ -160,7 +160,7 @@ rankdir=LR;  // Left to Right
 
 ### GitHub Actions
 
-**File:** `.github/workflows/generate-diagrams.yml`
+The repository has no such workflow; this is one way to add it, as `.github/workflows/generate-diagrams.yml`:
 
 ```yaml
 name: Generate Architecture Diagrams

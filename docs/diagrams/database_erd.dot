@@ -6,31 +6,46 @@ digraph DatabaseERD {
     node [fontname="Arial", fontsize=9, style=filled, shape=record, fillcolor="#2d2d44", fontcolor="#f0dba5", color="#3f4b2a"];
     edge [fontname="Arial", fontsize=8, color="#66d9ef", fontcolor="#a7db6c"];
 
-    // Users table
-    users [label="<f0> USERS|<f1> PK: id (UUID)|email (unique)|username (unique)|hashed_password|full_name|role (ENUM)|is_active (bool)|created_at|last_login|password_reset_token|password_reset_expires", fillcolor="#4dabf7"];
-
-    // UserSettings table
-    user_settings [label="<f0> USER_SETTINGS|<f1> PK: id (UUID)|<f2> FK: user_id → users.id|theme|notifications_enabled|auto_refresh_interval|default_analysis_options (JSON)|custom_settings (JSON)|created_at|updated_at", fillcolor="#51cf66"];
-
-    // Accounts table
-    accounts [label="<f0> ACCOUNTS|<f1> PK: id (UUID)|<f2> FK: user_id → users.id|account_type|name|credentials (JSON, encrypted)|endpoint_url|is_active|created_at|updated_at", fillcolor="#ffd43b"];
+    // The tables storage.py makes (its Base.metadata). Accounts aren't in the database: they're in
+    // users.json, so user_id columns are plain strings with no foreign key
 
     // Jobs table
-    jobs [label="<f0> JOBS|<f1> PK: id (UUID)|<f2> FK: user_id → users.id|case_number|source_paths (JSON array)|destination_path|options (JSON)|status (ENUM)|progress (INT 0-100)|log (JSON array)|result (JSON)|error (TEXT)|celery_task_id|created_at|started_at|completed_at|archived_at", fillcolor="#ff6b6b"];
+    jobs [label="<f0> JOBS|<f1> PK: id|case_number|source_paths (JSON array)|destination_path|options (JSON)|status (ENUM)|progress (INT 0-100)|log (JSON array)|result (JSON)|error (TEXT)|celery_task_id|pending_action|created_at|started_at|completed_at|archived_at|archived_from", fillcolor="#ff6b6b"];
 
-    // Sessions table
-    sessions [label="<f0> SESSIONS|<f1> PK: id (UUID)|<f2> FK: user_id → users.id|token (JWT)|ip_address|user_agent|is_active|created_at|expires_at|last_activity", fillcolor="#fa5252"];
+    // JobAccess table
+    job_access [label="<f0> JOB_ACCESS|<f1> PK: job_id → jobs.id|owner_id → users.json|owner_username|shared_with (JSON)", fillcolor="#ffa94d"];
+
+    // Case browser tables
+    case_findings [label="<f0> CASE_FINDINGS|<f1> PK: id|<f2> job_id → jobs.id|host|artefact|row_ref|row_hash|excerpt|title|technique|status|author|created_at|updated_at", fillcolor="#4dabf7"];
+    case_notes [label="<f0> CASE_NOTES|<f1> PK: id|<f2> job_id → jobs.id|<f3> finding_id → case_findings.id|author|body|created_at", fillcolor="#4dabf7"];
+    case_hosts [label="<f0> CASE_HOSTS|<f1> PK: job_id → jobs.id|PK: host|assignee|status|updated_by|updated_at", fillcolor="#4dabf7"];
+    case_activity [label="<f0> CASE_ACTIVITY|<f1> PK: id|<f2> job_id → jobs.id|actor|action|detail|created_at", fillcolor="#4dabf7"];
+
+    // ApiTokens table
+    api_tokens [label="<f0> API_TOKENS|<f1> PK: id|user_id → users.json|username|name|token_hash (unique)|prefix|scope|created_at|expires_at|last_used_at|revoked_at", fillcolor="#ffd43b"];
 
     // AuditLogs table
-    audit_logs [label="<f0> AUDIT_LOGS|<f1> PK: id (UUID)|<f2> FK: user_id → users.id|action|resource_type|resource_id|details (JSON)|ip_address|timestamp", fillcolor="#845ef7"];
+    audit_logs [label="<f0> AUDIT_LOGS|<f1> PK: id|user_id → users.json|username|action|resource_type|resource_id|details (JSON)|ip_address|timestamp", fillcolor="#845ef7"];
+
+    // Threat intelligence tables
+    threat_intel_indicators [label="<f0> THREAT_INTEL_INDICATORS|<f1> PK: id|evidential_element|threat_group|procedure_example|technique_id|technique_name|tactic|contextual_evidence|reference_url|navigation_layer_url|source_type", fillcolor="#20c997"];
+    threat_intel_validity [label="<f0> THREAT_INTEL_VALIDITY|<f1> PK: indicator_id → threat_intel_indicators.id|valid_until|confidence|first_seen", fillcolor="#20c997"];
+
+    // Files beside the database (src/web/backend/data)
+    users_json [shape=note, fillcolor="#51cf66", label="users.json (not a table):\n• accounts: username, email, role, password hash\n• MFA secret, backup codes\n• reset-access link (its hash) and pending secret\n• sessions_after (sessions before it refused)\n\ninvitations.json (not a table):\n• pending invitations: email, role, token hash"];
 
     // Relationships
-    users:f1 -> user_settings:f2 [label="1:1", color="#51cf66"];
-    users:f1 -> accounts:f2 [label="1:N", color="#ffd43b"];
-    users:f1 -> jobs:f2 [label="1:N", color="#ff6b6b"];
-    users:f1 -> sessions:f2 [label="1:N", color="#fa5252"];
-    users:f1 -> audit_logs:f2 [label="1:N", color="#845ef7"];
+    jobs:f1 -> job_access:f1 [label="1:1", color="#ffa94d"];
+    jobs:f1 -> case_findings:f2 [label="1:N", color="#4dabf7"];
+    jobs:f1 -> case_notes:f2 [label="1:N", color="#4dabf7"];
+    case_findings:f1 -> case_notes:f3 [label="1:N", color="#4dabf7"];
+    jobs:f1 -> case_hosts:f1 [label="1:N", color="#4dabf7"];
+    jobs:f1 -> case_activity:f2 [label="1:N", color="#4dabf7"];
+    threat_intel_indicators:f1 -> threat_intel_validity:f1 [label="1:1", color="#20c997"];
+    users_json -> api_tokens:f0 [label="user_id", style=dashed, color="#ffd43b"];
+    users_json -> audit_logs:f0 [label="user_id", style=dashed, color="#845ef7"];
+    users_json -> job_access:f0 [label="owner_id", style=dashed, color="#ffa94d"];
 
     // Indexes annotation
-    indexes [shape=note, fillcolor="#20c997", label="INDEXES:\n• users: email, username, role\n• accounts: user_id, account_type\n• jobs: user_id, status, case_number, created_at\n• sessions: token, user_id, expires_at\n• audit_logs: user_id, timestamp, action"];
+    indexes [shape=note, fillcolor="#20c997", label="INDEXES:\n• jobs: status, case_number, created_at\n• job_access: owner_id\n• case_findings: job_id\n• case_notes: job_id, finding_id\n• case_activity: job_id, created_at\n• api_tokens: user_id, token_hash (unique)\n• audit_logs: user_id, timestamp, action\n• threat_intel_indicators: threat_group, source_type\n• threat_intel_validity: valid_until"];
 }

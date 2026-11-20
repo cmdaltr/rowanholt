@@ -6,36 +6,55 @@ digraph JobStateMachine {
     node [fontname="Arial", fontsize=10, style=filled, shape=box, fillcolor="#2d2d44", fontcolor="#f0dba5", color="#3f4b2a"];
     edge [fontname="Arial", fontsize=9, color="#66d9ef", fontcolor="#a7db6c"];
 
-    // States
-    queued [label="QUEUED\n(Saved for Later)", shape=rect, fillcolor="#845ef7"];
-    pending [label="PENDING\n(Ready to Start)", shape=rect, fillcolor="#4dabf7"];
+    // States (models/job.py JobStatus)
+    pending [label="PENDING\n(Queued for the Worker)", shape=rect, fillcolor="#4dabf7"];
     running [label="RUNNING\n(Executing)", shape=ellipse, fillcolor="#ffd43b"];
+    paused [label="PAUSED\n(Process Group Stopped)", shape=rect, fillcolor="#ffa94d"];
+    awaiting [label="AWAITING_CONFIRMATION\n(Old Output Not Removed)", shape=rect, fillcolor="#845ef7"];
+    removing [label="REMOVING\n(Removing Old Output)", shape=rect, fillcolor="#74c0fc"];
     completed [label="COMPLETED\n(Success)", shape=rect, fillcolor="#51cf66"];
     failed [label="FAILED\n(Error)", shape=rect, fillcolor="#ff6b6b"];
     cancelled [label="CANCELLED\n(User Stopped)", shape=rect, fillcolor="#fa5252"];
     archived [label="ARCHIVED\n(Historical)", shape=rect, fillcolor="#20c997"];
 
-    // Transitions
-    queued -> pending [label="Start Job", color="#4dabf7"];
-    pending -> running [label="Celery Task\nDispatched", color="#ffd43b"];
+    // Normal flow
+    pending -> running [label="Worker\nStarts It", color="#ffd43b"];
     running -> completed [label="Success", color="#51cf66"];
     running -> failed [label="Error/Exception", color="#ff6b6b"];
-    running -> cancelled [label="User Cancels", color="#fa5252"];
+    running -> paused [label="Pause", color="#ffa94d"];
+    paused -> running [label="Resume", color="#ffd43b"];
 
-    // Archive transitions
+    // Cancelling (pending, running or paused)
+    pending -> cancelled [label="Cancel", color="#fa5252"];
+    running -> cancelled [label="Cancel", color="#fa5252"];
+    paused -> cancelled [label="Cancel", color="#fa5252"];
+
+    // Liveness (job_liveness.py): no heartbeat from the worker
+    pending -> failed [label="Lost\n(no heartbeat)", color="#ff6b6b", style=bold];
+    running -> failed [label="Lost\n(no heartbeat)", color="#ff6b6b", style=bold];
+
+    // A fresh run's old output (output_removal.py, removal_routes.py)
+    pending -> awaiting [label="Removal\nFailed", color="#845ef7"];
+    awaiting -> removing [label="Try Again", color="#74c0fc"];
+    removing -> pending [label="Removed", color="#4dabf7"];
+    removing -> failed [label="Failed Again", color="#ff6b6b"];
+    awaiting -> failed [label="Give Up", color="#ff6b6b"];
+
+    // Archive transitions (not while pending, running, paused or removing)
     completed -> archived [label="Archive", color="#20c997"];
     failed -> archived [label="Archive", color="#20c997"];
     cancelled -> archived [label="Archive", color="#20c997"];
 
-    // Restore transitions
+    // Restore from archive: the status it was archived from (archived_from)
     archived -> completed [label="Restore\n(was completed)", color="#51cf66", style=dashed];
     archived -> failed [label="Restore\n(was failed)", color="#ff6b6b", style=dashed];
+    archived -> cancelled [label="Restore\n(was cancelled)", color="#fa5252", style=dashed];
 
-    // Restart transitions
+    // Restart transitions (completed, failed or cancelled)
     failed -> pending [label="Restart", color="#4dabf7", style=dotted];
     cancelled -> pending [label="Restart", color="#4dabf7", style=dotted];
     completed -> pending [label="Re-run", color="#4dabf7", style=dotted];
 
     // Legend
-    legend [shape=note, fillcolor="#1a1a2e", fontcolor="#f0dba5", label="STATE TRANSITIONS:\n━━━ Normal Flow\n┄┄┄ Restart/Re-run\n- - - Restore from Archive"];
+    legend [shape=note, fillcolor="#1a1a2e", fontcolor="#f0dba5", label="STATE TRANSITIONS:\n━━━ Normal Flow\n▬▬▬ Liveness Check\n┄┄┄ Restart/Re-run\n- - - Restore from Archive"];
 }

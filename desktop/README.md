@@ -30,7 +30,7 @@ Setup covers the same three things everywhere.
 
 Rocky, RHEL and Alma have no desktop package, as Shikari has none: they run Rowanholt as a team server (`rowanholt server init`, [docs/SERVER.md](../docs/SERVER.md#rocky-rhel-and-alma)), and `desktop/install.sh` says so there. A checkout's `rowanholt app install` still works on a Rocky desktop: the launcher there says Docker Engine comes from Docker's own repository, not the distribution's (which ships Podman, unsupported), and SELinux stays enforcing, the containers that mount evidence folders running unlabelled rather than relabelling the evidence.
 
-**Evidence folders** (optional). Setup writes `docker-compose.local.yml`, which the launcher adds to the stack when it exists. The file is gitignored, so pulls never touch it. Each folder is mounted read-only in the backend and read-write in the worker. On macOS and Linux it appears at the same path inside the containers. On Windows, `D:\Cases` appears as `/mnt/d/Cases`. A `docker-compose.local.yml` you wrote by hand is left alone. To change the folders later: **Rowanholt › Set Up Rowanholt…** (macOS), the **Set Up Rowanholt** action on the menu entry (Linux), or the **Set Up Rowanholt** Start menu entry (Windows).
+**Evidence folders** (optional). Setup writes `docker-compose.local.yml`, which the launcher adds to the stack when it exists. The file is gitignored, so pulls never touch it. Each folder is mounted read-only in the backend and in Splunk (which reads a case from beside its evidence), and read-write in the worker. On macOS and Linux it appears at the same path inside the containers. On Windows, `D:\Cases` appears as `/mnt/d/Cases`. A `docker-compose.local.yml` you wrote by hand is left alone. To change the folders later: **Rowanholt › Set Up Rowanholt…** (macOS), the **Set Up Rowanholt** action on the menu entry (Linux), or the **Set Up Rowanholt** Start menu entry (Windows).
 
 ### Signing
 
@@ -113,7 +113,7 @@ A release install (not a checkout's build) asks GitHub for the latest published 
 | Linux | A notification and a dialog giving the command, since apt needs a password the menu entry can't ask for: `sh /opt/rowanholt/install.sh --version <tag>`. **Later** or **Skip this version** | `/opt/rowanholt/rowanholt-app.sh --update`, or `--update --check` |
 | Windows | A dialog: **Update** (runs `%LOCALAPPDATA%\Programs\cmdaltr\Rowanholt\seed\install.ps1 -Version <tag> -Launch`), **Later**, **Skip this version** | `powershell -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\Programs\cmdaltr\Rowanholt\desktop\windows\Rowanholt.ps1" -Update`, or `-Update -Check` |
 
-Quitting for an update leaves the stack running, as quitting always does. This is separate from the files folder: when a newer app launches, it still offers to update the files setup unpacked, as before.
+Quitting for an update leaves the stack running, as quitting always does. This is separate from the files folder: when a newer app launches, it still offers to update the files setup unpacked, as before. Unpacking over the old copy also removes the files the new release no longer has (listed in the source tarball's `.rowanholt-removed`: every file the repository has deleted), so a stale one isn't left for Vite to serve; `.env`, accounts, cases and anything else the repository ignores stay, and nothing outside the folder is touched.
 
 ## Layout
 

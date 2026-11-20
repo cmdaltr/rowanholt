@@ -130,35 +130,30 @@ allowed_paths = [
 
 ### Environment Variables
 
-Create `.env` file in `/src/web/frontend/`:
+The frontend is built with Vite (`vite.config.js`), which reads `VITE_` and `REACT_APP_` variables. The one it uses keeps its Create React App name, so the compose files and launchers that set it are unchanged:
 
 ```bash
-REACT_APP_API_URL=http://localhost:5688/api
-REACT_APP_VERSION=2.1.0
+REACT_APP_API_URL=http://localhost:5688
 ```
 
-### package.json Configuration
+### Dev Server and Proxy
 
-```json
-{
-  "name": "elrond-web",
-  "version": "2.1.0",
-  "proxy": "http://localhost:5688",
-  "homepage": "/"
-}
-```
+`vite.config.js` serves on port 3000 (`strictPort`) and proxies `/api`, WebSockets included, to `http://backend:5688`, the backend's name on the compose network.
 
 ### Build Configuration
 
 ```bash
-# Development
+# Development (vite)
 npm start
 
-# Production build
+# Production build (vite build)
 npm run build
 
-# Build output
+# Build output (outDir, where the Dockerfiles copy it from)
 ls -la build/
+
+# Tests (vitest)
+npm test
 ```
 
 ---

@@ -48,21 +48,23 @@ The Rowanholt DFIR (Digital Forensics and Incident Response) Acceleration Suite 
 ```
 Frontend:
 ├── React 18.x
-├── React Router 6.x
+├── React Router 7.x
+├── Vite (dev server and build; Vitest for its tests)
 ├── Axios (HTTP client)
 └── CSS3 (Custom styling)
 
 Backend:
-├── FastAPI (Python 3.11+)
+├── FastAPI (Python 3.12 in its image)
 ├── SQLAlchemy 2.0 (ORM)
-├── PostgreSQL 15 (Database)
+├── PostgreSQL 16 (Database)
 ├── Redis 7 (Caching & Message Broker)
 ├── Celery (Task Queue)
 └── Alembic (Migrations)
 
 Infrastructure:
 ├── Docker & Docker Compose
-├── Nginx (Reverse Proxy)
+├── Caddy (a team server's front: TLS, sign-in, the CSP)
+├── Nginx (serves a production build of the frontend)
 └── uvicorn (ASGI Server)
 
 Forensic Tools:

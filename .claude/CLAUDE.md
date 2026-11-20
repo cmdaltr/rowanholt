@@ -63,7 +63,7 @@ Each module has a display name and a code name (Ben's decision, 12 November 2026
 ## Stack
 
 - Python 3.12 in the backend image (`python:3.12-slim`, since 19 November 2026, for Pillow 13), 3.10 in the worker (Ubuntu 22.04's python3; Python 3.12 there is only iLEAPP's and ALEAPP's venvs, from deadsnakes), 3.12 in the smith-mcp and Quartermaster images; the package needs 3.10+ (`requires-python`, for samarkand); host-side scripts that import nothing of the backend's or Ledger's (the launcher's helpers, `startup_progress.py`, `samples.py`) and Custodian's Python collector stay Python 3.8-compatible
-- FastAPI, SQLAlchemy and Alembic over Postgres (users, jobs, history); Redis + Celery for the job queue; case data in case directories on disk
+- FastAPI, SQLAlchemy and Alembic over Postgres (jobs and sharing, the case browser, API tokens, the audit log, threat intelligence; `storage.py`'s tables, `docs/diagrams/database_erd.dot`); accounts in `users.json` and invitations in `invitations.json` (`src/web/backend/data`), not the database; Redis + Celery for the job queue; case data in case directories on disk
 - argparse for CLIs (`src/cli/rowanholt.py`, `elrond.py`)
 - openpyxl for XLSX output
 - Volatility 3, Plaso (psteal), Artemis, RegRipper, YARA, The Sleuth Kit, ClamAV, ewfmount/qemu-nbd/apfs-fuse as subprocess calls
