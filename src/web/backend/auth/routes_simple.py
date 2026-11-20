@@ -672,7 +672,7 @@ class ResetComplete(BaseModel):
 
 
 def _reset_record(token: str) -> tuple:
-    """(users, the record a reset link is for); 400 for a link that's unknown or used, 410 expired.
+    """(users, the record a reset link is for); 404 for a link that's unknown or used, 410 expired.
     Never 401, which the web app reads as a session that's ended. The caller holds users.locked()."""
     users = _users_or_503()
     try:

@@ -221,10 +221,10 @@ def find(token: str) -> tuple[dict, dict]:
     invitation = next((inv for inv in invitations.values()
                        if hmac.compare_digest(inv.get("token_hash") or "", hashed)), None)
     if not token or invitation is None:
-        raise InvitationRefused(INVALID)
+        raise InvitationRefused(INVALID, 404)
     if float(invitation.get("expires") or 0) < mfa._now():
         if float(invitation["expires"]) < mfa._now() - KEEP_EXPIRED_SECONDS:
-            raise InvitationRefused(INVALID)  # save() drops it
+            raise InvitationRefused(INVALID, 404)  # save() drops it
         if invitation.pop("pending_secret", None) is not None:
             save(invitations)
         raise InvitationRefused(EXPIRED, 410)

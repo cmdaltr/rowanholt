@@ -118,7 +118,7 @@ class ResetAccessTest(BackendCase):
         _, user_id, _ = self.new_user()
         first = self.issue(user_id)
         second = self.issue(user_id)
-        self.assertEqual(self.start(first).status_code, 400)
+        self.assertEqual(self.start(first).status_code, 404)
         self.assertEqual(self.start(second).status_code, 200)
 
     def test_opening_the_link_again_shows_the_same_authenticator(self):
@@ -209,8 +209,8 @@ class ResetAccessTest(BackendCase):
         token = self.issue(user_id)
         secret = self.start(token).json()["secret"]
         self.assertEqual(self.complete(token, self.code(secret)).status_code, 200)
-        self.assertEqual(self.start(token).status_code, 400)
-        self.assertEqual(self.complete(token, self.code(secret)).status_code, 400)
+        self.assertEqual(self.start(token).status_code, 404)
+        self.assertEqual(self.complete(token, self.code(secret)).status_code, 404)
 
     def test_an_expired_link_is_refused(self):
         _, user_id, _ = self.new_user()
@@ -236,15 +236,15 @@ class ResetAccessTest(BackendCase):
         self.assertEqual(self.start(token).status_code, 410)
         self.now += 120
         gone = self.start(token)
-        self.assertEqual(gone.status_code, 400)
+        self.assertEqual(gone.status_code, 404)
         self.assertEqual(gone.json()["detail"], self.reset.INVALID)
         self.assertNotIn("access_reset_hash", self.record(user_id))
 
     def test_refusals_before_anything_changes(self):
         name, user_id, _ = self.new_user()
         token = self.issue(user_id)
-        self.assertEqual(self.start("not-a-token").status_code, 400)
-        self.assertEqual(self.start("").status_code, 400)
+        self.assertEqual(self.start("not-a-token").status_code, 404)
+        self.assertEqual(self.start("").status_code, 404)
         # No authenticator started yet
         self.assertEqual(self.complete(token, "123456").status_code, 400)
         secret = self.start(token).json()["secret"]
@@ -311,7 +311,7 @@ class ResetAccessTest(BackendCase):
         release.set()
         writer.join(10)
         completer.join(10)
-        self.assertEqual(answers[0].status_code, 400)
+        self.assertEqual(answers[0].status_code, 404)
         self.assertFalse(self.mfa.is_enabled(self.record(user_id)))
 
     def test_the_lock_is_held_against_other_processes(self):

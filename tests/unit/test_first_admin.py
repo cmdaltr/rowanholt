@@ -119,7 +119,7 @@ class FirstAdminTest(BackendCase):
             ordinary, _ = self.invitations.create({}, "analyst@example.org")
         _, first = self.first_admin("one@example.org")
         _, second = self.first_admin("two@example.org")
-        self.assertEqual(self.accept(self.token(first), "one").status_code, 400)
+        self.assertEqual(self.accept(self.token(first), "one").status_code, 404)
         self.assertEqual(self.accept(self.token(second), "two").status_code, 200)
         self.assertEqual([inv["id"] for inv in self.invitations.pending()], [ordinary["id"]])
 

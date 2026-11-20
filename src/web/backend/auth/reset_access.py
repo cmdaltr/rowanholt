@@ -193,12 +193,12 @@ def find(users: dict, token: str) -> dict:
     record = next((u for u in users.values()
                    if hmac.compare_digest(u.get("access_reset_hash") or "", hashed)), None)
     if not token or record is None or _refusal(record):
-        raise ResetRefused(INVALID)
+        raise ResetRefused(INVALID, 404)
     expires = float(record.get("access_reset_expires") or 0)
     if expires < mfa._now():
         if expires < mfa._now() - KEEP_EXPIRED_SECONDS:
             _clear(record)
-            raise ResetRefused(INVALID, changed=True)
+            raise ResetRefused(INVALID, 404, changed=True)
         changed = record.pop("access_reset_pending_secret", None) is not None
         raise ResetRefused(EXPIRED, 410, changed=changed)
     return record
