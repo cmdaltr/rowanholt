@@ -151,6 +151,7 @@ class WebhookTest(BackendCase):
         self.assertNotIn("/Volumes", body.decode())
         self.assertNotIn("/mnt", body.decode())
         self.assertIn("<path>", data["error"])
+        self.assertIsNone(data["external_ref"])  # not started from Ostraka
 
     def test_confirming_a_finding_and_building_a_report_send_their_events(self):
         self.licensed()
@@ -169,6 +170,41 @@ class WebhookTest(BackendCase):
         self.assertEqual((data["finding_id"], data["host"], data["technique"], data["case_number"]),
                          (finding["id"], "HOST1", "T1685.005", "WEBHOOK-FINDING"))
         self.assertNotIn("1102", body.decode())  # the row's contents never leave
+        self.assertIsNone(data["external_ref"])
+
+    def test_a_job_started_for_an_ostraka_record_names_it_in_every_webhook(self):
+        from models.job import JobStatus
+        self.licensed()
+        self.hook()
+        storage = self.main.job_storage
+        sent = {}
+        for status in (JobStatus.COMPLETED, JobStatus.FAILED):
+            case = f"WEBHOOK-REF-{status.value}"
+            source = self.evidence / f"{case}.E01"
+            source.write_bytes(b"")
+            made = self.client.post("/api/jobs", headers=self.admin, json={
+                "case_number": case, "source_paths": [str(source)], "external_ref": "OST-26-014",
+                "destination_path": str(self.evidence / "out" / case)})
+            self.assertEqual(made.status_code, 200, made.text)
+            job = storage.get_job(made.json()["id"])
+            job.status = status
+            storage.save_job(job)
+        finding = self.main.case_routes.store().add_finding(
+            job.id, "admin", host="HOST1", artefact="evt/Security.jsonl", row_ref="9", row_hash="cd" * 32,
+            excerpt="", title="Log cleared", technique="T1685.005", status="lead")
+        resp = self.client.patch(f"/api/jobs/{job.id}/case/findings/{finding['id']}", headers=self.admin,
+                                 json={"status": "confirmed", "updated_at": finding["updated_at"]})
+        self.assertEqual(resp.status_code, 200, resp.text)
+        for _, body, headers in self.sent:
+            sent[headers["X-Rowanholt-Event"]] = json.loads(body)["data"]
+        self.assertEqual(set(sent), {"job.completed", "job.failed", "finding.confirmed"})
+        self.assertEqual({event: data["external_ref"] for event, data in sent.items()},
+                         dict.fromkeys(sent, "OST-26-014"))
+        self.assertEqual(set(sent["job.completed"]), {"job_id", "case_number", "status", "images", "external_ref"})
+        self.assertEqual(set(sent["job.failed"]),
+                         {"job_id", "case_number", "status", "images", "error", "external_ref"})
+        self.assertEqual(set(sent["finding.confirmed"]),
+                         {"job_id", "case_number", "finding_id", "host", "technique", "external_ref"})
 
     # ---- the admin API ----
 

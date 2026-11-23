@@ -206,7 +206,8 @@ Single sign-on stays free because gating it would sign people out, which the sha
   metadata) whatever the scheme, nor credentials in the URL, and one that breaks these rules (say,
   edited by hand in `webhooks.json`) isn't sent. Events:
   `job.completed` and `job.failed` (sent from `JobStorage.save_job` when a job's status becomes one
-  of them, whichever path ended it), `finding.confirmed` and `report.ready` (the case routes). Bodies
+  of them, whichever path ended it), `finding.confirmed` and `report.ready` (the case routes); the
+  first three carry the job's `external_ref`, the Ostraka reference it was started for, or null. Bodies
   carry ids, the case number, a host and counts, never artefact contents; a failed job's error has its
   file paths removed. Rowanholt has no other outward messages to share a masking step with, so that
   is the masking. Sending is checked with `has("automation")` when an event is sent: registering,

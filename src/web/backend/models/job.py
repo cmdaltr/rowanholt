@@ -9,6 +9,11 @@ from enum import Enum
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
+# An Ostraka reference (OST-26-014, HNT-2026-003), the record a job is started for
+# (docs/suite/INTEGRATION.md): kept with the job and sent with every webhook about it. The contract's
+# \d, written [0-9]: pydantic's regex reads \d as any Unicode digit
+EXTERNAL_REF = r"^(OST|HNT)-[0-9]{2}([0-9]{2})?-[0-9]{3,}$"
+
 
 class JobStatus(str, Enum):
     """Job status enumeration."""
@@ -116,6 +121,8 @@ class JobCreate(BaseModel):
     # never stored with the job, never in its dumps or its repr
     backup_password: Optional[SecretStr] = Field(None, exclude=True, repr=False,
                                                  description="Password of an encrypted phone backup (Mobile jobs)")
+    external_ref: Optional[str] = Field(None, pattern=EXTERNAL_REF, max_length=40,
+                                        description="The Ostraka reference the job is for (OST-26-014)")
 
 
 class PendingAction(BaseModel):
@@ -146,6 +153,7 @@ class Job(BaseModel):
     # archived before these were kept: main._unarchived_status reads it from the job instead)
     archived_at: Optional[datetime] = None
     archived_from: Optional[JobStatus] = None
+    external_ref: Optional[str] = Field(None, description="The Ostraka reference it was started for, if any")
     # From the job_access table, filled in by the API (server mode)
     owner: Optional[str] = Field(None, description="Username of the job's creator")
     shared_with: list[str] = Field(default_factory=list, description="Usernames it's shared with")

@@ -59,6 +59,9 @@ class JobModel(Base):
     # When it was archived, and the status it had then, to go back to (migration a6d3f9b2c418)
     archived_at = Column(DateTime, nullable=True)
     archived_from = Column(String, nullable=True)
+    # The Ostraka reference a job was started for (OST-26-014), set once when it's made (migration
+    # b9d4e2f7a1c3)
+    external_ref = Column(String, nullable=True, index=True)
 
 
 class JobAccessModel(Base):
@@ -117,6 +120,24 @@ class ApiTokenModel(Base):
     expires_at = Column(DateTime, nullable=False)
     last_used_at = Column(DateTime, nullable=True)
     revoked_at = Column(DateTime, nullable=True)
+
+
+class PairingCodeModel(Base):
+    """A pairing code (pairing_routes.py): one claim, within its ten minutes, makes Ostraka's token and
+    webhook. Only the code's SHA-256 is kept. Revision b9d4e2f7a1c3."""
+    __tablename__ = "pairing_codes"
+
+    id = Column(String, primary_key=True)
+    code_hash = Column(String, nullable=False, unique=True)
+    note = Column(String, nullable=False, default="")
+    created_by_id = Column(String, nullable=False)
+    created_by = Column(String, nullable=False)  # the admin's username
+    created_at = Column(DateTime, default=datetime.now)
+    expires_at = Column(DateTime, nullable=False)
+    claimed_at = Column(DateTime, nullable=True)
+    claimed_by_name = Column(String, nullable=True)
+    token_id = Column(String, nullable=True)
+    webhook_id = Column(String, nullable=True)
 
 
 class CaseFindingModel(Base):
@@ -261,6 +282,7 @@ class JobStorage:
             completed_at=job_model.completed_at,
             archived_at=job_model.archived_at,
             archived_from=job_model.archived_from,
+            external_ref=job_model.external_ref,
         )
 
     def save_job(self, job: Job) -> None:
@@ -299,6 +321,7 @@ class JobStorage:
                     completed_at=job.completed_at,
                     archived_at=job.archived_at,
                     archived_from=job.archived_from.value if job.archived_from else None,
+                    external_ref=job.external_ref,
                 )
                 session.add(job_model)
 
@@ -312,7 +335,8 @@ class JobStorage:
 
     @staticmethod
     def _copy_into(row: "JobModel", job: Job) -> None:
-        """Every column of the row from the job: a full save."""
+        """Every column of the row from the job: a full save. Not external_ref, which is set when the
+        job is made and never changes (a worker's copy of the job can't take it away)."""
         row.case_number = job.case_number
         row.source_paths = job.source_paths
         row.destination_path = job.destination_path
@@ -777,6 +801,101 @@ class JobStorage:
         try:
             session.query(ApiTokenModel).filter_by(id=token_id).update({"last_used_at": when})
             session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    # ── Pairing codes (pairing_routes.py) ─────────────────────────────────────
+
+    @staticmethod
+    def _pairing_dict(row: PairingCodeModel) -> dict:
+        return {"id": row.id, "note": row.note, "created_by_id": row.created_by_id, "created_by": row.created_by,
+                "created_at": row.created_at, "expires_at": row.expires_at, "claimed_at": row.claimed_at,
+                "claimed_by_name": row.claimed_by_name, "token_id": row.token_id, "webhook_id": row.webhook_id}
+
+    def add_pairing(self, code: dict) -> dict:
+        """Store a new pairing code (its hash, never the code)."""
+        session = self.Session()
+        try:
+            row = PairingCodeModel(**code)
+            session.add(row)
+            session.commit()
+            return self._pairing_dict(row)
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def list_pairings(self) -> List[dict]:
+        """Every pairing code that hasn't been withdrawn, newest first."""
+        session = self.Session()
+        try:
+            rows = session.query(PairingCodeModel).order_by(PairingCodeModel.created_at.desc()).all()
+            return [self._pairing_dict(row) for row in rows]
+        finally:
+            session.close()
+
+    def pairing_by_hash(self, code_hash: str) -> Optional[dict]:
+        """The pairing code with this hash, claimed and expired ones included (the caller decides)."""
+        session = self.Session()
+        try:
+            row = session.query(PairingCodeModel).filter_by(code_hash=code_hash).first()
+            return self._pairing_dict(row) if row else None
+        finally:
+            session.close()
+
+    def claim_pairing(self, code_hash: str, now: datetime, name: str) -> Optional[dict]:
+        """Claim a pairing code in one conditional UPDATE: only an unclaimed code still in its time, so
+        of two claims at once exactly one wins. The code as claimed, or None."""
+        session = self.Session()
+        try:
+            changed = (session.query(PairingCodeModel)
+                       .filter(PairingCodeModel.code_hash == code_hash, PairingCodeModel.claimed_at.is_(None),
+                               PairingCodeModel.expires_at > now)
+                       .update({"claimed_at": now, "claimed_by_name": name}, synchronize_session=False))
+            if not changed:
+                session.rollback()
+                return None
+            session.commit()
+            row = session.query(PairingCodeModel).filter_by(code_hash=code_hash).first()
+            return self._pairing_dict(row)
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def set_pairing_result(self, pairing_id: str, token_id: str, webhook_id: str) -> None:
+        """Record the token and webhook a claim made."""
+        session = self.Session()
+        try:
+            session.query(PairingCodeModel).filter_by(id=pairing_id).update(
+                {"token_id": token_id, "webhook_id": webhook_id})
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def withdraw_pairing(self, pairing_id: str) -> Optional[str]:
+        """Withdraw an unclaimed code (its row goes, so the link reads as never valid). "withdrawn",
+        "claimed" when it has been claimed (kept: it records the pairing), or None when there's no such code.
+        One conditional DELETE, so a withdrawal and a claim at once can't both win."""
+        session = self.Session()
+        try:
+            removed = (session.query(PairingCodeModel)
+                       .filter(PairingCodeModel.id == pairing_id, PairingCodeModel.claimed_at.is_(None))
+                       .delete(synchronize_session=False))
+            if removed:
+                session.commit()
+                return "withdrawn"
+            session.rollback()
+            exists = session.query(PairingCodeModel.id).filter_by(id=pairing_id).first()
+            return "claimed" if exists else None
         except Exception:
             session.rollback()
             raise

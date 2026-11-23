@@ -253,6 +253,11 @@ export const editWebhook = async (id, fields) => (await api.patch(`/api/webhooks
 export const deleteWebhook = async (id) => (await api.delete(`/api/webhooks/${id}`)).data;
 export const testWebhook = async (id) => (await api.post(`/api/webhooks/${id}/test`)).data;
 
+// Pairing with Ostraka (admins, team server): a link shown once, the codes listed, an open one withdrawn
+export const makePairingLink = async (note) => (await api.post('/api/pairing', { note })).data;
+export const getPairingCodes = async () => (await api.get('/api/pairing')).data;
+export const withdrawPairingCode = async (id) => { await api.delete(`/api/pairing/${id}`); };
+
 // Report brands (admins): the library, logos, the installation's brand and a case's
 export const getBrands = async () => (await api.get('/api/brands')).data;
 export const addBrand = async (brand) => (await api.post('/api/brands', brand)).data;

@@ -22,6 +22,7 @@ import CaseBrowser from './components/CaseBrowser';
 import StartOffer from './components/StartOffer';
 import Licence, { LicenceNotice, managesLicence } from './components/Licence';
 import Webhooks from './components/Webhooks';
+import { PairPage } from './components/PairOstraka';
 import Branding from './components/Branding';
 import { getAuthConfig } from './api';
 import './App.css';
@@ -171,6 +172,7 @@ function AppContent() {
               <Route path="/licence" element={<Licence serverMode={serverMode} />} />
               <Route path="/branding" element={<Branding serverMode={serverMode} />} />
               <Route path="/webhooks" element={<Webhooks serverMode={serverMode} />} />
+              <Route path="/pair" element={<PairPage />} />
               <Route path="/lab" element={<Navigate to="/aragorn#lab" replace />} />
             </Routes>
           </EnrolmentGate>

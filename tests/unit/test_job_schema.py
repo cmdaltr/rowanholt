@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src" / "web" / "ba
 
 import storage  # noqa: E402
 
-HEAD = "a6d3f9b2c418"  # the newest file in src/web/backend/alembic/versions
+HEAD = "b9d4e2f7a1c3"  # the newest file in src/web/backend/alembic/versions
 
 
 def heads(url: str) -> list:
@@ -35,7 +35,8 @@ class MigrationTest(unittest.TestCase):
         storage.JobStorage(url)
         tables = set(inspect(create_engine(url)).get_table_names())
         self.assertTrue({"jobs", "job_access", "threat_intel_indicators", "case_findings", "case_notes", "case_hosts",
-                         "case_activity", "threat_intel_validity", "api_tokens", "audit_logs", "alembic_version"} <= tables)
+                         "case_activity", "threat_intel_validity", "api_tokens", "audit_logs", "pairing_codes",
+                         "alembic_version"} <= tables)
         self.assertEqual(heads(url), [HEAD])
 
     def test_database_from_before_migrations_keeps_its_jobs(self):
@@ -169,6 +170,44 @@ class MigrationTest(unittest.TestCase):
         self.assertEqual((heads(url), columns()), ([HEAD], {"archived_at", "archived_from"}))
         job = storage.JobStorage(url).get_job("j1")
         self.assertEqual((job.status.value, job.archived_at, job.archived_from), ("archived", None, None))
+
+    def test_pairing_codes_and_external_ref_upgrade_downgrade_and_upgrade_again(self):
+        """b9d4e2f7a1c3 adds the pairing_codes table and external_ref on jobs; downgrading drops both and
+        keeps the jobs, and upgrading again puts them back, empty."""
+        from alembic import command
+        from alembic.config import Config
+        url = self.url("pairing")
+        storage.JobStorage(url)
+        engine = create_engine(url)
+        config = Config()
+        config.set_main_option("script_location", str(Path(storage.__file__).resolve().parent / "alembic"))
+        config.attributes["target_metadata"] = storage.Base.metadata
+
+        def migrate(step, revision: str) -> None:
+            with engine.begin() as connection:
+                config.attributes["connection"] = connection
+                step(config, revision)
+
+        def state() -> tuple:
+            found = inspect(engine)
+            return ("pairing_codes" in found.get_table_names(),
+                    "external_ref" in {c["name"] for c in found.get_columns("jobs")})
+
+        self.assertEqual((heads(url), state()), ([HEAD], (True, True)))
+        with engine.begin() as connection:
+            connection.execute(text(
+                "INSERT INTO jobs (id, case_number, source_paths, options, status, progress, created_at, external_ref) "
+                "VALUES ('j1', 'CASE01', '[]', '{}', 'completed', 100, '2026-11-23 10:00:00', 'OST-26-014')"))
+        self.assertEqual(storage.JobStorage(url).get_job("j1").external_ref, "OST-26-014")
+
+        migrate(command.downgrade, "a6d3f9b2c418")
+        self.assertEqual((heads(url), state()), (["a6d3f9b2c418"], (False, False)))
+        with engine.connect() as connection:
+            self.assertEqual(connection.execute(text("SELECT case_number FROM jobs WHERE id = 'j1'")).scalar(), "CASE01")
+
+        migrate(command.upgrade, "head")
+        self.assertEqual((heads(url), state()), ([HEAD], (True, True)))
+        self.assertIsNone(storage.JobStorage(url).get_job("j1").external_ref)
 
     def test_models_match_the_migrations(self):
         from alembic.autogenerate import compare_metadata

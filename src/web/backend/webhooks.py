@@ -1,10 +1,14 @@
 """Webhooks: Rowanholt POSTs JSON to URLs an admin registers when something happens (automation).
 
 Events
-    job.completed      an analysis finished:          {job_id, case_number, status, images}
-    job.failed         an analysis stopped:           {job_id, case_number, status, images, error}
-    finding.confirmed  an analyst confirmed a finding: {job_id, case_number, finding_id, host, technique}
+    job.completed      an analysis finished:          {job_id, case_number, status, images, external_ref}
+    job.failed         an analysis stopped:           {job_id, case_number, status, images, error, external_ref}
+    finding.confirmed  an analyst confirmed a finding: {job_id, case_number, finding_id, host, technique,
+                                                       external_ref}
     report.ready       a case report was built:       {job_id, case_number, format, findings, confirmed}
+
+external_ref is the Ostraka reference a job was started for (OST-26-014), null for any other job
+(docs/suite/INTEGRATION.md). A paired Ostraka (pairing_routes.py) has a webhook of its own for the first three.
 
 Bodies carry ids, the case number, a host and counts, never artefact contents: a webhook leaves the
 installation, the case's evidence doesn't. The one free text, a failed job's error, has its file paths
@@ -201,5 +205,7 @@ def emit_job(job) -> int:
             "images": len(job.source_paths or [])}
     if status == "failed":
         data["error"] = PATH.sub("<path>", job.error or "")[:200]
+        data["external_ref"] = getattr(job, "external_ref", None)
         return emit("job.failed", data)
+    data["external_ref"] = getattr(job, "external_ref", None)
     return emit("job.completed", data)

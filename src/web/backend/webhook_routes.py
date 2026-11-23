@@ -99,5 +99,5 @@ async def test_webhook(hook_id: str, admin: dict = Depends(access.require_admin)
     if not on:
         raise HTTPException(status.HTTP_402_PAYMENT_REQUIRED, why)
     data = {"job_id": "test", "case_number": "Rowanholt webhook test", "status": "completed", "images": 0,
-            "test": True}
+            "external_ref": None, "test": True}
     return await asyncio.to_thread(webhooks.deliver, hook, "job.completed", data, 1)

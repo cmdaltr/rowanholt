@@ -12,6 +12,9 @@ vi.mock('../api', () => ({
   editWebhook: vi.fn(),
   deleteWebhook: vi.fn(),
   testWebhook: vi.fn(),
+  getPairingCodes: vi.fn(),
+  makePairingLink: vi.fn(),
+  withdrawPairingCode: vi.fn(),
 }));
 
 let mockUser = { role: 'admin' };
@@ -88,4 +91,14 @@ test('only admins manage webhooks; the local analyst is one', async () => {
   api.getWebhooks.mockResolvedValue(FREE);
   render(<Webhooks serverMode={false} />);
   expect(await screen.findByText(HOOK.url)).toBeInTheDocument();
+  // Pairing makes an API token, and the local stack has none
+  expect(screen.queryByTestId('pair-ostraka')).not.toBeInTheDocument();
+  expect(api.getPairingCodes).not.toHaveBeenCalled();
+});
+
+test('a team server offers pairing with Ostraka beside the webhooks', async () => {
+  api.getWebhooks.mockResolvedValue(FREE);
+  api.getPairingCodes.mockResolvedValue([]);
+  render(<Webhooks serverMode />);
+  expect(await screen.findByTestId('pair-ostraka')).toBeInTheDocument();
 });

@@ -45,6 +45,7 @@ import licence  # The licence: edition, seats and features
 from licence_routes import router as licence_router
 import branding_routes  # Report brands (report-branding, brand-library)
 from webhook_routes import router as webhook_router  # Signed webhooks (automation)
+from pairing_routes import router as pairing_router  # Pairing with Ostraka (docs/suite/INTEGRATION.md)
 from models.job import (
     Job,
     JobCreate,
@@ -268,6 +269,7 @@ app.include_router(licence_router)
 app.include_router(branding_routes.router)
 app.include_router(branding_routes.case_router)
 app.include_router(webhook_router)
+app.include_router(pairing_router)
 app.include_router(removal_routes.router)
 
 # Include Anduril (Docker administration) routes; /api/aragorn is the name before the rename
@@ -549,6 +551,7 @@ async def create_job(job_request: JobCreate, request: Request):
             options=options,
             status=JobStatus.PENDING,
             created_at=datetime.now(),
+            external_ref=job_request.external_ref,
         )
 
         # Save job, and who it belongs to
