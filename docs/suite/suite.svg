@@ -13,7 +13,7 @@
   <text x="76" y="209" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Smith, the AI analyst, read-only, row-cited</text>
   <text x="76" y="222" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Lead, confirmed or benign; an analyst confirms</text>
   <text x="76" y="235" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Webhooks: job.completed, finding.confirmed</text>
-  <text x="76" y="250" font-size="10" font-weight="400" fill="#a7db6c" text-anchor="start">rvt_ tokens · full or smith-mcp scope</text>
+  <text x="76" y="250" font-size="10" font-weight="400" fill="#a7db6c" text-anchor="start">paired: an ostraka-scope token and a webhook</text>
   <text x="1000" y="110" font-size="11" font-weight="600" fill="#f5c842" text-anchor="start" letter-spacing="1.5">DETECTION AND HUNTING</text>
   <rect x="1000" y="122" width="340" height="200" rx="8" fill="#141d2b" stroke="#f5c842" stroke-width="1.5"/>
   <rect x="1016" y="138" width="12" height="12" rx="3" fill="none" stroke="#f5c842" stroke-width="1.5"/>
@@ -23,8 +23,8 @@
   <text x="1016" y="196" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Coverage: which techniques have a detection</text>
   <text x="1016" y="209" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Hunts, correlation, emulation (VECTR)</text>
   <text x="1016" y="222" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Detection library and the attack's anatomy</text>
-  <text x="1016" y="235" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Webhooks: run.completed, run.failed</text>
-  <text x="1016" y="250" font-size="10" font-weight="400" fill="#f5c842" text-anchor="start">shik_ tokens · as their owner's role</text>
+  <text x="1016" y="235" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Webhooks: run.completed, run.executed</text>
+  <text x="1016" y="250" font-size="10" font-weight="400" fill="#f5c842" text-anchor="start">paired: an ostraka-scope token and a webhook</text>
   <text x="530" y="110" font-size="11" font-weight="600" fill="#e07a5f" text-anchor="start" letter-spacing="1.5">THE RECORD OF THE INCIDENT</text>
   <rect x="530" y="122" width="340" height="200" rx="8" fill="#141d2b" stroke="#e07a5f" stroke-width="1.5"/>
   <rect x="546" y="138" width="12" height="12" rx="3" fill="none" stroke="#e07a5f" stroke-width="1.5"/>
@@ -35,21 +35,23 @@
   <text x="546" y="209" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Regulator clocks, handovers, the attack flow</text>
   <text x="546" y="222" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Every change in a hash-chained activity log</text>
   <text x="546" y="235" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">TLP guard: RED stays on the organisation's network</text>
-  <text x="546" y="250" font-size="10" font-weight="400" fill="#e07a5f" text-anchor="start">ost_ tokens · Settings → Integrations</text>
-  <path d="M530,175 L400,175" fill="none" stroke="#a7db6c" stroke-width="1.5" marker-end="url(#aa7db6c)"/>
-  <text x="465.0" y="169.0" font-size="10" font-weight="500" fill="#a0b8c8" text-anchor="middle">links a job or case</text>
-  <path d="M400,215 L530,215" fill="none" stroke="#a7db6c" stroke-width="1.5" marker-end="url(#aa7db6c)"/>
-  <text x="465.0" y="209.0" font-size="10" font-weight="500" fill="#a0b8c8" text-anchor="middle">findings arrive as leads</text>
-  <path d="M530,255 L400,255" fill="none" stroke="#a7db6c" stroke-width="1.5" marker-end="url(#aa7db6c)"/>
-  <text x="465.0" y="249.0" font-size="10" font-weight="500" fill="#a0b8c8" text-anchor="middle">reads a cited row</text>
-  <text x="465" y="290" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="middle">read-only token</text>
-  <path d="M870,175 L1000,175" fill="none" stroke="#f5c842" stroke-width="1.5" marker-end="url(#af5c842)"/>
-  <text x="935.0" y="169.0" font-size="10" font-weight="500" fill="#a0b8c8" text-anchor="middle">is T1059.001 covered?</text>
-  <path d="M1000,215 L870,215" fill="none" stroke="#f5c842" stroke-width="1.5" marker-end="url(#af5c842)"/>
-  <text x="935.0" y="209.0" font-size="10" font-weight="500" fill="#a0b8c8" text-anchor="middle">covered, or a gap task</text>
-  <path d="M1000,255 L870,255" fill="none" stroke="#f5c842" stroke-width="1.5" marker-end="url(#af5c842)"/>
-  <text x="935.0" y="249.0" font-size="10" font-weight="500" fill="#a0b8c8" text-anchor="middle">run.completed (signed)</text>
-  <text x="935" y="290" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="middle">re-checks open gaps</text>
+  <text x="546" y="250" font-size="10" font-weight="400" fill="#e07a5f" text-anchor="start">pairs from a one-use link · Integrations</text>
+  <path d="M530,160 L400,160" fill="none" stroke="#a7db6c" stroke-width="1.5" marker-end="url(#aa7db6c)"/>
+  <text x="465.0" y="154.0" font-size="10" font-weight="500" fill="#a0b8c8" text-anchor="middle">pairs; starts a job</text>
+  <path d="M530,200 L400,200" fill="none" stroke="#a7db6c" stroke-width="1.5" marker-end="url(#aa7db6c)"/>
+  <text x="465.0" y="194.0" font-size="10" font-weight="500" fill="#a0b8c8" text-anchor="middle">reads cases and rows</text>
+  <path d="M400,240 L530,240" fill="none" stroke="#a7db6c" stroke-width="1.5" marker-end="url(#aa7db6c)"/>
+  <text x="465.0" y="234.0" font-size="10" font-weight="500" fill="#a0b8c8" text-anchor="middle">findings, as leads</text>
+  <path d="M400,280 L530,280" fill="none" stroke="#a7db6c" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#aa7db6c)"/>
+  <text x="465.0" y="274.0" font-size="10" font-weight="500" fill="#a0b8c8" text-anchor="middle">job.completed (signed)</text>
+  <path d="M870,160 L1000,160" fill="none" stroke="#f5c842" stroke-width="1.5" marker-end="url(#af5c842)"/>
+  <text x="935.0" y="154.0" font-size="10" font-weight="500" fill="#a0b8c8" text-anchor="middle">pairs; starts a hunt</text>
+  <path d="M870,200 L1000,200" fill="none" stroke="#f5c842" stroke-width="1.5" marker-end="url(#af5c842)"/>
+  <text x="935.0" y="194.0" font-size="10" font-weight="500" fill="#a0b8c8" text-anchor="middle">is T1059.001 covered?</text>
+  <path d="M1000,240 L870,240" fill="none" stroke="#f5c842" stroke-width="1.5" marker-end="url(#af5c842)"/>
+  <text x="935.0" y="234.0" font-size="10" font-weight="500" fill="#a0b8c8" text-anchor="middle">counts, never rows</text>
+  <path d="M1000,280 L870,280" fill="none" stroke="#f5c842" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#af5c842)"/>
+  <text x="935.0" y="274.0" font-size="10" font-weight="500" fill="#a0b8c8" text-anchor="middle">run.executed (signed)</text>
   <text x="60" y="380" font-size="11" font-weight="600" fill="#66d9ef" text-anchor="start" letter-spacing="1.5">OUT OF THE SUITE</text>
   <rect x="60" y="392" width="290" height="84" rx="8" fill="#141d2b" stroke="#2a4a5e" stroke-width="1"/>
   <rect x="76" y="408" width="12" height="12" rx="3" fill="none" stroke="#66d9ef" stroke-width="1.5"/>
@@ -96,8 +98,8 @@
   <text x="76" y="714" font-size="13" font-weight="600" fill="#ffffff" text-anchor="start">samarkand</text>
   <text x="76" y="732" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">licences, webhooks, STIX, MISP, SIEM</text>
   <rect x="385" y="692" width="305" height="52" rx="8" fill="#141d2b" stroke="#4ecdc4" stroke-width="1"/>
-  <text x="401" y="714" font-size="13" font-weight="600" fill="#ffffff" text-anchor="start">Account standard</text>
-  <text x="401" y="732" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">invitation only, TOTP, one-use links</text>
+  <text x="401" y="714" font-size="13" font-weight="600" fill="#ffffff" text-anchor="start">Pairing</text>
+  <text x="401" y="732" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">a one-use link: a scoped token and a webhook</text>
   <rect x="710" y="692" width="305" height="52" rx="8" fill="#141d2b" stroke="#4ecdc4" stroke-width="1"/>
   <text x="726" y="714" font-size="13" font-weight="600" fill="#ffffff" text-anchor="start">Licensing</text>
   <text x="726" y="732" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Free, Pro, Services · Ed25519, offline</text>

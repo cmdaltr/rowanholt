@@ -80,7 +80,7 @@
   <text x="1010" y="349" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">a group, a CVE or techniques</text>
   <rect x="996" y="370" width="328" height="46" rx="6" fill="#0d1117" stroke="#2a4a5e" stroke-width="0.75"/>
   <text x="1010" y="389" font-size="12" font-weight="600" fill="#ffffff" text-anchor="start">Generate</text>
-  <text x="1010" y="405" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">detections per technique, four SIEMs</text>
+  <text x="1010" y="405" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">detections per technique, correlated</text>
   <rect x="996" y="426" width="328" height="46" rx="6" fill="#0d1117" stroke="#2a4a5e" stroke-width="0.75"/>
   <text x="1010" y="445" font-size="12" font-weight="600" fill="#ffffff" text-anchor="start">Validate</text>
   <text x="1010" y="461" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">containerised SIEMs, precision and recall</text>
@@ -88,38 +88,44 @@
   <text x="1010" y="501" font-size="12" font-weight="600" fill="#ffffff" text-anchor="start">Coverage</text>
   <text x="1010" y="517" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">which techniques have a detection</text>
   <rect x="996" y="538" width="328" height="46" rx="6" fill="#0d1117" stroke="#2a4a5e" stroke-width="0.75"/>
-  <text x="1010" y="557" font-size="12" font-weight="600" fill="#ffffff" text-anchor="start">Correlate</text>
-  <text x="1010" y="573" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">multi-stage attack-chain queries</text>
+  <text x="1010" y="557" font-size="12" font-weight="600" fill="#ffffff" text-anchor="start">Execute</text>
+  <text x="1010" y="573" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">runs a hunt's queries; keeps counts only</text>
   <rect x="996" y="594" width="328" height="46" rx="6" fill="#0d1117" stroke="#2a4a5e" stroke-width="0.75"/>
   <text x="1010" y="613" font-size="12" font-weight="600" fill="#ffffff" text-anchor="start">Deploy</text>
   <text x="1010" y="629" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">to the SIEM; emulation through VECTR</text>
   <path d="M520,337 L420,337" fill="none" stroke="#a7db6c" stroke-width="1.5" marker-end="url(#aa7db6c)"/>
-  <text x="470.0" y="331" font-size="9" font-weight="500" fill="#a0b8c8" text-anchor="middle">links a job or case</text>
+  <text x="470.0" y="331" font-size="9" font-weight="500" fill="#a0b8c8" text-anchor="middle">starts or links a job</text>
   <path d="M420,449 L520,449" fill="none" stroke="#a7db6c" stroke-width="1.5" marker-end="url(#aa7db6c)"/>
   <text x="470.0" y="443" font-size="9" font-weight="500" fill="#a0b8c8" text-anchor="middle">leads, with citations</text>
   <path d="M520,505 L420,505" fill="none" stroke="#a7db6c" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#aa7db6c)"/>
   <text x="470.0" y="499" font-size="9" font-weight="500" fill="#a0b8c8" text-anchor="middle">reads the cited row</text>
+  <path d="M420,617 L520,617" fill="none" stroke="#a7db6c" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#aa7db6c)"/>
+  <text x="470.0" y="611" font-size="9" font-weight="500" fill="#a0b8c8" text-anchor="middle">job.completed, signed</text>
+  <path d="M880,337 L980,337" fill="none" stroke="#f5c842" stroke-width="1.5" marker-end="url(#af5c842)"/>
+  <text x="930.0" y="331" font-size="9" font-weight="500" fill="#a0b8c8" text-anchor="middle">starts a hunt run</text>
   <path d="M980,393 L880,393" fill="none" stroke="#f5c842" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#af5c842)"/>
   <text x="930.0" y="387" font-size="9" font-weight="500" fill="#a0b8c8" text-anchor="middle">run.completed, signed</text>
   <path d="M880,498 L980,498" fill="none" stroke="#f5c842" stroke-width="1.5" marker-end="url(#af5c842)"/>
   <text x="930.0" y="492" font-size="9" font-weight="500" fill="#a0b8c8" text-anchor="middle">covered?</text>
   <path d="M980,512 L880,512" fill="none" stroke="#f5c842" stroke-width="1.5" marker-end="url(#af5c842)"/>
   <text x="930.0" y="526" font-size="9" font-weight="500" fill="#a0b8c8" text-anchor="middle">a gap becomes a task</text>
+  <path d="M980,561 L880,561" fill="none" stroke="#f5c842" stroke-width="1.5" marker-end="url(#af5c842)"/>
+  <text x="930.0" y="555" font-size="9" font-weight="500" fill="#a0b8c8" text-anchor="middle">counts, never rows</text>
   <text x="60" y="700" font-size="11" font-weight="600" fill="#4ecdc4" text-anchor="start" letter-spacing="1.5">BETWEEN THEM</text>
   <rect x="60" y="712" width="413" height="112" rx="8" fill="#141d2b" stroke="#2a4a5e" stroke-width="1"/>
   <rect x="76" y="728" width="12" height="12" rx="3" fill="none" stroke="#a7db6c" stroke-width="1.5"/>
-  <text x="96" y="739" font-size="13" font-weight="600" fill="#ffffff" text-anchor="start">Ostraka → Rowanholt</text>
-  <text x="76" y="760" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">GET a job, its case, a page of rows, findings</text>
-  <text x="76" y="773" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">a read-only smith-mcp token, stored encrypted</text>
-  <text x="76" y="786" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">a finding arrives as a lead with its citation</text>
-  <text x="76" y="799" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">row hash re-checked: is the row still intact?</text>
+  <text x="96" y="739" font-size="13" font-weight="600" fill="#ffffff" text-anchor="start">Ostraka ⇄ Rowanholt</text>
+  <text x="76" y="760" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">paired: an ostraka-scope token, a signed webhook</text>
+  <text x="76" y="773" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">reads cases and rows; starts jobs on its evidence</text>
+  <text x="76" y="786" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">finding.confirmed arrives as a lead, once</text>
+  <text x="76" y="799" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">job.completed is noted on the record</text>
   <rect x="493" y="712" width="413" height="112" rx="8" fill="#141d2b" stroke="#2a4a5e" stroke-width="1"/>
   <rect x="509" y="728" width="12" height="12" rx="3" fill="none" stroke="#f5c842" stroke-width="1.5"/>
   <text x="529" y="739" font-size="13" font-weight="600" fill="#ffffff" text-anchor="start">Ostraka ⇄ Shikari</text>
-  <text x="509" y="760" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">GET /api/coverage for confirmed techniques</text>
-  <text x="509" y="773" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">each gap a task for the detection team</text>
-  <text x="509" y="786" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">signed run.completed re-checks open gaps</text>
-  <text x="509" y="799" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">a gap closes only when Shikari has a detection</text>
+  <text x="509" y="760" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">paired: an ostraka-scope token, a signed webhook</text>
+  <text x="509" y="773" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">confirmed techniques without detections: gap tasks</text>
+  <text x="509" y="786" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">starts hunt runs; Shikari runs their queries</text>
+  <text x="509" y="799" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">a count per query comes back, never a row</text>
   <rect x="926" y="712" width="413" height="112" rx="8" fill="#141d2b" stroke="#2a4a5e" stroke-width="1"/>
   <rect x="942" y="728" width="12" height="12" rx="3" fill="none" stroke="#4ecdc4" stroke-width="1.5"/>
   <text x="962" y="739" font-size="13" font-weight="600" fill="#ffffff" text-anchor="start">The TLP guard</text>

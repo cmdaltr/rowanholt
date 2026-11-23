@@ -116,7 +116,7 @@ def suite() -> None:
         "Smith, the AI analyst, read-only, row-cited",
         "Lead, confirmed or benign; an analyst confirms",
         "Webhooks: job.completed, finding.confirmed",
-    ], ROWANHOLT, accent="rvt_ tokens · full or smith-mcp scope", strong=True)
+    ], ROWANHOLT, accent="paired: an ostraka-scope token and a webhook", strong=True)
 
     s.label(1000, 110, "Detection and hunting", SHIKARI)
     s.card(1000, 122, 340, 200, "Shikari", [
@@ -125,8 +125,8 @@ def suite() -> None:
         "Coverage: which techniques have a detection",
         "Hunts, correlation, emulation (VECTR)",
         "Detection library and the attack's anatomy",
-        "Webhooks: run.completed, run.failed",
-    ], SHIKARI, accent="shik_ tokens · as their owner's role", strong=True)
+        "Webhooks: run.completed, run.executed",
+    ], SHIKARI, accent="paired: an ostraka-scope token and a webhook", strong=True)
 
     s.label(530, 110, "The record of the incident", OSTRAKA)
     s.card(530, 122, 340, 200, "Ostraka", [
@@ -136,18 +136,18 @@ def suite() -> None:
         "Regulator clocks, handovers, the attack flow",
         "Every change in a hash-chained activity log",
         "TLP guard: RED stays on the organisation's network",
-    ], OSTRAKA, accent="ost_ tokens · Settings → Integrations", strong=True)
+    ], OSTRAKA, accent="pairs from a one-use link · Integrations", strong=True)
 
     # Ostraka and Rowanholt
-    s.arrow([(530, 175), (400, 175)], ROWANHOLT, "links a job or case")
-    s.arrow([(400, 215), (530, 215)], ROWANHOLT, "findings arrive as leads")
-    s.arrow([(530, 255), (400, 255)], ROWANHOLT, "reads a cited row")
-    s.text(465, 290, "read-only token", 10, DIM, anchor="middle")
+    s.arrow([(530, 160), (400, 160)], ROWANHOLT, "pairs; starts a job")
+    s.arrow([(530, 200), (400, 200)], ROWANHOLT, "reads cases and rows")
+    s.arrow([(400, 240), (530, 240)], ROWANHOLT, "findings, as leads")
+    s.arrow([(400, 280), (530, 280)], ROWANHOLT, "job.completed (signed)", dashed=True)
     # Ostraka and Shikari
-    s.arrow([(870, 175), (1000, 175)], SHIKARI, "is T1059.001 covered?")
-    s.arrow([(1000, 215), (870, 215)], SHIKARI, "covered, or a gap task")
-    s.arrow([(1000, 255), (870, 255)], SHIKARI, "run.completed (signed)", dashed=False)
-    s.text(935, 290, "re-checks open gaps", 10, DIM, anchor="middle")
+    s.arrow([(870, 160), (1000, 160)], SHIKARI, "pairs; starts a hunt")
+    s.arrow([(870, 200), (1000, 200)], SHIKARI, "is T1059.001 covered?")
+    s.arrow([(1000, 240), (870, 240)], SHIKARI, "counts, never rows")
+    s.arrow([(1000, 280), (870, 280)], SHIKARI, "run.executed (signed)", dashed=True)
 
     # What leaves the suite
     s.label(60, 380, "Out of the suite", OUTSIDE)
@@ -174,7 +174,7 @@ def suite() -> None:
     s.label(60, 680, "Shared by all three", TEAL)
     shared = [
         ("samarkand", "licences, webhooks, STIX, MISP, SIEM"),
-        ("Account standard", "invitation only, TOTP, one-use links"),
+        ("Pairing", "a one-use link: a scoped token and a webhook"),
         ("Licensing", "Free, Pro, Services · Ed25519, offline"),
         ("install-suite", "one command installs all three"),
     ]
@@ -250,24 +250,27 @@ def anatomy() -> None:
     ])
     shk = column(s, sx, 274, "Shikari", SHIKARI, [
         ("Hunt", "a group, a CVE or techniques"),
-        ("Generate", "detections per technique, four SIEMs"),
+        ("Generate", "detections per technique, correlated"),
         ("Validate", "containerised SIEMs, precision and recall"),
         ("Coverage", "which techniques have a detection"),
-        ("Correlate", "multi-stage attack-chain queries"),
+        ("Execute", "runs a hunt's queries; keeps counts only"),
         ("Deploy", "to the SIEM; emulation through VECTR"),
     ])
 
-    level(s, ox, rx + COL, row[0], ROWANHOLT, "links a job or case")
+    level(s, ox, rx + COL, row[0], ROWANHOLT, "starts or links a job")
     level(s, rx + COL, ox, row[2], ROWANHOLT, "leads, with citations")
     level(s, ox, rx + COL, row[3], ROWANHOLT, "reads the cited row", dashed=True)
+    level(s, rx + COL, ox, row[5], ROWANHOLT, "job.completed, signed", dashed=True)
+    level(s, ox + COL, sx, shk[0], SHIKARI, "starts a hunt run")
     level(s, sx, ox + COL, shk[1], SHIKARI, "run.completed, signed", dashed=True)
     level(s, ox + COL, sx, ost[3] - 7, SHIKARI, "covered?")
     level(s, sx, ox + COL, ost[3] + 7, SHIKARI, "a gap becomes a task", below=True)
+    level(s, sx, ox + COL, shk[4], SHIKARI, "counts, never rows")
 
     s.label(60, 700, "Between them", TEAL)
     between = [
-        (ROWANHOLT, "Ostraka → Rowanholt", ["GET a job, its case, a page of rows, findings", "a read-only smith-mcp token, stored encrypted", "a finding arrives as a lead with its citation", "row hash re-checked: is the row still intact?"]),
-        (SHIKARI, "Ostraka ⇄ Shikari", ["GET /api/coverage for confirmed techniques", "each gap a task for the detection team", "signed run.completed re-checks open gaps", "a gap closes only when Shikari has a detection"]),
+        (ROWANHOLT, "Ostraka ⇄ Rowanholt", ["paired: an ostraka-scope token, a signed webhook", "reads cases and rows; starts jobs on its evidence", "finding.confirmed arrives as a lead, once", "job.completed is noted on the record"]),
+        (SHIKARI, "Ostraka ⇄ Shikari", ["paired: an ostraka-scope token, a signed webhook", "confirmed techniques without detections: gap tasks", "starts hunt runs; Shikari runs their queries", "a count per query comes back, never a row"]),
         (TEAL, "The TLP guard", ["TLP:RED and AMBER+STRICT records exchange", "only with servers on the organisation's network:", "private, Tailscale, .internal, .lan, .ts.net", "requests carry identifiers, never the record"]),
     ]
     for i, (colour, title, lines) in enumerate(between):
