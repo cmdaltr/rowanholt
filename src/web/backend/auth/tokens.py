@@ -14,6 +14,9 @@ A token's scope says what it may do:
   are refused even when the user is an admin. Its names from before the analyst was renamed,
   "aule-mcp" (Aulë, until 12 November 2026) and "eru-mcp" (Eru, until 9 November 2026), are
   still taken wherever a scope is given or checked, and read as smith-mcp.
+- ostraka: what Ostraka needs once it's paired (pairing_routes.py, docs/suite/INTEGRATION.md): reading
+  jobs and their cases, the case-id check and the file browser, and starting a job, which belongs to the
+  token's owner. Everything else is refused, admin areas included.
 """
 
 import hashlib
@@ -24,8 +27,9 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 PREFIX = "rvt_"
-SCOPES = ("full", "smith-mcp")
+SCOPES = ("full", "smith-mcp", "ostraka")
 SMITH_SCOPE = "smith-mcp"
+OSTRAKA_SCOPE = "ostraka"
 # Scopes from before a rename, still taken: tokens made before the migrations that renamed them
 # (alembic f2b7c9d4e816 and e8c3a1f5b927), and scripts and MCP hosts that still ask for the old name
 OLD_SCOPES = {"aule-mcp": SMITH_SCOPE, "eru-mcp": SMITH_SCOPE}
@@ -40,6 +44,11 @@ SMITH_WRITES = re.compile(r"^/api/jobs/[0-9a-fA-F-]{36}/case/(findings|notes)$")
 # case_summary and suggestions
 SMITH_QUESTIONS = re.compile(r"^/api/ai/(offline/answer|cases/[^/]+/(query|summary|suggestions))$")
 READ_METHODS = ("GET", "HEAD", "OPTIONS")
+# What an ostraka token may read (GET and HEAD): the health check, who it is, the jobs and everything
+# under one (its case, rows and findings), the case-id check and the file browser. Its one write is
+# starting a job (OSTRAKA_WRITES)
+OSTRAKA_READS = re.compile(r"^/api/(health|auth/me|jobs|jobs/[0-9a-fA-F-]{36}(/.*)?|validate/case-id/[^/]+|fs/browse)$")
+OSTRAKA_WRITES = re.compile(r"^/api/jobs$")
 # Never through a token: making or revoking tokens, swapping one for a session, or anything that
 # sets a password or makes an account (each would outlive the token, so revoking it wouldn't end
 # the access)
@@ -85,10 +94,22 @@ def refusal(token: dict, method: str, path: str, admin_prefixes: tuple) -> Optio
     """Why a request made with this token is refused, or None if it's allowed."""
     if path.startswith(SIGN_IN_ONLY):
         return "Tokens are managed from a sign-in, not with a token"
-    if scope_of(token["scope"]) != SMITH_SCOPE:
+    scope = scope_of(token["scope"])
+    if scope == OSTRAKA_SCOPE:
+        return ostraka_refusal(method, path)
+    if scope != SMITH_SCOPE:
         return None
     if path.startswith(admin_prefixes):
         return "A smith-mcp token can't use admin areas"
     if method in READ_METHODS or (method == "POST" and (SMITH_WRITES.match(path) or SMITH_QUESTIONS.match(path))):
         return None
     return "A smith-mcp token can only read, flag leads and add notes"
+
+
+def ostraka_refusal(method: str, path: str) -> Optional[str]:
+    """Why an ostraka token's request is refused, or None: reads of OSTRAKA_READS and POST /api/jobs only."""
+    if method in ("GET", "HEAD") and OSTRAKA_READS.match(path):
+        return None
+    if method == "POST" and OSTRAKA_WRITES.match(path):
+        return None
+    return "An ostraka token can only read jobs and their cases, and start jobs"

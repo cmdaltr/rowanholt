@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import PageHero from './PageHero';
 import { addWebhook, deleteWebhook, editWebhook, getWebhooks, testWebhook } from '../api';
 import { managesLicence } from './Licence';
+import PairOstraka from './PairOstraka';
 
 // Webhooks (the automation feature, docs/LICENSING_MODEL.md): admins register a URL and the events it
 // wants. Registering stays open on every edition, so nothing is lost when a licence lapses; sending is
@@ -180,6 +181,8 @@ function WebhooksBody({ serverMode = true }) {
           <button className="secondary" onClick={() => setSecret(null)}>I've kept it</button>
         </div>
       )}
+      {/* Pairing makes an API token, and tokens are for a team server */}
+      {serverMode && <PairOstraka />}
       {data.webhooks.map((hook) => (
         <Webhook key={hook.id} hook={hook} sending={data.sending} onChanged={load} onDeleted={load} />
       ))}

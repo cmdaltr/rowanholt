@@ -14,20 +14,21 @@ Paths below are given in full (`/api/...`), except under Authentication, where t
 1. [Authentication Status](#authentication-status)
 2. [Authentication](#authentication)
 3. [API Tokens](#api-tokens)
-4. [Users](#users)
-5. [Job Management](#job-management)
-6. [File System](#file-system)
-7. [Administration (Steward)](#administration-steward)
-8. [Docker Administration (Quartermaster)](#docker-administration-quartermaster)
-9. [Crucible: Recorded Attack Telemetry](#crucible-recorded-attack-telemetry) (and datasets)
-10. [Threat Intelligence](#threat-intelligence)
-11. [Case Browser and Collaboration](#case-browser-and-collaboration)
-12. [Smith (AI Analyst)](#smith-ai-analyst)
-13. [Lab](#lab)
-14. [Health Check](#health-check) (and Busy)
-15. [Request/Response Formats](#requestresponse-formats)
-16. [Error Handling](#error-handling)
-17. [Code Examples](#code-examples)
+4. [Pairing with Ostraka](#pairing-with-ostraka)
+5. [Users](#users)
+6. [Job Management](#job-management)
+7. [File System](#file-system)
+8. [Administration (Steward)](#administration-steward)
+9. [Docker Administration (Quartermaster)](#docker-administration-quartermaster)
+10. [Crucible: Recorded Attack Telemetry](#crucible-recorded-attack-telemetry) (and datasets)
+11. [Threat Intelligence](#threat-intelligence)
+12. [Case Browser and Collaboration](#case-browser-and-collaboration)
+13. [Smith (AI Analyst)](#smith-ai-analyst)
+14. [Lab](#lab)
+15. [Health Check](#health-check) (and Busy)
+16. [Request/Response Formats](#requestresponse-formats)
+17. [Error Handling](#error-handling)
+18. [Code Examples](#code-examples)
 
 ---
 
@@ -37,11 +38,11 @@ What a caller may do depends on the mode the backend runs in. Every request goes
 
 **Local mode** (the default: a stack on an analyst's own machine). Nothing needs a sign-in. A request without a token acts as the local analyst (`local`, role `admin`) and sees every job and case. The stack publishes the API on `127.0.0.1:5688` only, as it does every other port (Postgres, Redis, the web app, Splunk, Elastic, Kibana, the Navigator), so the open API is the machine's own. Signing in still works (login, and guest and register while the stack is published on loopback, `ROWANHOLT_BIND`), and a signed-in caller is that account: a non-admin one gets `403` from the admin-only routes (licence, brands, webhooks, users, symbol tables, sample data), which an anonymous request passes. A guest's token names no account, so a guest acts as the local analyst. Two areas want a signed-in admin even locally, since they drive the host: the lab (`/api/lab`, the Crucible lab and the Crucible telemetry Update) and Quartermaster (`/api/anduril`). Both are off (`503`) while the backend uses the default `SECRET_KEY`.
 
-**Server mode** (`ROWANHOLT_SERVER_MODE`, set by `deploy/server/docker-compose.server.yml`; see [SERVER.md](SERVER.md)). Every `/api` route needs a signed-in user (`401 Sign in required`) except `/api/health`, `/api/busy`, `/api/auth/config`, `/api/auth/login`, `/api/auth/login/mfa` (the sign-in's second step, whose challenge is its credential), `/api/auth/logout`, `/api/auth/forgot-password` (emails a reset link; the same answer for anyone), `/api/auth/reset-access/start` and `/complete` and `/api/auth/invitations/accept`, `/accept/start` and `/accept/complete` (a reset link or invitation, whose token is the credential), `/api/auth/oidc/login`, `/api/auth/oidc/callback` and `/api/auth/verify`. There are no guests and no open sign-up. With `ROWANHOLT_REQUIRE_MFA=true`, a password user's sign-in without MFA reaches only `/api/auth/me`, `/api/auth/session` and `/api/auth/mfa`, `/mfa/setup` and `/mfa/enable` until MFA is on: anything else, `/api/auth/verify` included, is `403` (with `"mfa_enrolment_required": true`; [Multi-Factor Authentication](#multi-factor-authentication)). On top of that:
+**Server mode** (`ROWANHOLT_SERVER_MODE`, set by `deploy/server/docker-compose.server.yml`; see [SERVER.md](SERVER.md)). Every `/api` route needs a signed-in user (`401 Sign in required`) except `/api/health`, `/api/busy`, `/api/auth/config`, `/api/auth/login`, `/api/auth/login/mfa` (the sign-in's second step, whose challenge is its credential), `/api/auth/logout`, `/api/auth/forgot-password` (emails a reset link; the same answer for anyone), `/api/auth/reset-access/start` and `/complete` and `/api/auth/invitations/accept`, `/accept/start` and `/accept/complete` (a reset link or invitation, whose token is the credential), `/api/auth/oidc/login`, `/api/auth/oidc/callback`, `/api/auth/verify` and `/api/pairing/claim` (Ostraka's claim of a pairing code, which is its credential). There are no guests and no open sign-up. With `ROWANHOLT_REQUIRE_MFA=true`, a password user's sign-in without MFA reaches only `/api/auth/me`, `/api/auth/session` and `/api/auth/mfa`, `/mfa/setup` and `/mfa/enable` until MFA is on: anything else, `/api/auth/verify` included, is `403` (with `"mfa_enrolment_required": true`; [Multi-Factor Authentication](#multi-factor-authentication)). On top of that:
 
 | Who | What |
 |---|---|
-| Admins only (`403`) | Everything under `/api/lab`, `/api/anduril` (and its old name `/api/aragorn`), `/api/auth/users`, `/api/symbols`, `/api/samples`, `/api/licence`, `/api/brands` and `/api/webhooks`, and a case's brand; anything but GET under `/api/mordor` and `/api/threat-intel`, apart from `POST /api/threat-intel/lookup` |
+| Admins only (`403`) | Everything under `/api/lab`, `/api/anduril` (and its old name `/api/aragorn`), `/api/auth/users`, `/api/symbols`, `/api/samples`, `/api/licence`, `/api/brands`, `/api/webhooks` and `/api/pairing` (apart from `/api/pairing/claim`), and a case's brand; anything but GET under `/api/mordor` and `/api/threat-intel`, apart from `POST /api/threat-intel/lookup` |
 | Anyone signed in | Everything under `/api/jobs/{job_id}` and `/api/ai/cases/{case_id}/…`: every case is the team's ([SERVER.md](SERVER.md#working-cases-as-a-team)) |
 | Anyone but another analyst | Disk and memory images in an analyst's own evidence folder (`/srv/evidence/<username>/`): as a job's source, its keyword, YARA or IOC file, or in `/api/fs/browse` (`403`, and left out of a listing). The case output in that folder is everyone's; a destination there is its owner's (`403`) |
 | The job's owner or an admin (`403`) | Cancel, pause, resume, delete, archive, restart with fresh output, add a note (`PATCH`), confirm or give up a failed removal; the bulk actions check each job the same way. A job from before server mode has no owner: admins only |
@@ -51,7 +52,7 @@ A job's `can_manage` says which side of the last row the caller is on ([List Job
 **Credentials.** The backend reads the `Authorization: Bearer` header first, then the `session_token` cookie, so a stale header doesn't hide a good cookie.
 
 - A sign-in ([Login](#login), or single sign-on) returns a JWT and sets it as the `session_token` cookie: `httpOnly`, `SameSite=Lax`, `Secure` in server mode, valid for 24 hours (`access_token_expire_minutes`). Each request checks the account in the user store, so disabling someone stops their next request; disabling also ends their sessions and revokes their API tokens, so enabling them again brings neither back.
-- An API token (`rvt_…`, [API Tokens](#api-tokens)) goes in the bearer header. Its scope limits it: `full` is whatever its user may do, `smith-mcp` only what Smith's MCP server needs. Tokens are made on a team server only.
+- An API token (`rvt_…`, [API Tokens](#api-tokens)) goes in the bearer header. Its scope limits it: `full` is whatever its user may do, `smith-mcp` only what Smith's MCP server needs, `ostraka` only what a paired Ostraka needs. Tokens are made on a team server only.
 
 The lab and Quartermaster check a sign-in's JWT against the user store themselves, so an API token doesn't open them (`401`), even an admin's `full` one.
 
@@ -362,12 +363,14 @@ Long-lived, revocable tokens for scripts and Smith's MCP server, in place of a s
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/auth/tokens?all=` | The caller's tokens, `{"tokens": [...]}`; with `all=true`, everyone's (admins; `403` otherwise) |
-| `POST` | `/api/auth/tokens` | `{"name": "...", "scope": "full", "days": 90}`: a new token for the caller. The response is the record plus `token`, shown this once (only its SHA-256 is kept). `name` 1–100 characters, `scope` `full` or `smith-mcp`, `days` 1–365 (`400` otherwise) |
+| `POST` | `/api/auth/tokens` | `{"name": "...", "scope": "full", "days": 90}`: a new token for the caller. The response is the record plus `token`, shown this once (only its SHA-256 is kept). `name` 1–100 characters, `scope` `full`, `smith-mcp` or `ostraka`, `days` 1–365 (`400` otherwise) |
 | `DELETE` | `/api/auth/tokens/{token_id}` | Revoke one of the caller's tokens (an admin, anyone's). Returns the record; `404` if there's no such token |
 
 A record has `id`, `user_id`, `username`, `name`, `prefix` (the first characters, to recognise it), `scope`, `created_at`, `expires_at`, `last_used_at` (written at most once a minute) and `revoked_at`. A token stops working when it's revoked, when it expires, or when its user is disabled or removed.
 
 **The `smith-mcp` scope** allows reads (GET, HEAD, OPTIONS), flagging leads and adding notes (`POST /api/jobs/{job_id}/case/findings` and `/notes`), and Smith's questions, which are POSTs that only read (`/api/ai/offline/answer`, `/api/ai/cases/{case_id}/query`, `/summary`, `/suggestions`); anything else is `403`, and so are the admin areas, even for an admin's token. Everything it writes is recorded as "Smith (for <user>)". The scope's names from before the analyst was renamed, `aule-mcp` and `eru-mcp`, are still accepted when a token is made (stored as `smith-mcp`) and read as `smith-mcp` wherever a scope is checked.
+
+**The `ostraka` scope** is what pairing with Ostraka makes ([Pairing with Ostraka](#pairing-with-ostraka)): it reads cases and starts jobs, and nothing else. It allows `GET` and `HEAD` on `/api/health`, `/api/auth/me`, `/api/jobs` and everything under `/api/jobs/{job_id}` (a case, its rows, its findings), `/api/validate/case-id/{case_id}` and `/api/fs/browse`, and `POST /api/jobs`. Anything else is `403`: admin areas (even for an admin's token), writing findings or notes, managing jobs, Smith and threat intelligence. A job it starts belongs to the token's owner.
 
 A caller that sends `X-Rowanholt-Agent: smith-mcp` (or `aule-mcp`, `eru-mcp`, or the old header `X-Rivendell-Agent`) is treated as Smith on the case routes without such a token: its findings are leads only, and it can't change or remove findings or assign hosts (`403`). Online threat intelligence lookups are refused to both.
 
@@ -405,6 +408,43 @@ The same can be done from the host with `rowanholt server users` ([SERVER.md](SE
 
 ---
 
+## Pairing with Ostraka
+
+Ostraka connects to Rowanholt in one step: an admin makes a pairing link here, an Ostraka admin pastes it into Ostraka (Settings, Integrations), and Ostraka claims it, which makes its token and its webhook together. The contract is [suite/INTEGRATION.md](suite/INTEGRATION.md); the code is `pairing_routes.py`, table `pairing_codes`. In the web app it's the Pair with Ostraka panel on the Webhooks page. Team server only, as API tokens are (`400` locally).
+
+The link is `<ROWANHOLT_PUBLIC_URL>/pair#pair_…` (the request's own address when `ROWANHOLT_PUBLIC_URL` isn't set, as for account links): `pair_` and 43 random characters after the `#`, so it never reaches a server's or proxy's logs. It works once, within 10 minutes, and only its SHA-256 is kept. An admin may have any number open. Opening `/pair` in a browser only says the link is for Ostraka.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/pairing` | Admins. `{"note": "Ostraka on the homelab"}` → `201 {"id", "link", "expires_at"}`, the link shown this once |
+| `GET` | `/api/pairing` | Admins. `[{"id", "note", "created_by", "created_at", "expires_at", "claimed_at", "claimed_by_name"}]`, newest first |
+| `DELETE` | `/api/pairing/{id}` | Admins. Withdraw an unclaimed code: `204`; `404` for none, `409` for one that's been claimed (revoke its token or delete its webhook instead) |
+| `POST` | `/api/pairing/claim` | No sign-in: the code is the credential. See below |
+
+**Claiming a code.**
+
+```json
+{"code": "pair_…", "product": "ostraka", "name": "Ostraka", "version": "0.3.0",
+ "webhook_url": "https://ostraka.example.org/api/integrations/rowanholt/webhook"}
+```
+
+The code is claimed with one conditional `UPDATE`, so of two claims at once only one succeeds. Refusals:
+
+- `422` with the reason when `webhook_url` fails the webhook URL rules (`samarkand.webhooks.url_problem`: https, or http to localhost, loopback or a private address; never link-local, never with credentials). Checked before the code is claimed, so a mistyped URL doesn't use it up
+- `404 {"detail": "This pairing link isn't valid. Ask for a new one."}` for a code that doesn't exist, has been claimed or was withdrawn, or whose admin has been deactivated or is no longer an admin
+- `410 {"detail": "This pairing link has expired. Ask for a new one."}` for an expired one
+
+A claim makes an API token with the `ostraka` scope, owned by the admin who made the code, named `Ostraka (paired)`, for 365 days; and a webhook to `webhook_url` for `job.completed`, `job.failed` and `finding.confirmed`, with a new secret, described as `Ostraka (paired)`. The webhook is made on every edition and sends once a licence with `automation` is installed. The answer is the only place the token and the secret appear:
+
+```json
+{"product": "rowanholt", "version": "2.1.1", "token": "rvt_…", "token_expires_at": "…",
+ "webhook_id": "…", "webhook_secret": "…", "events": ["job.completed", "job.failed", "finding.confirmed"]}
+```
+
+Revoking the token or deleting the webhook undoes the pairing. The audit log records `pairing_code_created`, `pairing_code_withdrawn`, `pairing_claimed` (who made the code, the claim's address, the token's prefix and the webhook's id) and `pairing_claim_refused` (why); never a code, a link, a token or a secret.
+
+---
+
 ## Job Management
 
 ### Create Job
@@ -434,7 +474,7 @@ The same can be done from the host with `rowanholt server users` ([SERVER.md](SE
 }
 ```
 
-`destination_path` is optional. `backup_password` (optional, Mobile jobs only) is an encrypted phone backup's password: it goes to the worker through Redis, expiring, and is never stored with the job.
+`destination_path` is optional. `external_ref` (optional) is the Ostraka reference the job is for, matching `^(OST|HNT)-\d{2}(\d{2})?-\d{3,}$` with ASCII digits (`OST-26-014`, `HNT-2026-003`; `422` otherwise, and longer than 40 characters): the job keeps it, [Get Job Details](#get-job-details) returns it, and every webhook about the job carries it (`null` for a job without one). `backup_password` (optional, Mobile jobs only) is an encrypted phone backup's password: it goes to the worker through Redis, expiring, and is never stored with the job.
 
 `options` maps onto Ledger's command line (`build_elrond_command` in `tasks_docker.py`). All are optional booleans unless shown otherwise:
 
@@ -464,6 +504,7 @@ Paths are passed to the worker unchanged, except `/host/tmp/rowanholt/…`, whic
 - `source_paths`: required list; each inside the allowed folders (`403`) and existing (`400`)
 - `destination_path`: optional, checked as above
 - `backup_password`: only with `options.mobile` (`400`)
+- `external_ref`: optional, an Ostraka reference (`422`)
 
 **Errors:**
 - `400 Bad Request`: as above, or the output folder exists without `force_overwrite`
@@ -930,6 +971,7 @@ Folders come first, then files, by name; `..` leads when there's a parent. `is_i
 | `GET` `PUT` | `/api/jobs/{job_id}/case/brand` | The brand of a job's case number, `{"brand_id"}` |
 | `GET` `POST` | `/api/webhooks` | `events`, the webhooks (`has_secret`, never the secret), and `sending` with `reason`; `POST` `{"url", "events", "secret", "description"}`, the secret generated when not given and returned this once. `422` for a URL or event refused |
 | `PATCH` `DELETE` | `/api/webhooks/{hook_id}` | Change `url`, `events`, `enabled` or `description`, or remove it |
+| `GET` `POST` `DELETE` | `/api/pairing` | Pairing links for Ostraka: [Pairing with Ostraka](#pairing-with-ostraka) |
 | `POST` | `/api/webhooks/{hook_id}/test` | Send a test `job.completed` now and return the delivery; `402` when this edition doesn't send webhooks |
 | `GET` | `/api/symbols` | Volatility symbol tables for Linux and macOS, with their kernel banners and the folders' audit log |
 | `POST` | `/api/symbols/add` | Multipart `kind` (`package`, `table`, `vmlinux` or `kdk`), `file`, and `system_map` or `dwarf` where the kind needs one; built in the worker. Returns `{"task_id"}` |

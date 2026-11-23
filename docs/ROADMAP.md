@@ -261,3 +261,10 @@ Parked: Azure in a lab (above). The Volatility 3 plugins are their own repositor
 2. **containerd's bbolt database: a stdlib reader** in `process/extractions/`, read-only, no new dependency. The records inside are protobuf and need decoding by hand whichever way the file is read.
 3. **Threat intelligence expiry: yes,** as the `threat_intel_validity` side table and an Alembic migration; the ten columns stay as they are.
 4. **The MCP server's phase 2: deferred,** then built on 3 November: `flag_lead` and `add_note` behind `--allow-writes`, leads only, recorded as "Smith (for <user>)" (see `docs/SMITH.md`). Reviewed the same day, with conditions (`.claude/threat-model.md`).
+
+## Decisions (Ben, 23 November 2026)
+
+1. **Pairing with Ostraka, as the suite's contract says** (`docs/suite/INTEGRATION.md`, the same file in Ostraka and Shikari). An admin makes a pairing link (the Webhooks page, or `POST /api/pairing`); Ostraka claims it once within ten minutes, with no sign-in, and the claim makes an `ostraka`-scope token owned by that admin (365 days) and a webhook for `job.completed`, `job.failed` and `finding.confirmed`. Codes are kept as SHA-256 only, in `pairing_codes` (migration `b9d4e2f7a1c3`). Team server only, as API tokens are.
+2. **The `ostraka` scope** reads jobs and their cases, the case-id check and the file browser, and starts jobs (`POST /api/jobs`); everything else is `403`, admin areas included.
+3. **`external_ref` on a job**: the Ostraka reference it was started for, kept on the job (set once, never by a worker's save), returned by `GET /api/jobs/{id}` and carried by the three webhooks (`null` otherwise).
+

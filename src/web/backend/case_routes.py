@@ -411,7 +411,8 @@ def _confirmed(job_id: str, finding: Dict) -> None:
     job = _jobs.get_job(job_id) if _jobs else None
     webhooks.emit("finding.confirmed", {"job_id": job_id, "case_number": job.case_number if job else "",
                                         "finding_id": finding["id"], "host": finding["host"],
-                                        "technique": finding.get("technique") or ""})
+                                        "technique": finding.get("technique") or "",
+                                        "external_ref": getattr(job, "external_ref", None)})
 
 
 def _flagged_already(already: Dict) -> HTTPException:
