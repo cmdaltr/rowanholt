@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 820" font-family="'Segoe UI', 'SF Pro Display', -apple-system, sans-serif">
+  <defs><marker id="aa7db6c" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#a7db6c"/></marker><marker id="aa7db6cs" markerWidth="8" markerHeight="6" refX="0" refY="3" orient="auto"><path d="M8,0 L0,3 L8,6" fill="#a7db6c"/></marker><marker id="ae07a5f" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#e07a5f"/></marker><marker id="ae07a5fs" markerWidth="8" markerHeight="6" refX="0" refY="3" orient="auto"><path d="M8,0 L0,3 L8,6" fill="#e07a5f"/></marker><marker id="af5c842" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#f5c842"/></marker><marker id="af5c842s" markerWidth="8" markerHeight="6" refX="0" refY="3" orient="auto"><path d="M8,0 L0,3 L8,6" fill="#f5c842"/></marker></defs>
+  <rect x="0" y="0" width="1400" height="820" rx="8" fill="#0d1117"/>
+  <text x="60" y="46" font-size="26" font-weight="700" fill="#ffffff" text-anchor="start">The suite — Ostraka, Rowanholt and Shikari</text>
+  <text x="60" y="66" font-size="13" font-weight="400" fill="#7a8fa6" text-anchor="start">Three products beside each other: evidence, detection and the record of the incident</text>
+  <text x="60" y="110" font-size="11" font-weight="600" fill="#a7db6c" text-anchor="start" letter-spacing="1.5">EVIDENCE AND ANALYSIS</text>
+  <rect x="60" y="122" width="340" height="200" rx="8" fill="#141d2b" stroke="#a7db6c" stroke-width="1.5"/>
+  <rect x="76" y="138" width="12" height="12" rx="3" fill="none" stroke="#a7db6c" stroke-width="1.5"/>
+  <text x="96" y="149" font-size="13" font-weight="600" fill="#ffffff" text-anchor="start">Rowanholt</text>
+  <text x="76" y="170" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Acquisition (Gandalf) and analysis (Elrond)</text>
+  <text x="76" y="183" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Parsed artefacts from Windows, Linux, macOS, cloud</text>
+  <text x="76" y="196" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Findings that cite a row: host, artefact, row, SHA-256</text>
+  <text x="76" y="209" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Smith, the AI analyst, read-only, row-cited</text>
+  <text x="76" y="222" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Lead, confirmed or benign; an analyst confirms</text>
+  <text x="76" y="235" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Webhooks: job.completed, finding.confirmed</text>
+  <text x="76" y="250" font-size="10" font-weight="400" fill="#a7db6c" text-anchor="start">rvt_ tokens · full or smith-mcp scope</text>
+  <text x="1000" y="110" font-size="11" font-weight="600" fill="#f5c842" text-anchor="start" letter-spacing="1.5">DETECTION AND HUNTING</text>
+  <rect x="1000" y="122" width="340" height="200" rx="8" fill="#141d2b" stroke="#f5c842" stroke-width="1.5"/>
+  <rect x="1016" y="138" width="12" height="12" rx="3" fill="none" stroke="#f5c842" stroke-width="1.5"/>
+  <text x="1036" y="149" font-size="13" font-weight="600" fill="#ffffff" text-anchor="start">Shikari</text>
+  <text x="1016" y="170" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">ATT&amp;CK groups, CVEs and reports become detections</text>
+  <text x="1016" y="183" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Splunk, Defender XDR, Elasticsearch, SecOps</text>
+  <text x="1016" y="196" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Coverage: which techniques have a detection</text>
+  <text x="1016" y="209" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Hunts, correlation, emulation (VECTR)</text>
+  <text x="1016" y="222" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Detection library and the attack's anatomy</text>
+  <text x="1016" y="235" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Webhooks: run.completed, run.failed</text>
+  <text x="1016" y="250" font-size="10" font-weight="400" fill="#f5c842" text-anchor="start">shik_ tokens · as their owner's role</text>
+  <text x="530" y="110" font-size="11" font-weight="600" fill="#e07a5f" text-anchor="start" letter-spacing="1.5">THE RECORD OF THE INCIDENT</text>
+  <rect x="530" y="122" width="340" height="200" rx="8" fill="#141d2b" stroke="#e07a5f" stroke-width="1.5"/>
+  <rect x="546" y="138" width="12" height="12" rx="3" fill="none" stroke="#e07a5f" stroke-width="1.5"/>
+  <text x="566" y="149" font-size="13" font-weight="600" fill="#ffffff" text-anchor="start">Ostraka</text>
+  <text x="546" y="170" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Incidents and hunts: people, tasks, decisions</text>
+  <text x="546" y="183" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Findings: leads until an analyst confirms</text>
+  <text x="546" y="196" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Assessments, ACH, stakeholder updates, reports</text>
+  <text x="546" y="209" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Regulator clocks, handovers, the attack flow</text>
+  <text x="546" y="222" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Every change in a hash-chained activity log</text>
+  <text x="546" y="235" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">TLP guard: RED stays on the organisation's network</text>
+  <text x="546" y="250" font-size="10" font-weight="400" fill="#e07a5f" text-anchor="start">ost_ tokens · Settings → Integrations</text>
+  <path d="M530,175 L400,175" fill="none" stroke="#a7db6c" stroke-width="1.5" marker-end="url(#aa7db6c)"/>
+  <text x="465.0" y="169.0" font-size="10" font-weight="500" fill="#a0b8c8" text-anchor="middle">links a job or case</text>
+  <path d="M400,215 L530,215" fill="none" stroke="#a7db6c" stroke-width="1.5" marker-end="url(#aa7db6c)"/>
+  <text x="465.0" y="209.0" font-size="10" font-weight="500" fill="#a0b8c8" text-anchor="middle">findings arrive as leads</text>
+  <path d="M530,255 L400,255" fill="none" stroke="#a7db6c" stroke-width="1.5" marker-end="url(#aa7db6c)"/>
+  <text x="465.0" y="249.0" font-size="10" font-weight="500" fill="#a0b8c8" text-anchor="middle">reads a cited row</text>
+  <text x="465" y="290" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="middle">read-only token</text>
+  <path d="M870,175 L1000,175" fill="none" stroke="#f5c842" stroke-width="1.5" marker-end="url(#af5c842)"/>
+  <text x="935.0" y="169.0" font-size="10" font-weight="500" fill="#a0b8c8" text-anchor="middle">is T1059.001 covered?</text>
+  <path d="M1000,215 L870,215" fill="none" stroke="#f5c842" stroke-width="1.5" marker-end="url(#af5c842)"/>
+  <text x="935.0" y="209.0" font-size="10" font-weight="500" fill="#a0b8c8" text-anchor="middle">covered, or a gap task</text>
+  <path d="M1000,255 L870,255" fill="none" stroke="#f5c842" stroke-width="1.5" marker-end="url(#af5c842)"/>
+  <text x="935.0" y="249.0" font-size="10" font-weight="500" fill="#a0b8c8" text-anchor="middle">run.completed (signed)</text>
+  <text x="935" y="290" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="middle">re-checks open gaps</text>
+  <text x="60" y="380" font-size="11" font-weight="600" fill="#66d9ef" text-anchor="start" letter-spacing="1.5">OUT OF THE SUITE</text>
+  <rect x="60" y="392" width="290" height="84" rx="8" fill="#141d2b" stroke="#2a4a5e" stroke-width="1"/>
+  <rect x="76" y="408" width="12" height="12" rx="3" fill="none" stroke="#66d9ef" stroke-width="1.5"/>
+  <text x="96" y="419" font-size="13" font-weight="600" fill="#ffffff" text-anchor="start">SIEMs</text>
+  <text x="76" y="440" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Shikari deploys detections;</text>
+  <text x="76" y="453" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Ostraka stores queries, never rows</text>
+  <rect x="390" y="392" width="290" height="84" rx="8" fill="#141d2b" stroke="#2a4a5e" stroke-width="1"/>
+  <rect x="406" y="408" width="12" height="12" rx="3" fill="none" stroke="#66d9ef" stroke-width="1.5"/>
+  <text x="426" y="419" font-size="13" font-weight="600" fill="#ffffff" text-anchor="start">Teams and Slack</text>
+  <text x="406" y="440" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">team and incident channels,</text>
+  <text x="406" y="453" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">outbound webhooks, masked</text>
+  <rect x="720" y="392" width="290" height="84" rx="8" fill="#141d2b" stroke="#2a4a5e" stroke-width="1"/>
+  <rect x="736" y="408" width="12" height="12" rx="3" fill="none" stroke="#66d9ef" stroke-width="1.5"/>
+  <text x="756" y="419" font-size="13" font-weight="600" fill="#ffffff" text-anchor="start">MISP, STIX 2.1, Navigator</text>
+  <text x="736" y="440" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">indicators and techniques,</text>
+  <text x="736" y="453" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">from the record</text>
+  <rect x="1050" y="392" width="290" height="84" rx="8" fill="#141d2b" stroke="#2a4a5e" stroke-width="1"/>
+  <rect x="1066" y="408" width="12" height="12" rx="3" fill="none" stroke="#66d9ef" stroke-width="1.5"/>
+  <text x="1086" y="419" font-size="13" font-weight="600" fill="#ffffff" text-anchor="start">Reports</text>
+  <text x="1066" y="440" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">PDF and Word, branded;</text>
+  <text x="1066" y="453" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Rowanholt's case reports too</text>
+  <path d="M1170,322 L1170,360 L205,360 L205,392" fill="none" stroke="#f5c842" stroke-width="1.5" marker-end="url(#af5c842)"/>
+  <path d="M700,322 L700,345 L535,345 L535,392" fill="none" stroke="#e07a5f" stroke-width="1.5" marker-end="url(#ae07a5f)"/>
+  <path d="M700,345 L865,345 L865,392" fill="none" stroke="#e07a5f" stroke-width="1.5" marker-end="url(#ae07a5f)"/>
+  <path d="M780,345 L1195,345 L1195,392" fill="none" stroke="#e07a5f" stroke-width="1.5" marker-end="url(#ae07a5f)"/>
+  <text x="60" y="530" font-size="11" font-weight="600" fill="#4ecdc4" text-anchor="start" letter-spacing="1.5">AI AND AGENTS</text>
+  <rect x="60" y="542" width="410" height="84" rx="8" fill="#141d2b" stroke="#2a4a5e" stroke-width="1"/>
+  <rect x="76" y="558" width="12" height="12" rx="3" fill="none" stroke="#4ecdc4" stroke-width="1.5"/>
+  <text x="96" y="569" font-size="13" font-weight="600" fill="#ffffff" text-anchor="start">MCP servers, one per product</text>
+  <text x="76" y="590" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Rowanholt's Smith, Shikari's, Ostraka's /mcp:</text>
+  <text x="76" y="603" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">each as its token's owner; restricted TLP stays out</text>
+  <rect x="495" y="542" width="410" height="84" rx="8" fill="#141d2b" stroke="#2a4a5e" stroke-width="1"/>
+  <rect x="511" y="558" width="12" height="12" rx="3" fill="none" stroke="#4ecdc4" stroke-width="1.5"/>
+  <text x="531" y="569" font-size="13" font-weight="600" fill="#ffffff" text-anchor="start">Ollama or Anthropic</text>
+  <text x="511" y="590" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">local models for TLP:RED and AMBER+STRICT;</text>
+  <text x="511" y="603" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">AI rephrases or answers, never confirms</text>
+  <rect x="930" y="542" width="410" height="84" rx="8" fill="#141d2b" stroke="#2a4a5e" stroke-width="1"/>
+  <rect x="946" y="558" width="12" height="12" rx="3" fill="none" stroke="#e07a5f" stroke-width="1.5"/>
+  <text x="966" y="569" font-size="13" font-weight="600" fill="#ffffff" text-anchor="start">The reporting standard</text>
+  <text x="946" y="590" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">fixed rules, not AI: PHIA terms, verified</text>
+  <text x="946" y="603" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">confirmation, ACH arithmetic</text>
+  <text x="60" y="680" font-size="11" font-weight="600" fill="#4ecdc4" text-anchor="start" letter-spacing="1.5">SHARED BY ALL THREE</text>
+  <rect x="60" y="692" width="305" height="52" rx="8" fill="#141d2b" stroke="#4ecdc4" stroke-width="1"/>
+  <text x="76" y="714" font-size="13" font-weight="600" fill="#ffffff" text-anchor="start">samarkand</text>
+  <text x="76" y="732" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">licences, webhooks, STIX, MISP, SIEM</text>
+  <rect x="385" y="692" width="305" height="52" rx="8" fill="#141d2b" stroke="#4ecdc4" stroke-width="1"/>
+  <text x="401" y="714" font-size="13" font-weight="600" fill="#ffffff" text-anchor="start">Account standard</text>
+  <text x="401" y="732" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">invitation only, TOTP, one-use links</text>
+  <rect x="710" y="692" width="305" height="52" rx="8" fill="#141d2b" stroke="#4ecdc4" stroke-width="1"/>
+  <text x="726" y="714" font-size="13" font-weight="600" fill="#ffffff" text-anchor="start">Licensing</text>
+  <text x="726" y="732" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">Free, Pro, Services · Ed25519, offline</text>
+  <rect x="1035" y="692" width="305" height="52" rx="8" fill="#141d2b" stroke="#4ecdc4" stroke-width="1"/>
+  <text x="1051" y="714" font-size="13" font-weight="600" fill="#ffffff" text-anchor="start">install-suite</text>
+  <text x="1051" y="732" font-size="10" font-weight="400" fill="#7a8fa6" text-anchor="start">one command installs all three</text>
+  <rect x="60" y="780" width="12" height="12" rx="3" fill="none" stroke="#e07a5f" stroke-width="1.5"/>
+  <text x="80" y="790" font-size="11" font-weight="400" fill="#a0b8c8" text-anchor="start">Ostraka</text>
+  <rect x="210" y="780" width="12" height="12" rx="3" fill="none" stroke="#a7db6c" stroke-width="1.5"/>
+  <text x="230" y="790" font-size="11" font-weight="400" fill="#a0b8c8" text-anchor="start">Rowanholt</text>
+  <rect x="360" y="780" width="12" height="12" rx="3" fill="none" stroke="#f5c842" stroke-width="1.5"/>
+  <text x="380" y="790" font-size="11" font-weight="400" fill="#a0b8c8" text-anchor="start">Shikari</text>
+  <rect x="510" y="780" width="12" height="12" rx="3" fill="none" stroke="#4ecdc4" stroke-width="1.5"/>
+  <text x="530" y="790" font-size="11" font-weight="400" fill="#a0b8c8" text-anchor="start">shared</text>
+  <rect x="660" y="780" width="12" height="12" rx="3" fill="none" stroke="#66d9ef" stroke-width="1.5"/>
+  <text x="680" y="790" font-size="11" font-weight="400" fill="#a0b8c8" text-anchor="start">outside the suite</text>
+</svg>

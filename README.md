@@ -35,6 +35,8 @@ Rowanholt's modules have a display name, used in the web app, CLI output and the
 
 ### Installation
 
+Rowanholt is one of three products that sit beside each other, with Ostraka (the incident record) and Shikari (detection and hunting): how they work together is in [docs/suite](docs/suite/README.md), and `scripts/install-suite.sh` (or `install-suite.ps1` on Windows) installs all three with one command.
+
 The desktop app (macOS `.dmg`, Windows installer, Ubuntu/Debian `.deb`) from the [releases](https://github.com/cmdaltr/rowanholt/releases) installs Rowanholt without a terminal: its first launch checks for Docker (and installs OrbStack on a Mac), puts Rowanholt's files in place and opens the UI. See [desktop/README.md](desktop/README.md). From source:
 
 ```bash
