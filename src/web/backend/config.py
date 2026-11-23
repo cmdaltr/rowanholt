@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     # Application
     app_name: str = "elrond Web Interface"
-    app_version: str = "2.1.1"
+    app_version: str = "2.2.0"
     debug: bool = False
 
     # Server

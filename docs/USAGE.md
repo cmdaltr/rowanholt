@@ -1,6 +1,6 @@
 # Rowanholt Usage Guide
 
-**Version:** 2.1.1
+**Version:** 2.2.0
 **Quick Reference for Common Tasks**
 
 ---
@@ -441,5 +441,5 @@ docker exec rowanholt-backend mv /app/data/users.json /app/data/users.json.bak
 
 ---
 
-**Version:** 2.1.1
+**Version:** 2.2.0
 **Last Updated:** 2026-10-22

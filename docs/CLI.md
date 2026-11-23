@@ -1,6 +1,6 @@
 # Rowanholt CLI Reference
 
-**Version:** 2.1.1
+**Version:** 2.2.0
 
 Every command below can be run through the `rowanholt` command from any directory (see [The `rowanholt` command](#the-rowanholt-command)); called directly, they run from the repository root. The Python modules are run with `python3 -m src.analysis.…`. Don't run them from inside `src/analysis`: Ledger's `platform/` package shadows the standard library `platform` module there, so anything that imports numpy or pandas loads `elrond.py` and fails on its arguments.
 
@@ -899,6 +899,6 @@ python3 -m src.analysis.mitre.cli --help
 
 ---
 
-**Version:** 2.1.1
+**Version:** 2.2.0
 **Last Updated:** 2026-10-22
 **License:** See LICENSE file

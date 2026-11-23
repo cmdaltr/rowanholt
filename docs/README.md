@@ -138,5 +138,5 @@ See [USAGE.md](USAGE.md) for more examples.
 
 ---
 
-**Documentation Version:** 2.1.1
+**Documentation Version:** 2.2.0
 **Last Updated:** 2026-10-27

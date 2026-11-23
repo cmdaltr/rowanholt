@@ -1,6 +1,6 @@
 # Rowanholt Web API Reference
 
-**Version:** 2.1.1
+**Version:** 2.2.0
 **Base URL:** `http://127.0.0.1:5688/api` on a local stack; `https://<server>/api` on a team server, through its proxy
 **Protocol:** REST, and two WebSockets (the case browser's live feed and the lab's VM consoles)
 **Authentication:** none on a local stack; on a team server a session cookie, a sign-in's JWT, or an API token (see [Authentication Status](#authentication-status))
@@ -437,7 +437,7 @@ The code is claimed with one conditional `UPDATE`, so of two claims at once only
 A claim makes an API token with the `ostraka` scope, owned by the admin who made the code, named `Ostraka (paired)`, for 365 days; and a webhook to `webhook_url` for `job.completed`, `job.failed` and `finding.confirmed`, with a new secret, described as `Ostraka (paired)`. The webhook is made on every edition and sends once a licence with `automation` is installed. The answer is the only place the token and the secret appear:
 
 ```json
-{"product": "rowanholt", "version": "2.1.1", "token": "rvt_…", "token_expires_at": "…",
+{"product": "rowanholt", "version": "2.2.0", "token": "rvt_…", "token_expires_at": "…",
  "webhook_id": "…", "webhook_secret": "…", "events": ["job.completed", "job.failed", "finding.confirmed"]}
 ```
 
@@ -1482,6 +1482,6 @@ Job progress has no socket of its own: poll `GET /api/jobs/{job_id}`.
 
 ---
 
-**Version:** 2.1.1
+**Version:** 2.2.0
 **Last Updated:** 2026-11-12
 **License:** See LICENSE file

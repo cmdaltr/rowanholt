@@ -3,7 +3,7 @@
 <div align="center">
   <img src="./docs/images/rowanholt-tm.png" alt="Rowanholt™" width="800"/>
 
-  **Digital Forensics Suite v2.1.1**
+  **Digital Forensics Suite v2.2.0**
 </div>
 <div align="center">
   <i>rowan + Old English holt: the rowan wood</i><br><br>

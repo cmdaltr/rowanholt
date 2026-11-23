@@ -1,6 +1,6 @@
 # Rowanholt Configuration Guide
 
-**Version:** 2.1.1
+**Version:** 2.2.0
 **Last Updated:** 2025-01-15
 
 ---
@@ -77,7 +77,7 @@ Location: `/src/web/backend/config.py`
 class Settings(BaseSettings):
     # Application
     app_name: str = "elrond Web Interface"
-    app_version: str = "2.1.1"
+    app_version: str = "2.2.0"
     debug: bool = False
 
     # Server
@@ -578,7 +578,7 @@ tar czf rowanholt-config_$(date +%Y%m%d).tar.gz \
 
 ---
 
-**Version:** 2.1.1
+**Version:** 2.2.0
 **For additional help, see:**
 - [API.md](API.md) - REST API reference
 - [CLI.md](CLI.md) - Command-line tools

@@ -388,4 +388,4 @@ docker-compose -f docker/docker-compose.prod.yml build
 ---
 
 **Last Updated**: 2025-01-15
-**Version**: 2.1.1
+**Version**: 2.2.0

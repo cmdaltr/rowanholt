@@ -24,7 +24,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Version
-VERSION="2.1.1"
+VERSION="2.2.0"
 
 # Default values
 ENCRYPTION_METHOD=""
