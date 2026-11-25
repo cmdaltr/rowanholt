@@ -141,7 +141,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         // An update made while the stack ran: what answers is the old version, so start it again (rebuilt)
         let rebuild = root.map { needsRebuild($0) } ?? false
         probe { up in
-            if up && !rebuild { self.showUI() } else { self.startStack() }
+            if up && !rebuild { self.showUI() }
+            else if up || self.startRequested || UserDefaults.standard.bool(forKey: "AutoStartStack") {
+                self.startRequested = false
+                self.startStack()
+            }
+            else { self.askToStart() }
+        }
+    }
+
+    /// Set by Rowanholt › Start Rowanholt: that is the asking, so start without the question
+    var startRequested = false
+
+    /// The stack is stopped (Stop Rowanholt, a reboot, or stopped on purpose to free memory): say so
+    /// and start it only when asked, unless "Start automatically" was ticked once. Nothing is lost
+    /// while it's stopped: cases and settings live in Docker volumes and the Rowanholt folder.
+    func askToStart() {
+        splashPlain("Rowanholt's containers are stopped.")
+        let alert = NSAlert()
+        alert.messageText = "Rowanholt's containers are stopped"
+        alert.informativeText = "Start them now? Your cases and settings are kept while they're stopped. You can also start them later from the Rowanholt menu › Start Rowanholt."
+        alert.addButton(withTitle: "Start")
+        alert.addButton(withTitle: "Not Now")
+        alert.showsSuppressionButton = true
+        alert.suppressionButton?.title = "Start automatically from now on"
+        alert.beginSheetModal(for: window) { response in
+            if alert.suppressionButton?.state == .on {
+                UserDefaults.standard.set(true, forKey: "AutoStartStack")
+            }
+            if response == .alertFirstButtonReturn {
+                self.startStack()
+            } else {
+                self.splashPlain("Rowanholt is stopped. Choose Rowanholt › Start Rowanholt to start it.")
+            }
         }
     }
 
@@ -395,7 +427,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         }
     }
 
-    @objc func startStackMenu(_ sender: Any?) { launch() }
+    @objc func startStackMenu(_ sender: Any?) { startRequested = true; launch() }
 
     @objc func setupMenu(_ sender: Any?) { showSetup() }
 
