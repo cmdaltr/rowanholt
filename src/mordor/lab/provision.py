@@ -1,6 +1,6 @@
 """
 Turn a fresh machine into one a recording can run on, in one click per step, run inside the
-machine itself (docker exec / tart exec / utmctl exec). Ported from Archer. The lab's own Windows
+machine itself (docker exec / tart exec / utmctl exec). Ported from Shikari. The lab's own Windows
 VM is set up by ./lab.sh mordor-sensor instead (Sysmon too), which the lab agent runs. The steps:
 
   logging   the OS's native audit logging the detections rely on (auditd rules on Linux;

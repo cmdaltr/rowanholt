@@ -5,7 +5,7 @@ dispatches to the engine that runs the machine (engines).
 
 A machine Rowanholt made is tagged in the registry with its template, so the page shows its OS
 and what it records, and provisioning knows which script to run. The lab's own machines and any
-UTM VM are listed too. Ported from Archer; the lab is admin-only in Rowanholt, so there's no
+UTM VM are listed too. Ported from Shikari; the lab is admin-only in Rowanholt, so there's no
 per-user ownership.
 """
 
@@ -49,7 +49,7 @@ def _decorate(m: Dict) -> Dict:
 
     A UTM VM counts the moment it exists — Rowanholt didn't make it, but it drives any UTM VM —
     so it shows even before its OS is set. Only a machine Rowanholt created here may be deleted
-    here: the lab's own are ./lab.sh's, and another VM in UTM (Archer's, say) is yours."""
+    here: the lab's own are ./lab.sh's, and another VM in UTM (Shikari's, say) is yours."""
     known = registry.get(m["engine"], m["name"])
     template = BY_ID.get((known or {}).get("template", ""))
     lab = lab_machine(m["engine"], m["name"])

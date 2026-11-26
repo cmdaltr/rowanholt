@@ -160,7 +160,7 @@ Each capture runs the Atomic tests, exports the Sysmon, Security and PowerShell 
 
 ### Recorded Telemetry
 
-`mordor-capture` makes one dataset from a whole run, for Ledger to analyse. `mordor-record` keeps each Atomic test's logs apart, so the telemetry engine (`src/mordor/telemetry`, ported from Archer) knows which log records which technique:
+`mordor-capture` makes one dataset from a whole run, for Ledger to analyse. `mordor-record` keeps each Atomic test's logs apart, so the telemetry engine (`src/mordor/telemetry`, ported from Shikari) knows which log records which technique:
 
 ```bash
 ./lab.sh mordor-sensor                                 # once per VM
@@ -181,7 +181,7 @@ python3 -m src.mordor.telemetry --guide <Kaggle zip>     # re-summarise Microsof
 
 ### The Crucible Page
 
-**Crucible** in the web UI (`/mordor`) is one page, Archer's Emulate page ported. It shows where the telemetry comes from (the pipeline diagram and a card per public dataset, with **Update** for admins), a link to the lab that records your own, and every recorded technique with the logs its recordings hold, searchable by a value in the recorded events. An OTRF recording in a technique's detail has **Download for Ledger**, which fetches its raw events for `--Mordor` analysis. Its last section, **Downloadable datasets**, is the OTRF catalogue: the datasets that span several techniques (APT29's days) and bulk download.
+**Crucible** in the web UI (`/mordor`) is one page, Shikari's Emulate page ported. It shows where the telemetry comes from (the pipeline diagram and a card per public dataset, with **Update** for admins), a link to the lab that records your own, and every recorded technique with the logs its recordings hold, searchable by a value in the recorded events. An OTRF recording in a technique's detail has **Download for Ledger**, which fetches its raw events for `--Mordor` analysis. Its last section, **Downloadable datasets**, is the OTRF catalogue: the datasets that span several techniques (APT29's days) and bulk download.
 
 Recording is a Crucible run on **Steward → Deploy**; the machines themselves are on **Steward → Lab** (`/aragorn#lab`), with the rest of what Rowanholt runs on this host. Both need the lab agent and an admin login. The **Lab machines** panel shows this host and the engines it can drive (Docker, Tart, UTM), what you can create on it, and every machine:
 

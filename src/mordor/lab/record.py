@@ -1,8 +1,8 @@
 """
 Run Atomic Red Team in a machine and bring the recording into Your lab, from the Mordor page.
 It drives the same script ./lab.sh mordor-record uses (lab/windows/Invoke-MordorRecord.ps1, from
-Archer's record-atomics.ps1), copied into the machine and run there, then pulls the run folder
-into src/mordor/data/telemetry/lab/<run> and rebuilds the lab telemetry. Ported from Archer; the
+Shikari's record-atomics.ps1), copied into the machine and run there, then pulls the run folder
+into src/mordor/data/telemetry/lab/<run> and rebuilds the lab telemetry. Ported from Shikari; the
 lab's own Windows VM records through ./lab.sh over SSH instead (the lab agent routes it).
 
 The atomics change the machine, so a run reverts it to a snapshot afterwards when asked — take

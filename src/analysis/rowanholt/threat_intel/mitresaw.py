@@ -1,4 +1,4 @@
-"""MITRESaw's procedures (mitre_procedures.csv, from `MITRESaw.py -E`, or Archer's
+"""MITRESaw's procedures (mitre_procedures.csv, from `MITRESaw.py -E`, or Shikari's
 data/mitre_procedures.csv): every ATT&CK group's and software's procedures with the evidence
 named in each, one indicator per piece of evidence.
 

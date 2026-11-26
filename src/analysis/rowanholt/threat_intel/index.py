@@ -9,9 +9,9 @@ What doesn't match, by design:
 - Built-in binaries and commands (net, cmd.exe, rundll32.exe, whoami), tool names that are also
   ordinary words (empire), and anything under three characters. MITRESaw names them because a
   procedure used them, but they're on every host, so a match says nothing.
-- Prose and documentation placeholders picked up by procedure extraction (Archer's indicator
-  hygiene, archer/build/indicator_hygiene.py).
-- Public resolvers and first-party domains (known_good.json, from Archer).
+- Prose and documentation placeholders picked up by procedure extraction (Shikari's indicator
+  hygiene, shikari/build/indicator_hygiene.py).
+- Public resolvers and first-party domains (known_good.json, from Shikari).
 
 Procedure evidence (MITRESaw's) describes what a group did, not what only it leaves behind: it
 names kernel32.dll, eth0 and .jpg as readily as Mimikatz, and those are on every host. Matching a

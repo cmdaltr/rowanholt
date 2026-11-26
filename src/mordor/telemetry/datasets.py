@@ -49,7 +49,7 @@ BACKGROUND_SHARE = 0.4  # an event type recorded in this share of datasets is th
 MAX_VALUES = 150  # distinct values per field per event type per dataset
 MAX_LEN = 500
 
-# The fields kept, by what a detection's indicators are (Archer's indicator kinds)
+# The fields kept, by what a detection's indicators are (Shikari's indicator kinds)
 FIELDS = {
     "cmd": ["CommandLine", "ParentCommandLine", "ScriptBlockText", "Payload", "ContextInfo"],
     "file": ["Image", "ParentImage", "TargetFilename", "ImageLoaded", "NewProcessName", "ParentProcessName",
@@ -291,7 +291,7 @@ def _pretty_records(text: str) -> Iterable[Dict]:
 
 
 def _mde(e: Dict) -> Tuple[str, Dict]:
-    """An Advanced Hunting row, as Archer's mde.py exports them: "MDE DeviceProcessEvents ProcessCreated"."""
+    """An Advanced Hunting row, as Shikari's mde.py exports them: "MDE DeviceProcessEvents ProcessCreated"."""
     table = e["Table"]
     path = e.get("FolderPath")
     return f"MDE {table} {e.get('ActionType') or ''}".strip(), _keep({}, {

@@ -1,5 +1,5 @@
 {
-  "_comment": "Recorded event types (channel and event ID, as archer/telemetry names them) to what Archer generates for: the Defender XDR table (with the ActionType when it's a DeviceEvents one) and the Google SecOps UDM event type. Empty means there's no direct equivalent. Extend or override in bespoke/mappings/telemetry_map.json.",
+  "_comment": "Recorded event types (channel and event ID, as shikari/telemetry names them) to what Shikari generates for: the Defender XDR table (with the ActionType when it's a DeviceEvents one) and the Google SecOps UDM event type. Empty means there's no direct equivalent. Extend or override in bespoke/mappings/telemetry_map.json.",
   "events": {
     "Microsoft-Windows-Sysmon/Operational 1": {"label": "Sysmon 1: process created", "mde": "DeviceProcessEvents", "udm": "PROCESS_LAUNCH"},
     "Microsoft-Windows-Sysmon/Operational 2": {"label": "Sysmon 2: file creation time changed", "mde": "", "udm": "FILE_MODIFICATION"},
@@ -135,7 +135,7 @@
     "plist removed": {"label": "plist removed (launch agent, daemon or login hook)", "mde": "DeviceFileEvents", "udm": "FILE_DELETION"}
   },
   "prefixes": {
-    "_comment": "Event types matched by their start (cloud, Linux, EDR): Archer's table and UDM type for the whole family",
+    "_comment": "Event types matched by their start (cloud, Linux, EDR): Shikari's table and UDM type for the whole family",
     "MDE DeviceProcessEvents ": {"label": "Defender DeviceProcessEvents", "mde": "DeviceProcessEvents", "udm": "PROCESS_LAUNCH"},
     "MDE DeviceProcessEvents": {"label": "Defender DeviceProcessEvents", "mde": "DeviceProcessEvents", "udm": "PROCESS_LAUNCH"},
     "MDE DeviceFileEvents ": {"label": "Defender DeviceFileEvents", "mde": "DeviceFileEvents", "udm": "FILE_CREATION"},

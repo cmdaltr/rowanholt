@@ -1,5 +1,5 @@
 """
-Your own lab's recordings (ported from Archer): Atomic Red Team tests run by
+Your own lab's recordings (ported from Shikari): Atomic Red Team tests run by
 lab/windows/Invoke-MordorRecord.ps1 on a lab machine, each test's logs saved beside a manifest:
 
     data/telemetry/lab/<run>/manifest.json
@@ -9,7 +9,7 @@ lab/windows/Invoke-MordorRecord.ps1 on a lab machine, each test's logs saved bes
                                               /es.ndjson       macOS Endpoint Security (eslogger)
                                               /unified.ndjson  macOS unified log
                                               /plists.ndjson   launch agents, daemons and login items changed
-                                              /mde.json        Defender XDR rows (Archer's mde.py, not ported)
+                                              /mde.json        Defender XDR rows (Shikari's mde.py, not ported)
 
 ./lab.sh mordor-record copies a run here from the Windows VM and rebuilds; on another machine,
 copy the run's folder here and run python -m src.mordor.telemetry --build --source lab.

@@ -1,5 +1,5 @@
 {
- "_comment": "Never threat intelligence matches: public resolvers, first-party and shared-hosting domains every host talks to. Copied from Archer (archer/mappings/known_good.json, MIT, the same author); keep the two in step.",
+ "_comment": "Never threat intelligence matches: public resolvers, first-party and shared-hosting domains every host talks to. Copied from Shikari (shikari/mappings/known_good.json, MIT, the same author); keep the two in step.",
  "first_party_domains": {
   "_comment": "The domain and every subdomain: only the platform itself can create them",
   "values": [

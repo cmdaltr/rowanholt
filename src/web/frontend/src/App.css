@@ -3040,7 +3040,7 @@ select.large-select:disabled {
 .lab-error { border-color: #ed5565; }
 .lab-message { border-color: #8cc152; }
 
-/* ---- Mordor: recorded telemetry and its lab (components/MordorTelemetry.jsx, from Archer's Emulate page) */
+/* ---- Mordor: recorded telemetry and its lab (components/MordorTelemetry.jsx, from Shikari's Emulate page) */
 .mt-page .lab-note { color: #999; margin: 0.5rem 0 1rem; line-height: 1.5; }
 .mt-dim { color: #888; font-size: 0.9rem; }
 .mt-bad { color: #ed5565; }

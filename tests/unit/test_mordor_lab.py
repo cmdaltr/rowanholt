@@ -150,7 +150,7 @@ def test_provision_runs_the_os_script_inside_the_machine_and_remembers_it(monkey
 def test_windows_provisioning_uses_powershell_and_lists_three_steps():
     steps = [s["step"] for s in provision.steps_for("windows")]
     assert steps == ["logging", "powershell", "atomics"]
-    # Windows PowerShell 5.1, which every Windows has (Archer used pwsh, which a stock install lacks)
+    # Windows PowerShell 5.1, which every Windows has (Shikari used pwsh, which a stock install lacks)
     assert provision.STEPS["windows"]["interp"][0] == "powershell"
     assert provision.steps_for("plan9") == []
 
@@ -227,7 +227,7 @@ def test_listing_leaves_out_hidden_machines(monkeypatch, tmp_path):
     assert [m["name"] for m in machines.listing(["utm"])] == ["archer-win11", "rowan-lab-win11"]
 
 def test_all_host_names_includes_vms_outside_archer(monkeypatch):
-    # For clash-free naming: every name on the host, Archer's and not
+    # For clash-free naming: every name on the host, Shikari's and not
     monkeypatch.setattr(engines.Docker, "list", lambda self: [
         {"engine": "docker", "name": "archer-ubuntu-1", "kind": "container", "image": "", "os": "linux", "state": "running", "detail": ""}])
     monkeypatch.setattr("src.mordor.lab.engines.run",

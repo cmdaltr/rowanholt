@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
 Runs Atomic Red Team tests on this machine and saves each test's logs for Rowanholt's recorded
-telemetry (src/mordor/telemetry/lab.py). Ported from Archer's record-atomics.ps1.
+telemetry (src/mordor/telemetry/lab.py). Ported from Shikari's record-atomics.ps1.
 
 .DESCRIPTION
 Run it on a disposable test machine, never on one you care about: the tests change the system.

@@ -15,7 +15,7 @@ from typing import Dict, Iterable, List, Optional
 
 from . import datasets as ds
 
-# Archer writes indicators that contain a variable span (a user name, a random path segment)
+# Shikari writes indicators that contain a variable span (a user name, a random path segment)
 # with this ellipsis standing in for the gap, so "C:\Users\…\AppData" matches any user's. If a
 # detection source doesn't use gap indicators, leave it as-is: a value with no GAP is matched whole.
 GAP = "\u2026"

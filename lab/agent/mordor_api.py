@@ -1,4 +1,4 @@
-"""The Mordor page's lab: the agent's /mordor/* endpoints over src.mordor.lab (ported from Archer).
+"""The Mordor page's lab: the agent's /mordor/* endpoints over src.mordor.lab (ported from Shikari).
 
 The quick verbs (overview, start, stop, snapshot, logs, delete, set OS, verify ISO) answer
 straight away. The slow ones (create, revert, clone, set up, record) run through the agent's

@@ -39,7 +39,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-import mordor_api  # the Mordor page's lab (src/mordor/lab, ported from Archer)
+import mordor_api  # the Mordor page's lab (src/mordor/lab, ported from Shikari)
 from src.mordor.lab import consoles  # noqa: E402 (mordor_api puts the repository on sys.path)
 
 LAB_ROOT = Path(__file__).resolve().parent.parent

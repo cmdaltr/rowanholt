@@ -1,6 +1,6 @@
 // Mordor → Recorded telemetry: where attack telemetry comes from (public datasets and the lab's
 // own recordings), the lab that records it, and which logs record each technique. Ported from
-// Archer's Emulate page (templates/emulate.html, static/js/lab.js, emulate.js); the engine is
+// Shikari's Emulate page (templates/emulate.html, static/js/lab.js, emulate.js); the engine is
 // src/mordor/telemetry and the lab src/mordor/lab, driven on the host by the lab agent.
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';

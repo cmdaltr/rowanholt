@@ -3,8 +3,8 @@
    python -m src.mordor.telemetry --build --source otrf   # one source (splunk|otrf|evtx|macos|lab)
    python -m src.mordor.telemetry --guide <GUIDE zip, folder or CSV>   # Microsoft GUIDE (Defender XDR alerting)
 
-Ported from Archer. "lab" reads your own recordings (./lab.sh mordor-record). The Defender
-export (mde.py) was left out: it depends on Archer's Microsoft Graph setup.
+Ported from Shikari. "lab" reads your own recordings (./lab.sh mordor-record). The Defender
+export (mde.py) was left out: it depends on Shikari's Microsoft Graph setup.
 """
 
 import argparse

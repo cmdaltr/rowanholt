@@ -1,4 +1,4 @@
-// The lab's machines (src/mordor/lab, ported from Archer's Emulate page): this host's engines,
+// The lab's machines (src/mordor/lab, ported from Shikari's Emulate page): this host's engines,
 // the machines it can create, and every machine with its lifecycle, set-up and recording. Shown
 // on Aragorn → Lab; driven on the host by the lab agent (lab/agent/mordor_api.py).
 import React, { Suspense, lazy, useState, useEffect, useCallback, useRef } from 'react';

@@ -1,8 +1,8 @@
 """
 macOS-ATTACK-DATASET (Samir Bousseaden; GPL-3.0): macOS attacks recorded with Elastic Endpoint
-Security, one JSON file each, filed by tactic only. The techniques below are Archer's reading of
+Security, one JSON file each, filed by tactic only. The techniques below are Shikari's reading of
 each file's name; files it can't place with confidence are left out. GPL-3.0 keeps the data out
-of Archer's (MIT) repository, so it's built on this machine only (INFO["local"]). See
+of Shikari's (MIT) repository, so it's built on this machine only (INFO["local"]). See
 src.mordor.telemetry.datasets.
 """
 

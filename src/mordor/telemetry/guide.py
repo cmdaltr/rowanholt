@@ -11,7 +11,7 @@ GUIDE needs a Kaggle login, so it's downloaded by hand and summarised here:
     python -m src.mordor.telemetry --guide ~/Downloads/microsoft-security-incident-prediction.zip
 
 The summary (src/mordor/data/telemetry_guide.json, a few hundred KB) is all that's kept.
-Ported from Archer.
+Ported from Shikari.
 """
 
 import csv

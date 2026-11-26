@@ -1,4 +1,4 @@
-"""Recorded attack telemetry (src/mordor/telemetry, ported from Archer): the shipped data and the lab source."""
+"""Recorded attack telemetry (src/mordor/telemetry, ported from Shikari): the shipped data and the lab source."""
 
 import gzip
 import io

@@ -1,7 +1,7 @@
 """How long an indicator holds: kept beside the fixed 10-column schema, never in it.
 
 STIX gives an indicator its own valid_until and confidence; every other source gets a default
-lifetime by the kind of value it is (90 days for IPs and domains, as Archer uses; none for hashes,
+lifetime by the kind of value it is (90 days for IPs and domains, as Shikari uses; none for hashes,
 tool names, commands and paths, which don't move to someone else). The backend stores these in
 threat_intel_validity (one row per indicator id), and an expired indicator is left out of matching
 until a refreshed import or an admin brings it back.

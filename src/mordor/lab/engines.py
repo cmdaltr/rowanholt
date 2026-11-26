@@ -10,7 +10,7 @@ The engines Rowanholt drives on the machine it runs on, behind one interface
   utm      UTM/QEMU VMs on macOS through utmctl; a clone gets a console port of its own.
 
 The command parsing (parse_docker_ps, parse_tart_list) is pure, so it's tested without either
-installed. Names are validated by the caller (machines) before they reach here. Ported from Archer.
+installed. Names are validated by the caller (machines) before they reach here. Ported from Shikari.
 """
 
 import json

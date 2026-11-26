@@ -724,7 +724,7 @@ async def verify_dataset_endpoint(dataset_id: str):
 
 
 # ============================================
-# Recorded attack telemetry (src/mordor/telemetry, ported from Archer)
+# Recorded attack telemetry (src/mordor/telemetry, ported from Shikari)
 # ============================================
 # Which logs record each ATT&CK technique, from OTRF Security-Datasets, Splunk
 # attack_data, EVTX-to-MITRE-Attack and the lab's own recordings
@@ -896,7 +896,7 @@ async def telemetry_noisy(req: TelemetryNoisyRequest):
 
 
 # ============================================
-# Mordor lab: the machines recordings run on (src/mordor/lab, ported from Archer)
+# Mordor lab: the machines recordings run on (src/mordor/lab, ported from Shikari)
 # ============================================
 # Docker, Tart and UTM are on the host, so these proxy to the lab agent (lab/agent/mordor_api.py),
 # admin-only like the rest of the lab. Slow actions start an agent run; poll /api/lab/runs/{id}.

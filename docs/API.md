@@ -1026,7 +1026,7 @@ Quartermaster won't stop, restart or recreate its own container from the API. Us
 
 **Authentication:** locally, none, apart from Update and the lab, which need a signed-in admin (as [Lab](#lab)). On a team server, anyone signed in may read (GET); everything else under `/api/mordor` is admin-only, `/check` and `/noisy` included, as are dataset downloads and deletion
 
-Which logs record each ATT&CK technique, from attacks emulated in labs, and whether a detection's indicators appear in the recorded events. The engine is `src/mordor/telemetry`, ported from Archer. It ships with 1,632 recordings covering 354 techniques: OTRF Security-Datasets (Mordor), Splunk attack_data and EVTX-to-MITRE-Attack. Your own recordings from `./lab.sh mordor-record` or the Crucible page show up as the source `lab`, and Microsoft GUIDE adds Defender XDR's alerting per technique. Reading touches no network. A rebuild from the CLI (`python -m src.mordor.telemetry --build`) or the lab is picked up on the next request.
+Which logs record each ATT&CK technique, from attacks emulated in labs, and whether a detection's indicators appear in the recorded events. The engine is `src/mordor/telemetry`, ported from Shikari. It ships with 1,632 recordings covering 354 techniques: OTRF Security-Datasets (Mordor), Splunk attack_data and EVTX-to-MITRE-Attack. Your own recordings from `./lab.sh mordor-record` or the Crucible page show up as the source `lab`, and Microsoft GUIDE adds Defender XDR's alerting per technique. Reading touches no network. A rebuild from the CLI (`python -m src.mordor.telemetry --build`) or the lab is picked up on the next request.
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -1071,7 +1071,7 @@ OTRF Security-Datasets (Mordor) to download as evidence (`mordor_routes.py`).
 
 **Role Required:** `ADMIN`, signed in (a sign-in's JWT, not an API token), locally as well as on a team server
 
-The machines recordings run on (`src/mordor/lab`, ported from Archer). Docker, Tart and UTM are on the host, so these proxy to the lab agent (`./lab.sh agent start`) and return `503` without it. Machine and snapshot names are 1–64 letters, digits, `.`, `-` or `_`.
+The machines recordings run on (`src/mordor/lab`, ported from Shikari). Docker, Tart and UTM are on the host, so these proxy to the lab agent (`./lab.sh agent start`) and return `503` without it. Machine and snapshot names are 1–64 letters, digits, `.`, `-` or `_`.
 
 | Method | Endpoint | Description |
 |---|---|---|

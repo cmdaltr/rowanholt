@@ -43,15 +43,15 @@ Container forensics goes first because half of it is written. ML goes last becau
   - text watchlists;
   - TAXII 2.1 collections (`stix.py`).
 
-  The STIX and TAXII parsers are ported from Archer. `Source Type` records each row's origin, and duplicates are dropped on element, group, technique and source. No columns were added.
-- **Matching.** `index.py` infers each indicator's kind and refuses the ones that would flood a case: built-ins, ordinary words, prose, placeholders, bare extensions and shallow directories. Archer's `known_good.json` supplies part of that list. Each element carries its breadth, the number of groups behind it, and an element more than 15 groups use is marked common. Against a whole case, MITRESaw contributes only software names and multi-word command phrases. On a copy of the Windows 11 demo case, that took the result from 86,829 matches (Lazarus first, on `.jpg`) to 42 matches across seven elements.
+  The STIX and TAXII parsers are ported from Shikari. `Source Type` records each row's origin, and duplicates are dropped on element, group, technique and source. No columns were added.
+- **Matching.** `index.py` infers each indicator's kind and refuses the ones that would flood a case: built-ins, ordinary words, prose, placeholders, bare extensions and shallow directories. Shikari's `known_good.json` supplies part of that list. Each element carries its breadth, the number of groups behind it, and an element more than 15 groups use is marked common. Against a whole case, MITRESaw contributes only software names and multi-word command phrases. On a copy of the Windows 11 demo case, that took the result from 86,829 matches (Lazarus first, on `.jpg`) to 42 matches across seven elements.
 - **Ledger.** `--threatIntel FILE ...`, or Threat Intelligence on Ledger's page, runs after analysis (`match.py`). It writes `<host>/analysis/threat_intel_matches.csv`, fills `watchlist_match` in `iocs.csv`, and writes the case's `threat_groups.csv`. That file ranks groups by atomic indicators, then specific elements, then technique overlap. Its Basis column states which of those each rank rests on, and a group that overlaps only on techniques says so.
 - **Web.** Lookout, the threat intelligence page (`/pippin`), imports files, pulls TAXII collections, lists and removes sources, searches indicators and checks a single value (`/api/threat-intel`, [API.md](API.md#threat-intelligence)). Importing is admin-only on a team server.
 - **Smith.** The offline question "Does anything match known threat intelligence?" lists the most specific matches first. `enrich_artefact()` (`threat_intel_routes.enrich_value`) is ready for the planned MCP server.
 - **Tests.** `tests/unit/test_threat_intel.py`, and the Smith question in `test_smith_offline.py`.
 
 **Still to do.**
-- **Expiry** (done 2 November). STIX `valid_until` and confidence are kept beside the ten columns in `threat_intel_validity` (`threat_intel/validity.py`, Alembic `9e3c5a7b1f42`); other sources default to 90 days for IPs and domains, as Archer does. Expired indicators stay listed but are left out of Ledger's matching and Smith's value index.
+- **Expiry** (done 2 November). STIX `valid_until` and confidence are kept beside the ten columns in `threat_intel_validity` (`threat_intel/validity.py`, Alembic `9e3c5a7b1f42`); other sources default to 90 days for IPs and domains, as Shikari does. Expired indicators stay listed but are left out of Ledger's matching and Smith's value index.
 - **Online lookups** (4 November, approved under the threat model the same day). VirusTotal only, off unless `.env` sets `ROWANHOLT_ONLINE_LOOKUPS=virustotal` and `VIRUSTOTAL_API_KEY`: a **Look up on VirusTotal** button on Lookout's *Check a value*, one IP, domain or hash per click, refused to Smith, private addresses and internal names never sent, logged with who asked (`threat_intel_lookup.py`, `test_threat_intel_lookup.py`). The review accepted them from Lookout, logged in the backend log, not per case.
 
 ## Collaborative investigation
@@ -123,7 +123,7 @@ Container forensics goes first because half of it is written. ML goes last becau
 1. **A lab target** (`lab/azure/`): one resource group with the cheapest Linux VM, a storage account and a key vault; `create`, `seed`, `collect`, `teardown`. The seed does attacker-like things with their expected results: a role assignment (**T1098**), a key vault secret read (**T1555.006**), Run Command (**T1651**), an NSG opened to the internet (**T1686.001**), a disk snapshot (**T1578.001**) and its export URL (**T1537**), a storage account's keys listed (**T1552**).
 2. **The existing code made to pass** against it, with unit tests over recorded API responses.
 3. **Entra ID logs** as new artefacts, through `docs/FEATURE_REQUESTS.md` first.
-4. **Archer**: the same activity as the test set for Sentinel and KQL queries.
+4. **Shikari**: the same activity as the test set for Sentinel and KQL queries.
 
 Guardrails: its own resource group or subscription with a budget alert set first; a least-privilege service principal, its secret out of the repo; the seed run as a separate "attacker" identity; teardown after every run; no real case data. Decisions then: separate subscription or not; the SDKs in a `requirements/cloud.txt` or not at all; whether the tenant has Entra ID P1/P2 (sign-in and audit logs past 7 days).
 
@@ -144,7 +144,7 @@ Each feature's "Still to do" above, as work to schedule, then the Smith MCP serv
 ### Threat intelligence
 
 1. **Expiry and confidence** (done 2 November: built on `feat/ti-expiry`, merged into `feat/server-deployment`, Alembic `9e3c5a7b1f42`). The ten-column schema stays as it is. A side table, `threat_intel_validity` (indicator id, `valid_until`, `confidence`, `first_seen`), added by an Alembic migration:
-   - STIX imports fill it from `valid_until` and `confidence`; other sources get a default lifetime per kind (90 days for IPs and domains, as Archer does; none for hashes and tool names).
+   - STIX imports fill it from `valid_until` and `confidence`; other sources get a default lifetime per kind (90 days for IPs and domains, as Shikari does; none for hashes and tool names).
    - Matching skips expired indicators and says how many it skipped; Lookout shows the expiry and lets an admin extend or clear it.
    - Tests: an expired STIX indicator doesn't match; a refreshed import revives it.
    - Agreed (decision 3).
@@ -176,7 +176,7 @@ Each feature's "Still to do" above, as work to schedule, then the Smith MCP serv
 - It calls nothing but the Rowanholt API, so it adds no outbound access.
 - It runs over stdio on the analyst's machine (`src/smith_mcp/server.py`, `rowanholt mcp` to start it), and optionally over streamable HTTP behind Caddy on a team server.
 
-The March 2026 prototype ("Building an MCP") kept its own case folders, ran its own acquisition and could call Anthropic's API. None of that carries over: cases are Rowanholt jobs, acquisition is Custodian's, and Smith's model is Ollama. Archer keeps its own server.
+The March 2026 prototype ("Building an MCP") kept its own case folders, ran its own acquisition and could call Anthropic's API. None of that carries over: cases are Rowanholt jobs, acquisition is Custodian's, and Smith's model is Ollama. Shikari keeps its own server.
 
 **Phase 1: reading a case** (two days; built).
 
